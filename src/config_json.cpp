@@ -13,6 +13,7 @@
 #include <configuration.h>
 #include <crc32_util.h>
 #include <maxhop.h>
+#include "tz_rule.h" // TZ-02: tzParse() validates node_tz on import
 
 #include <meshcom_settings.h> // the one settings struct, both platforms (D1-04)
 
@@ -477,6 +478,15 @@ int configImportJson(const char *in, size_t len, char *err, size_t errcap)
                 {
                     cfg_err(err, errcap, "%s: %u chars, max %u", f->key,
                             (unsigned int)strlen(s), (unsigned int)(f->size - 1));
+                    rc = CFG_IMP_EVALUE;
+                    break;
+                }
+
+                /* TZ-02: "" = no rule stays valid; anything else must parse */
+                TzRule tzr;
+                if (strcmp(f->key, "node_tz") == 0 && s[0] != '\0' && !tzParse(s, &tzr))
+                {
+                    cfg_err(err, errcap, "%s: not a valid POSIX TZ rule", f->key);
                     rc = CFG_IMP_EVALUE;
                     break;
                 }

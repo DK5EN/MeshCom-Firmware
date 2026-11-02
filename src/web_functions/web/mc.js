@@ -177,7 +177,7 @@ if(empty<0)empty=0;
 var qrsPct=ring>0?(qrs/ring*100):0;
 var qrsfPct=ring>0?(qrsf/ring*100):0;
 var qrtPct=ring>0?(qrt/ring*100):0;
-var colors=['#A2182F','#E07B39','#3B7DD8','#6FA96F','#9E9E9E'];
+var colors=['var(--mcred)','var(--mcp2)','var(--mcp3)','var(--mcp4)','var(--mcp5)'];
 var names=['crit','high','normal','low','bg'];
 var html='';
 html+='<div class=font-bold>TX queue</div>';
@@ -221,7 +221,7 @@ var rxPct=rx/(intv*1000)*100;if(rxPct>100)rxPct=100;
 var txPct=tx/(intv*1000)*100;if(txPct>100)txPct=100;
 var totPct=(rx+tx)/(intv*1000)*100;if(totPct>100)totPct=100;
 html+='<div class=mcq-util-row><span class=mcq-util-label>rx '+rxPct.toFixed(1)+'%</span><div class=mcq-util-track><div style=height:100%;width:'+rxPct+'%;background:#3B7DD8></div></div></div>';
-html+='<div class=mcq-util-row><span class=mcq-util-label>tx '+txPct.toFixed(1)+'%</span><div class=mcq-util-track><div style=height:100%;width:'+txPct+'%;background:#A2182F></div></div></div>';
+html+='<div class=mcq-util-row><span class=mcq-util-label>tx '+txPct.toFixed(1)+'%</span><div class=mcq-util-track><div style=height:100%;width:'+txPct+'%;background:var(--mcred)></div></div></div>';
 html+='<div class=font-small>total '+totPct.toFixed(1)+'% ('+age+' s ago)</div>';
 }
 d.innerHTML=html;

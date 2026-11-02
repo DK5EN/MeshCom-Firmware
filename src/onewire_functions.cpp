@@ -10,6 +10,11 @@ byte data[9];
 byte addr[8];
 float celsius, fahrenheit;
 
+// SENS-03: a DS18x20 delivered a CRC-valid reading (set with node_temp2). Unlike one_found, which only says
+// the pin was opened, this tells RM `sens` a DS18B20 really sits on the bus (a DHT leaves it false).
+bool ds18_found = false;
+bool dht_ok = false;   // SENS-03: last DHT read gave valid T and H (dht_found is only the driver's static type)
+
 #ifdef OneWire_GPIO
 //--------------------------------------------------------------------------
 
@@ -33,6 +38,7 @@ DHT_Unified dht(OneWire_GPIO, DHTTYPE);
 void init_onewire_dht()
 {
     dht_found = false;
+    dht_ok = false;
     
     if(!bONEWIRE)
         return;
@@ -114,8 +120,10 @@ bool loop_onewire_dht()
 {
     if(!dht_found)
     {
+        dht_ok = false;
         return false;
     }
+    bool read_ok = true;   // SENS-03
 
     // Delay between measurements.
     /* defined by mainloop
@@ -134,6 +142,7 @@ bool loop_onewire_dht()
             Serial.println(F("Error reading temperature (DHT)!"));
 
         dht_found=false;
+        read_ok = false;
     }
     else
     {
@@ -155,6 +164,7 @@ bool loop_onewire_dht()
             Serial.println(F("Error reading humidity (DHT)!"));
 
         dht_found = false;
+        read_ok = false;
     }
     else
     {
@@ -168,6 +178,7 @@ bool loop_onewire_dht()
         }
     }
 
+    dht_ok = read_ok;
     return true;
 }
 
@@ -192,6 +203,7 @@ void PrintBytes(const uint8_t* addr, uint8_t count, bool newline=false)
 void init_onewire_ds18(void)
 {
     one_found = false;
+    ds18_found = false;
 
     if(!bONEWIRE)
         return;
@@ -235,6 +247,7 @@ bool loop_onewire_ds18()
 {
     if(!one_found)
     {
+        ds18_found = false;
         meshcom_settings.node_temp2 = 0;
         return false;
     }
@@ -248,6 +261,7 @@ bool loop_onewire_ds18()
                 Serial.println("No more OneWire addresses.");
             }
             ds.reset_search();
+            ds18_found = false;
             return false;
         }
 
@@ -265,6 +279,7 @@ bool loop_onewire_ds18()
         {
             Serial.println("OneWire CRC is not valid!");
             one_found=false;
+            ds18_found = false;
             return false;
         }
 
@@ -295,6 +310,7 @@ bool loop_onewire_ds18()
                 if(bWXDEBUG && bDisplayCont)
                     Serial.println("Device is not a DS18x20 family device.");
                 one_found=false;
+                ds18_found = false;
                 return false;
         } 
 
@@ -386,9 +402,11 @@ bool loop_onewire_ds18()
         }
 
         meshcom_settings.node_temp2 = celsius;
+        ds18_found = true;
     }
     else
     {
+        ds18_found = false;
         if(bWXDEBUG)
         {
             Serial.println("Temperature (DS18) = CRC ERROR");

@@ -758,8 +758,35 @@ void test_sens_bme680_only()
 void test_sens_onewire_only()
 {
     RmSensFlags f = sf();
-    f.oneWireOn = true;
+    f.oneWireOn = f.oneWireDs18Found = true;
     expectSens(sp(f), false, false, false, true);
+}
+
+// SENS-03: a detected DHT on the one-wire pin is plain T/H, never T2
+void test_sens_onewire_dht()
+{
+    RmSensFlags f = sf();
+    f.oneWireOn = f.oneWireDhtFound = true;
+    expectSens(sp(f), true, true, false, false);
+    f.oneWireOn = false; // stale found flag with one-wire off
+    expectSens(sp(f), false, false, false, false);
+}
+
+// one-wire on but neither device detected: nothing claimed
+void test_sens_onewire_nothing_found()
+{
+    RmSensFlags f = sf();
+    f.oneWireOn = true;
+    expectSens(sp(f), false, false, false, false);
+}
+
+// DHT together with a BMP280 (T, P): flags are OR-ed, no duplicate field
+void test_sens_onewire_dht_plus_bmp280()
+{
+    RmSensFlags f = sf();
+    f.bmpOn = f.bmxFound = true;
+    f.oneWireOn = f.oneWireDhtFound = true;
+    expectSens(sp(f), true, true, true, false);
 }
 
 int main(int, char **)
@@ -788,6 +815,9 @@ int main(int, char **)
     RUN_TEST(test_net_upd);
     RUN_TEST(test_upd_result);
     RUN_TEST(test_chan_result);
+    RUN_TEST(test_sens_onewire_dht);
+    RUN_TEST(test_sens_onewire_nothing_found);
+    RUN_TEST(test_sens_onewire_dht_plus_bmp280);
     RUN_TEST(test_sens_bmpflag_bme280);
     RUN_TEST(test_sens_bmeflag_bmp280);
     RUN_TEST(test_sens_bmpflag_bmp280);

@@ -15,6 +15,7 @@
 #include <command_functions.h>
 #include "regex_functions.h"
 #include "msg_input_budget.h"   // TD-25 byte budget of the message input
+#include <esp32/esp32_main.h>   // TD-32: esp32SetBleEnabled
 
 #define SETTING_PAGE_MAX_ITEM 7
 #define GET_BUFF_LEN(a) sizeof(a)/sizeof(a[0])
@@ -2337,6 +2338,7 @@ static lv_obj_t * gpson_sw;
 static lv_obj_t * track_sw;
 static lv_obj_t * mute_sw;
 static lv_obj_t * wifiap_sw;
+static lv_obj_t * ble_sw;   // TD-32
 
 void btn_event_handler_save(lv_event_t * e)
 {
@@ -2503,6 +2505,16 @@ void btn_event_handler_switch(lv_event_t * e)
             meshcom_settings.node_mute = lv_obj_has_state(mute_sw, LV_STATE_CHECKED);
             
             save_settings();
+
+            return;
+        }
+
+        // BLE (TD-32): same sequence as the T-Deck header icon / console "--ble"
+        if (lv_event_get_target(e) == ble_sw)
+        {
+            meshcom_settings.node_bleon = lv_obj_has_state(ble_sw, LV_STATE_CHECKED);
+            save_settings();
+            esp32SetBleEnabled(meshcom_settings.node_bleon);
 
             return;
         }
@@ -2853,6 +2865,18 @@ static void create9(lv_obj_t *parent)
     lv_obj_center(btnlabelsave);
 
     /////////////////////////////////////////////////////////////////////////////
+    // BLE (TD-32): right of the SAVE button (free slot, no extra row)
+    ble_sw = lv_checkbox_create(parent);
+    lv_checkbox_set_text(ble_sw, "BLE");
+    lv_obj_align(ble_sw, LV_ALIGN_TOP_LEFT, ihor3 + 8, ivert);
+    if(meshcom_settings.node_bleon)
+        lv_obj_add_state(ble_sw, LV_STATE_CHECKED);
+    else
+        lv_obj_clear_state(ble_sw, LV_STATE_CHECKED);
+
+    lv_obj_add_event_cb(ble_sw, btn_event_handler_switch, LV_EVENT_ALL, NULL);
+
+    /////////////////////////////////////////////////////////////////////////////
     // MESH
     ivert += iv_step;
 
@@ -2953,6 +2977,15 @@ static void create9(lv_obj_t *parent)
 }
 static void entry9(void) 
 {
+    // TD-32: a "--ble on|off" from the console/phone may have changed it since the screen was built
+    if(ble_sw != NULL)
+    {
+        if(meshcom_settings.node_bleon)
+            lv_obj_add_state(ble_sw, LV_STATE_CHECKED);
+        else
+            lv_obj_clear_state(ble_sw, LV_STATE_CHECKED);
+    }
+
     ui_disp_full_refr();
 
     keypad_register_cb(cb_9_handler);

@@ -613,14 +613,15 @@ static void tdeck_tbl_set(lv_obj_t *table, uint16_t row, uint16_t col, const cha
 }
 
 // TD-30: a tap on a header icon toggles the radio live and persists the choice
+void tdeck_wifi_set(bool wifi_want);   // event_functions.cpp (TD-32)
+
 static void header_wifi_icon_event_cb(lv_event_t *e)
 {
     if(lv_event_get_code(e) != LV_EVENT_CLICKED)
         return;
     if(bWIFIAP)
         return;   // TD-30: AP mode owns the radio; WIFI_OFF would kill the AP and leave bWIFIAP stale
-    esp32SetWifiEnabled(!meshcom_settings.node_wifion);   // stores, saves, starts/stops
-    tdeck_update_header_wifi();
+    tdeck_wifi_set(!meshcom_settings.node_wifion);   // TD-32: same sequence as the setup checkbox
 }
 
 static void header_bt_icon_event_cb(lv_event_t *e)

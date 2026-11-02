@@ -2,11 +2,11 @@
 /* WEB-DARK-01/WEB-A11Y-01: light palette on :root, dark palette overrides the same names below (follows the OS). */
 /* --mcgray is the ink colour (text, borders). Contrast pairs are pinned by tools/webgui_theme_test.js. */
 :root {color-scheme:light;--fs-s:.85rem;--fs-m:1rem;--fs-l:1.25rem;--fs-xl:1.6rem;--mcbg:#FFFFFF;--mcgray:#252323;--mcred:#A2182F;--mclightred:#FCEDF0;--mcmidred:#FFA5B4;--mclightblue:#CADFEA;--mclightgreen:#CBFBD4;--widthfactor:1.0;}
-:root {--mcbord:#767676;--mcline:#E0E0E0;--mcmute:#595959;--mcok:#1A7F37;--mcyel:#F6E7B8;--mcredbtn:#A2182F;--mctbl:#F9F9F9;--mceven:#F0F0F0;--mcempty:#ECECEC;--mcsw0:#767676;--mcsw1:#1A7F37;--mcsw2:#8A5A00;}
+:root {--mcbord:#767676;--mcline:#E0E0E0;--mcmute:#595959;--mcok:#1A7F37;--mcyel:#F6E7B8;--mcredbtn:#A2182F;--mctbl:#F9F9F9;--mceven:#F0F0F0;--mcempty:#ECECEC;--mcsw0:#767676;--mcsw1:#1A7F37;--mcsw2:#8A5A00;--mcp2:#E07B39;--mcp3:#3B7DD8;--mcp4:#6FA96F;--mcp5:#9E9E9E;}
 :root {--navbg:#252323;--navfg:#FFFFFF;--navhov:#4A4545;--navselbg:#FFFFFF;--navselfg:#252323;--navinv:invert(1);}
 @media (prefers-color-scheme:dark) {:root {color-scheme:dark;--mcbg:#14161A;--mcgray:#E8E8E8;--mcred:#FF8A9B;--mclightred:#3A1D24;--mcmidred:#6B2A37;--mclightblue:#1F3A4D;--mclightgreen:#1D4A2B;}}
 @media (prefers-color-scheme:dark) {:root {--mcbord:#8A8F98;--mcline:#3A3F47;--mcmute:#A8ADB5;--mcok:#3FB950;--mcyel:#4A3D12;--mcredbtn:#B3203A;}}
-@media (prefers-color-scheme:dark) {:root {--mctbl:#1B1E23;--mceven:#22262C;--mcempty:#2A2E35;--mcsw0:#8A8F98;--mcsw1:#3FB950;--mcsw2:#D29922;}}
+@media (prefers-color-scheme:dark) {:root {--mctbl:#1B1E23;--mceven:#22262C;--mcempty:#2A2E35;--mcsw0:#8A8F98;--mcsw1:#3FB950;--mcsw2:#D29922;--mcp2:#F0883E;--mcp3:#5B9DF0;--mcp4:#6FBF6F;--mcp5:#9E9E9E;}}
 @media (prefers-color-scheme:dark) {:root {--navbg:#0B0C0E;--navfg:#E8E8E8;--navhov:#2C3037;--navselbg:#E8E8E8;--navselfg:#14161A;}}
 @media screen and (max-width:600px) {html {font-size:12px;} :root{--widthfactor:0.7;}}
 @media screen and (min-width:601px) {html {font-size:14px;} :root{--widthfactor:0.7;}}

@@ -221,7 +221,9 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   DK5EN-1/-90/-92, DK5EN-98 runs the build (list empty). Not released; ships with the next release so the third-party
   DM3KS build (sku2atsc/MeshCom-Firmware, DB0SD area) can retire. DK5EN-14 flashed 10-24 16:09. Open: fork-key
   migration not benched ([campaign-blockcall.md](campaign-blockcall.md)).
-- GPS-05b closed 2026-11-02 (tau stays 30 min), BL-05 accepted risk; backlog sweep: [campaign-backlog-sweep-20261102.md](campaign-backlog-sweep-20261102.md).
+- Backlog sweep 2026-11-02 ([campaign-backlog-sweep-20261102.md](campaign-backlog-sweep-20261102.md), not released): GPS-05b closed
+  (tau stays 30 min), BL-05 accepted risk; fixed host-only TD-31, BL-02, PF-T1, MCC-T1, WEB-DARK-02, TZ-02, SENS-03, TD-32;
+  CSMA-04 instrumentation built (INSTRUMENT only). Bench checks listed in the campaign doc. New: SENS-04.
 - Stability: REBOOT-98 (single event, watch); BL-04 closed with WEB-WDT-01.
 - Gateway server table: FR/US rows when operators name servers; stale `test/golden/corpus/commands`.
 

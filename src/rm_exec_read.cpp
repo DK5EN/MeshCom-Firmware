@@ -97,13 +97,15 @@ static int execPos(char *res, size_t n)
     return done(res, n, body, rmFmtPos(body, sizeof(body), in));
 }
 
+
 static int execSens(char *res, size_t n)
 {
     // Presence = config flag AND driver detection (rmSensPresence, src/rm_format.h); never value != 0.
     // The BMP/BME flags only pick the I2C address, the chip (humidity only on a BME280) comes from
     // bmx_is_bme. Writers: src/esp32/esp32_main.cpp:4362-4407 (BMX280/AHT20/SHT21), src/bme680.cpp:156,
-    // BMP3 temperature src/esp32/loop_actions_esp32.cpp:131-135. bONEWIRE is claimed as T2 only
-    // (a DHT on that path writes node_temp/node_hum, a DS18B20 node_temp2: not distinguishable by flag, SENS-03).
+    // BMP3 temperature src/esp32/loop_actions_esp32.cpp:131-135. bONEWIRE alone claims nothing (SENS-03):
+    // the one-wire driver records its device, a DHT (dht_ok: last read valid) writes node_temp/node_hum and is reported as
+    // T/H, a DS18B20 (ds18_found, CRC-valid read) writes node_temp2 and is reported as T2.
     RmSensFlags f;
     memset(&f, 0, sizeof(f));
     f.bmpOn = bBMPON;
@@ -119,6 +121,8 @@ static int execSens(char *res, size_t n)
     f.bmp3On = bBMP3ON;
     f.bmp3Found = bmp3_found;
     f.oneWireOn = bONEWIRE;
+    f.oneWireDs18Found = ds18_found;
+    f.oneWireDhtFound = dht_ok;   // a valid read, not the driver's static DHT11 type (dht_found)
     RmSensIn in;
     memset(&in, 0, sizeof(in));
     rmSensPresence(f, in);

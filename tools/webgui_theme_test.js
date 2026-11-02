@@ -292,8 +292,11 @@ const logoStart = WF.split('\n').findIndex((l) => l.includes('id=\\"mc_logo\\"')
 let logoEnd = logoStart;
 WF.split('\n').forEach((l, i) => { if (i + 1 > logoStart && logoEnd === logoStart && l.includes('</svg>')) logoEnd = i + 1; });
 check('logo SVG range found', logoStart > 0 && logoEnd > logoStart, logoStart + '-' + logoEnd);
-// literals that are knowingly outside the contrast scan (follow-up WEB-DARK-01: chart segment colours vs dark track)
-const followUp = [/var colors=\[/, /background:#A2182F>/];
+// literals that are knowingly outside the contrast scan (none since WEB-DARK-02)
+const followUp = [];
+// WEB-DARK-02: chart segments sit on the track (--mcempty), not on the page: dark values need 3:1 against the dark track
+// (WCAG 1.4.11). The light palette is the unchanged pre-dark look and is not re-judged here.
+const chartSeg = /var colors=\[/;
 const TOK = /#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|rgba?\([^)]*\)|var\(--[\w-]+\)|(?<=[:=]\s*['"]?)(?:black|white|grey|gray)\b/g;
 const surfaceCol = (theme, inSpec) => {
   if (inSpec) { const sb = colour(['#spectrum_display'], 'background-color', theme); if (sb) return sb; }
@@ -304,7 +307,7 @@ for (const [fname, src] of [['web_functions.cpp', WF], ['web_rm_page.cpp', RM], 
   const key = fname === 'web_functions.cpp' ? 'WF' : fname === 'web_rm_page.cpp' ? 'RM' : 'JS';
   const lit = key === 'JS' ? (x) => x : literals;
   // JS variables that feed `color:'+NAME` are text colours
-  const textVars = new Set([...lit(src).matchAll(/color:'\+(\w+)/g)].map((m) => m[1]));
+  const textVars = new Set([...lit(src).matchAll(/(?<![-\w])color:'\+(\w+)/g)].map((m) => m[1]));
   src.split('\n').forEach((raw, i) => {
     const ln = i + 1;
     if (/^\s*\/\//.test(raw) || skipRanges[key].some(([x, y]) => ln >= x && ln <= y)) return;
@@ -326,10 +329,12 @@ for (const [fname, src] of [['web_functions.cpp', WF], ['web_rm_page.cpp', RM], 
       scanned++;
       const res = [];
       let ok = true;
+      const seg = chartSeg.test(t);
       for (const theme of ['light', 'dark']) {
+        if (seg && theme === 'light') continue;
         const c = parseColor(resolve(m[0], theme));
         if (!c) continue;
-        const surf = surfaceCol(theme, inSpec);
+        const surf = seg ? parseColor(resolve('var(--mcempty)', theme)) : surfaceCol(theme, inSpec);
         const tbl = colour(['#content_inner > table'], 'background', theme);
         let r, min;
         if (role === 'text') { r = Math.min(ratio(c, surf), inSpec ? 99 : ratio(c, tbl)); min = 4.5; }

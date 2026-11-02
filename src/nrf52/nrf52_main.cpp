@@ -490,8 +490,15 @@ void getMacAddr(uint8_t *dmac)
     dmac[0] = src[5]; // | 0xc0; // MSB high two bits get set elsewhere in the bluetooth stack
 }
 
+#if INSTRUMENT_ENABLED
+extern volatile uint32_t g_csma04_cad_t0;   // CSMA-04 fork-only, lora_functions.cpp
+extern volatile uint32_t g_csma04_free_t;
+#endif
 void OnCadDone(bool channelActivityDetected)
 {
+#if INSTRUMENT_ENABLED
+    if(!channelActivityDetected) g_csma04_free_t = micros();   // CSMA-04 fork-only
+#endif
     // RACE-05 fix: atomic flag update under critical section
     taskENTER_CRITICAL();
     cad_channel_busy = channelActivityDetected;
@@ -1790,6 +1797,9 @@ void nrf52loop()
                 taskENTER_CRITICAL();
                 Radio.Standby();
                 Radio.StartCad();
+#if INSTRUMENT_ENABLED
+                g_csma04_cad_t0 = micros();   // CSMA-04 fork-only
+#endif
                 taskEXIT_CRITICAL();
                 g_rxs.noteAction(RXS_BY_CAD, millis());
             }
@@ -1864,6 +1874,9 @@ void nrf52loop()
                     taskENTER_CRITICAL();
                     Radio.Standby();
                     Radio.StartCad();
+#if INSTRUMENT_ENABLED
+                g_csma04_cad_t0 = micros();   // CSMA-04 fork-only
+#endif
                     taskEXIT_CRITICAL();
                     g_rxs.noteAction(RXS_BY_CAD, millis());
                 }

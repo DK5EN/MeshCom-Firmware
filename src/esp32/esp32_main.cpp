@@ -18,6 +18,10 @@
 #include "ntp_async.h"      // NTP-01: isPending() haelt das GPS-Gate fuer --ntpsync offen
 #include "configuration_global.h"
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
+#if INSTRUMENT_ENABLED
+extern volatile uint32_t g_csma04_cad_t0;   // CSMA-04 fork-only, lora_functions.cpp
+extern volatile uint32_t g_csma04_free_t;
+#endif
 #include "loop_breadcrumb.h" // F3: always-on LAST_LOOP_SECTION breadcrumb for TASK_WDT forensics
 #include "track_warning.h" // TRK-01: Warnhinweis bei aktivem Track
 #include <maxhop.h>         // CS-01: plausibility of the persisted text hop limit
@@ -4099,6 +4103,9 @@ void esp32loop()
                 if(bLORADEBUG)
                     printfdeb("[CHECK] T_ETH_ELITE BUG please fixit\n");
                 #else
+                #if INSTRUMENT_ENABLED
+                g_csma04_cad_t0 = micros();   // CSMA-04 fork-only
+                #endif
                 int cad_result = radio.scanChannel();
                 #endif
                 g_rxs.noteAction(RXS_BY_CAD, millis());   // LRF W2b
@@ -4121,6 +4128,9 @@ void esp32loop()
                     if(bLORADEBUG)
                         printfdeb("[CHECK] radio.scanChannel() / 2\n");
 
+                    #if INSTRUMENT_ENABLED
+                    g_csma04_cad_t0 = micros();   // CSMA-04 fork-only: window of the scan that decided
+                    #endif
                     cad_result = radio.scanChannel();
                     g_rxs.noteAction(RXS_BY_CAD, millis());   // LRF W2b
                     g_rxs_cad_scans++;
@@ -4137,6 +4147,9 @@ void esp32loop()
 
                 if(channel_free)
                 {
+                    #if INSTRUMENT_ENABLED
+                    g_csma04_free_t = micros();   // CSMA-04 fork-only
+                    #endif
                     if(bLORADEBUG)
                         printfdeb("[MC-DBG] CAD_FREE attempt=%d\n", cad_attempt);
 

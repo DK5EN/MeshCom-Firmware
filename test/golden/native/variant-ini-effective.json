@@ -3055,7 +3055,8 @@
   ],
   "build_src_filter": [
    "-<*>",
-   "+<config_json.cpp>"
+   "+<config_json.cpp>",
+   "+<tz_rule.cpp>"
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",

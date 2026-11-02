@@ -385,7 +385,7 @@ static void test_node_tz_empty_and_length_limit(void)
     meshcom_settings.node_tz[0] = '\0';
     std::string doc = do_export();
     TEST_ASSERT_TRUE(doc.find("\"node_tz\":\"\"") != std::string::npos);
-    snprintf(meshcom_settings.node_tz, sizeof(meshcom_settings.node_tz), "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+    snprintf(meshcom_settings.node_tz, sizeof(meshcom_settings.node_tz), "<+0530>-5:30<+0630>-6:30,M3.5.0,M10.5.0"); /* valid POSIX TZ, 39 chars */
     TEST_ASSERT_EQUAL_INT(39, (int)strlen(meshcom_settings.node_tz));
     std::string doc39 = do_export();
     wipe_settings();
@@ -394,10 +394,48 @@ static void test_node_tz_empty_and_length_limit(void)
 
     /* 40 Zeichen: der Wert selbst wird im Dokument verlaengert (die CRC passt
      * dann nicht mehr, aber der Wertcheck laeuft vor der CRC -- config_json.h) */
-    std::string bad = replace_once(doc39, "\"node_tz\":\"X", "\"node_tz\":\"XX");
+    std::string bad = replace_once(doc39, "\"node_tz\":\"<", "\"node_tz\":\"<<");
     wipe_settings();
     TEST_ASSERT_EQUAL_INT(CFG_IMP_EVALUE, do_import(bad));
     TEST_ASSERT_NOT_NULL(strstr(g_err, "node_tz"));
+}
+
+/* TZ-02: node_tz must pass tzParse(); "" stays valid, anything else that does
+ * not parse is refused (error names the key) and nothing is written. The CRC
+ * is valid (exported from the bad value), so only the tz check can refuse. */
+static void test_node_tz_invalid_is_refused(void)
+{
+    const char *bad[] = {"<+0x>junk", "GARBAGE!!", "CET-1CEST"};
+    for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++)
+    {
+        fill_settings();
+        snprintf(meshcom_settings.node_tz, sizeof(meshcom_settings.node_tz), "%s", bad[i]);
+        std::string doc = do_export();
+
+        wipe_settings();
+        snprintf(meshcom_settings.node_tz, sizeof(meshcom_settings.node_tz), "CET-1CEST,M3.5.0,M10.5.0/3");
+        s_meshcom_settings before;
+        memcpy(&before, &meshcom_settings, sizeof(before));
+
+        TEST_ASSERT_EQUAL_INT_MESSAGE(CFG_IMP_EVALUE, do_import(doc), bad[i]);
+        TEST_ASSERT_NOT_NULL(strstr(g_err, "node_tz"));
+        TEST_ASSERT_EQUAL_MEMORY(&before, &meshcom_settings, sizeof(before));
+    }
+
+    /* valid rule and empty string still import */
+    fill_settings();
+    std::string good = do_export();
+    wipe_settings();
+    TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(good));
+    TEST_ASSERT_EQUAL_STRING("CET-1CEST,M3.5.0,M10.5.0/3", meshcom_settings.node_tz);
+
+    fill_settings();
+    meshcom_settings.node_tz[0] = '\0';
+    std::string empty = do_export();
+    wipe_settings();
+    snprintf(meshcom_settings.node_tz, sizeof(meshcom_settings.node_tz), "CET-1");
+    TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(empty));
+    TEST_ASSERT_EQUAL_STRING("", meshcom_settings.node_tz);
 }
 
 static void test_crc_mismatch_is_refused(void)
@@ -1041,6 +1079,7 @@ int main(int, char **)
     RUN_TEST(test_canonical_form_is_as_documented);
     RUN_TEST(test_import_without_node_tz_keeps_current_value);
     RUN_TEST(test_node_tz_empty_and_length_limit);
+    RUN_TEST(test_node_tz_invalid_is_refused);
     RUN_TEST(test_crc_mismatch_is_refused);
     RUN_TEST(test_layout_mismatch_is_refused);
     RUN_TEST(test_truncated_json_is_refused);

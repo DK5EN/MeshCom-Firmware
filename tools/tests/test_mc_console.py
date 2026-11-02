@@ -36,6 +36,7 @@ class FakeNode:
         self.chatty = chatty
         self.close_at_once = close_at_once
         self.auth: list[bool] = []
+        self.resp: list[bytes] = []  # auth responses actually sent (non-empty, or a bare line end)
         self.rx = b""
         self.srv = socket.socket()
         self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -74,6 +75,8 @@ class FakeNode:
                         done = True
                         break
                     buf += ch
+                if buf or done:
+                    self.resp.append(buf)
                 want = hmac.new(self.password.encode(), nonce, hashlib.sha256).hexdigest().encode()
                 ok = done and hmac.compare_digest(buf, want)
                 self.auth.append(ok)
@@ -157,7 +160,8 @@ def test_nonce_without_password_names_the_key(no_env, node) -> None:
     n = node(password="benchpw")
     with pytest.raises(mc_console.LoginError, match="MC_PW_DK5EN_92"):
         mc_console.Console("127.0.0.1", n.port, call="DK5EN-92").connect()
-    assert n.auth == []  # nothing was sent: no blind HMAC attempt
+    time.sleep(0.3)  # let the node thread see the close (it records an empty read as a failed auth)
+    assert n.resp == []  # nothing was sent: no blind HMAC attempt
 
 
 def test_wrong_password_is_a_refusal_and_never_echoes_it(no_env, node) -> None:

@@ -270,6 +270,30 @@ void btn_event_handler_dropdown_country(lv_event_t * e)
 }
 
 /**
+ * TD-32: WLAN on/off for the setup checkbox AND the header icon (one sequence)
+ */
+void tdeck_wifi_set(bool wifi_want)
+{
+    if (wifi_want)
+    {
+        // turn webserver on and AP off
+        commandAction((char*)"--wifiap off", false);
+        commandAction((char*)"--webserver on", false);
+    }
+    else
+    {
+        // turn webserver and AP off (makes no sense without wifi)
+        commandAction((char*)"--webserver off", false);
+        commandAction((char*)"--gateway off", false);
+        commandAction((char*)"--wifiap off", false);
+    }
+    // TD-30: store + start/stop through the one shared function (console, icon, checkbox)
+    esp32SetWifiEnabled(wifi_want);
+    save_settings();
+    tdeck_update_header_wifi();
+}
+
+/**
  * handler for setup buttons
  */
 void btn_event_handler_setup_btn(lv_event_t * e)
@@ -280,25 +304,7 @@ void btn_event_handler_setup_btn(lv_event_t * e)
         if (bDEBUG)
             Serial.println("[TDECK]...btn_event_handler - btn_wifi pressed");
 
-        const bool wifi_want = lv_obj_has_state(btn_wifi, LV_STATE_CHECKED);
-
-        if (wifi_want)
-        {
-            // turn webserver on and AP off
-            commandAction((char*)"--wifiap off", false);
-            commandAction((char*)"--webserver on", false);
-        }
-        else
-        {
-            // turn webserver and AP off (makes no sense without wifi)
-            commandAction((char*)"--webserver off", false);
-            commandAction((char*)"--gateway off", false);
-            commandAction((char*)"--wifiap off", false);
-        }
-        // TD-30: store + start/stop through the one shared function (console, icon, checkbox)
-        esp32SetWifiEnabled(wifi_want);
-        save_settings();
-        tdeck_update_header_wifi();
+        tdeck_wifi_set(lv_obj_has_state(btn_wifi, LV_STATE_CHECKED));
 
         tdeck_refresh_SET_view();
 

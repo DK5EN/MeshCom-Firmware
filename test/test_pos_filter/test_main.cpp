@@ -361,15 +361,38 @@ static void cadenceRun(uint32_t dt, uint32_t seed, double *ex, double *ey, doubl
     *tx = x; *ty = y;
 }
 
+// PF-T1: one realisation's 1 s vs 3 s end-point difference scatters with the
+// noise path (libm-dependent: glibc seed 0 gives 2.66 m, macOS passed 2 m), so a
+// single-seed distance bound tests the noise, not the filter. Cadence dependence
+// is a SYSTEMATIC offset: average the signed difference vector over
+// CADENCE_SEEDS (independent noise averages out, sd/sqrt(16)) and bound that.
+// Observed (glibc): systematic offset 1.08 m; per-seed distance 0.28..5.13 m.
+#define CADENCE_SEEDS 16
+
 void test_kadenz_unabhaengig(void)
 {
-    double e1x, e1y, t1x, t1y, e3x, e3y, t3x, t3y;
-    cadenceRun(DT1, 11, &e1x, &e1y, &t1x, &t1y);
-    cadenceRun(DT3, 22, &e3x, &e3y, &t3x, &t3y);
-    double d = hypot(e1x - e3x, e1y - e3y);
-    printf("cadence: 1s err=%.2f 3s err=%.2f diff=%.2f m\n",
-           hypot(e1x - t1x, e1y - t1y), hypot(e3x - t3x, e3y - t3y), d);
-    TEST_ASSERT_TRUE_MESSAGE(d < 2.0, "1 s and 3 s runs end more than 2 m apart");
+    double sumD = 0, sumE3 = 0, maxD = 0, minD = 1e9, sumDx = 0, sumDy = 0;
+    for (int s = 0; s < CADENCE_SEEDS; s++)
+    {
+        double e1x, e1y, t1x, t1y, e3x, e3y, t3x, t3y;
+        cadenceRun(DT1, 11u + 101u * (uint32_t)s, &e1x, &e1y, &t1x, &t1y);
+        cadenceRun(DT3, 22u + 101u * (uint32_t)s, &e3x, &e3y, &t3x, &t3y);
+        double d = hypot(e1x - e3x, e1y - e3y);
+        printf("cadence seed %d: 1s err=%.2f 3s err=%.2f diff=%.2f m\n", s,
+               hypot(e1x - t1x, e1y - t1y), hypot(e3x - t3x, e3y - t3y), d);
+        sumD += d;
+        sumDx += e1x - e3x;
+        sumDy += e1y - e3y;
+        sumE3 += hypot(e3x - t3x, e3y - t3y);
+        if (d > maxD) maxD = d;
+        if (d < minD) minD = d;
+    }
+    double mean = sumD / CADENCE_SEEDS;
+    double bias = hypot(sumDx / CADENCE_SEEDS, sumDy / CADENCE_SEEDS);
+    printf("cadence: diff over %d seeds min=%.2f mean=%.2f max=%.2f m, systematic offset=%.2f m\n",
+           CADENCE_SEEDS, minD, mean, maxD, bias);
+    TEST_ASSERT_TRUE_MESSAGE(bias < 2.0, "1 s and 3 s runs end systematically more than 2 m apart");
+    TEST_ASSERT_TRUE_MESSAGE(sumE3 / CADENCE_SEEDS < 4.0, "mean 3 s filter error >= 4 m");
 }
 
 // ---------------------------------------------------------------------------

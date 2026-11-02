@@ -2885,12 +2885,33 @@ void OnRxError(void)
 
 // SL-03 -- eine Zeile je gestarteter Sendung (Erfolgsausgaenge von doTX()).
 // stat_txn zaehlt auch bei --setlog off.
+#if INSTRUMENT_ENABLED
+// CSMA-04 fork-only: blind window CAD start -> CAD free -> TX start, in micros().
+// g_csma04_cad_t0 / g_csma04_free_t are stamped by the CAD code (nrf52_main.cpp:
+// CAD start + OnCadDone; esp32_main.cpp: before scanChannel + at channel_free);
+// g_csma04_tx_t at the send call (logRadioTx). Printed only after the send.
+volatile uint32_t g_csma04_cad_t0 = 0;
+volatile uint32_t g_csma04_free_t = 0;
+static volatile uint32_t g_csma04_tx_t = 0;
+#endif
+
 static void setlogPrintTx(const char *line)
 {
     stat_txn.fetch_add(1);
 
     if(bDisplayLog && line[0] != 0x00)
+    {
+#if INSTRUMENT_ENABLED
+        // CSMA-04 fork-only: append after the TX started (outside the measured window).
+        char buf[176];
+        uint32_t t0 = g_csma04_cad_t0, tf = g_csma04_free_t, tt = g_csma04_tx_t;
+        snprintf(buf, sizeof(buf), "%s cad=%lu free=+%lu tx=+%lu", line,
+                 (unsigned long)t0, (unsigned long)(uint32_t)(tf - t0), (unsigned long)(uint32_t)(tt - tf));
+        setlogPrint(buf);
+#else
         setlogPrint(line);
+#endif
+    }
 }
 
 /**@brief our Lora TX sequence — priority-based slot selection
@@ -2914,6 +2935,9 @@ static inline void logRadioTx(int len, const char *kind)
 {
     if(bLORADEBUG)
         printfdeb("[MC-DBG] RADIO_TX len=%d kind=%s\n", len, kind);
+#if INSTRUMENT_ENABLED
+    g_csma04_tx_t = micros();   // CSMA-04 fork-only: immediately before the send call
+#endif
 }
 
 bool doTX()

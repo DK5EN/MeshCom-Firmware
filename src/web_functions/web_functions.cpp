@@ -3133,7 +3133,7 @@ void sub_page_setup()
     _create_setup_textinput_element("utcoffset", "UTC Offset", String(meshcom_settings.node_utcoff, 1).c_str(), "1.0", "utcoffset", 4, false, false); // create Textinput-Element including Label and Button
     // TZ-01: a set POSIX TZ rule overrides the fixed offset above; the offset then shows the derived value
     // node_tz is HTML-escaped: tzParse() accepts any alnum name inside <...>
-    // (e.g. "<plaintext>-1"), and a config import does not run tzParse() at all.
+    // (e.g. "<plaintext>-1"); a config import refuses a value tzParse() rejects (TZ-02).
     _create_setup_textinput_element("tz", "Timezone (POSIX TZ)", String(meshcom_settings.node_tz), "CET-1CEST,M3.5.0,M10.5.0/3", "tz", 39, false, false);
     web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">A set POSIX TZ rule overrides the fixed UTC offset (DST handled automatically); the UTC offset field then shows the derived value. Empty or &quot;none&quot; = fixed offset only.</p>");
     _create_setup_textinput_element("maxv", "max. Voltage", String(meshcom_settings.node_maxv, 3), "4.125", "maxv", 5, false, false);                 // create Textinput-Element including Label and Button

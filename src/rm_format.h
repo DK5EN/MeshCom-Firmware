@@ -458,10 +458,15 @@ struct RmSensFlags
     bool aht20On, aht20Found;
     bool sht21On, sht21Found;
     bool bmp3On, bmp3Found;
-    bool oneWireOn; // t2 only (a DHT on that path is not claimed, SENS-03)
+    // SENS-03: bONEWIRE alone says nothing about the device; the driver records what it found.
+    bool oneWireOn;         // config flag (bONEWIRE)
+    bool oneWireDs18Found;  // DS18B20 read OK (ds18_found): writes node_temp2
+    bool oneWireDhtFound;   // DHT read valid (dht_ok): writes node_temp/node_hum
 };
 
 // Fixed rule: a field is claimed only when its sensor is enabled AND detected.
+// One-wire (SENS-03): a detected DHT is plain T/H (OR-ed with the other T/H sources, same node_temp/
+// node_hum fields, no new wire field); a detected DS18B20 is T2. Enabled but nothing found claims nothing.
 inline void rmSensPresence(const RmSensFlags &f, RmSensIn &in)
 {
     const bool bmx = (f.bmpOn || f.bmeOn) && f.bmxFound;
@@ -469,10 +474,12 @@ inline void rmSensPresence(const RmSensFlags &f, RmSensIn &in)
     const bool aht = f.aht20On && f.aht20Found;
     const bool sht = f.sht21On && f.sht21Found;
     const bool bmp3 = f.bmp3On && f.bmp3Found;
-    in.hasT = bmx || b680 || aht || bmp3;
-    in.hasH = (bmx && f.bmxIsBme) || b680 || aht || sht;
+    const bool dht = f.oneWireOn && f.oneWireDhtFound;
+    const bool ds18 = f.oneWireOn && f.oneWireDs18Found;
+    in.hasT = bmx || b680 || aht || bmp3 || dht;
+    in.hasH = (bmx && f.bmxIsBme) || b680 || aht || sht || dht;
     in.hasP = bmx || b680 || bmp3;
-    in.hasT2 = sht || f.oneWireOn;
+    in.hasT2 = sht || ds18;
 }
 
 inline size_t rmFmtSens(char *out, size_t n, const RmSensIn &in)

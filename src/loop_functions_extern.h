@@ -205,10 +205,12 @@ extern bool aht20_found;
 extern bool sht21_found;
 extern bool mcu811_found;
 extern bool one_found;
+extern bool ds18_found;   // onewire_functions.cpp: CRC-valid DS18x20 reading seen (SENS-03)
 extern int one_start;
 extern bool ina226_found;
 extern bool shtc3_found;
 extern bool dht_found;
+extern bool dht_ok;      // onewire_functions.cpp: last DHT read gave valid T and H (SENS-03)
 
 extern bool bSHORTPATH;
 //extern bool bGPSDEBUG;
