@@ -1198,7 +1198,8 @@ static void test_agreement_max_zeros_rejected_by_both(void)
         snprintf(msg, sizeof(msg), "%s: rejected frame must not relay", name);
         TEST_ASSERT_EQUAL_INT_MESSAGE(0, txRingDepth(), msg);
         snprintf(msg, sizeof(msg), "%s: rejected frame must not touch the dedup ring", name);
-        TEST_ASSERT_TRUE_MESSAGE(is_new_packet((uint8_t[4]){0x02, 0x20, 0x00, 0x00}), msg);
+        uint8_t hdr[4] = {0x02, 0x20, 0x00, 0x00};   // named: GCC rejects the address of a temporary array
+        TEST_ASSERT_TRUE_MESSAGE(is_new_packet(hdr), msg);
     }
 }
 

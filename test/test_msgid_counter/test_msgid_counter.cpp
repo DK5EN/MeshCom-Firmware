@@ -13,6 +13,8 @@
 
 #include <unity.h>
 
+#include <cstdio>
+
 #include <set>
 #include <vector>
 

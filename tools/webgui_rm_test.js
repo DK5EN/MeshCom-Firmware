@@ -1885,37 +1885,45 @@ function leaks(P, canary) {
     check('BLK-01 input check: list and none pass, other characters and over-long input are refused', P.w.rmChk('blockcall', 'dl1abc,DK5EN-1') === false && P.w.rmChk('blockcall', 'none') === false && P.w.rmChk('blockcall', 'DL1ABC;X') !== false && P.w.rmChk('blockcall', 'A'.repeat(HDR.RM_MAX_ARGS + 1)) === 'Too long.');
     check('NU-27 err tokens are not mapped to texts in the page JS (they come from the server message)', !/aubusy|nowifi|noasset|safeboot|err stale/.test(JS.replace(/e=nowifi/g, '')));
     // UCH: update channel row (RM1 "upd chan prod|dev", only in MC_AU_DEV_CHANNEL builds)
-    const ch = (k) => X('rm_upd_chan_' + k), sc = () => P.sends().filter((x) => /cmd=upd&args=chan/.test(x.body));
-    await P.T.advance(10001);
-    await U('m=notify c=prod n=1 a=v4.41a st=- b=0 g=0 ck=12 e=-');
-    check('UCH-01 flag 1: row "Update channel" with MAIN (icssw-org) and DEV (DK5EN) shown', !!X('rm_upd_chan') && /Update channel/.test(X('rm_upd_chan').textContent) && ch('prod') && ch('dev') && ch('prod').textContent === 'MAIN (icssw-org)' && ch('dev').textContent === 'DEV (DK5EN)', X('rm_upd_chan') && X('rm_upd_chan').textContent);
-    check('UCH-02 c=prod marks MAIN, DEV is offered', ch('prod').getAttribute('aria-pressed') === 'true' && ch('dev').getAttribute('aria-pressed') === 'false' && !ch('dev').disabled);
-    { const cs = P.w.getComputedStyle(ch('prod')), cd = P.w.getComputedStyle(chk());
-      check('UCH-15 the active channel reads as selected, not as unavailable: full opacity, normal text colour (Chrome greys disabled text), grey 2px border, bold (other disabled buttons stay faded)', ch('prod').disabled && cs.opacity === '1' && /2px/.test(cs.borderTopWidth || cs.borderWidth || cs.border) && (cs.fontWeight === 'bold' || cs.fontWeight === '700') && /#rm_upd_chan button\.rmsel:disabled\{[^}]*color:inherit/.test(HTML), 'opacity ' + cs.opacity + ' border ' + (cs.borderTopWidth || cs.border) + ' weight ' + cs.fontWeight + ' check-btn opacity ' + cd.opacity); }
-    P.w.eval('rmUpdChan=0'); P.w.rmRender();
-    check('UCH-03 flag 0: no channel row at all, Check and Update now unaffected', !X('rm_upd_chan') && !ch('dev') && !!chk() && !!go());
-    P.w.eval('rmUpdChan=1'); P.w.rmRender();
-    check('UCH-04 flag back to 1: row is back', !!ch('dev'));
-    const c0 = sc().length;
-    await P.tap(ch('dev'));
-    check('UCH-05 first tap arms, nothing sent; confirm text says the check result is cleared and a new check is needed', ch('dev').textContent === 'Really? tap again' && sc().length === c0 && /last check result is cleared/.test(P.text('rm_msg')) && /new check is needed/.test(P.text('rm_msg')), ch('dev').textContent + '|' + P.text('rm_msg'));
-    await P.tap(ch('dev'));
-    check('UCH-14 sent-history label is short ("Update channel DEV"), the long note only in the confirm text', P.w.rmLabel('upd chan dev') === 'Update channel DEV' && P.w.rmLabel('upd chan prod') === 'Update channel MAIN', P.w.rmLabel('upd chan dev'));
-    check('UCH-06 second tap sends exactly "upd chan dev" (%20 encoding), data-cf upd chan dev', sc().length === c0 + 1 && /cmd=upd&args=chan%20dev/.test(sc()[c0].body) && ch('dev').getAttribute('data-cf') === 'upd chan dev', (sc()[c0] || {}).body);
-    await P.T.advance(10001);
-    await poll([E('upd', 'ok m=notify c=prod n=1 a=v4.41a st=- b=0 g=0 ck=12 e=-', 30), E('upd chan dev', 'ok chan dev', 2, { ctr: 41 })]);
-    check('UCH-07 after "ok chan dev": card shows DEV, available none, newer no, Update now disabled (no tag), DEV marked', X('rm_v_upd_c').textContent === 'development' && X('rm_v_upd_a').textContent === 'none' && X('rm_v_upd_n').textContent === 'no' && go().disabled && ch('dev').getAttribute('aria-pressed') === 'true' && ch('prod').getAttribute('aria-pressed') === 'false' && !ch('prod').disabled, [X('rm_v_upd_c').textContent, X('rm_v_upd_a').textContent, go().disabled].join('|'));
-    check('UCH-08 ok text "Channel set to DEV. Run Check."', P.w.rmOkText({ cmd: 'upd chan dev', reply: 'ok chan dev', msg: 'x' }) === 'Channel set to DEV. Run Check.' && P.w.rmOkText({ cmd: 'upd chan prod', reply: 'ok chan prod', msg: 'x' }) === 'Channel set to MAIN. Run Check.' && /Channel set to DEV/.test(P.text('rm_msgs')), P.text('rm_msgs'));
-    await poll([E('upd', 'ok m=notify c=dev n=1 a=v4.41c st=- b=0 g=0 ck=1 e=-', 1), E('upd chan dev', 'ok chan dev', 40, { ctr: 41 })]);
-    check('UCH-09 a newer read replaces the override (check result back, Update now enabled)', X('rm_v_upd_a').textContent === 'v4.41c' && !go().disabled);
-    await U('m=notify c=prod n=1 a=v4.41a st=- b=1 g=0 ck=12 e=-');
-    check('UCH-10 b=1: both channel buttons disabled', ch('dev').disabled && ch('prod').disabled);
-    await U('m=notify c=prod n=1 a=v4.41a st=- b=0 g=1 ck=12 e=-');
-    check('UCH-11 g=1: channel buttons disabled', ch('dev').disabled);
-    await poll([]);
-    check('UCH-12 no read yet: row shown but disabled', !!ch('dev') && ch('dev').disabled && ch('prod').disabled);
-    await poll([E('upd chan prod', 'err blocked', 1, { st: 'err', ctr: 44 })]);
-    check('UCH-13 err blocked: "This node has no channel switch."', /This node has no channel switch\./.test(P.text('rm_msgs')), P.text('rm_msgs'));
+    // UCH-01 (backlog): a build without MC_AU_DEV_CHANNEL (RM_UPDCHAN=0) has no channel row at all;
+    // the UCH-01..15 cases below exercise the flag-1 page only.
+    if (!UPDCHAN) {
+      await P.T.advance(10001);
+      await U('m=notify c=prod n=1 a=v4.41a st=- b=0 g=0 ck=12 e=-');
+      check('UCH-00 flag-0 build: no update channel row, Check and Update now still there', !X('rm_upd_chan') && !X('rm_upd_chan_dev') && !!chk() && !!go());
+    } else {
+      const ch = (k) => X('rm_upd_chan_' + k), sc = () => P.sends().filter((x) => /cmd=upd&args=chan/.test(x.body));
+      await P.T.advance(10001);
+      await U('m=notify c=prod n=1 a=v4.41a st=- b=0 g=0 ck=12 e=-');
+      check('UCH-01 flag 1: row "Update channel" with MAIN (icssw-org) and DEV (DK5EN) shown', !!X('rm_upd_chan') && /Update channel/.test(X('rm_upd_chan').textContent) && ch('prod') && ch('dev') && ch('prod').textContent === 'MAIN (icssw-org)' && ch('dev').textContent === 'DEV (DK5EN)', X('rm_upd_chan') && X('rm_upd_chan').textContent);
+      check('UCH-02 c=prod marks MAIN, DEV is offered', ch('prod').getAttribute('aria-pressed') === 'true' && ch('dev').getAttribute('aria-pressed') === 'false' && !ch('dev').disabled);
+      { const cs = P.w.getComputedStyle(ch('prod')), cd = P.w.getComputedStyle(chk());
+        check('UCH-15 the active channel reads as selected, not as unavailable: full opacity, normal text colour (Chrome greys disabled text), grey 2px border, bold (other disabled buttons stay faded)', ch('prod').disabled && cs.opacity === '1' && /2px/.test(cs.borderTopWidth || cs.borderWidth || cs.border) && (cs.fontWeight === 'bold' || cs.fontWeight === '700') && /#rm_upd_chan button\.rmsel:disabled\{[^}]*color:inherit/.test(HTML), 'opacity ' + cs.opacity + ' border ' + (cs.borderTopWidth || cs.border) + ' weight ' + cs.fontWeight + ' check-btn opacity ' + cd.opacity); }
+      P.w.eval('rmUpdChan=0'); P.w.rmRender();
+      check('UCH-03 flag 0: no channel row at all, Check and Update now unaffected', !X('rm_upd_chan') && !ch('dev') && !!chk() && !!go());
+      P.w.eval('rmUpdChan=1'); P.w.rmRender();
+      check('UCH-04 flag back to 1: row is back', !!ch('dev'));
+      const c0 = sc().length;
+      await P.tap(ch('dev'));
+      check('UCH-05 first tap arms, nothing sent; confirm text says the check result is cleared and a new check is needed', ch('dev').textContent === 'Really? tap again' && sc().length === c0 && /last check result is cleared/.test(P.text('rm_msg')) && /new check is needed/.test(P.text('rm_msg')), ch('dev').textContent + '|' + P.text('rm_msg'));
+      await P.tap(ch('dev'));
+      check('UCH-14 sent-history label is short ("Update channel DEV"), the long note only in the confirm text', P.w.rmLabel('upd chan dev') === 'Update channel DEV' && P.w.rmLabel('upd chan prod') === 'Update channel MAIN', P.w.rmLabel('upd chan dev'));
+      check('UCH-06 second tap sends exactly "upd chan dev" (%20 encoding), data-cf upd chan dev', sc().length === c0 + 1 && /cmd=upd&args=chan%20dev/.test(sc()[c0].body) && ch('dev').getAttribute('data-cf') === 'upd chan dev', (sc()[c0] || {}).body);
+      await P.T.advance(10001);
+      await poll([E('upd', 'ok m=notify c=prod n=1 a=v4.41a st=- b=0 g=0 ck=12 e=-', 30), E('upd chan dev', 'ok chan dev', 2, { ctr: 41 })]);
+      check('UCH-07 after "ok chan dev": card shows DEV, available none, newer no, Update now disabled (no tag), DEV marked', X('rm_v_upd_c').textContent === 'development' && X('rm_v_upd_a').textContent === 'none' && X('rm_v_upd_n').textContent === 'no' && go().disabled && ch('dev').getAttribute('aria-pressed') === 'true' && ch('prod').getAttribute('aria-pressed') === 'false' && !ch('prod').disabled, [X('rm_v_upd_c').textContent, X('rm_v_upd_a').textContent, go().disabled].join('|'));
+      check('UCH-08 ok text "Channel set to DEV. Run Check."', P.w.rmOkText({ cmd: 'upd chan dev', reply: 'ok chan dev', msg: 'x' }) === 'Channel set to DEV. Run Check.' && P.w.rmOkText({ cmd: 'upd chan prod', reply: 'ok chan prod', msg: 'x' }) === 'Channel set to MAIN. Run Check.' && /Channel set to DEV/.test(P.text('rm_msgs')), P.text('rm_msgs'));
+      await poll([E('upd', 'ok m=notify c=dev n=1 a=v4.41c st=- b=0 g=0 ck=1 e=-', 1), E('upd chan dev', 'ok chan dev', 40, { ctr: 41 })]);
+      check('UCH-09 a newer read replaces the override (check result back, Update now enabled)', X('rm_v_upd_a').textContent === 'v4.41c' && !go().disabled);
+      await U('m=notify c=prod n=1 a=v4.41a st=- b=1 g=0 ck=12 e=-');
+      check('UCH-10 b=1: both channel buttons disabled', ch('dev').disabled && ch('prod').disabled);
+      await U('m=notify c=prod n=1 a=v4.41a st=- b=0 g=1 ck=12 e=-');
+      check('UCH-11 g=1: channel buttons disabled', ch('dev').disabled);
+      await poll([]);
+      check('UCH-12 no read yet: row shown but disabled', !!ch('dev') && ch('dev').disabled && ch('prod').disabled);
+      await poll([E('upd chan prod', 'err blocked', 1, { st: 'err', ctr: 44 })]);
+      check('UCH-13 err blocked: "This node has no channel switch."', /This node has no channel switch\./.test(P.text('rm_msgs')), P.text('rm_msgs'));
+    }
     P.w.rmPageLeave();
   }
   {
