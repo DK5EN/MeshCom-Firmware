@@ -189,8 +189,12 @@ listed files, every behaviour gets a test that fails on the stub and passes afte
 
 - No `CHGMA` anywhere (AXP2101 has no current ADC), as designed. `I` and `IS1` unchanged; uptime continuous across
   the USB unplug (no reboot). BLE via `tools/bench/ble_golden.py` (one `--info` write), web via Chrome and the page text.
+- Heltec V3 (DK5EN-1, no PMU), baseline `8681fcb4` vs fork-dev `328e858a`: console `--info` identical apart from
+  volatile values, no `Charge:` line; BLE `I`/`IS1` same keys, no `IS2`; web Battery row unchanged (the info page gains
+  the WX-01 lines `UV (LTR390): off` / `Anemometer: off`). With a cell from boot both builds read 4.12 V. A cell
+  hot-plugged into a running node is not detected on either build: pre-existing, BACKLOG `BAT-05`.
 - Not observed: `full` (cell at 95-99 %). Not benched: an AXP192 T-Beam (none in the fleet, so the signed mA path is
-  host-tested only), and the Heltec V3 byte-identical check (DK5EN-1 not on the bench today).
+  host-tested only), (the Heltec V3 check followed the same day, line above).
 
 ### W4 (docs and upstream)
 
