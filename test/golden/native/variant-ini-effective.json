@@ -3517,6 +3517,29 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_msg_input_budget": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "build_src_filter": [
+   "-<*> +<charset_filter.cpp>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_msg_input_budget"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_msgstore_hook": {
   "build_flags": [
    "-std=gnu++17",

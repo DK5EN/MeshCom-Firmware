@@ -24,6 +24,12 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   `esp32_flash.cpp` are part of the Safeboot image). **Not done:** no bench node besides DK5EN-92 (local build of the
   same commit) runs the release; own beacons at prio 2 and the boot-time ping-target clean-up are host-tested only.
 
+- **TD-25 / TD-24 T-Deck fixes (2026-11-02, fork-dev, not released):** the message input on T-Deck/Plus and
+  T-Deck Pro caps UTF-8 bytes like the web GUI (149, minus callsign + 2 for a DM), cuts on a code-point boundary
+  and shows "N bytes left" (`src/msg_input_budget.h`, test `test_msg_input_budget`). The first bubble of a new
+  conversation removes the "No messages" hint. Opus advisor APPROVED. **Open:** bench on DK5EN-14 (label layout,
+  150 x `ż`, DM from a new peer); new TD-26 (Pro sends a 9-character call as a broadcast).
+
 - **CHARS-01 national characters end to end (2026-11-02, fork-dev, not released):** one feature across every
   display path, both back ends and the web GUI. sp2ong's E290 patch (`6eda5f8a`, #1221) is the origin; on top: a
   shared fallback `src/text_fold.{h,cpp}` used by every display (letters the font lacks fold to ASCII, `ä` -> `ae`,

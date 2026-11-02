@@ -237,6 +237,7 @@ flashes whatever is attached.
 | test_mcp17_bits              | Unit          |     8 | native                                                       |
 | test_mh_phone                | Unit          |    12 | native_mh_phone                                              |
 | test_millis_rollover         | Regression    |     4 | native                                                       |
+| test_msg_input_budget        | Regression    |     7 | native_msg_input_budget                                      |
 | test_msgid_counter           | Unit          |     6 | native                                                       |
 | test_msgstore                | Unit          |    60 | native                                                       |
 | test_msgstore_hook           | Unit          |     6 | native_msgstore_hook                                         |
