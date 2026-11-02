@@ -2021,6 +2021,25 @@ static void test_lrf_w1_advisor_rework_pins(void)
     pos_after(nmain, "if(bLORADEBUG) radioDiagRead(&_rxs_before);", 0, "watchdog diag read gated");
 }
 
+// BAT-04: --info prints "Charge: ..." only when the state is known; BLE I keys stay deferred
+void test_bat04_info_charge_line_pin(void)
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const size_t anchor = cmd.find("global_batt/1000.0, global_proz");
+    TEST_ASSERT_TRUE_MESSAGE(anchor != std::string::npos, "no --info battery printf anchor");
+    const size_t idocBegin = cmd.rfind("JsonDocument idoc;", anchor);
+    TEST_ASSERT_TRUE_MESSAGE(idocBegin != std::string::npos, "no idoc block");
+    const std::string idoc = cmd.substr(idocBegin, anchor - idocBegin);
+    TEST_ASSERT_TRUE_MESSAGE(idoc.find("\"CHG") == std::string::npos && idoc.find("\"BATI") == std::string::npos,
+                             "BLE I document must not carry CHG/BATI keys (3 bytes margin)");
+    const std::string blk = cmd.substr(anchor, 1200);
+    const size_t fmt = blk.find("battChargeFormat(");
+    TEST_ASSERT_TRUE_MESSAGE(fmt != std::string::npos, "--info block does not call battChargeFormat");
+    const size_t guard = blk.find("bci.state != BCS_UNKNOWN");
+    TEST_ASSERT_TRUE_MESSAGE(guard != std::string::npos, "--info charge line has no BCS_UNKNOWN guard");
+    TEST_ASSERT_TRUE_MESSAGE(blk.find("Charge: ") != std::string::npos, "no \"Charge: \" line");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -2075,6 +2094,7 @@ int main(int, char **)
     RUN_TEST(test_rx_deaf02_nrf52_tx_unblock);
     RUN_TEST(test_lrf21_ping_target_wiring);
     RUN_TEST(test_lrf21_ping_target_sanitize_and_callers);
+    RUN_TEST(test_bat04_info_charge_line_pin);
     RUN_TEST(test_lrf_w1_advisor_rework_pins);
     RUN_TEST(test_shed_is_gated_staged_and_polled);
     RUN_TEST(test_guard_chain_announces_the_check_result_before_the_download);

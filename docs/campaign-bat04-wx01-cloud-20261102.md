@@ -8,7 +8,7 @@ Resume point for one cloud session that implements and build-tests two campaigns
 The two campaign docs hold design, acceptance criteria and their own wave logs. This doc holds the joint
 schedule, the cloud setup and the rules a cloud session cannot read from the operator's machine.
 
-**State:** C0 not started.
+**State:** C0, C1 and C2 (folded into C1) committed; next C3 (WX-W2).
 
 ## Operator decisions (2026-11-02)
 
@@ -95,6 +95,45 @@ $4 each. Total about $60 to $80, 5 to 6 h wall-clock.
 
 ## Wave log
 
-| Wave  | Commit | Gate | Advisor | Notes |
-| ----- | ------ | ---- | ------- | ----- |
-| setup | -      | -    | -       | -     |
+| Wave  | Commit                                                     | Gate                                                                                                                                  | Advisor                                                                                                                                                                                                                       | Notes                                                                                                                                                                                                                                                                                                                                                                |
+| ----- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| setup | -                                                          | stage 1,2 PASS: 89 Unity envs, 3336/3336 cases, pytest 1478, golden selftest 48; all 7 board builds green                             | -                                                                                                                                                                                                                             | Ran on the operator's Mac (PlatformIO 6.1.18 already installed, Rosetta present), not a cloud VM. Baseline at `8681fcb4`, see table below                                                                                                                                                                                                                            |
+| C0    | - (committed with C1)                                      | contract compiles (`-fsyntax-only`); no gate on its own                                                                               | -                                                                                                                                                                                                                             | `src/batt_charge.h` stubs, `global_batt_charge` in both battery files (`batt_function_old.cpp` too: T-Beam, Heltec, RAK and the BQ boards build the old file), three native envs, `ENABLE_LTR390`/`ENABLE_WIND` in `[esp32]` build_flags (`t_deck_pro` and `t5_epaper` do not inherit `[esp32]` flags, so they stay without WX-01). Scout findings in the BAT-04 doc |
+| C1+C2 | BAT-04 firmware commit and WX-01 W1 commit (see `git log`) | stage 1,2 PASS: 92 Unity envs, 3383/3383, pytest 1478, golden regenerated (3 new native envs, `ENABLE_*` flags); 7 clean builds green | BAT-04: REWORK (AXP192 VBUS ADC enable dropped, 4095.5 mA I2C-failure bound, exact guard pin), then APPROVED. WX-01 W1: REWORK (PCNT cannot debounce a reed contact, LTR390 rate/resolution, `ltr390End`/wfac), then APPROVED | BAT rework applied by the orchestrator (few lines, fail-before/pass-after pins); WX rework by a fresh Sonnet-high implementer. Deltas in the table below                                                                                                                                                                                                             |
+
+### Baseline board builds (`8681fcb4`, `MC_AU_DEV_CHANNEL=1`, clean)
+
+| Env                      | Flash (bytes)      | RAM (bytes)                                          |
+| ------------------------ | ------------------ | ---------------------------------------------------- |
+| `ttgo_tbeam`             | 2031089 / 3403776  | 104728 / 1310720                                     |
+| `ttgo_tbeam_supreme`     | 1947441 / 3403776  | 129764 / 327680                                      |
+| `heltec_wifi_lora_32_V2` | 2000961 / 3403776  | 104600 / 327680                                      |
+| `heltec_wifi_lora_32_V3` | 1911961 / 3403776  | 129428 / 327680                                      |
+| `t_deck_pro`             | 2318765 / 12582912 | 154528 / 327680                                      |
+| `t5_epaper`              | 4833757 / 6553600  | 129832 / 327680                                      |
+| `wiscore_rak4631`        | 715008 / 815104    | 99404 / 248832 (linker line, incl. heap reservation) |
+
+Strings proof baseline: `LTR390` and `[WIND]` count 0 in every image.
+
+### Deviations from the schedule
+
+- **C2 folded into C1.** BAT-C dropped (no clean BQ hook, see BAT-04 doc), and BAT-D/BAT-E depend only on the C0
+  contract with files disjoint from every C1 writer, so they ran in C1. Saves one gate cycle.
+- **BAT-B owns `src/esp32/esp32_pmu.cpp` too:** the AXP192 branch of `setupPMU()` never enabled the battery
+  current ADC (the doc assumed it did).
+
+### C1+C2 board builds (clean, `MC_AU_DEV_CHANNEL=1`), delta to the C0 baseline
+
+| Env                      | Flash (bytes) | Delta | RAM (bytes) | Delta | Strings                                |
+| ------------------------ | ------------- | ----- | ----------- | ----- | -------------------------------------- |
+| `ttgo_tbeam`             | 2033225       | +2136 | 104736      | +8    | `Charge: ` 1                           |
+| `ttgo_tbeam_supreme`     | 1949445       | +2004 | 129772      | +8    | `Charge: ` 1                           |
+| `heltec_wifi_lora_32_V2` | 2002097       | +1136 | 104608      | +8    | `LTR390` 0, `[WIND]` 0 (not wired yet) |
+| `heltec_wifi_lora_32_V3` | 1913053       | +1092 | 129428      | 0     | `LTR390` 0, `[WIND]` 0 (not wired yet) |
+| `t_deck_pro`             | 2319653       | +888  | 154536      | +8    | -                                      |
+| `t5_epaper`              | 4834417       | +660  | 129840      | +8    | -                                      |
+| `wiscore_rak4631`        | 715552        | +544  | 99404       | 0     | `LTR390` 0, `[WIND]` 0                 |
+
+The RAK image grows only by the shared BAT-04 code (formatter, `--info` line, web row); the WX-01 modules compile to
+nothing there. WX-01 W1 modules are not referenced yet, so the linker drops them from the ESP32 images; the strings
+proof for `LTR390` / `[WIND]` moves to C3/C4.

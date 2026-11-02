@@ -1,12 +1,12 @@
 # Campaign BAT-04: battery charge state and current (upstream issue #1073)
 
-| Item      | Value                                                                                                                                                                                |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Started   | 2026-11-02 (plan only, nothing implemented)                                                                                                                                          |
-| Baseline  | `fork-dev` at `adbf723f`. Code facts below were read at this commit                                                                                                                  |
-| Request   | icssw-org/MeshCom-Firmware#1073 (DD8BA): show whether the battery is charging or discharging, including the current, on the T-Beam                                                   |
-| Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; Opus advisor gate before every commit; one upstream PR afterwards via `/submit-pr`                                          |
-| Status    | Open. Q1-Q4 answered 2026-11-02 (recommendations accepted); runs in the cloud with WX-01, schedule in [campaign-bat04-wx01-cloud-20261102.md](campaign-bat04-wx01-cloud-20261102.md) |
+| Item      | Value                                                                                                                                                                                                                                                                                    |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Started   | 2026-11-02 (plan only, nothing implemented)                                                                                                                                                                                                                                              |
+| Baseline  | `fork-dev` at `adbf723f`. Code facts below were read at this commit                                                                                                                                                                                                                      |
+| Request   | icssw-org/MeshCom-Firmware#1073 (DD8BA): show whether the battery is charging or discharging, including the current, on the T-Beam                                                                                                                                                       |
+| Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; Opus advisor gate before every commit; one upstream PR afterwards via `/submit-pr`                                                                                                                                              |
+| Status    | W0, W1, W2 done 2026-11-02 (findings 5a, wave log 7); W3 bench and W4 upstream open (operator's machine). Q1-Q4 answered 2026-11-02 (recommendations accepted); runs in the cloud with WX-01, schedule in [campaign-bat04-wx01-cloud-20261102.md](campaign-bat04-wx01-cloud-20261102.md) |
 
 Line numbers drift. Every brief must `grep -n` the named symbol before trusting a line number in this document.
 
@@ -185,6 +185,21 @@ listed files, every behaviour gets a test that fails on the stub and passes afte
 - German comment on #1073: charge LED via `--charge led on` (since #1238); charge state on every PMU board;
   current on AXP192 and BQ boards; AXP2101 cannot measure it.
 
+## 5a. W0 findings (2026-11-02, cloud session C0)
+
+- **AXP192 current ADC is not enabled.** `enableBattVoltageMeasure()` runs only in the AXP2101 branch of
+  `setupPMU()` (`src/esp32/esp32_pmu.cpp`). W1-B adds it to the AXP192 branch (file added to its set).
+- **No clean BQ hook (Q2 fallback: T-Beam only).** T-Deck Pro and T5 refresh `global_batt` through the generic
+  `read_batt()` path in `loopAction_battCheck()`; `PPM` / `bq27220` are read only by the UI getters
+  (`ui_deckpro_port.cpp`, `ui_port.cpp`), with no periodic poll. The BQ27220 driver has `int16_t getCurrent()`
+  (register 0x0C), no average-current getter. **W1-C dropped; follow-up row BAT-04b.**
+- **BLE `I` keys deferred.** The worst-case `I` document is 296 bytes against `msg_buffer[300]` (3 bytes margin) and
+  already above `BLE_JSON_PAYLOAD_MAX` 244, where `bleJsonFrameFailSoft()` drops trailing keys. Margin under 30
+  bytes, so per 4.5 `CHG` / `BATI` are not added; decision for the operator (SN1-style follow-up).
+- **Both battery files define `global_batt_charge`:** the T-Beam, Heltec, RAK and BQ boards build
+  `batt_function_old.cpp`, the E22 boards `batt_functions.cpp`.
+- **Bench boards per PMU:** not checked in the cloud session (no `/bench` access); W3 on the operator's machine.
+
 ## 6. Definition of done
 
 - Every row of the classification table and the format cases (`ma_valid` false, clamp at int16 limits, buffer
@@ -193,3 +208,14 @@ listed files, every behaviour gets a test that fails on the stub and passes afte
 - Boards without a PMU produce byte-identical `--info`, web and BLE `I` output (checked on the Heltec V3 bench run).
 - No new LoRa bytes (APRS and RM1 untouched unless Q1 says otherwise).
 - Gate green, builds listed in W2 green, advisor APPROVED, bench W3 done.
+
+## 7. Wave log
+
+| Wave  | Commit                                    | Gate                                                                                                               | Advisor               | Notes                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| W0    | -                                         | -                                                                                                                  | -                     | Findings in 5a: AXP192 current ADC not enabled, no clean BQ hook (W1-C dropped, follow-up BAT-04b), BLE `I` keys deferred (3 bytes margin)                                                                                                                                                                                                                                                                               |
+| W1+W2 | BAT-04 firmware commit (cloud session C1) | stage 1,2 PASS (92 envs, 3383/3383); clean builds of all 7 gate envs green; T-Beam image +2136 B flash, RAK +544 B | REWORK, then APPROVED | Writers A (core + 10 host tests), B (PMU read, AXP192 ADC enable, 5 source pins), D (`--info` line + pin), E (web row, no test: no native harness covers `sub_page_info()`). Rework: AXP192 VBUS ADC stays off (a cell-less T-Beam keeps showing "USB"), currents above 4095.5 mA (failed I2C read) leave `ma_valid` false, exact guard pin. `--info` prints `...Charge: <state>` (prefix like the other `--info` lines) |
+
+Open for the operator: W3 bench (AXP2101 and AXP192 T-Beam transitions, Heltec V3 byte-identical check), W4 PR and
+the #1073 comment, BAT-04b (BQ boards: needs a periodic `PPM`/`bq27220` poll), BLE `I` keys `CHG`/`BATI` (needs room
+in the `I` document).
