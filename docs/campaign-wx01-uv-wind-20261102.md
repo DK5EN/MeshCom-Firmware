@@ -134,6 +134,12 @@ The PR carries this section in German, the issue comment in English. Placeholder
 
 None; Q1-Q3 answered (see Operator decisions).
 
+## TLM-03 (found in C4, fixed 2026-11-02)
+
+On a node without the soft-serial app no `T#` frame went on air at all (periodic timer passed `SOFTSER_APP_ID`
+unconditionally since upstream v4.34x.05.16). Fixed before the WX-01 upstream PR (operator decision):
+`src/telemetry_app.h`, both timer call sites, test `native_telemetry_app`. BACKLOG row `TLM-03`.
+
 ## Wave log
 
 | Wave | Commit                      | Gate          | Advisor                                                                                                                                                                                                      | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                           |

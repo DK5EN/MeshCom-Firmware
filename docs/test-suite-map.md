@@ -268,6 +268,7 @@ flashes whatever is attached.
 | test_rm_web_parse            | Unit          |     8 | native_rm_web_parse                                          |
 | test_rm_format               | Unit          |    32 | native_rm_format                                             |
 | test_charge_led_mode         | Regression    |    11 | native_charge_led_mode                                       |
+| test_telemetry_app           | Regression    |     4 | native_telemetry_app                                         |
 | test_board_led               | Unit          |    13 | native_board_led                                             |
 | test_gw_reg_state            | Unit          |    35 | native_gw_reg_state                                          |
 | test_web_txbuf               | Unit          |    20 | native_web_txbuf                                             |
