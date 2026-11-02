@@ -1084,6 +1084,10 @@ void work_webpage(void)
                         { // RM GUI: set / clear node_passwd, the password is in the BODY
                             sub_rm_passwd(web_content_length);
                         }
+                        else if (web_header.startsWith("POST /rmwebpwd"))
+                        { // WEB-PWD-01: set / clear the web login password, the password is in the BODY
+                            sub_web_passwd(web_content_length);
+                        }
                         else if (web_header.startsWith("GET /rmnodes"))
                         { // RM GUI: the three saved nodes (slot, used, call), never a key
                             sub_rm_nodes_get();
@@ -1568,6 +1572,21 @@ void deliver_scaffold(bool bget_password)
                        "raM(k?'Remote management is '+v+'.':'Could not change it. Is a password set?',!k);raSt();})\n"
                        ".catch(function(e){raX(e,'The node did not answer. Try again.');raSt();});}");
     // RA-JS-END
+    // Web login password card (WEB-PWD-01): the login of this web GUI, NOT the RM/KISS password above. Body only, never a URL.
+    // WP-JS-BEGIN
+    web_client.println("var wpA=0,wpT=0;\n"
+                       "function wpM(t,b){var e=rmEl('wp_msg');if(e){e.textContent=t;e.style.color=b?'var(--mcred)':'';}}\n"
+                       "function wpDis(m){clearTimeout(wpT);wpA=0;var b=rmEl('wp_clr');if(b)b.textContent='Clear';if(m)wpM('');}\n"
+                       "function wpProblem(p){return !p.length?'Enter a password.':p.length>19?'The web password can be at most 19 characters.':/[^\\x20-\\x7e]/.test(p)?'Use only plain letters, digits and symbols (no umlauts or special characters).':"
+                       "(p.charAt(0)==' '||p.charAt(p.length-1)==' ')?'The password must not start or end with a space.':p=='none'?'The word none is reserved. Choose another one.':'';}");
+    web_client.println("function wpP(b,t,ok){rmPost('/rmwebpwd',b).then(rmJson).then(function(j){if(j&&j.ok){wpM(t);rmEl('wp_st').textContent='web login password: '+ok;if(ok=='set')setTimeout(function(){location.reload();},1500);}else wpM(rmErrText(j),1);})\n"
+                       ".catch(function(e){wpM(e===0?'Log in again to change these settings.':'The node did not answer. Try again.',1);});}");
+    web_client.println("function wpSet(){var i=rmEl('wp_pw'),k=rmEl('wp_pw2'),p=i.value,e=wpProblem(p);wpDis();\n"
+                       "if(!e&&p!=k.value)e='The two entries do not match.';\n"
+                       "if(e){wpM(e,1);return;}i.value='';k.value='';wpP('act=set&pw='+rmEnc(p),'Web password set. You are logged out, log in again.','set');}\n"
+                       "function wpClr(){if(!wpA){wpA=1;rmEl('wp_clr').textContent='Really? tap again';wpM('Clear the web password? Everyone on the network can then open this page.');wpT=setTimeout(function(){wpDis(1);},4000);return;}\n"
+                       "wpDis();wpP('act=clear','Web password cleared. This page is now open without a login.','not set');}");
+    // WP-JS-END
 
     // WQ-01: LoRa Queue panel on the rxlog page. rxlog is fetched by loadPage()
     // and injected with innerHTML, which never runs a <script> tag it carries,
@@ -3667,6 +3686,30 @@ void sub_page_setup()
                        "<p class=\"font-small\" style=\"grid-column:1/-1\">This password also protects the net console (port 2323) and the KISS port, not only remote management.</p>");
     web_client.println("</div></div>");
     // RA-HTML-END
+
+    // Web login password card (WEB-PWD-01): the login of this web page, not the RM/KISS password of the card above.
+    // WP-HTML-BEGIN
+    web_client.println("<div class=\"cardlayout collapsablecard\">");
+    web_client.println("<label class=\"cardlabel\">Web login password</label>");
+    web_client.println("<span>Open this for the password that protects this web page.</span>\n");
+    web_client.println("<button class=\"cardtoggle\" onclick=\"togglecard(this);\"><i></i></button>\n");
+    web_client.println("<div class=\"grid grid3\">");
+    web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">This is the login of this web page. It is not the Remote Admin password (RM, net console, KISS) above.</p>"
+                       "<style>#wp_msg:empty{display:none}</style>");
+    web_client.println("<label for=\"wp_pw\">New password :</label>"
+                       "<input type=\"password\" id=\"wp_pw\" maxlength=\"19\" size=\"10\" autocomplete=\"new-password\" placeholder=\"New web password\"><span></span>"
+                       "<label for=\"wp_pw2\">Repeat :</label>"
+                       "<input type=\"password\" id=\"wp_pw2\" maxlength=\"19\" size=\"10\" autocomplete=\"new-password\" placeholder=\"Repeat\">"
+                       "<button id=\"wp_set\" onclick=\"wpSet()\">Set</button>");
+    web_client.print("<span id=\"wp_st\" class=\"font-small\" style=\"grid-column:1/3\">");
+#define WP_ST_SET "web login password: set"
+#define WP_ST_NOT "web login password: not set"
+    web_client.print(strlen(meshcom_settings.node_webpwd) > 0 ? WP_ST_SET : WP_ST_NOT);   // only set / not set, never the password
+    web_client.println("</span><button id=\"wp_clr\" onclick=\"wpClr()\">Clear</button>"
+                       "<p id=\"wp_msg\" class=\"font-small\" style=\"grid-column:1/-1\"></p>"
+                       "<p class=\"font-small\" style=\"grid-column:1/-1\">1 to 19 plain characters. After setting or changing it you are logged out and log in again.</p>");
+    web_client.println("</div></div>");
+    // WP-HTML-END
 
     // IP Network Settings Section
     web_client.println("<div class=\"cardlayout collapsablecard\">");

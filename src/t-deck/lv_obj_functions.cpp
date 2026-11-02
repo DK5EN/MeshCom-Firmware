@@ -59,6 +59,7 @@ extern TFT_eSPI tft;
 #if defined(ENABLE_AUDIO)
 #include <esp32/esp32_audio.h>
 #endif
+#include <esp32/esp32_main.h>   // TD-30: esp32SetBleEnabled / esp32SetWifiEnabled
 
 int         iKeyBoardType=1;
 
@@ -611,6 +612,27 @@ static void tdeck_tbl_set(lv_obj_t *table, uint16_t row, uint16_t col, const cha
     lv_table_set_cell_value(table, row, col, txt);
 }
 
+// TD-30: a tap on a header icon toggles the radio live and persists the choice
+static void header_wifi_icon_event_cb(lv_event_t *e)
+{
+    if(lv_event_get_code(e) != LV_EVENT_CLICKED)
+        return;
+    if(bWIFIAP)
+        return;   // TD-30: AP mode owns the radio; WIFI_OFF would kill the AP and leave bWIFIAP stale
+    esp32SetWifiEnabled(!meshcom_settings.node_wifion);   // stores, saves, starts/stops
+    tdeck_update_header_wifi();
+}
+
+static void header_bt_icon_event_cb(lv_event_t *e)
+{
+    if(lv_event_get_code(e) != LV_EVENT_CLICKED)
+        return;
+    meshcom_settings.node_bleon = !meshcom_settings.node_bleon;
+    save_settings();
+    esp32SetBleEnabled(meshcom_settings.node_bleon);
+    tdeck_update_header_bt();
+}
+
 void setDisplayLayout(lv_obj_t *parent)
 {
     static lv_style_t lable_style;
@@ -720,12 +742,18 @@ void setDisplayLayout(lv_obj_t *parent)
     lv_obj_set_style_text_font(header_wifi_icon, &mc_font_latin_18, LV_PART_MAIN);
     // Slightly increase left offset so wifi icon sits closer to battery icon
     lv_obj_align_to(header_wifi_icon, header_sat_icon, LV_ALIGN_OUT_LEFT_MID, -9, 0);
+    lv_obj_add_flag(header_wifi_icon, LV_OBJ_FLAG_CLICKABLE);   // TD-30
+    lv_obj_set_ext_click_area(header_wifi_icon, 8);
+    lv_obj_add_event_cb(header_wifi_icon, header_wifi_icon_event_cb, LV_EVENT_CLICKED, NULL);
 
     header_bt_icon = lv_label_create(tab_menu_header);
     lv_label_set_text(header_bt_icon, LV_SYMBOL_BLUETOOTH);
     lv_obj_set_style_text_font(header_bt_icon, &mc_font_latin_18, LV_PART_MAIN);
     // Match spacing with wifi icon (leave a comfortable gap)
     lv_obj_align_to(header_bt_icon, header_wifi_icon, LV_ALIGN_OUT_LEFT_MID, -7, 0);
+    lv_obj_add_flag(header_bt_icon, LV_OBJ_FLAG_CLICKABLE);   // TD-30
+    lv_obj_set_ext_click_area(header_bt_icon, 8);
+    lv_obj_add_event_cb(header_bt_icon, header_bt_icon_event_cb, LV_EVENT_CLICKED, NULL);
 
     /*header_locator_label = lv_label_create(tab_menu_header);
     lv_label_set_text(header_locator_label, "JJ00AAAA");
@@ -2494,11 +2522,16 @@ static void update_header_wifi_indicator(void)
             if (bDEBUG)
                 Serial.printf("[TDECK]...update_header_wifi_indicator: node_wifion=false, WiFi.status=%d, ssid='%s'\n", (int)WiFi.status(), meshcom_settings.node_ssid);
             
-            text_color_set_if_changed(header_wifi_icon, lv_color_white());
+            // TD-30: stays visible (dimmed, struck through) so a tap can switch WiFi back on
+            text_color_set_if_changed(header_wifi_icon, lv_palette_main(LV_PALETTE_GREY));
             label_set_if_changed(header_wifi_icon, LV_SYMBOL_WIFI);
-            lv_obj_add_flag(header_wifi_icon, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_text_opa(header_wifi_icon, LV_OPA_40, LV_PART_MAIN);
+            lv_obj_set_style_text_decor(header_wifi_icon, LV_TEXT_DECOR_STRIKETHROUGH, LV_PART_MAIN);
+            lv_obj_clear_flag(header_wifi_icon, LV_OBJ_FLAG_HIDDEN);
             return;
         }
+        lv_obj_set_style_text_opa(header_wifi_icon, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_text_decor(header_wifi_icon, LV_TEXT_DECOR_NONE, LV_PART_MAIN);
     }
 
     // AP mode considered connected
@@ -2527,7 +2560,7 @@ static void update_header_wifi_indicator(void)
         // Not enabled/configured -> White
         text_color_set_if_changed(header_wifi_icon, lv_palette_main(LV_PALETTE_GREY)); //ex lv_color_white()
         label_set_if_changed(header_wifi_icon, LV_SYMBOL_WIFI);
-        lv_obj_add_flag(header_wifi_icon, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(header_wifi_icon, LV_OBJ_FLAG_HIDDEN);   // TD-30: stay tappable
     }
 }
 
@@ -2538,6 +2571,16 @@ static void update_header_bt_indicator(void)
     // Always render the icon glyph in white
     text_color_set_if_changed(header_bt_icon, lv_palette_main(LV_PALETTE_GREY)); //ex lv_color_white()
     label_set_if_changed(header_bt_icon, LV_SYMBOL_BLUETOOTH);
+
+    // TD-30: BLE switched off by the user: dimmed + struck through, nothing else to show
+    if(!meshcom_settings.node_bleon)
+    {
+        lv_obj_set_style_text_opa(header_bt_icon, LV_OPA_40, LV_PART_MAIN);
+        lv_obj_set_style_text_decor(header_bt_icon, LV_TEXT_DECOR_STRIKETHROUGH, LV_PART_MAIN);
+        return;
+    }
+    lv_obj_set_style_text_opa(header_bt_icon, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_text_decor(header_bt_icon, LV_TEXT_DECOR_NONE, LV_PART_MAIN);
 
     /* KBC
     // Ensure a square touch/visual area for the icon

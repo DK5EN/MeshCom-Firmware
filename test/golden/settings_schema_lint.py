@@ -362,12 +362,13 @@ FIELD_CLASSIFICATION: Dict[str, str] = {
     "node_webpwd": PERSIST,
     "node_wifi_power": PERSIST,
     "node_wifion": PERSIST,
+    "node_bleon": PERSIST,
     "valid_mark_1": RUNTIME,
     "valid_mark_2": RUNTIME,
 }
-assert len(FIELD_CLASSIFICATION) == 157, (
+assert len(FIELD_CLASSIFICATION) == 158, (
     f"FIELD_CLASSIFICATION has {len(FIELD_CLASSIFICATION)} entries, expected "
-    f"157 (156 + node_gwlab, F1 --gateway lab) -- TRIAGE_DOC section 3's original 147 minus auto_join, "
+    f"158 (157 + node_bleon TD-30; 156 + node_gwlab, F1 --gateway lab) -- TRIAGE_DOC section 3's original 147 minus auto_join, "
     f"send_repeat_time and node_ackid, removed from struct s_meshcom_settings "
     f"outright in the D1-04 W3 struct merge (see the comment above this table), "
     f"plus node_ethmtu (2026-10-01, #1183), node_tz (2026-10-04, TZ-01) and "

@@ -57,6 +57,7 @@ ALIASES = {
     "map": "node_map",
     "modus": "node_modus",
     "wifion": "node_wifion",
+    "bleon": "node_bleon",
     "blday": "node_blday",
     "blnight": "node_blnight",
     "blauto": "node_blauto",

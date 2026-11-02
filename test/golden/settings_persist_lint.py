@@ -219,6 +219,7 @@ for _names, _reason in [
     (("node_immediate_save", "node_immsave"), _TDECK),
     (("node_kbl_sync", "node_kblsync"), _TDECK),
     (("node_wifion",), _TDECK),
+    (("node_bleon",), _TDECK),
     (("node_bl_day", "node_blday"), _TDECK),
     (("node_bl_night", "node_blnight"), _TDECK),
     (("node_bl_auto", "node_blauto"), _TDECK),

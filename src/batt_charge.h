@@ -51,6 +51,30 @@ static inline int16_t battNetMa(float charge_ma, float discharge_ma)
     return (int16_t)(net >= 0.0 ? (int32_t)(net + 0.5) : -(int32_t)(-net + 0.5));
 }
 
+// BAT-04b: cell presence from the BQ27220 BatteryStatus word (0x0A), BATTPRES = bit 3. The gauge
+// voltage is no presence test: on USB-only power the charger holds BAT up. An all-ones word means the
+// I2C read failed (Wire.read() returns -1, so every register reads 0xFFFF); only that case falls back to a voltage sanity check.
+static inline bool battBqPresent(uint16_t battery_status, uint16_t gauge_mv)
+{
+    if (battery_status == 0xFFFFu) return gauge_mv >= 2500u && gauge_mv <= 5000u;   // 0xFFFF mV = failed read too
+    return (battery_status & 0x0008u) != 0;
+}
+
+// BAT-04b: BQ25896 charger + BQ27220 gauge (T-Deck Pro, T5 e-paper). Inputs: VBUS present, cell
+// present, charger status "charging", BQ27220 signed instantaneous current (register 0x0C) in mA (+ into the cell).
+// The gauge measures the current, so ma_valid follows the cell presence.
+static inline BattChargeInfo battChargeFromBq(bool vbus, bool batt_present, bool charging, int32_t ma)
+{
+    BattChargeInfo ci = { battChargeClassify(vbus, batt_present, charging), false, 0 };
+    if (batt_present) {
+        if (ma > 32767) ma = 32767;
+        if (ma < -32768) ma = -32768;
+        ci.ma = (int16_t)ma;
+        ci.ma_valid = true;
+    }
+    return ci;
+}
+
 // "unknown" "no battery" "charging" "full" "discharging"
 static inline const char *battChargeName(BattChargeState s)
 {

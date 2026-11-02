@@ -67,7 +67,7 @@ function loadPageJs() {
 }
 function mutate(t, from, to) { if (!t.includes(from)) throw new Error('mutation anchor not found: ' + from); return t.replace(from, to); }
 
-let html = block('RA-HTML'), js = block('RA-JS'), sc = scaffold(), lp = loadPageJs();
+let html = block('RA-HTML') + block('WP-HTML'), js = block('RA-JS') + block('WP-JS'), sc = scaffold(), lp = loadPageJs();
 if (MUT === 'noconfirm') js = mutate(js, 'if(!raA){', 'if(0){');
 if (MUT === 'pwurl') sc = mutate(sc, "fetch(u,{method:'POST'", "fetch(u+'?'+b,{method:'POST'");
 if (MUT === 'noval') js = mutate(js, 'if(e){raM(e,1);return;}', '');
@@ -76,10 +76,12 @@ if (MUT === 'silentst') js = mutate(js, "raX(e,'Could not read the state of this
 if (MUT === 'nodisarm') js = mutate(js, 'e=rmPwProblem(p);raDis();', 'e=rmPwProblem(p);');
 if (MUT === 'nomsg') js = mutate(js, 'raM(rmErrText(j),1)', "raM('The request was refused.',1)");
 if (MUT === 'nologin') js = mutate(js, "e===0?'Log in again to change these settings.':t", 't');
+if (MUT === 'wpnoconfirm') js = mutate(js, 'if(!wpA){', 'if(0){');
+if (MUT === 'wpnomatch') js = mutate(js, 'if(!e&&p!=k.value)', 'if(0)');
 if (MUT) console.log('NOTE mutation active: ' + MUT);
 
 const calls = [];
-let fail = {}, passwdReply = null;
+let fail = {}, passwdReply = null, webReply = null;
 let status = { on: 0, pw: 0, lock: 0, lockS: 0 };
 let timers = [], now = 0;
 function runTimers(ms) { now += ms; const due = timers.filter((t) => t.at <= now); timers = timers.filter((t) => t.at > now); due.forEach((t) => t.fn()); }
@@ -102,6 +104,7 @@ w.fetch = (url, opt) => {
     if (passwdReply) j = passwdReply;
     else if (opt.body.indexOf('act=set') === 0) { status.pw = 1; j = { ok: true }; }
     else if (opt.body === 'act=clear') { status.pw = 0; status.on = 0; j = { ok: true }; }
+  } else if (url === '/rmwebpwd') { j = webReply || { ok: true };
   } else if (url.indexOf('/setparam/?rm=') === 0) { status.on = url.endsWith('on') ? 1 : 0; j = { returncode: 0 }; }
   return Promise.resolve({ status: 200, json: () => Promise.resolve(j) });
 };
@@ -249,6 +252,52 @@ async function settle() { for (let i = 0; i < 6; i++) await flush(); }
     fail = { '/setparam': 'net' }; $('ra_on').checked = true; w.raOn(); await settle(); fail = {};
     check('/setparam network error shows "did not answer"', msg() === DNA, msg());
     check('error paths leave no timers', timers.length === 0, String(timers.length));
+  }
+
+  { // WEB-PWD-01: Web login password card, apart from Remote Admin
+    const wl = (txt) => txt.replace(/\s+/g, ' ');
+    check('WP card title Web login password', /<label class="cardlabel">Web login password<\/label>/.test(html));
+    check('WP card is a separate card from Remote Admin', (html.match(/class="cardlabel"/g) || []).length === 2 && html.indexOf('Web login password') > html.indexOf('Remote Admin'));
+    check('WP text says web page login, not the RM/KISS password', /login of this web page\. It is not the Remote Admin password \(RM, net console, KISS\)/.test(html));
+    check('WP handlers wired and own ids', ['wpSet()', 'wpClr()'].every((h) => html.indexOf('="' + h + '"') >= 0) && !!$('wp_pw') && !!$('wp_pw2') && $('wp_pw').id !== 'ra_pw');
+    check('WP fields are password inputs', $('wp_pw').type === 'password' && $('wp_pw2').type === 'password');
+    let n0 = calls.length;
+    $('wp_pw').value = 'abc1'; $('wp_pw2').value = 'abc2'; w.wpSet(); await settle();
+    check('WP mismatch blocked client-side, no request', calls.length === n0 && /do not match/.test($('wp_msg').textContent), $('wp_msg').textContent);
+    $('wp_pw').value = ''; $('wp_pw2').value = ''; w.wpSet(); await settle();
+    check('WP empty blocked', calls.length === n0 && $('wp_msg').textContent === 'Enter a password.');
+    $('wp_pw').value = 'x'.repeat(20); $('wp_pw2').value = 'x'.repeat(20); w.wpSet(); await settle();
+    check('WP 20 chars blocked', calls.length === n0 && /at most 19/.test($('wp_msg').textContent));
+    $('wp_pw').value = 'none'; $('wp_pw2').value = 'none'; w.wpSet(); await settle();
+    check('WP "none" blocked', calls.length === n0);
+    n0 = calls.length;
+    $('wp_pw').value = 'ge&heim 1'; $('wp_pw2').value = 'ge&heim 1'; w.wpSet(); await settle();
+    const pc = calls.filter((c) => c.url === '/rmwebpwd');
+    check('WP set POSTs /rmwebpwd act=set&pw= with the encoded password in the body', pc.length === 1 && pc[0].method === 'POST' && pc[0].body === 'act=set&pw=ge%26heim%201', JSON.stringify(pc));
+    check('WP no password in any URL', calls.every((c) => c.url.indexOf('ge') < 0));
+    check('WP fields cleared after set, password not rendered back', $('wp_pw').value === '' && $('wp_pw2').value === '' && w.document.body.innerHTML.indexOf('ge&amp;heim') < 0 && w.document.body.textContent.indexOf('geheim') < 0);
+    check('WP status says set, message tells to log in again', $('wp_st').textContent === 'web login password: set' && /log in again/.test($('wp_msg').textContent));
+    check('WP Remote Admin state untouched by the web password', !calls.slice(n0).some((c) => c.url === '/rmpasswd'));
+    // reload is scheduled only after a set
+    timers = [];
+    n0 = calls.length;
+    w.wpClr(); await settle();
+    check('WP clear first tap only asks, no request', calls.length === n0 && $('wp_clr').textContent === 'Really? tap again' && /Clear the web password/.test($('wp_msg').textContent));
+    runTimers(4001);
+    check('WP clear confirmation disarms after 4 s', calls.length === n0 && $('wp_clr').textContent === 'Clear' && $('wp_msg').textContent === '');
+    w.wpClr(); w.wpClr(); await settle();
+    const cc = calls.filter((c) => c.url === '/rmwebpwd');
+    check('WP second tap POSTs act=clear', cc.length === 2 && cc[1].body === 'act=clear', JSON.stringify(cc));
+    check('WP status says not set after clear', $('wp_st').textContent === 'web login password: not set' && /open without a login/.test($('wp_msg').textContent));
+    webReply = { ok: false, err: 'pw', msg: 'The web password needs 1 to 19 plain characters.' };
+    $('wp_pw').value = 'okok'; $('wp_pw2').value = 'okok'; w.wpSet(); await settle(); webReply = null;
+    check('WP server refusal shows its sentence in red', $('wp_msg').textContent === 'The web password needs 1 to 19 plain characters.' && $('wp_msg').style.color === 'var(--mcred)');
+    fail = { '/rmwebpwd': 401 }; $('wp_pw').value = 'okok'; $('wp_pw2').value = 'okok'; w.wpSet(); await settle(); fail = {};
+    check('WP network/401 error is reported', $('wp_msg').textContent.length > 0 && $('wp_msg').style.color === 'var(--mcred)');
+    timers = [];
+    const src = fs.readFileSync(SRC, 'utf8');
+    check('WP route POST /rmwebpwd dispatches sub_web_passwd behind the same guards', /startsWith\("POST \/rmwebpwd"\)\)\s*\{[^}]*sub_web_passwd\(web_content_length\)/.test(src));
+    check('WP card prints only set / not set from node_webpwd', /strlen\(meshcom_settings\.node_webpwd\) > 0 \? WP_ST_SET : WP_ST_NOT/.test(src));
   }
 
   { // LED-08: setup controls, setparam handlers and info rows (source level; the markup comes from C++ printf calls)

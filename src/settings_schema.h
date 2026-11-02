@@ -152,6 +152,7 @@ size_t fieldCount();
             X("node_immsave",  CFG_BOOL, node_immediate_save,   CFG_NORANGE, CFG_NOESC)          \
             X("node_kblsync",  CFG_BOOL, node_kbl_sync,         CFG_NORANGE, CFG_NOESC)          \
             X("node_wifion",   CFG_BOOL, node_wifion,           CFG_NORANGE, CFG_NOESC)          \
+            X("node_bleon",    CFG_BOOL, node_bleon,            CFG_NORANGE, CFG_NOESC)          \
             X("node_blday",    CFG_INT,  node_bl_day,           CFG_NORANGE, CFG_NOESC)          \
             X("node_blnight",  CFG_INT,  node_bl_night,         CFG_NORANGE, CFG_NOESC)          \
             X("node_blauto",   CFG_BOOL, node_bl_auto,          CFG_NORANGE, CFG_NOESC)

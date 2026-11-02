@@ -29,6 +29,9 @@ const char *rmReadBody(char *buf, size_t cap, long content_length);
 /** POST /rmpasswd   act=set&pw=<pw>  |  act=clear   -> nodePasswdApply() */
 void sub_rm_passwd(long content_length);
 
+/** POST /rmwebpwd   act=set&pw=<pw>  |  act=clear   -> web login password (node_webpwd), WEB-PWD-01 */
+void sub_web_passwd(long content_length);
+
 /** GET /rmnodes   {"nodes":[{"slot":0,"used":1,"call":"DK5EN-1"},...3 entries]}   never a key */
 void sub_rm_nodes_get(void);
 

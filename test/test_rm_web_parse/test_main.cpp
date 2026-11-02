@@ -649,10 +649,34 @@ static void test_every_web_error_token_has_a_server_sentence(void)
 
 // ------------------------------------------------------------------------------------------ main
 
+// WEB-PWD-01: POST /rmwebpwd takes 1..19 printable characters (the RM password: 1..14), same act/form rules
+static void test_webpwd_body(void)
+{
+    Buf a("act=set&pw=0123456789012345678"); // 19
+    RmPwdReq r = rmParseWebPwdBody(a.b);
+    TEST_ASSERT_NULL(r.err);
+    TEST_ASSERT_EQUAL_STRING("0123456789012345678", r.pw);
+    Buf b("act=set&pw=01234567890123456789"); // 20
+    TEST_ASSERT_EQUAL_STRING("pw", rmParseWebPwdBody(b.b).err);
+    Buf c("act=set&pw=012345678901234"); // 15: too long for RM, fine for the web
+    TEST_ASSERT_NOT_NULL(rmParsePasswdBody(c.b).err);
+    Buf c2("act=set&pw=012345678901234");
+    TEST_ASSERT_NULL(rmParseWebPwdBody(c2.b).err);
+    Buf d("act=set&pw=none");
+    TEST_ASSERT_EQUAL_STRING("pw", rmParseWebPwdBody(d.b).err);
+    Buf e("act=clear");
+    r = rmParseWebPwdBody(e.b);
+    TEST_ASSERT_NULL(r.err);
+    TEST_ASSERT_TRUE(r.clear);
+    Buf f("act=clear&pw=x");
+    TEST_ASSERT_EQUAL_STRING("form", rmParseWebPwdBody(f.b).err);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
     RUN_TEST(test_passwd_table);
+    RUN_TEST(test_webpwd_body);
     RUN_TEST(test_passwd_null_body);
     RUN_TEST(test_nodes_table);
     RUN_TEST(test_send_table);

@@ -37,6 +37,13 @@
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 #include <t-deck/tdeck_main.h>
 #endif
+#if defined(BOARD_T_DECK_PRO)
+#include <t-deck-pro/tdeck_pro.h>
+#endif
+#if defined(BOARD_T5_EPAPER)
+#include <t5-epaper/t5epaper_main.h>
+#endif
+#include "batt_charge.h"
 
 // heapMonTimer body reads/writes these two globals, still defined (as plain,
 // non-static globals) in esp32_main.cpp.
@@ -406,6 +413,28 @@ void loopAction_battCheck(void)
 
         global_batt = read_batt();
         global_proz = mv_to_percent(global_batt);
+
+        #if defined(BOARD_T_DECK_PRO) || defined(BOARD_T5_EPAPER)
+        // BAT-04b: BQ25896 + BQ27220 charge state, every 5 s (shared I2C bus), only after both inits.
+        {
+            static uint32_t s_lastBqRead = 0;
+            #if defined(BOARD_T_DECK_PRO)
+            const bool bq_ok = peri_init_st[E_PERI_BQ25896] && peri_init_st[E_PERI_BQ27220];
+            #else
+            const bool bq_ok = peri_buf[E_PERI_BQ25896] && peri_buf[E_PERI_BQ27220];
+            #endif
+            const uint32_t bq_now = millis();
+            if(bq_ok && (s_lastBqRead == 0 || (uint32_t)(bq_now - s_lastBqRead) >= 5000UL))
+            {
+                s_lastBqRead = bq_now ? bq_now : 1;
+                BQ27220BatteryStatus bq_bs;
+                bq_bs.full = 0xFFFF;
+                bq27220.getBatteryStatus(&bq_bs);
+                const bool bq_batt = battBqPresent(bq_bs.full, bq27220.getVoltage());   // BATTPRES bit; voltage only if the read failed
+                global_batt_charge = battChargeFromBq(PPM.isVbusIn(), bq_batt, PPM.isCharging(), bq27220.getCurrent());
+            }
+        }
+        #endif
 
         const uint32_t sampleCount = battSampleCount();
         if(sampleCount != s_lastSampleCount)

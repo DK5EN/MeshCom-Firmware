@@ -33,6 +33,7 @@ using namespace ace_button;
 #include <lvgl.h>
 #include <WiFi.h>
 #include <esp32/esp32_audio.h>
+#include <esp32/esp32_main.h>   // TD-30: esp32SetWifiEnabled
 
 extern TFT_eSPI tft;
 
@@ -279,16 +280,13 @@ void btn_event_handler_setup_btn(lv_event_t * e)
         if (bDEBUG)
             Serial.println("[TDECK]...btn_event_handler - btn_wifi pressed");
 
-        meshcom_settings.node_wifion = lv_obj_has_state(btn_wifi, LV_STATE_CHECKED);
+        const bool wifi_want = lv_obj_has_state(btn_wifi, LV_STATE_CHECKED);
 
-        if (meshcom_settings.node_wifion)
+        if (wifi_want)
         {
             // turn webserver on and AP off
             commandAction((char*)"--wifiap off", false);
             commandAction((char*)"--webserver on", false);
-
-            // attempt to start WiFi immediately
-            startNetwork();
         }
         else
         {
@@ -296,10 +294,9 @@ void btn_event_handler_setup_btn(lv_event_t * e)
             commandAction((char*)"--webserver off", false);
             commandAction((char*)"--gateway off", false);
             commandAction((char*)"--wifiap off", false);
-            // disable WiFi and update header
-            WiFi.disconnect(true, true);
-            WiFi.mode(WIFI_OFF); // Explicitly turn off radio
         }
+        // TD-30: store + start/stop through the one shared function (console, icon, checkbox)
+        esp32SetWifiEnabled(wifi_want);
         save_settings();
         tdeck_update_header_wifi();
 

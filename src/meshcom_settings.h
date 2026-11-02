@@ -250,6 +250,8 @@
         M(bool, node_immediate_save, false)                                                          \
         M(bool, node_kbl_sync, true)                                                                 \
         M(bool, node_wifion, true)                                                                   \
+        /* TD-30: BLE advertising intent (header icon / ble on|off); stack stays initialised */    \
+        M(bool, node_bleon, true)                                                                    \
         /* TD-23 backlight: day and night level 1..16 (SYM+B), auto day/night switch */             \
         M(int, node_bl_day, 16)                                                                      \
         M(int, node_bl_night, 4)                                                                     \

@@ -28,6 +28,10 @@ static WebGuardVerdict check(const std::string &hdr, const char *path)
     return webGuardCheck(hdr.data(), hdr.size(), path);
 }
 
+#ifndef WEBPWD_ROUTE
+#define WEBPWD_ROUTE "/rmwebpwd"   // WEB-PWD-01 route under test
+#endif
+
 // request line + header lines (each given WITHOUT line end) + blank line
 static std::string req(const char *requestLine, std::initializer_list<const char *> headers)
 {
@@ -700,6 +704,28 @@ void test_request_applies_post_rm_without_second_space(void)
     TEST_ASSERT_TRUE(reqApplies("POST /rmpasswd\r\nContent-Length:10\r\n\r\n", "/", false));
 }
 
+// WEB-PWD-01: the web login password route gets exactly the /rmpasswd treatment -- guard applies without
+// MC_WEB_GUARD, no CORS, cross-origin POST refused. (The route was "/webpwd" first: neither the guard nor the
+// quiet request-line logging, both keyed on "/rm", covered it.)
+static void webpwd_route_case(const char *route)
+{
+    std::string line = std::string("POST ") + route + " HTTP/1.1";
+    std::string path = route;
+    std::string h = req(line.c_str(), {"Host: 192.168.68.71", "Origin: http://attacker.com"});
+    TEST_ASSERT_TRUE_MESSAGE(reqApplies(h.c_str(), path.c_str(), false), route);
+    TEST_ASSERT_TRUE_MESSAGE(webGuardIsRmRoute(h.c_str(), h.size()), route);
+    TEST_ASSERT_FALSE_MESSAGE(webGuardCorsAllowed(path.c_str(), true), route);
+    expect(WG_CROSS_SITE, h, path.c_str(), route);
+    std::string same = req(line.c_str(), {"Host: 192.168.68.71", "Origin: http://192.168.68.71"});
+    expect(WG_OK, same, path.c_str(), route);
+    // verdict identical to POST /rmpasswd
+    std::string r = req("POST /rmpasswd HTTP/1.1", {"Host: 192.168.68.71", "Origin: http://attacker.com"});
+    TEST_ASSERT_EQUAL_INT((int)check(r, "/rmpasswd"), (int)check(h, path.c_str()));
+    TEST_ASSERT_EQUAL(reqApplies(r.c_str(), "/rmpasswd", false), reqApplies(h.c_str(), path.c_str(), false));
+}
+
+void test_webpwd_route_covered_like_rmpasswd(void) { webpwd_route_case(WEBPWD_ROUTE); }
+
 void test_request_applies_get_rm_without_second_space(void)
 {
     TEST_ASSERT_TRUE(reqApplies("GET /rmstatus\r\n\r\n", "/", false));
@@ -933,6 +959,7 @@ int main(int, char **)
     RUN_TEST(test_guard_applies_wrapper_follows_compile_flag);
     RUN_TEST(test_request_applies_post_rm_without_second_space);
     RUN_TEST(test_request_applies_get_rm_without_second_space);
+    RUN_TEST(test_webpwd_route_covered_like_rmpasswd);
     RUN_TEST(test_request_applies_referer_remote_page);
     RUN_TEST(test_request_applies_plain_request_only_with_flag);
     RUN_TEST(test_request_applies_respects_len);

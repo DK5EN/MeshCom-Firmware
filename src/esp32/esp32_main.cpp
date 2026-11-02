@@ -504,6 +504,17 @@ static volatile bool s_bleResumeFailed = false;    // the last esp32BleResume() 
 static volatile bool s_bleGuard = false;           // BLE guard (spec 7): set/cleared by the loop task only; esp32BleResume() refuses while set
 static char s_bleManuf[60] = {0};                  // manufacturer data string, built once at boot
 
+// TD-30: the user's BLE on/off intent (T-Deck header icon / "--ble on|off"). Every advertising start
+// below asks this; AU pause/resume must not turn BLE back on after the user switched it off.
+static inline bool bleAdvWanted(void)
+{
+#if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO)
+    return meshcom_settings.node_bleon;
+#else
+    return true;
+#endif
+}
+
 // Loop-task side. True: the BLE objects may be used now, the caller MUST bleLifeUnlock().
 static inline bool bleLifeLock(void)
 {
@@ -557,7 +568,7 @@ static bool bleStackStart(bool startAdv)
     // NimBLEDevice::deinit(true) (AU-10 pause) would delete it with the server.
     pServer = NimBLEDevice::createServer();
     pServer->setCallbacks(&serverCallbacks, false);
-    pServer->advertiseOnDisconnect(true);
+    pServer->advertiseOnDisconnect(bleAdvWanted());   // TD-30
 
     // Create the BLE Service
     pService = pServer->createService(SERVICE_UUID);
@@ -616,7 +627,9 @@ static bool bleStackStart(bool startAdv)
     else
         pAdvertising->enableScanResponse(false);
 
-    if(startAdv)
+    if(startAdv && !bleAdvWanted())
+        printfdeb("[BLE ]...advertising off (user switched BLE off, TD-30)\n");
+    else if(startAdv)
         pAdvertising->start();
     else
     {
@@ -651,7 +664,8 @@ bool esp32BlePause(void)
     NimBLEDevice::stopAdvertising();
     if(deviceConnected || isPhoneReady != 0 || pServer->getConnectedCount() > 0)
     {
-        NimBLEDevice::getAdvertising()->start();
+        if(bleAdvWanted())   // TD-30
+            NimBLEDevice::getAdvertising()->start();
         xSemaphoreGive(s_bleLife);
         Serial.print("[AU];ble;pause;skip;phone\n");
         return false;
@@ -781,6 +795,63 @@ bool esp32BleResume(void)
 }
 
 
+
+// TD-30: BLE on/off at runtime, no reboot. NEVER deinit (crashes the S3, see esp32BleForcePause): off =
+// no advertising + no advertise-on-disconnect + every linked central dropped; on = advertise again.
+// The caller has already stored node_bleon. While an AU job has the stack paused only the flag counts
+// (esp32BleResume() honours it).
+void esp32SetBleEnabled(bool on)
+{
+#if !defined(DISABLE_BLE)
+    if(s_bleLife == NULL || s_bleDown || pServer == NULL)
+        return;
+    if(xSemaphoreTake(s_bleLife, pdMS_TO_TICKS(500)) != pdTRUE)
+        return;   // the loop backstop stops advertising and, every 5 s, drops a still-linked central
+    if(s_bleDown || pServer == NULL)
+    {
+        xSemaphoreGive(s_bleLife);
+        return;
+    }
+    pServer->advertiseOnDisconnect(on);
+    if(on)
+    {
+        NimBLEAdvertising *pAdv = NimBLEDevice::getAdvertising();
+        if(pAdv != NULL && !pAdv->isAdvertising())
+            pAdv->start();
+    }
+    else
+    {
+        NimBLEDevice::stopAdvertising();
+        std::vector<uint16_t> peers = pServer->getPeerDevices();
+        for(size_t i = 0; i < peers.size(); i++)
+            pServer->disconnect(peers[i]);
+    }
+    xSemaphoreGive(s_bleLife);
+    Serial.printf("[BLE ];enabled;%d\n", on ? 1 : 0);
+#else
+    (void)on;
+#endif
+}
+
+// TD-30: WLAN on/off, shared by the console ("--wifi on|off"), the T-Deck setup checkbox and the header
+// icon. Stores node_wifion, then starts or stops the network.
+#if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+void esp32SetWifiEnabled(bool on)
+{
+    meshcom_settings.node_wifion = on;
+    save_settings();
+    Serial.printf("[WIFI];wifion;%d\n", on ? 1 : 0);
+    if(on)
+        startNetwork();
+    else
+    {
+        WiFi.disconnect(true, true);
+        WiFi.mode(WIFI_OFF);
+        { extern bool hasIPaddress; hasIPaddress = false; }
+        meshcom_settings.node_hasIPaddress = false;
+    }
+}
+#endif
 
 // LRF W2b: the Module* of the radio, kept for the read-only chip diagnostic (esp32_radio_diag.h).
 static Module *g_radio_mod = nullptr;
@@ -3309,7 +3380,7 @@ void esp32loop()
             Serial.printf("[BOOT];ready;ms;%lu;ip;%d\n", (unsigned long)millis(),
                           (hasIPaddress || meshcom_settings.node_hasIPaddress) ? 1 : 0);
             #if defined(BENCH_BLE_ADV_LATE) && !defined(DISABLE_BLE)
-            if(bleLifeLock())   // AU-10: BLE may be paused by an update job
+            if(bleAdvWanted() && bleLifeLock())   // AU-10: BLE may be paused by an update job; TD-30: user may have it off
             {
                 NimBLEDevice::getAdvertising()->start();
                 bleLifeUnlock();
@@ -4532,13 +4603,28 @@ void esp32loop()
               )
             {
                 NimBLEAdvertising *pAdv = NimBLEDevice::getAdvertising();
-                if(pAdv != NULL && !pAdv->isAdvertising())
+                if(pAdv != NULL && !bleAdvWanted())
+                {
+                    // TD-30 backstop: the user switched BLE off, nothing may advertise (or stay linked)
+                    if(pAdv->isAdvertising())
+                        pAdv->stop();
+                }
+                else if(pAdv != NULL && !pAdv->isAdvertising())
                 {
                     bool ok = pAdv->start();
                     bleStatsOnAdvRestart(g_bleStats);
                     if(bBLEDEBUG)
                         Serial.printf("[BLE ];adv_restart;ms;%lu;ok;%d\n", (unsigned long)millis(), (int)ok);
                 }
+                bleLifeUnlock();
+            }
+            // TD-30 backstop, linked side: BLE switched off while a central is still linked (the
+            // disconnect in esp32SetBleEnabled() timed out on s_bleLife) -> drop it now
+            else if(deviceConnected && pServer != NULL && !bleAdvWanted() && bleLifeLock())
+            {
+                std::vector<uint16_t> peers = pServer->getPeerDevices();
+                for(size_t i = 0; i < peers.size(); i++)
+                    pServer->disconnect(peers[i]);
                 bleLifeUnlock();
             }
         }

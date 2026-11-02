@@ -28,6 +28,9 @@
 #include <extudp_target.h>
 #include <TinyGPSPlus.h>    // DIST fuer --mheard -- reine distanceBetween()-Rechnung, kein GPS-Modul noetig
 #include "udp_functions.h"
+#if defined(ESP32)
+#include <esp32/esp32_main.h>   // TD-30: esp32SetBleEnabled / esp32SetWifiEnabled
+#endif
 #include "gw_servers.h"   // GWU: gwCodes(), gwSelectNet() for --setnet / --gateway srv
 #include "radio_units.h"   // RF-01..RF-03 unit conversions
 #include "web_functions/web_auth.h" // WEB-AUTH-01: webAuthReset()
@@ -1731,7 +1734,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--netconsole            net console status\n");
             #endif
             #if defined(ESP32)
-            printdeb("--wifistat              WiFi link/counters\n--udpstat               MeshCom UDP RX/TX counters\n");
+            printdeb("--wifi on/off           WiFi radio (T-Deck, saved)\n--ble on/off            BLE advertising (T-Deck, saved)\n--wifistat              WiFi link/counters\n--udpstat               MeshCom UDP RX/TX counters\n");
             #endif
             #if defined(NRF52_SERIES)
             printdeb("--ethstat               Ethernet link/counters\n--dumpsettings          dump raw settings store\n");
@@ -6236,6 +6239,33 @@ void commandAction(char *umsg_text, bool ble)
         Serial.printf("[UDP];log;%d\n", bUDPLOG ? 1 : 0);
         return;
     }
+    else
+    if(commandCheck(msg_text+2, (char*)"wifi on") == 0 || commandCheck(msg_text+2, (char*)"wifi off") == 0)
+    {
+        // HL-01: the WLAN intent flag was GUI-only on the T-Deck
+        bool on = (commandCheck(msg_text+2, (char*)"wifi on") == 0);
+        #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+        esp32SetWifiEnabled(on);   // TD-30: shared with the setup checkbox and the header icon
+        #else
+        Serial.printf("[WIFI];wifion;n/a;note;only the T-Deck gates WLAN on node_wifion (requested %d)\n", on ? 1 : 0);
+        #endif
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"ble on") == 0 || commandCheck(msg_text+2, (char*)"ble off") == 0)
+    {
+        // TD-30: BLE advertising on/off at runtime, persisted (T-Deck; the stack stays initialised)
+        bool on = (commandCheck(msg_text+2, (char*)"ble on") == 0);
+        #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO)
+        meshcom_settings.node_bleon = on;
+        save_settings();
+        Serial.printf("[BLE ];bleon;%d\n", on ? 1 : 0);
+        esp32SetBleEnabled(on);
+        #else
+        Serial.printf("[BLE ];bleon;n/a;note;only the T-Deck gates BLE on node_bleon (requested %d)\n", on ? 1 : 0);
+        #endif
+        return;
+    }
     #endif
     else
     // --persiststat: every setting that is persisted but NEVER exported.
@@ -6276,7 +6306,7 @@ void commandAction(char *umsg_text, bool ble)
                       meshcom_settings.node_immediate_save ? 1 : 0,
                       meshcom_settings.node_mute ? 1 : 0);
 
-        Serial.printf("[PERSIST];ui;kblock;%d;bllock;%d;kllock;%d;kblsync;%d;map;%d;modus;%d;wifion;%d;blday;%d;blnight;%d;blauto;%d\n",
+        Serial.printf("[PERSIST];ui;kblock;%d;bllock;%d;kllock;%d;kblsync;%d;map;%d;modus;%d;wifion;%d;blday;%d;blnight;%d;blauto;%d;bleon;%d\n",
                       meshcom_settings.node_keyboardlock ? 1 : 0,
                       meshcom_settings.node_backlightlock ? 1 : 0,
                       meshcom_settings.node_kbllightlock ? 1 : 0,
@@ -6286,7 +6316,8 @@ void commandAction(char *umsg_text, bool ble)
                       meshcom_settings.node_wifion ? 1 : 0,
                       meshcom_settings.node_bl_day,
                       meshcom_settings.node_bl_night,
-                      meshcom_settings.node_bl_auto ? 1 : 0);
+                      meshcom_settings.node_bl_auto ? 1 : 0,
+                      meshcom_settings.node_bleon ? 1 : 0);
 
         // One path per line: these are free-text char[128] and a ';' inside a
         // path would otherwise split a field of the line above.
@@ -6539,29 +6570,6 @@ void commandAction(char *umsg_text, bool ble)
     {
         // TM-34 bench hook: driver-side disconnect + re-select, no config change
         wifiDrop();
-        return;
-    }
-    else
-    if(commandCheck(msg_text+2, (char*)"wifi on") == 0 || commandCheck(msg_text+2, (char*)"wifi off") == 0)
-    {
-        // HL-01: the WLAN intent flag was GUI-only on the T-Deck
-        bool on = (commandCheck(msg_text+2, (char*)"wifi on") == 0);
-        #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-        meshcom_settings.node_wifion = on;
-        save_settings();
-        Serial.printf("[WIFI];wifion;%d\n", on ? 1 : 0);
-        if(on)
-            startNetwork();
-        else
-        {
-            WiFi.disconnect(true, true);
-            WiFi.mode(WIFI_OFF);
-            { extern bool hasIPaddress; hasIPaddress = false; }
-            meshcom_settings.node_hasIPaddress = false;
-        }
-        #else
-        Serial.printf("[WIFI];wifion;n/a;note;only the T-Deck gates WLAN on node_wifion (requested %d)\n", on ? 1 : 0);
-        #endif
         return;
     }
     #endif
