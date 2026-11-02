@@ -1084,6 +1084,47 @@ static void test_real_lora_set_block_uses_prod_lock()
     TEST_ASSERT_TRUE_MESSAGE(blk.find("meshcom_settings.max_hop_text = iHop") == std::string::npos, "{SET} assigns max_hop_text from the raw field");
 }
 
+// WX-01 (upstream #999): --uv / --wind rows. Bit 0 / bit 1 of node_wx_flags, only on boards with
+// ENABLE_LTR390 / ENABLE_WIND; the ladder answers "not supported on this board" everywhere else.
+static void test_real_uv_wind_rows_use_node_wx_flags_bits()
+{
+    std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
+
+    std::string uvon = real_row(src, "\"--uv on\"");
+    std::string uvoff = real_row(src, "\"--uv off\"");
+    std::string wion = real_row(src, "\"--wind on\"");
+    std::string wioff = real_row(src, "\"--wind off\"");
+    TEST_ASSERT_FALSE_MESSAGE(uvon.empty() || uvoff.empty() || wion.empty() || wioff.empty(),
+        "one of the '--uv'/'--wind' on/off rows is missing in src/command_functions.cpp");
+
+    TEST_ASSERT_EQUAL_STRING("&bUVON", nth_field(uvon, 1).c_str());
+    TEST_ASSERT_EQUAL_STRING("&meshcom_settings.node_wx_flags", nth_field(uvon, 2).c_str());
+    TEST_ASSERT_EQUAL_STRING("0x0001", nth_field(uvon, 4).c_str());
+    TEST_ASSERT_EQUAL_STRING("0xFFFFFFFE", nth_field(uvoff, 3).c_str());
+    TEST_ASSERT_EQUAL_STRING("0x00000000", nth_field(uvoff, 4).c_str());
+    TEST_ASSERT_EQUAL_STRING("&bWINDON", nth_field(wion, 1).c_str());
+    TEST_ASSERT_EQUAL_STRING("&meshcom_settings.node_wx_flags", nth_field(wion, 2).c_str());
+    TEST_ASSERT_EQUAL_STRING("0x0002", nth_field(wion, 4).c_str());
+    TEST_ASSERT_EQUAL_STRING("0xFFFFFFFD", nth_field(wioff, 3).c_str());
+    TEST_ASSERT_EQUAL_STRING("0x00000000", nth_field(wioff, 4).c_str());
+
+    // rows sit inside the ENABLE_LTR390 / ENABLE_WIND guards
+    size_t g1 = src.find("#if defined(ENABLE_LTR390)", src.find("static const ToggleRow"));
+    TEST_ASSERT_TRUE_MESSAGE(g1 != std::string::npos && g1 < src.find("\"--uv on\""), "--uv rows not under ENABLE_LTR390");
+    size_t g2 = src.rfind("#if defined(ENABLE_WIND)", src.find("\"--wind on\""));
+    TEST_ASSERT_TRUE_MESSAGE(g2 != std::string::npos && g2 > g1, "--wind rows not under ENABLE_WIND");
+
+    // post hooks
+    TEST_ASSERT_TRUE(src.find("ltr390Begin()") != std::string::npos);
+    TEST_ASSERT_TRUE(src.find("ltr390End()") != std::string::npos);
+    TEST_ASSERT_TRUE(src.find("windBegin(") != std::string::npos);
+    TEST_ASSERT_TRUE(src.find("windEnd()") != std::string::npos);
+
+    // unsupported boards answer, change nothing
+    TEST_ASSERT_TRUE_MESSAGE(src.find("uv not supported on this board") != std::string::npos, "no unsupported answer for --uv");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("wind not supported on this board") != std::string::npos, "no unsupported answer for --wind");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1125,6 +1166,7 @@ int main(int, char **)
     RUN_TEST(test_real_extudp_off_row_has_a_non_null_post_action);
     RUN_TEST(test_real_extudp_off_post_action_resets_the_extern_socket);
     RUN_TEST(test_real_bmx_off_rung_clears_only_the_bmp390_bit_of_sset3);
+    RUN_TEST(test_real_uv_wind_rows_use_node_wx_flags_bits);
     RUN_TEST(test_real_charge_led_rows_mark_node_dirty);
     RUN_TEST(test_real_led_surfaces_are_wired);
     RUN_TEST(test_real_led_guards_are_wired);

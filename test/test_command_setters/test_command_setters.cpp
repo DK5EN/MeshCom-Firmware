@@ -12,6 +12,7 @@
 
 #include <unistd.h>
 
+#include <algorithm>
 #include <fstream>
 #include <regex>
 #include <sstream>
@@ -2040,10 +2041,176 @@ void test_bat04_info_charge_line_pin(void)
     TEST_ASSERT_TRUE_MESSAGE(blk.find("Charge: ") != std::string::npos, "no \"Charge: \" line");
 }
 
+// body of wxWindPinOk() (from its signature to the closing brace in column 0)
+static std::string wx_wind_pin_ok_body(const std::string &cmd)
+{
+    const size_t a = cmd.find("bool wxWindPinOk(int pin)\n{");
+    if(a == std::string::npos) return "";
+    const size_t b = cmd.find("\n}\n", a);
+    if(b == std::string::npos) return "";
+    return cmd.substr(a, b - a);
+}
+
+// Worst-case JSON size of one BLE register document, computed from the source block (no ArduinoJson in this
+// env): every key of the block counts (all #if branches on; a key that appears twice counts once), values by kind:
+// string literal as written, bool "false" = 5, float = 15 ("-1.23456789e-05"), int = 11 ("-2147483648").
+static size_t ble_doc_worst_json(const std::string &cmd, const char *docname, const char *typ, std::vector<std::string> *keys = nullptr)
+{
+    const std::string head = std::string(docname) + "[\"TYP\"] = \"" + typ + "\"";
+    const size_t a = cmd.find(head);
+    TEST_ASSERT_TRUE_MESSAGE(a != std::string::npos, head.c_str());
+    const size_t b = cmd.find(std::string("sendBleJsonRegister(") + docname + ")", a);
+    TEST_ASSERT_TRUE_MESSAGE(b != std::string::npos, docname);
+    const std::string blk = cmd.substr(a, b - a);
+
+    std::vector<std::pair<std::string, size_t>> kv;   // key -> value width
+    std::regex re(std::string(docname) + "\\[\"([A-Za-z0-9]+)\"\\] = ([^;]+);");
+    for(std::sregex_iterator it(blk.begin(), blk.end(), re), end; it != end; ++it)
+    {
+        const std::string key = (*it)[1], rhs = (*it)[2];
+        size_t w;
+        if(rhs[0] == '"') w = rhs.size();
+        else if(rhs.find("node_shunt") != std::string::npos || rhs.find("node_imax") != std::string::npos) w = 15;
+        else if(rhs == "false" || rhs == "true" || rhs.find("_found") != std::string::npos || std::regex_match(rhs, std::regex("b[A-Z0-9]+")) || rhs == "bLPS33") w = 5;
+        else w = 11;
+        bool seen = false;
+        for(auto &e : kv) if(e.first == key) { e.second = std::max(e.second, w); seen = true; }
+        if(!seen) kv.push_back({key, w});
+    }
+    size_t n = 2;   // { }
+    for(auto &e : kv) { n += e.first.size() + 2 /* quotes */ + 1 /* : */ + e.second + 1 /* , */; if(keys) keys->push_back(e.first); }
+    return n - 1;   // no comma after the last pair
+}
+
+// WX-01 (upstream #999): --windpin / --windcal. Source pins on the real rungs.
+static void test_windpin_windcal_rungs_validate_and_store()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+
+    const size_t pin = cmd.find("commandCheck(msg_text+2, (char*)\"windpin \") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(pin != std::string::npos, "no --windpin rung");
+    const size_t cal = cmd.find("commandCheck(msg_text+2, (char*)\"windcal \") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(cal != std::string::npos, "no --windcal rung");
+
+    const std::string pr = cmd.substr(pin, 1800);
+    TEST_ASSERT_TRUE_MESSAGE(pr.find("cmdStoreInt(") != std::string::npos, "--windpin does not parse via cmdStoreInt");
+    TEST_ASSERT_TRUE_MESSAGE(pr.find("wxWindPinOk(") != std::string::npos, "--windpin does not check the reserved pins");
+    TEST_ASSERT_TRUE_MESSAGE(pr.find("node_wind_pin") != std::string::npos, "--windpin does not store node_wind_pin");
+    TEST_ASSERT_TRUE_MESSAGE(pr.find("save_settings()") != std::string::npos, "--windpin does not save");
+
+    const std::string cr = cmd.substr(cal, 1200);
+    TEST_ASSERT_TRUE_MESSAGE(cr.find("cmdStoreFloat(") != std::string::npos, "--windcal does not parse via cmdStoreFloat");
+    TEST_ASSERT_TRUE_MESSAGE(cr.find("node_wind_cal") != std::string::npos, "--windcal does not store node_wind_cal");
+    TEST_ASSERT_TRUE_MESSAGE(cr.find("0.1, 100.0") != std::string::npos, "--windcal range is not 0.1..100");
+    TEST_ASSERT_TRUE_MESSAGE(cr.find("save_settings()") != std::string::npos, "--windcal does not save");
+
+    // pin check: the reserved list is built from the board macros and goes through wxPinAllowed
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("#include \"wx_pins.h\"") != std::string::npos, "wx_pins.h not included");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("wxPinAllowed(") != std::string::npos, "wxPinAllowed not used");
+    // ... searched INSIDE the wxWindPinOk body only (the same text elsewhere in the file must not satisfy it)
+    const std::string body = wx_wind_pin_ok_body(cmd);
+    TEST_ASSERT_TRUE_MESSAGE(!body.empty(), "no wxWindPinOk() body");
+    for(const char *m : {"LORA_CS", "LORA_NSS", "LORA_RST", "LORA_RESET", "LORA_DIO0", "LORA_DIO1", "LORA_DIO2",
+                         "SX1262X_CS", "SX1262X_IRQ", "SX1262X_RST", "SX1262X_GPIO",
+                         "SX1268_CS", "SX1268_IRQ", "SX1268_RST", "SX1268_GPIO",
+                         "SX126x_CS", "SX126x_IRQ", "SX126x_RST", "SX126x_GPIO",
+                         "RF95_SCK", "RF95_MISO", "RF95_MOSI", "RF95_NSS",
+                         "RADIO_SCLK_PIN", "RADIO_MISO_PIN", "RADIO_MOSI_PIN", "RADIO_CS_PIN", "RADIO_RST_PIN",
+                         "RADIO_IRQ_PIN", "RADIO_BUSY_PIN", "RADIO_SCK", "RADIO_MISO", "RADIO_MOSI",
+                         "PIN_LORA_NSS", "PIN_LORA_DIO_1", "PIN_LORA_NRST", "PIN_LORA_BUSY",
+                         "E22_NSS", "E22_BUSY", "E22_DIO1", "E22_NRST", "E22_RXEN", "E22_TXEN",
+                         "ETH_CS_PIN", "SDCARD_CS",
+                         "I2C_SDA", "I2C_SCL", "GPS_RX_PIN", "GPS_TX_PIN", "BUTTON_PIN"})
+    {
+        TEST_ASSERT_TRUE_MESSAGE(body.find(std::string("#if defined(") + m + ")") != std::string::npos, m);
+        TEST_ASSERT_TRUE_MESSAGE(body.find(std::string("WX_RES(") + m + ")") != std::string::npos, m);
+    }
+    for(const char *m : {"SS", "SCK", "MISO", "MOSI"})   // Arduino variant constants, not macros: unguarded
+        TEST_ASSERT_TRUE_MESSAGE(body.find(std::string("WX_RES(") + m + ")") != std::string::npos, m);
+    TEST_ASSERT_TRUE_MESSAGE(body.find("defined(CONFIG_IDF_TARGET_ESP32S3)") != std::string::npos, "no S3 switch");
+    // an EMPTY macro (LORA_DIO0 on the T-Beam Supreme) or a runtime expression (SS) must still compile:
+    // every entry goes through WX_RES(x) = (int)(x + 0); a bare (int)(X) cast is a syntax error for an empty X
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("#define WX_RES(x) , (int)(x + 0)") != std::string::npos, "WX_RES is not (int)(x + 0)");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("(int)(") == std::string::npos, "a reserved entry is a bare (int)(X) cast");
+    // octal PSRAM/flash (GPIO 33-37) and pins the chip does not have
+    TEST_ASSERT_TRUE_MESSAGE(body.find("CONFIG_SPIRAM_MODE_OCT") != std::string::npos, "no octal-PSRAM switch");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("pin < 0 || pin >= GPIO_NUM_MAX || !GPIO_IS_VALID_GPIO(pin)") != std::string::npos, "no GPIO validity check");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("is_s3, octal)") != std::string::npos, "octal flag not passed to wxPinAllowed");
+
+    // per board: the radio/SPI pins the variant really defines are in the reserved list (Heltec V3, T-Beam Supreme,
+    // E22 S3, T-Beam 1W, T3-S3, T-ETH-Elite, ESP32 E22 DevKit, T-Beam classic is in the Arduino core's LORA_* macros)
+    struct BoardPins { const char *cfg; std::vector<const char *> names; };
+    const std::vector<BoardPins> boards = {
+        {"variants/heltec_wifi_lora_32_V3/configuration.h", {"RF95_NSS", "RF95_SCK", "RF95_MISO", "RF95_MOSI", "LORA_RESET", "LORA_DIO1", "LORA_DIO2", "SX1262X_CS", "SX1262X_RST", "SX1262X_IRQ", "SX1262X_GPIO"}},
+        {"variants/ttgo_tbeam_supreme/configuration.h", {"LORA_NSS", "LORA_RESET", "LORA_DIO1", "LORA_DIO2", "SX1262X_CS", "SX1262X_RST", "SX1262X_IRQ", "SX1262X_GPIO"}},
+        {"variants/E22_1262_S3-DevKitC-1-N16R8/configuration.h", {"E22_DIO1", "E22_BUSY", "E22_RXEN", "E22_TXEN", "E22_NRST", "E22_NSS", "SX126x_CS", "SX126x_IRQ", "SX126x_RST", "SX126x_GPIO"}},
+        {"variants/LilyGo_T-Beam-1W/configuration.h", {"RADIO_CS_PIN", "RADIO_RST_PIN", "RADIO_IRQ_PIN", "RADIO_BUSY_PIN", "RADIO_SCLK_PIN", "RADIO_MISO_PIN", "RADIO_MOSI_PIN", "SDCARD_CS"}},
+        {"variants/LilyGo_T3_S3_V1_3/configuration.h", {"RADIO_CS_PIN", "RADIO_RST_PIN", "RADIO_IRQ_PIN", "RADIO_BUSY_PIN", "RADIO_SCLK_PIN", "RADIO_MISO_PIN", "RADIO_MOSI_PIN"}},
+        {"variants/T-ETH-ELITE_1262/configuration.h", {"RADIO_CS_PIN", "RADIO_RST_PIN", "RADIO_IRQ_PIN", "RADIO_BUSY_PIN", "RADIO_SCK", "RADIO_MISO", "RADIO_MOSI", "ETH_CS_PIN"}},
+        {"variants/E22_1262-DevKitC/configuration.h", {"LORA_CS", "LORA_RST", "LORA_DIO0", "LORA_DIO1", "E22_RXEN", "E22_TXEN"}},
+        {"variants/heltec_wifi_lora_32_V2/configuration.h", {"LORA_CS", "LORA_RST", "LORA_DIO0", "LORA_DIO1"}},
+    };
+    for(const BoardPins &b : boards)
+    {
+        const std::string cfg = read_repo_file(b.cfg);
+        for(const char *n : b.names)
+        {
+            const std::string msg = std::string(b.cfg) + ": " + n;
+            TEST_ASSERT_TRUE_MESSAGE(cfg.find(std::string("#define ") + n) != std::string::npos, (msg + " is not defined by the variant any more").c_str());
+            TEST_ASSERT_TRUE_MESSAGE(body.find(std::string("WX_RES(") + n + ")") != std::string::npos, (msg + " is not in the reserved list").c_str());
+        }
+    }
+
+    // unsupported boards: answered, nothing stored
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("windpin not supported on this board") != std::string::npos, "no unsupported answer for --windpin");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("windcal not supported on this board") != std::string::npos, "no unsupported answer for --windcal");
+}
+
+// WX-01: BLE budget. UV/UVF/WIND/WINDP sit in the "S1" register document, not in "SE": SE alone is 241 of
+// BLE_JSON_PAYLOAD_MAX 244 JSON bytes in the worst case (all ints at -2147483648), so any further key there makes
+// bleJsonFrameFailSoft drop USERPIN. Worst case computed from the source: SE 241 (223 with sane pins), S1 199 with
+// the four WX keys (56 bytes of it), both <= 244.
+static void test_wx_ble_keys_live_in_s1_and_fit_the_budget()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const std::string cfg = read_repo_file("src/configuration_global.h");
+    TEST_ASSERT_TRUE_MESSAGE(cfg.find("#define BLE_JSON_PAYLOAD_MAX 244") != std::string::npos, "BLE_JSON_PAYLOAD_MAX is not 244 any more");
+
+    std::vector<std::string> se_keys, s1_keys;
+    const size_t se = ble_doc_worst_json(cmd, "sensdoc", "SE", &se_keys);
+    const size_t s1 = ble_doc_worst_json(cmd, "sensdoc1", "S1", &s1_keys);
+    for(const char *k : {"UV", "UVF", "WIND", "WINDP"})
+    {
+        TEST_ASSERT_TRUE_MESSAGE(std::find(s1_keys.begin(), s1_keys.end(), k) != s1_keys.end(), (std::string(k) + " missing in S1").c_str());
+        TEST_ASSERT_TRUE_MESSAGE(std::find(se_keys.begin(), se_keys.end(), k) == se_keys.end(), (std::string(k) + " is in SE").c_str());
+    }
+    TEST_ASSERT_TRUE_MESSAGE(std::find(se_keys.begin(), se_keys.end(), "USERPIN") != se_keys.end(), "SE lost USERPIN");
+    char msg[96];
+    snprintf(msg, sizeof(msg), "SE worst case %u > 244", (unsigned)se);
+    TEST_ASSERT_TRUE_MESSAGE(se <= 244, msg);
+    snprintf(msg, sizeof(msg), "S1 worst case %u > 244", (unsigned)s1);
+    TEST_ASSERT_TRUE_MESSAGE(s1 <= 244, msg);
+}
+
+// WX-01: settings rows for the new members (ESP32 persisted, ranges as the sanitize rule).
+static void test_wx_settings_rows_and_defaults()
+{
+    const std::string st = read_repo_file("src/meshcom_settings.h");
+    TEST_ASSERT_TRUE(st.find("M(int, node_wx_flags, 0)") != std::string::npos);
+    TEST_ASSERT_TRUE(st.find("M(int, node_wind_pin, 0)") != std::string::npos);
+    TEST_ASSERT_TRUE(st.find("M(float, node_wind_cal, 2.4f)") != std::string::npos);
+    const std::string sc = read_repo_file("src/settings_schema.h");
+    TEST_ASSERT_TRUE(sc.find("\"node_windpin\", CFG_INT, node_wind_pin, 0.0, 48.0") != std::string::npos);
+    TEST_ASSERT_TRUE(sc.find("\"node_windcal\", CFG_FLT, node_wind_cal, 0.1, 100.0") != std::string::npos);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
     RUN_TEST(test_a_plain_number_parses);
+    RUN_TEST(test_windpin_windcal_rungs_validate_and_store);
+    RUN_TEST(test_wx_ble_keys_live_in_s1_and_fit_the_budget);
+    RUN_TEST(test_wx_settings_rows_and_defaults);
     RUN_TEST(test_a_non_numeric_argument_is_zero_not_leftover);
     RUN_TEST(test_leading_space_is_skipped);
     RUN_TEST(test_trailing_junk_still_yields_the_leading_number);

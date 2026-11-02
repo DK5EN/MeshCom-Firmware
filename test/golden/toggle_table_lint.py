@@ -750,9 +750,9 @@ def self_test() -> int:
     real_rows, real_hard, real_warn = run_checks(real_table, real_text,
                                                  require_pinned=True)
     expect(
-        "the real tree has 84 rows and no hard failures (%d rows, %d hard, %d warn)"
+        "the real tree has 88 rows and no hard failures (%d rows, %d hard, %d warn)"
         % (len(real_rows), len(real_hard), len(real_warn)),
-        len(real_rows) == 84 and real_hard == [],   # 84 since --charge led on/off (upstream #1196, 2026-10-11)
+        len(real_rows) == 88 and real_hard == [],   # 88 since --uv/--wind on/off (WX-01, 2026-11-02)
     )
     if real_hard:
         for h in real_hard:
