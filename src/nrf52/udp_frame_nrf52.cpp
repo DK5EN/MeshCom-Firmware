@@ -624,6 +624,15 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                     addBLEOutBuffer(convBuffer, size);
                 }
               }
+              else
+              if(!bSrcUnconfigured && msg_type_b == MSG_TYPE_TEXT &&
+                 strcmp(destination_call, meshcom_settings.node_call) == 0)
+              {
+                // TXP-02: own-call DM is handled locally (bUDPtoLoraSend=false above) but its id must
+                // still enter the dedup ring, or the LoRa copy is "new" and uploaded to the server again
+                addLoraRxBuffer(aprsmsg.msg_id, true);
+                stat_newid.fetch_add(1);
+              }
             }
           }
         }

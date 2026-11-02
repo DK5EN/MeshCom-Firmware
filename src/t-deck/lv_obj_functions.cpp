@@ -580,6 +580,37 @@ static void msg_input_budget_cb(lv_event_t *e)
     msg_budget_busy = false;
 }
 
+// TD-28: a one-line textarea whose content (line + padding + border) is taller
+// than the widget scrolls vertically with the cursor. Centre the line with
+// symmetric padding that fits, drop the scrollbar and forbid vertical scroll.
+// Call after the style is attached (the font is resolved from the style chain).
+static void tdeck_ta_oneline_fit(lv_obj_t *ta)
+{
+    if(ta == NULL)
+        return;
+
+    lv_obj_update_layout(ta);   // sizes are applied lazily in LVGL 8; get the real height
+    const lv_font_t *font = lv_obj_get_style_text_font(ta, LV_PART_MAIN);
+    lv_coord_t bw = lv_obj_get_style_border_width(ta, LV_PART_MAIN);
+    lv_coord_t room = lv_obj_get_height(ta) - 2 * bw - lv_font_get_line_height(font);
+    lv_coord_t pad = room > 0 ? room / 2 : 0;
+
+    lv_obj_set_style_pad_top(ta, pad, LV_PART_MAIN);
+    lv_obj_set_style_pad_bottom(ta, pad, LV_PART_MAIN);
+    lv_obj_set_scrollbar_mode(ta, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_scroll_dir(ta, LV_DIR_HOR);
+}
+
+// TD-27: table cell with TEXT_CROP, so a long text is clipped instead of
+// wrapping into a second row (single-row tables only).
+static void tdeck_tbl_set(lv_obj_t *table, uint16_t row, uint16_t col, const char *txt)
+{
+    // ctrl first: lv_table_add_cell_ctrl() does not recompute the row height,
+    // lv_table_set_cell_value() does and keeps the ctrl byte (LVGL 8.3).
+    lv_table_add_cell_ctrl(table, row, col, LV_TABLE_CELL_CTRL_TEXT_CROP);
+    lv_table_set_cell_value(table, row, col, txt);
+}
+
 void setDisplayLayout(lv_obj_t *parent)
 {
     static lv_style_t lable_style;
@@ -751,7 +782,7 @@ void setDisplayLayout(lv_obj_t *parent)
     lv_style_set_line_width(&ta_style, 4);
 
     static lv_style_t tr_style;
-    lv_style_set_text_font(&tr_style, &lv_font_unscii_16);
+    lv_style_set_text_font(&tr_style, &mc_font_latin_12); // TD-29: same font as the table pages
     lv_style_set_text_color(&tr_style, lv_color_black());
     lv_style_set_bg_opa(&tr_style, LV_OPA_100);
     lv_style_set_bg_color(&tr_style, lv_color_white());
@@ -1446,6 +1477,16 @@ void setDisplayLayout(lv_obj_t *parent)
     lv_obj_add_style(setup_mtone, &ta_style, LV_PART_MAIN);
     lv_obj_add_style(setup_mtone, &ta_input_cursor, LV_PART_CURSOR | LV_STATE_FOCUSED);
 
+    // TD-28: every one-line setup field: padding fitted to the height, no vertical scroll
+    {
+        lv_obj_t *oneline[] = {setup_callsign, setup_name, setup_comment, setup_lat, setup_lat_c,
+                               setup_alt, setup_lon, setup_lon_c, setup_wifissid, setup_wifipassword,
+                               setup_grc0, setup_grc1, setup_grc2, setup_grc3, setup_grc4, setup_grc5,
+                               setup_utc, setup_txpower, setup_stone, setup_mtone};
+        for(lv_obj_t *o : oneline)
+            tdeck_ta_oneline_fit(o);
+    }
+
     // Line Persist
     lv_obj_t * setup_line_persist = SET_new_line(t1, setup_line_messagetone, 5);
 
@@ -1599,7 +1640,7 @@ void setDisplayLayout(lv_obj_t *parent)
     lv_table_set_row_cnt(position_ta, 1);
     lv_table_set_col_cnt(position_ta, 3);
 
-    lv_table_set_col_width(position_ta, 0, 84); // call
+    lv_table_set_col_width(position_ta, 0, 84); // call, TD-27: 80 px text >= 73 px, cells cropped
     lv_table_set_col_width(position_ta, 1, 40); // time
     lv_table_set_col_width(position_ta, 2, 174); // postxt
 
@@ -1654,14 +1695,23 @@ void setDisplayLayout(lv_obj_t *parent)
     lv_textarea_set_cursor_click_pos(track_ta, false);
     lv_textarea_set_text_selection(track_ta, false);
     lv_textarea_set_cursor_pos(track_ta, 0);
-    lv_obj_set_size(track_ta, 300, LV_VER_RES * 0.72);
+    // TD-29: page without padding/scroll (166 px high); 9 lines x 17 px = 153 px
+    // + 2x2 pad + 2x2 border = 161 px; SEND POS sits right of the text, not below
+    lv_obj_set_style_pad_all(t6, 0, LV_PART_MAIN);
+    lv_obj_set_scroll_dir(t6, LV_DIR_NONE);
+    lv_obj_set_scrollbar_mode(t6, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_size(track_ta, 196, 163);
+    lv_obj_set_pos(track_ta, 2, 1);
     lv_textarea_set_text(track_ta, "");
     lv_textarea_set_max_length(track_ta, 1000);
-    lv_obj_align(track_ta, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_style(track_ta, &tr_style, LV_PART_MAIN);
+    lv_obj_set_style_pad_hor(track_ta, 4, LV_PART_MAIN);
+    lv_obj_set_style_pad_ver(track_ta, 2, LV_PART_MAIN);
+    lv_obj_set_scrollbar_mode(track_ta, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_scroll_dir(track_ta, LV_DIR_NONE);
 
     lv_obj_t * btsendpos = lv_btn_create(t6);
-    lv_obj_set_pos(btsendpos, 180, 150);
+    lv_obj_set_pos(btsendpos, 208, 4);
     lv_obj_set_size(btsendpos, 100, 20);
     lv_obj_add_event_cb(btsendpos, btn_event_handler_sendpos, LV_EVENT_ALL, NULL);
 
@@ -1683,21 +1733,21 @@ void setDisplayLayout(lv_obj_t *parent)
     lv_table_set_row_cnt(mh_ta, 1);
     lv_table_set_col_cnt(mh_ta, 7);
 
-    lv_table_set_col_width(mh_ta, 0, 76);
+    lv_table_set_col_width(mh_ta, 0, 84); // TD-27: 80 px text >= 73 px DL4MFH-55
     lv_table_set_col_width(mh_ta, 1, 40);
     lv_table_set_col_width(mh_ta, 2, 35);
-    lv_table_set_col_width(mh_ta, 3, 62);
+    lv_table_set_col_width(mh_ta, 3, 54); // HW, clipped (TD-27)
     lv_table_set_col_width(mh_ta, 4, 30);
     lv_table_set_col_width(mh_ta, 5, 30);
     lv_table_set_col_width(mh_ta, 6, 25);
 
-    lv_table_set_cell_value(mh_ta, 0, 0, "Call");
-    lv_table_set_cell_value(mh_ta, 0, 1, "Time");
-    lv_table_set_cell_value(mh_ta, 0, 2, "Typ");
-    lv_table_set_cell_value(mh_ta, 0, 3, "HW");
-    lv_table_set_cell_value(mh_ta, 0, 4, "SSI");
-    lv_table_set_cell_value(mh_ta, 0, 5, "SNR");
-    lv_table_set_cell_value(mh_ta, 0, 6, "NC");
+    tdeck_tbl_set(mh_ta, 0, 0, "Call");
+    tdeck_tbl_set(mh_ta, 0, 1, "Time");
+    tdeck_tbl_set(mh_ta, 0, 2, "Typ");
+    tdeck_tbl_set(mh_ta, 0, 3, "HW");
+    tdeck_tbl_set(mh_ta, 0, 4, "SSI");
+    tdeck_tbl_set(mh_ta, 0, 5, "SNR");
+    tdeck_tbl_set(mh_ta, 0, 6, "NC");
 
     // lv_obj_set_height(mh_ta, LV_VER_RES * 0.6);
 
@@ -1717,13 +1767,13 @@ void setDisplayLayout(lv_obj_t *parent)
     lv_table_set_row_cnt(path_ta, 1);
     lv_table_set_col_cnt(path_ta, 3);
 
-    lv_table_set_col_width(path_ta, 0, 76);
+    lv_table_set_col_width(path_ta, 0, 84); // TD-27
     lv_table_set_col_width(path_ta, 1, 40);
-    lv_table_set_col_width(path_ta, 2, 182);
+    lv_table_set_col_width(path_ta, 2, 174);
 
-    lv_table_set_cell_value(path_ta, 0, 0, "Call");
-    lv_table_set_cell_value(path_ta, 0, 1, "Time");
-    lv_table_set_cell_value(path_ta, 0, 2, "Path");
+    tdeck_tbl_set(path_ta, 0, 0, "Call");
+    tdeck_tbl_set(path_ta, 0, 1, "Time");
+    tdeck_tbl_set(path_ta, 0, 2, "Path");
 
     // lv_obj_set_height(path_ta, LV_VER_RES * 0.6);
 
@@ -1768,8 +1818,8 @@ void setDisplayLayout(lv_obj_t *parent)
     dm_callsign = lv_textarea_create(msg_controls);
     lv_textarea_set_one_line(dm_callsign, true);
     lv_textarea_set_text_selection(dm_callsign, false);
-    lv_obj_set_pos(dm_callsign, 6, 5);
-    lv_obj_set_size(dm_callsign, 165, 30);
+    lv_obj_set_pos(dm_callsign, 6, 4);
+    lv_obj_set_size(dm_callsign, 165, 32); // TD-28: 22 line + 2x3 pad + 2x2 border = 32
     lv_textarea_set_text(dm_callsign, "");
     lv_textarea_set_max_length(dm_callsign, 9);
     lv_obj_add_style(dm_callsign, &ta_style, LV_PART_MAIN);
@@ -1777,6 +1827,7 @@ void setDisplayLayout(lv_obj_t *parent)
     lv_textarea_set_accepted_chars(dm_callsign, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-");
     lv_textarea_set_placeholder_text(dm_callsign, "To Call or Group");
     lv_obj_clear_flag(dm_callsign, LV_OBJ_FLAG_SCROLLABLE);
+    tdeck_ta_oneline_fit(dm_callsign);
     lv_obj_add_event_cb(dm_callsign, msg_input_budget_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
     lv_obj_t * btn = lv_btn_create(msg_controls);
@@ -4263,7 +4314,7 @@ void loadPosPersistence()
 
             posrow++;
 
-            lv_table_set_cell_value(position_ta, posrow, 0, s_pos.c_str());
+            tdeck_tbl_set(position_ta, posrow, 0, s_pos.c_str());
 
             if(file.read(pos, 6) != 6)
                 break;
@@ -4272,7 +4323,7 @@ void loadPosPersistence()
             snprintf(u_pos, sizeof(u_pos), "%s", pos);
             s_pos = u_pos;
             s_pos.trim();
-            lv_table_set_cell_value(position_ta, posrow, 1, s_pos.c_str());
+            tdeck_tbl_set(position_ta, posrow, 1, s_pos.c_str());
 
             if(file.read(pos, 24) != 24)
                 break;
@@ -4281,7 +4332,7 @@ void loadPosPersistence()
             snprintf(u_pos, sizeof(u_pos), "%s", pos);
             s_pos = u_pos;
             s_pos.trim();
-            lv_table_set_cell_value(position_ta, posrow, 2, s_pos.c_str());
+            tdeck_tbl_set(position_ta, posrow, 2, s_pos.c_str());
 
             // TD-15: the map markers live in their own arrays, restore them too
             double r_lat = 0.0, r_lon = 0.0;
@@ -4342,9 +4393,9 @@ void tdeck_add_to_pos_view(String callsign, double u_dlat, char lat_c, double u_
 
             if(pos_push != pos_next_push)
             {
-                lv_table_set_cell_value(position_ta, pos_next_push, 0, lv_table_get_cell_value(position_ta, pos_push, 0));
-                lv_table_set_cell_value(position_ta, pos_next_push, 1, lv_table_get_cell_value(position_ta, pos_push, 1));
-                lv_table_set_cell_value(position_ta, pos_next_push, 2, lv_table_get_cell_value(position_ta, pos_push, 2));
+                tdeck_tbl_set(position_ta, pos_next_push, 0, lv_table_get_cell_value(position_ta, pos_push, 0));
+                tdeck_tbl_set(position_ta, pos_next_push, 1, lv_table_get_cell_value(position_ta, pos_push, 1));
+                tdeck_tbl_set(position_ta, pos_next_push, 2, lv_table_get_cell_value(position_ta, pos_push, 2));
             }
 
             pos_next_push--;
@@ -4352,13 +4403,13 @@ void tdeck_add_to_pos_view(String callsign, double u_dlat, char lat_c, double u_
     }
 
     snprintf(buf, 10, "%s", callsign.c_str());
-    lv_table_set_cell_value(position_ta, 1, 0, buf);
+    tdeck_tbl_set(position_ta, 1, 0, buf);
 
     snprintf(buf, 6, "%02i:%02i", meshcom_settings.node_date_hour, meshcom_settings.node_date_minute);
-    lv_table_set_cell_value(position_ta, 1, 1, buf);
+    tdeck_tbl_set(position_ta, 1, 1, buf);
 
     snprintf(buf, 24, "%.2lf%c/%.2lf%c/%i", u_dlat, lat_c, u_dlon, lon_c, alt);
-    lv_table_set_cell_value(position_ta, 1, 2, buf);
+    tdeck_tbl_set(position_ta, 1, 2, buf);
 
     if(bnotfound && posrow < MAX_POSROW)
         posrow++;
@@ -5045,13 +5096,13 @@ void tdeck_refresh_mh_view()
     char buf[24];
     uint16_t row = 0;
 
-    lv_table_set_cell_value(mh_ta, row, 0, (char*)"Call");
-    lv_table_set_cell_value(mh_ta, row, 1, (char*)"Time");
-    lv_table_set_cell_value(mh_ta, row, 2, (char*)"Typ");
-    lv_table_set_cell_value(mh_ta, row, 3, (char*)"HW");
-    lv_table_set_cell_value(mh_ta, row, 4, (char*)"SSI");
-    lv_table_set_cell_value(mh_ta, row, 5, (char*)"SNR");
-    lv_table_set_cell_value(mh_ta, row, 6, (char*)"NC");
+    tdeck_tbl_set(mh_ta, row, 0, (char*)"Call");
+    tdeck_tbl_set(mh_ta, row, 1, (char*)"Time");
+    tdeck_tbl_set(mh_ta, row, 2, (char*)"Typ");
+    tdeck_tbl_set(mh_ta, row, 3, (char*)"HW");
+    tdeck_tbl_set(mh_ta, row, 4, (char*)"SSI");
+    tdeck_tbl_set(mh_ta, row, 5, (char*)"SNR");
+    tdeck_tbl_set(mh_ta, row, 6, (char*)"NC");
     row++;
 
     for (int k = 0; k < n; k++)
@@ -5061,31 +5112,31 @@ void tdeck_refresh_mh_view()
             continue;
 
         snprintf(buf, sizeof(buf), "%s", v.call);
-        lv_table_set_cell_value(mh_ta, row, 0, buf);
+        tdeck_tbl_set(mh_ta, row, 0, buf);
 
         tdeckFormatTimeOrAge(v.age_min, buf, sizeof(buf));
-        lv_table_set_cell_value(mh_ta, row, 1, buf);
+        tdeck_tbl_set(mh_ta, row, 1, buf);
 
         snprintf(buf, sizeof(buf), "%s", nbrPayloadTypeName(v.plt));
-        lv_table_set_cell_value(mh_ta, row, 2, buf);
+        tdeck_tbl_set(mh_ta, row, 2, buf);
 
         snprintf(buf, sizeof(buf), "%s", nbrHardwareName(v.hw));
-        lv_table_set_cell_value(mh_ta, row, 3, buf);
+        tdeck_tbl_set(mh_ta, row, 3, buf);
 
         if (v.rssi == NBR_MH_RSSI_UNKNOWN)
             snprintf(buf, sizeof(buf), "   -");
         else
             snprintf(buf, sizeof(buf), "%4d", (int)v.rssi);
-        lv_table_set_cell_value(mh_ta, row, 4, buf);
+        tdeck_tbl_set(mh_ta, row, 4, buf);
 
         if (v.snr == NBR_SNR_UNKNOWN)
             snprintf(buf, sizeof(buf), "   -");
         else
             snprintf(buf, sizeof(buf), "%4d", (int)v.snr);
-        lv_table_set_cell_value(mh_ta, row, 5, buf);
+        tdeck_tbl_set(mh_ta, row, 5, buf);
 
         snprintf(buf, sizeof(buf), "%4u", (unsigned)v.ncnt);
-        lv_table_set_cell_value(mh_ta, row, 6, buf);
+        tdeck_tbl_set(mh_ta, row, 6, buf);
 
         row++;
     }
@@ -5108,9 +5159,9 @@ void tdeck_refresh_path_view()
     char via[48];
     uint16_t row = 0;
 
-    lv_table_set_cell_value(path_ta, row, 0, (char*)"Call");
-    lv_table_set_cell_value(path_ta, row, 1, (char*)"Time");
-    lv_table_set_cell_value(path_ta, row, 2, (char*)"Path");
+    tdeck_tbl_set(path_ta, row, 0, (char*)"Call");
+    tdeck_tbl_set(path_ta, row, 1, (char*)"Time");
+    tdeck_tbl_set(path_ta, row, 2, (char*)"Path");
     row++;
 
     int count = nbrRouteCount(nbrMatrix, now_min);
@@ -5122,14 +5173,14 @@ void tdeck_refresh_path_view()
             continue;
 
         snprintf(buf, sizeof(buf), "%s", v.call);
-        lv_table_set_cell_value(path_ta, row, 0, buf);
+        tdeck_tbl_set(path_ta, row, 0, buf);
 
         tdeckFormatTimeOrAge(v.age_min, buf, sizeof(buf));
-        lv_table_set_cell_value(path_ta, row, 1, buf);
+        tdeck_tbl_set(path_ta, row, 1, buf);
 
         tdeckAppendVia(v.entry, via, sizeof(via));
         snprintf(buf, sizeof(buf), "%u%s/%s", (unsigned)v.hops, v.gw ? "G" : "", via);
-        lv_table_set_cell_value(path_ta, row, 2, buf);
+        tdeck_tbl_set(path_ta, row, 2, buf);
 
         row++;
     }

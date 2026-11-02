@@ -429,6 +429,29 @@ static void test_batt03_ein_schlechtes_fenster_kippt_nicht(void)
     TEST_ASSERT_FLOAT_WITHIN(1.0f, 3990.0f, mv);
 }
 
+// BAT-05: cell hot-plugged into a node that booted without one. Floating phase latches "no
+// battery", then a stable 4.12 V cell (+-6 mV ADC noise, small window spread) must flip back to
+// present within 4 windows of 30 s (2 min, not the 5.5 min of the sample-count streak) and report a value again.
+static void test_bat05_hotplug_zelle_wird_wieder_erkannt(void)
+{
+    uint32_t t = 0;
+    float mv = 1.0f;
+    for(int i = 0; i < 3 * BATT_DETECT_ABSENT_STREAK; i++, t += 30000)
+        mv = battFeedSampleSpread(kNoCellSeries[i % kNoCellN], kNoCellSpreadMv, kSwitchedMaxMv, t);
+    TEST_ASSERT_FALSE(battDetected());
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, mv);
+
+    const float noise[] = {0, 4, -5, 6, -3, 2, -6, 5, -2, 3};
+    // first cell window is implausible (jump from the floating phase), then 3 good windows (~2 min)
+    const int bound = 4;
+    int n = 0;
+    for(; n < bound && !battDetected(); n++, t += 30000)
+        mv = battFeedSampleSpread(4120.0f + noise[n % 10], 25.0f, kSwitchedMaxMv, t);
+    TEST_ASSERT_TRUE_MESSAGE(battDetected(), "BAT-05: cell not re-detected");
+    TEST_ASSERT_TRUE(battHardwarePresent());
+    TEST_ASSERT_FLOAT_WITHIN(20.0f, 4120.0f, mv);
+}
+
 // battFeedSample() is battFeedSampleSpread(..., BATT_DETECT_SPREAD_NONE, ...): identical results.
 static void test_batt03_feedsample_delegiert_ohne_spread(void)
 {
@@ -640,6 +663,7 @@ int main(int, char **)
     RUN_TEST(test_batt03_zelle_mit_kleinem_spread_bleibt_present);
     RUN_TEST(test_batt03_ein_schlechtes_fenster_kippt_nicht);
     RUN_TEST(test_batt03_feedsample_delegiert_ohne_spread);
+    RUN_TEST(test_bat05_hotplug_zelle_wird_wieder_erkannt);
     RUN_TEST(test_teleport_core_across_wrap_matches_unwrapped_run);
     RUN_TEST(test_teleport_core_hop_1h);
     RUN_TEST(test_teleport_core_hop_2p31_minus_1);

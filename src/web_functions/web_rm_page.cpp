@@ -67,22 +67,22 @@ void sub_page_remote()
                        ".rmtile{min-height:3.4em;justify-content:center;text-align:center;}\n"
                        ".rmarmed{background:var(--mcmidred);font-weight:bold;}\n"
                        "#rm_page button:disabled{opacity:0.45;cursor:default;}\n"
-                       ".rmsw:indeterminate{background-color:#d4d4d4;}\n"
+                       ".rmsw:indeterminate{background-color:var(--mcsw0);}\n"
                        ".rmsw:indeterminate::before{left:.9em;}");
     web_client.println("#rm_upd_chan button.rmsel:disabled{opacity:1;color:inherit;border:solid 2px var(--mcgray);font-weight:bold;}");
-    web_client.println(".rmok{color:#1a7f37;font-weight:bold;}\n"
+    web_client.println(".rmok{color:var(--mcok);font-weight:bold;}\n"
                        ".rmbad{color:var(--mcred);font-weight:bold;}\n"
                        ".rmlock{font-weight:bold;}\n"
                        "#rm_msg{min-height:1.4em;}\n"
                        ".rmtab{width:100%;border-collapse:collapse;}\n"
-                       ".rmtab th,.rmtab td{padding:2px 5px;text-align:left;vertical-align:top;border-bottom:solid 1px #e0e0e0;}");
+                       ".rmtab th,.rmtab td{padding:2px 5px;text-align:left;vertical-align:top;border-bottom:solid 1px var(--mcline);}");
     web_client.println("#rm_msgs td:nth-child(2),#rm_msgs td:nth-child(4),#rm_log td:nth-child(3),#rm_log td:nth-child(4),#rm_log td:nth-child(5){overflow-wrap:anywhere;}\n"
                        "#rm_msgs td:nth-child(1),#rm_log td:nth-child(1),.rmtab button{white-space:nowrap;}");
     web_client.println("@media (max-width:600px){.rmtab thead{display:none;}\n"
                        ".rmtab,#rm_msgs,#rm_log{display:block;}\n"
                        ".rmw{grid-template-columns:1fr max-content;}\n"
                        ".rmw>:first-child{grid-column:1/3;}\n"
-                       "#rm_msgs tr,#rm_log tr{display:block;padding:3px 0;border-bottom:solid 1px #e0e0e0;}");
+                       "#rm_msgs tr,#rm_log tr{display:block;padding:3px 0;border-bottom:solid 1px var(--mcline);}");
     web_client.println("#rm_msgs td,#rm_log td{display:inline-block;border:0;padding:1px 8px 1px 0;}\n"
                        "#rm_msgs td:nth-child(2),#rm_msgs td:nth-child(4),#rm_log td:nth-child(4),#rm_log td:nth-child(5){display:block;}");
     web_client.println("#rm_log td:nth-child(2)::before{content:\"from \";}\n"
@@ -353,7 +353,7 @@ void rmScaffoldJs()
     web_client.println("function rmTiles(p,c,o,a){var g=rmNew('div','mbx-counters'),i,d;p.appendChild(g);for(i=0;i<a.length;i+=2){d=g.appendChild(rmNew('div','',a[i+1]));d.appendChild(rmNew('b','',o[a[i]]||'-','rm_v_'+c+'_'+a[i]));}}");
     web_client.println("function rmTxqView(p,o){var m=/^(\\d+)\\/(\\d+)$/.exec(o.q||''),b=m?+m[2]:0,f=b>60?Math.round(m[1]*60/b):m?+m[1]:0,v=['quiet','qrs','qrt'].indexOf(o.bp),x=p.appendChild(rmNew('div','mcq-bar')),s,i;\n"
                        "for(i=0;i<Math.min(b,60);i++)x.appendChild(rmNew('div',i<f?'mcq-cell':'mcq-cell-empty')).style.background=i<f?'#3B7DD8':'';");
-    web_client.println("x=p.appendChild(rmNew('div','font-small',(m?o.q:'-')+' queued, state ','rm_v_txq_q'));s=x.appendChild(rmNew('span',['rmok','','rmbad'][v],v<0?o.bp||'-':['quiet','slow down','hold'][v],'rm_v_txq_bp'));if(v==1)s.style.color='#E07B39';\n"
+    web_client.println("x=p.appendChild(rmNew('div','font-small',(m?o.q:'-')+' queued, state ','rm_v_txq_q'));s=x.appendChild(rmNew('span',['rmok','','rmbad'][v],v<0?o.bp||'-':['quiet','slow down','hold'][v],'rm_v_txq_bp'));if(v==1)s.style.color='var(--mcsw2)';\n"
                        "x=p.appendChild(rmNew('div','mcq-util-row'));x.appendChild(rmNew('span','mcq-util-label','use '+(isNaN(o.u)?'-':o.u+' %'),'rm_v_txq_u'));");
     web_client.println("x.appendChild(rmNew('div','mcq-util-track')).appendChild(rmNew('div')).style.cssText='height:100%;width:'+(parseInt(o.u,10)||0)+'%;background:#3B7DD8';}\n");
     web_client.println("function rmRenderCards(){var c=rmSel.call,dis=!rmValidCall(c)||rmLocked(),B={},K=['radio','ident','pos','queues','mh'],d,i,j,p,h,v,o,x,y,z,e,f,fa=document.activeElement,fid='';if(!rmEl('rm_card_mh'))return;\n"

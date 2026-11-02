@@ -1744,14 +1744,14 @@ static bool bDM=false;
 static bool bTEXT=true;
 
 // TD-25: the input caps bytes (UTF-8), not characters. dm_keypad only counts when the send path
-// uses it (1..8 chars).
+// uses it (1..9 chars, TD-26).
 static lv_obj_t *input_budget_lab = NULL;
 static bool input_budget_busy = false;
 
 static const char *input_budget_dm(void)
 {
     size_t n = strlen(lv_textarea_get_text(dm_keypad));
-    return (n > 0 && n < 9) ? lv_textarea_get_text(dm_keypad) : NULL;
+    return (n > 0 && n <= 9) ? lv_textarea_get_text(dm_keypad) : NULL;
 }
 
 static void input_budget_cb(lv_event_t * e)
@@ -1796,6 +1796,14 @@ static void lora_mode_send()
 
     if(strlen(lv_textarea_get_text(input_keypad)) < 2)
     {
+        return;
+    }
+
+    // TD-26: a typed destination that is not valid must not go out as a broadcast
+    if(strlen(lv_textarea_get_text(dm_keypad)) > 0 && !msg_input_dest_valid(lv_textarea_get_text(dm_keypad)))
+    {
+        if(input_budget_lab != NULL)
+            lv_label_set_text(input_budget_lab, "Invalid call - not sent");
         return;
     }
 

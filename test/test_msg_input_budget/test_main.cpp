@@ -77,6 +77,18 @@ static void test_fits_send_limit(void)
     TEST_ASSERT_TRUE(m2.size() <= 150);
 }
 
+static void test_dest_valid(void)
+{
+    TEST_ASSERT_TRUE(msg_input_dest_valid("A"));
+    TEST_ASSERT_TRUE(msg_input_dest_valid("DK5EN-1"));
+    TEST_ASSERT_TRUE(msg_input_dest_valid("DL4MFH-55"));  // 9 chars, TD-26
+    TEST_ASSERT_FALSE(msg_input_dest_valid("DL4MFH-555"));  // 10
+    TEST_ASSERT_FALSE(msg_input_dest_valid(""));
+    TEST_ASSERT_FALSE(msg_input_dest_valid(NULL));
+    TEST_ASSERT_FALSE(msg_input_dest_valid("DK5 EN"));
+    TEST_ASSERT_FALSE(msg_input_dest_valid("DK5}EN"));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -87,5 +99,6 @@ int main(int, char **)
     RUN_TEST(test_ascii_exact);
     RUN_TEST(test_empty);
     RUN_TEST(test_fits_send_limit);
+    RUN_TEST(test_dest_valid);
     return UNITY_END();
 }

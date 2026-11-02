@@ -259,6 +259,12 @@ inline float battBrownUpdate(batt_brown_t *s, float raw, float alpha)
 #ifndef BATT_DETECT_PRESENT_STREAK
 #define BATT_DETECT_PRESENT_STREAK      10
 #endif
+// BAT-05: a sample that carries a window spread (switched divider, 30 s cadence) is already an
+// 8-read test and a floating pin never passes it (spread 819-1267 mV). 10 of them would be 5 min
+// before a hot-plugged cell is seen; 3 (~90 s) are enough.
+#ifndef BATT_DETECT_PRESENT_STREAK_WINDOW
+#define BATT_DETECT_PRESENT_STREAK_WINDOW 3
+#endif
 
 typedef struct {
     bool  haveLast;            // false until the first sample has been seen
@@ -343,7 +349,8 @@ inline bool battDetectUpdateSpread(batt_detect_state_t *state, float rawMv, floa
 
     if (state->present && state->implausibleStreak >= BATT_DETECT_ABSENT_STREAK)
         state->present = false;
-    else if (!state->present && state->plausibleStreak >= BATT_DETECT_PRESENT_STREAK)
+    else if (!state->present && state->plausibleStreak >=
+             ((spreadMv >= 0.0f) ? BATT_DETECT_PRESENT_STREAK_WINDOW : BATT_DETECT_PRESENT_STREAK))
         state->present = true;
 
     return state->present;

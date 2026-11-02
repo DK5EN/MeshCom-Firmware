@@ -31,6 +31,11 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   `esp32_flash.cpp` are part of the Safeboot image). **Not done:** no bench node besides DK5EN-92 (local build of the
   same commit) runs the release; own beacons at prio 2 and the boot-time ping-target clean-up are host-tested only.
 
+- **Campaign open-items-20261102 (cloud session, branch `claude/blissful-hamilton-vd8mbd`, not released):** resume point
+  [campaign-open-items-20261102.md](campaign-open-items-20261102.md). W0 BOOT-01 + UCH-01 and W1 TD-26, TD-27/28/29,
+  WEB-DARK-01, WEB-A11Y-01, BAT-05, TXP-02 are done (host gate + builds); W2 TD-30, BAT-04b, WEB-PWD-01 and W3
+  WEB-LED-01 follow. All bench checks are listed in the campaign doc for the operator.
+
 - **TD-25 / TD-24 T-Deck fixes (2026-11-02, fork-dev, not released):** the message input on T-Deck/Plus and
   T-Deck Pro caps UTF-8 bytes like the web GUI (149, minus callsign + 2 for a DM), cuts on a code-point boundary
   and shows "N bytes left" (`src/msg_input_budget.h`, test `test_msg_input_budget`). The first bubble of a new

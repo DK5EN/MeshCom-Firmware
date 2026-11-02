@@ -1627,7 +1627,7 @@ void deliver_scaffold(bool bget_password)
     web_client.println("for(var pr2=1;pr2<=5;pr2++){html+='<span class=mcq-swatch style=background:'+colors[pr2-1]+'></span>'+names[pr2-1]+' '+p[pr2]+' ';}");
     web_client.println("if(w0>0){html=html.replace(/ +$/,'')+', '+w0+' waiting for ACK';}");
     web_client.println("html+='</div>';");
-    web_client.println("var bpcolor=(bp==0)?'#3B9E4F':((bp==1)?'#E07B39':'#A2182F');");
+    web_client.println("var bpcolor=(bp==0)?'var(--mcok)':((bp==1)?'var(--mcsw2)':'var(--mcred)');");
     web_client.println("var bptxt=(bp==0)?'accepted':((bp==1)?'slow down':'refused');");
     web_client.println("html+='<div class=font-bold>Your messages: <span style=color:'+bpcolor+'>'+bptxt+'</span></div>';");
     web_client.println("var drop=parseInt(d.getAttribute('data-drop'))||0;");
@@ -1639,7 +1639,7 @@ void deliver_scaffold(bool bget_password)
     web_client.println("}else if(dwin==0){");
     web_client.println("html+='<div class=font-bold>Dedup window: n/a (no new ids in the last window)</div>';");
     web_client.println("}else{");
-    web_client.println("var dwc=(dwin<40||dwin>48)?'#E07B39':'inherit';");
+    web_client.println("var dwc=(dwin<40||dwin>48)?'var(--mcsw2)':'inherit';");
     web_client.println("html+='<div class=font-bold>Dedup window:&nbsp;&asymp;<span style=color:'+dwc+'>'+dwin+'</span> min</div>';");
     web_client.println("html+='<div class=font-small>('+newid+' new ids, '+dup+' dups in last '+Math.round(intv/60)+' min; safe corridor 40-48 min)</div>';");
     web_client.println("}");
@@ -1666,7 +1666,16 @@ void deliver_scaffold(bool bget_password)
     web_client.println("<style>\n");
 
     // basic definitions
-    web_client.println(":root {--fs-s:.85rem;--fs-m:1rem;--fs-l:1.25rem;--fs-xl:1.6rem;--mcbg:#FFFFFF;--mcgray:#252323;--mcred:#A2182F;--mclightred:#FCEDF0;--mcmidred:#FFA5B4;--mclightblue:#CADFEA;--mclightgreen:#CBFBD4;--widthfactor:1.0;}\n");
+    // WEB-DARK-01/WEB-A11Y-01: light palette on :root, dark palette overrides the same names below (follows the OS).
+    // --mcgray is the ink colour (text, borders). Contrast pairs are pinned by tools/webgui_theme_test.js.
+    web_client.println(":root {color-scheme:light;--fs-s:.85rem;--fs-m:1rem;--fs-l:1.25rem;--fs-xl:1.6rem;--mcbg:#FFFFFF;--mcgray:#252323;--mcred:#A2182F;--mclightred:#FCEDF0;--mcmidred:#FFA5B4;--mclightblue:#CADFEA;--mclightgreen:#CBFBD4;--widthfactor:1.0;}\n");
+    web_client.println(":root {--mcbord:#767676;--mcline:#E0E0E0;--mcmute:#595959;--mcok:#1A7F37;--mcyel:#F6E7B8;--mcredbtn:#A2182F;"
+                        "--mctbl:#F9F9F9;--mceven:#F0F0F0;--mcempty:#ECECEC;--mcsw0:#767676;--mcsw1:#1A7F37;--mcsw2:#8A5A00;}\n");
+    web_client.println(":root {--navbg:#252323;--navfg:#FFFFFF;--navhov:#4A4545;--navselbg:#FFFFFF;--navselfg:#252323;--navinv:invert(1);}\n");
+    web_client.println("@media (prefers-color-scheme:dark) {:root {color-scheme:dark;--mcbg:#14161A;--mcgray:#E8E8E8;--mcred:#FF8A9B;--mclightred:#3A1D24;--mcmidred:#6B2A37;--mclightblue:#1F3A4D;--mclightgreen:#1D4A2B;}}\n");
+    web_client.println("@media (prefers-color-scheme:dark) {:root {--mcbord:#8A8F98;--mcline:#3A3F47;--mcmute:#A8ADB5;--mcok:#3FB950;--mcyel:#4A3D12;--mcredbtn:#B3203A;}}\n");
+    web_client.println("@media (prefers-color-scheme:dark) {:root {--mctbl:#1B1E23;--mceven:#22262C;--mcempty:#2A2E35;--mcsw0:#8A8F98;--mcsw1:#3FB950;--mcsw2:#D29922;}}\n");
+    web_client.println("@media (prefers-color-scheme:dark) {:root {--navbg:#0B0C0E;--navfg:#E8E8E8;--navhov:#2C3037;--navselbg:#E8E8E8;--navselfg:#14161A;}}\n");
     web_client.println("@media screen and (max-width:600px) {html {font-size:12px;} :root{--widthfactor:0.7;}}\n");
     web_client.println("@media screen and (min-width:601px) {html {font-size:14px;} :root{--widthfactor:0.7;}}\n");
     web_client.println("@media screen and (min-width:801px) {html {font-size:14px;} :root{--widthfactor:1.0;}}\n");
@@ -1680,14 +1689,15 @@ void deliver_scaffold(bool bget_password)
     web_client.println(".mw-600 {max-width:600px;}");
 
     // nav-bar definitions
-    web_client.println("#nav_layer {height:100%;width:calc(60px*var(--widthfactor));background-color:var(--mcgray);position:fixed !important;overflow:auto;top:0px;}\n");
+    web_client.println("#nav_layer {height:100%;width:calc(60px*var(--widthfactor));background-color:var(--navbg);position:fixed !important;overflow:auto;top:0px;}\n");
     web_client.println("#mc_logo {width:100%;aspect-ratio:1/1;margin:0px auto 75px auto;padding:5px 0px;display:block;background-color:#000;}\n");
-    web_client.println(".nav_button {background-color:var(--mcgray);border:solid 6px var(--mcgray);box-shadow:none;border-radius:10px 0px 0px 10px;cursor:pointer; width:100%; aspect-ratio:1/1; margin:calc(20px*var(--widthfactor)) auto; display:block;}\n");
+    web_client.println(".nav_button {background-color:var(--navbg);color:var(--navfg);border:solid 6px var(--navbg);box-shadow:none;border-radius:10px 0px 0px 10px;cursor:pointer; width:100%; aspect-ratio:1/1; margin:calc(20px*var(--widthfactor)) auto; display:block;}\n");
     web_client.println(".nav_button>svg {display:block;width:90%;height:90%;margin:auto auto;}\n");
-    web_client.println(".nav_button.nbactive {background-color:var(--mcbg);-webkit-transition:0.5s;transition:0.5s; border-right-color:var(--mcbg);}\n");
-    web_client.println(".nav_button.nbactive>svg, .nav_button.nbactive>img {filter:invert(1);}\n");
+    web_client.println(".nav_button:hover {background-color:var(--navhov);border-color:var(--navhov);}\n");
+    web_client.println(".nav_button.nbactive {background-color:var(--navselbg);color:var(--navselfg);-webkit-transition:0.5s;transition:0.5s; border-color:var(--navselbg);}\n");
+    web_client.println(".nav_button.nbactive>img {filter:var(--navinv);}\n");
     web_client.println(".nav_button.extra_space {margin-top:40px !important;}\n");
-    web_client.println("select,input,textarea {font-family:monospace;border-radius:7px;padding:3px 5px;box-sizing:border-box;border:solid 1px #7c7c7c;-webkit-transition:0.5s;transition:0.5s;}\n");
+    web_client.println("select,input,textarea {font-family:monospace;border-radius:7px;padding:3px 5px;box-sizing:border-box;border:solid 1px var(--mcbord);background-color:var(--mcbg);color:var(--mcgray);-webkit-transition:0.5s;transition:0.5s;}\n");
     web_client.println("select:focus,input:focus,textarea:focus {border:solid 1px var(--mcred);background-color:var(--mclightred);outline:none;}\n");
 
     // header (red bar with Call, Time, Date, etc) definitions
@@ -1699,15 +1709,15 @@ void deliver_scaffold(bool bget_password)
     web_client.println("@keyframes rotation{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}\n");
 
     // content definitions
-    web_client.println("#content_title {padding:0px 30px 0px 0px;margin:0px 0px 10px 0px;text-align:right;top:0px;overflow:hidden;background-color:#FCEDF0;}\n");
+    web_client.println("#content_title {padding:0px 30px 0px 0px;margin:0px 0px 10px 0px;text-align:right;top:0px;overflow:hidden;background-color:var(--mclightred);}\n");
     web_client.println("#content_layer {margin-left:calc(60px*var(--widthfactor));top:0px;overflow:hidden;}");
     web_client.println("#content_inner {margin:20px 10px 30px 4%;}\n");
 
     // content definitions -> tables
-    web_client.println("#content_inner > table {border-collapse:separate;overflow:hidden;border-spacing:0;border:solid 1px #7c7c7c;border-radius:10px;width:100%;background:#f9f9f9;}\n");
-    web_client.println("#content_inner > table thead {background-color:var(--mcgray);color:#ffffff;border-radius:10px;}\n");
-    web_client.println("#content_inner > table tr:nth-child(even) {background-color:#f0f0f0;}\n");
-    web_client.println("#content_inner > table td {vertical-align:top;padding:0.5em 0.5em 0.5em 0.5em;border-bottom:solid 1px #e0e0e0;}\n");
+    web_client.println("#content_inner > table {border-collapse:separate;overflow:hidden;border-spacing:0;border:solid 1px var(--mcbord);border-radius:10px;width:100%;background:var(--mctbl);}\n");
+    web_client.println("#content_inner > table thead {background-color:var(--navbg);color:var(--navfg);border-radius:10px;}\n");
+    web_client.println("#content_inner > table tr:nth-child(even) {background-color:var(--mceven);}\n");
+    web_client.println("#content_inner > table td {vertical-align:top;padding:0.5em 0.5em 0.5em 0.5em;border-bottom:solid 1px var(--mcline);}\n");
 
     // content definitions -> anchors
     web_client.println("#content_inner a {color:var(--mcred);}\n");
@@ -1722,14 +1732,14 @@ void deliver_scaffold(bool bget_password)
     web_client.println("#messagetext {width:100%;}\n");
     web_client.println("#sendcall {min-width:8em;}\n");
 
-    web_client.println(".message {--r:1em;--t:1.5em;max-width:300px;padding:15px;margin-bottom:20px;border-inline:var(--t) solid #0000; border-radius:calc(var(--r) + var(--t))/var(--r);mask:radial-gradient(100% 100% at var(--_p) 0,#0000 99%,#000 102%) var(--_p) 100%/var(--t) var(--t) no-repeat, linear-gradient(#000 0 0) padding-box;color:#000;}\n");
+    web_client.println(".message {--r:1em;--t:1.5em;max-width:300px;padding:15px;margin-bottom:20px;border-inline:var(--t) solid #0000; border-radius:calc(var(--r) + var(--t))/var(--r);mask:radial-gradient(100% 100% at var(--_p) 0,#0000 99%,#000 102%) var(--_p) 100%/var(--t) var(--t) no-repeat, linear-gradient(#000 0 0) padding-box;color:var(--mcgray);}\n");
     web_client.println(".message>div>p {padding:0px;margin:0px;}\n");
     web_client.println(".message-received{--_p:0;border-bottom-left-radius:0 0;place-self:start;background-color:var(--mclightgreen);border-color:var(--mclightgreen);}\n");
     web_client.println(".message-send{--_p:100%;border-bottom-right-radius:0 0;place-self:end;background-color:var(--mclightblue);border-color:var(--mclightblue);}\n");
 
     // content definitions -> commonly used cards
     web_client.println(".cardlayout {min-height:20px;border:solid 1px var(--mcgray);border-radius:7px;padding:7px;padding-top:16px;margin:30px 0px;position:relative;max-width:600px;}\n");
-    web_client.println(".cardlabel {position:absolute;font-weight:bold;margin:0 5px;left:6px;top:-1px;transform:translateY(-50%);z-index:10;background-color:#fff;padding:0 2px;}\n");
+    web_client.println(".cardlabel {position:absolute;font-weight:bold;margin:0 5px;left:6px;top:-1px;transform:translateY(-50%);z-index:10;background-color:var(--mcbg);padding:0 2px;}\n");
 
     web_client.println(".grid {display:grid;align-items:center;grid-column-gap:8px;grid-row-gap:7px;margin:7px;}\n");
     web_client.println(".grid3{grid-template-columns:minmax(min-content,400px) minmax(min-content,150px) minmax(min-content,50px)}\n");
@@ -1738,35 +1748,35 @@ void deliver_scaffold(bool bget_password)
     web_client.println(".flex-auto-wrap>* {flex:1;}\n");
 
     // content definitions -> commonly used inputs
-    web_client.println("input:where([type=\"checkbox\"][role=\"switch\"]) {-webkit-appearance:none;-moz-appearance:none;appearance:none;position:relative;font-size:inherit;width:2.5em;height:1.2em;box-sizing:content-box;border-radius:1em;vertical-align:text-bottom;margin:auto;color:inherit;background-color:rgb(212, 212, 212);}\n");
-    web_client.println("input:where([type=\"checkbox\"][role=\"switch\"]):checked {background-color:rgb(102, 214, 102);}\n");
+    web_client.println("input:where([type=\"checkbox\"][role=\"switch\"]) {-webkit-appearance:none;-moz-appearance:none;appearance:none;position:relative;font-size:inherit;width:2.5em;height:1.2em;box-sizing:content-box;border-radius:1em;vertical-align:text-bottom;margin:auto;color:inherit;background-color:var(--mcsw0);}\n");
+    web_client.println("input:where([type=\"checkbox\"][role=\"switch\"]):checked {background-color:var(--mcsw1);}\n");
     web_client.println("input:where([type=\"checkbox\"][role=\"switch\"])::before {content:\"\";position:absolute;top:50%;left:0;transform:translate(0,-50%);box-sizing:border-box;width:1.1em;height:1.1em;margin:0 0.15em;border-radius:50%;background:var(--mcbg);-webkit-transition:0.5s;transition:0.5s;}\n");
     web_client.println("input:where([type=\"checkbox\"][role=\"switch\"]):checked::before {left:1.8em;}\n");
 
     // content definitions -> setup collapsable cards
 
     web_client.println(".collapsablecard>.cardtoggle {position:absolute;right:8px;top:-1px;transform:translateY(-50%);z-index:10;width:36px;height:36px;border-radius:50% !important;disjplay:none;}\n");
-    web_client.println(".collapsablecard>.cardtoggle>i {padding:4px;margin:auto;border:solid black;border-width:2px 0 0 2px;display:block;-webkit-transform:rotate(-135deg);transform:rotate(-135deg);-webkit-transition:0.5s;transition:0.5s;}\n");
+    web_client.println(".collapsablecard>.cardtoggle>i {padding:4px;margin:auto;border:solid var(--mcgray);border-width:2px 0 0 2px;display:block;-webkit-transform:rotate(-135deg);transform:rotate(-135deg);-webkit-transition:0.5s;transition:0.5s;}\n");
     web_client.println(".cardopen>.cardtoggle>i {-webkit-transform: rotate(45deg);transform: rotate(45deg);}\n");
     web_client.println(".collapsablecard>div {max-height:0px;-webkit-transition:opacity .15s .0s,max-height .25s .10s;transition:opacity .15s .0s,max-height .25s .10s,margin .0s .50s;	opacity:0.0;overflow:hidden;margin:0px;}\n");
     web_client.println(".cardopen>div {-webkit-transition:opacity .15s .10s,max-height .25s .0s;transition:opacity .15s .10s,max-height .25s .0s;max-height:none;opacity:1;margin:7px;}\n");
     web_client.println(".cardopen>span:first-of-type {display:none;}\n");
 
     // content definitions -> WQ-01 LoRa Queue panel (rxlog page)
-    web_client.println(".mcq-toggle {position:absolute;right:8px;top:-1px;transform:translateY(-50%);z-index:10;border:solid 1px var(--mcgray);background:#fff;border-radius:5px;padding:1px 8px;cursor:pointer;}\n");
+    web_client.println(".mcq-toggle {position:absolute;right:8px;top:-1px;transform:translateY(-50%);z-index:10;border:solid 1px var(--mcgray);background:var(--mcbg);border-radius:5px;padding:1px 8px;cursor:pointer;}\n");
     web_client.println(".mcq-barwrap {position:relative;}\n");
     web_client.println(".mcq-bar {display:flex;flex-direction:row;gap:1px;height:14px;margin:4px 0 2px 0;}\n");
     web_client.println(".mcq-cell {flex:1;height:14px;}\n");
-    web_client.println(".mcq-cell-wait {flex:1;height:14px;background:#fff;border:2px solid #888;box-sizing:border-box;}\n");
-    web_client.println(".mcq-cell-empty {flex:1;height:14px;background:#ECECEC;border:1px solid #d0d0d0;box-sizing:border-box;}\n");
-    web_client.println(".mcq-tick {position:absolute;top:0;bottom:0;width:1px;background:#000;opacity:0.5;}\n");
-    web_client.println(".mcq-tick-faint {position:absolute;top:0;bottom:0;width:1px;background:#000;opacity:0.15;}\n");
+    web_client.println(".mcq-cell-wait {flex:1;height:14px;background:var(--mcbg);border:2px solid var(--mcbord);box-sizing:border-box;}\n");
+    web_client.println(".mcq-cell-empty {flex:1;height:14px;background:var(--mcempty);border:1px solid var(--mcline);box-sizing:border-box;}\n");
+    web_client.println(".mcq-tick {position:absolute;top:0;bottom:0;width:1px;background:var(--mcgray);opacity:0.5;}\n");
+    web_client.println(".mcq-tick-faint {position:absolute;top:0;bottom:0;width:1px;background:var(--mcgray);opacity:0.15;}\n");
     web_client.println(".mcq-ticklabels {position:relative;height:12px;font-size:var(--fs-s);margin:0 0 8px 0;}\n");
     web_client.println(".mcq-legend {font-size:var(--fs-s);margin:0 0 8px 0;}\n");
     web_client.println(".mcq-swatch {display:inline-block;width:8px;height:8px;margin:0 3px 0 6px;border-radius:2px;vertical-align:middle;}\n");
     web_client.println(".mcq-util-row {display:flex;align-items:center;gap:6px;margin:2px 0;}\n");
     web_client.println(".mcq-util-label {display:inline-block;min-width:60px;}\n");
-    web_client.println(".mcq-util-track {flex:1;height:10px;background:#ECECEC;border-radius:4px;overflow:hidden;}\n");
+    web_client.println(".mcq-util-track {flex:1;height:10px;background:var(--mcempty);border-radius:4px;overflow:hidden;}\n");
 
     // content definitions -> message-page tab bar
     web_client.println("#mctabs {margin:6px 0;}\n");
@@ -1778,11 +1788,18 @@ void deliver_scaffold(bool bget_password)
     // stage 3 mailbox card below: "before you switch this on" warning box.
     web_client.println(".cardbody>.grid,.cardbody>.mbx-warn {margin:0 0 7px 0;}\n"); // Store node card: sub-grids inside the single collapsible body
     web_client.println(".mbx-warn {background:var(--mclightred);border:solid 1px var(--mcred);border-radius:5px;padding:6px 8px;margin:7px;}\n");
+    web_client.println("#content_inner .rmdet {border-top-color:var(--mcline);}\n"); // Remote page rule keeps its literal (webgui_rm_test pin)
 #if defined(ESP32)
     // AU web GUI: Auto update row of the info page: green row, disabled and red (Install now) buttons.
     web_client.println("#content_inner tr.au-green td {background-color:var(--mclightgreen);}\n");
+    // WEB-DARK-01: Neighbours row roles (own row / super node / E_self) from the palette, were inline light-only colours
+    web_client.println("#content_inner tr.nbr-me td {background-color:var(--mclightblue);}\n");
+    web_client.println("#content_inner tr.nbr-super td {background-color:var(--mclightgreen);}\n");
+    web_client.println("#content_inner tr.nbr-eself td {background-color:var(--mclightred);}\n");
+    // WEB-DARK-01: Spectrum chart is drawn in black ink, so it stays a light card in both themes
+    web_client.println("#spectrum_display {background:#fff;border-radius:7px;}\n");
     web_client.println("#content_inner button:disabled {opacity:.45;cursor:not-allowed;}\n");
-    web_client.println("#content_inner button.au-red {background-color:var(--mcred);color:#fff;}\n");
+    web_client.println("#content_inner button.au-red {background-color:var(--mcredbtn);color:#fff;}\n");
     web_client.println("#au_msg,#au_err {margin:4px 0;}\n#au_hint {color:var(--mcgray);font-size:var(--fs-s);}\n");
 #endif
 
@@ -1792,17 +1809,17 @@ void deliver_scaffold(bool bget_password)
     web_client.println("#content_inner > table td.num {white-space:nowrap;font-variant-numeric:tabular-nums;}\n");
     web_client.println(".mbx-actions button {padding:3px 7px;}\n");
     web_client.println(".mbx-counters {display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px 10px;margin:7px;font-variant-numeric:tabular-nums;}\n");
-    web_client.println(".mbx-counters>div {display:flex;justify-content:space-between;gap:6px;border-bottom:1px dotted #c8c8c8;padding:2px 0;}\n");
+    web_client.println(".mbx-counters>div {display:flex;justify-content:space-between;gap:6px;border-bottom:1px dotted var(--mcbord);padding:2px 0;}\n");
     web_client.println(".mbx-counters b {font-weight:bold;}\n");
     web_client.println(".mbx-state {display:inline-block;border:solid 1px var(--mcgray);border-radius:5px;padding:0 6px;font-size:var(--fs-s);font-weight:bold;white-space:nowrap;}\n");
     web_client.println(".mbx-held {background:var(--mclightblue);}\n");
     web_client.println(".mbx-armed, .mbx-ladder {background:var(--mclightgreen);}\n");
-    web_client.println(".mbx-cooldown {background:#F6E7B8;}\n");
+    web_client.println(".mbx-cooldown {background:var(--mcyel);}\n");
     web_client.println(".mbx-stale {color:var(--mcred);}\n");
     web_client.println(".mbx-actions {display:flex;gap:6px;white-space:nowrap;}\n");
     web_client.println(".mbx-toolbar {display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 10px 0;}\n");
     web_client.println(".mbx-toolbar .spacer {flex:1;}\n");
-    web_client.println(".mbx-legend {font-size:var(--fs-s);margin:8px 0 0 0;color:#555;}\n");
+    web_client.println(".mbx-legend {font-size:var(--fs-s);margin:8px 0 0 0;color:var(--mcmute);}\n");
     web_client.println(".mbx-legend .mbx-state {margin-right:8px;}\n");
 
     web_client.println("</style>\n\n");
@@ -1826,24 +1843,24 @@ void deliver_scaffold(bool bget_password)
     
     
 
-    web_client.println("<Button class=\"nav_button nbactive\" onclick=\"loadPage('info',this,true)\"><svg viewBox=\"-0.5 0 25 25\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <path d=\"M12 21.5C17.1086 21.5 21.25 17.3586 21.25 12.25C21.25 7.14137 17.1086 3 12 3C6.89137 3 2.75 7.14137 2.75 12.25C2.75 17.3586 6.89137 21.5 12 21.5Z\" stroke=\"#ffffff\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path> <path d=\"M12.9309 8.15005C12.9256 8.39231 12.825 8.62272 12.6509 8.79123C12.4767 8.95974 12.2431 9.05271 12.0008 9.05002C11.8242 9.04413 11.6533 8.98641 11.5093 8.884C11.3652 8.7816 11.2546 8.63903 11.1911 8.47415C11.1275 8.30927 11.1139 8.12932 11.152 7.95675C11.19 7.78419 11.278 7.6267 11.405 7.50381C11.532 7.38093 11.6923 7.29814 11.866 7.26578C12.0397 7.23341 12.2192 7.25289 12.3819 7.32181C12.5446 7.39072 12.6834 7.506 12.781 7.65329C12.8787 7.80057 12.9308 7.97335 12.9309 8.15005ZM11.2909 16.5301V11.1501C11.2882 11.0556 11.3046 10.9615 11.3392 10.8736C11.3738 10.7857 11.4258 10.7057 11.4922 10.6385C11.5585 10.5712 11.6378 10.518 11.7252 10.4822C11.8126 10.4464 11.9064 10.4286 12.0008 10.43C12.094 10.4299 12.1863 10.4487 12.272 10.4853C12.3577 10.5218 12.4352 10.5753 12.4997 10.6426C12.5642 10.7099 12.6143 10.7895 12.6472 10.8767C12.6801 10.9639 12.6949 11.0569 12.6908 11.1501V16.5301C12.6908 16.622 12.6727 16.713 12.6376 16.7979C12.6024 16.8828 12.5508 16.96 12.4858 17.025C12.4208 17.09 12.3437 17.1415 12.2588 17.1767C12.1738 17.2119 12.0828 17.23 11.9909 17.23C11.899 17.23 11.8079 17.2119 11.723 17.1767C11.6381 17.1415 11.5609 17.09 11.4959 17.025C11.4309 16.96 11.3793 16.8828 11.3442 16.7979C11.309 16.713 11.2909 16.622 11.2909 16.5301Z\" fill=\"#ffffff\"></path> </g></svg></Button>\n");
-    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('messages',this,true)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <path d=\"M7 9H17M7 13H17M21 20L17.6757 18.3378C17.4237 18.2118 17.2977 18.1488 17.1656 18.1044C17.0484 18.065 16.9277 18.0365 16.8052 18.0193C16.6672 18 16.5263 18 16.2446 18H6.2C5.07989 18 4.51984 18 4.09202 17.782C3.71569 17.5903 3.40973 17.2843 3.21799 16.908C3 16.4802 3 15.9201 3 14.8V7.2C3 6.07989 3 5.51984 3.21799 5.09202C3.40973 4.71569 3.71569 4.40973 4.09202 4.21799C4.51984 4 5.0799 4 6.2 4H17.8C18.9201 4 19.4802 4 19.908 4.21799C20.2843 4.40973 20.5903 4.71569 20.782 5.09202C21 5.51984 21 6.0799 21 7.2V20Z\" stroke=\"#ffffff\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path> </g></svg></Button>\n");
+    web_client.println("<Button class=\"nav_button nbactive\" onclick=\"loadPage('info',this,true)\"><svg viewBox=\"-0.5 0 25 25\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <path d=\"M12 21.5C17.1086 21.5 21.25 17.3586 21.25 12.25C21.25 7.14137 17.1086 3 12 3C6.89137 3 2.75 7.14137 2.75 12.25C2.75 17.3586 6.89137 21.5 12 21.5Z\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path> <path d=\"M12.9309 8.15005C12.9256 8.39231 12.825 8.62272 12.6509 8.79123C12.4767 8.95974 12.2431 9.05271 12.0008 9.05002C11.8242 9.04413 11.6533 8.98641 11.5093 8.884C11.3652 8.7816 11.2546 8.63903 11.1911 8.47415C11.1275 8.30927 11.1139 8.12932 11.152 7.95675C11.19 7.78419 11.278 7.6267 11.405 7.50381C11.532 7.38093 11.6923 7.29814 11.866 7.26578C12.0397 7.23341 12.2192 7.25289 12.3819 7.32181C12.5446 7.39072 12.6834 7.506 12.781 7.65329C12.8787 7.80057 12.9308 7.97335 12.9309 8.15005ZM11.2909 16.5301V11.1501C11.2882 11.0556 11.3046 10.9615 11.3392 10.8736C11.3738 10.7857 11.4258 10.7057 11.4922 10.6385C11.5585 10.5712 11.6378 10.518 11.7252 10.4822C11.8126 10.4464 11.9064 10.4286 12.0008 10.43C12.094 10.4299 12.1863 10.4487 12.272 10.4853C12.3577 10.5218 12.4352 10.5753 12.4997 10.6426C12.5642 10.7099 12.6143 10.7895 12.6472 10.8767C12.6801 10.9639 12.6949 11.0569 12.6908 11.1501V16.5301C12.6908 16.622 12.6727 16.713 12.6376 16.7979C12.6024 16.8828 12.5508 16.96 12.4858 17.025C12.4208 17.09 12.3437 17.1415 12.2588 17.1767C12.1738 17.2119 12.0828 17.23 11.9909 17.23C11.899 17.23 11.8079 17.2119 11.723 17.1767C11.6381 17.1415 11.5609 17.09 11.4959 17.025C11.4309 16.96 11.3793 16.8828 11.3442 16.7979C11.309 16.713 11.2909 16.622 11.2909 16.5301Z\" fill=\"currentColor\"></path> </g></svg></Button>\n");
+    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('messages',this,true)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <path d=\"M7 9H17M7 13H17M21 20L17.6757 18.3378C17.4237 18.2118 17.2977 18.1488 17.1656 18.1044C17.0484 18.065 16.9277 18.0365 16.8052 18.0193C16.6672 18 16.5263 18 16.2446 18H6.2C5.07989 18 4.51984 18 4.09202 17.782C3.71569 17.5903 3.40973 17.2843 3.21799 16.908C3 16.4802 3 15.9201 3 14.8V7.2C3 6.07989 3 5.51984 3.21799 5.09202C3.40973 4.71569 3.71569 4.40973 4.09202 4.21799C4.51984 4 5.0799 4 6.2 4H17.8C18.9201 4 19.4802 4 19.908 4.21799C20.2843 4.40973 20.5903 4.71569 20.782 5.09202C21 5.51984 21 6.0799 21 7.2V20Z\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path> </g></svg></Button>\n");
 #if defined(ENABLE_MSGSTORE)
     // Stage 3 store node: envelope icon from docs/design/mailbox-page-mockup.html, placed
     // right after Messages. Non-eligible boards never emit this button, so a stray click
     // would 404 anyway, but there is no click to have.
-    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('mailbox',this,true)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <path d=\"M3 8l9 6 9-6\" stroke=\"#ffffff\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path> <rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\" stroke=\"#ffffff\" stroke-width=\"1.6\"></rect> </g></svg></Button>\n");
+    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('mailbox',this,true)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <path d=\"M3 8l9 6 9-6\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path> <rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\" stroke=\"currentColor\" stroke-width=\"1.6\"></rect> </g></svg></Button>\n");
 #endif
-    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('wx',this,true)\"><svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 512 512\" xml:space=\"preserve\" fill=\"#000000\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g > <style type=\"text/css\"> .st0{fill:#ffffff;} </style> <g> <path class=\"st0\" d=\"M115.958,269.922c16.999-10.12,36.842-15.916,58.04-15.916c2.556,0,5.127,0.078,7.682,0.234 c7.199-24.681,20.957-46.355,39.203-63.12c-3.49-39.437-36.562-70.32-76.879-70.32c-42.647,0-77.207,34.56-77.207,77.199 C66.798,230.766,87.194,258.719,115.958,269.922z\"></path> <rect x=\"135.652\" y=\"54.002\" class=\"st0\" width=\"16.696\" height=\"45.911\"></rect> <polygon class=\"st0\" points=\"102.184,108.88 79.232,69.116 64.772,77.467 87.724,117.232 \"></polygon> <polygon class=\"st0\" points=\"15.114,133.233 54.878,156.185 63.23,141.726 23.466,118.774 \"></polygon> <polygon class=\"st0\" points=\"45.919,189.654 0,189.654 0,206.35 45.919,206.342 \"></polygon> <polygon class=\"st0\" points=\"15.114,262.77 23.466,277.23 63.23,254.27 54.878,239.811 \"></polygon> <rect x=\"240.478\" y=\"114.523\" transform=\"matrix(0.4998 0.8661 -0.8661 0.4998 243.5358 -146.7501)\" class=\"st0\" width=\"16.694\" height=\"45.913\"></rect> <polygon class=\"st0\" points=\"223.228,77.467 208.776,69.116 185.817,108.88 200.269,117.232 \"></polygon> <path class=\"st0\" d=\"M431.997,298c-0.031,0-0.062,0.008-0.101,0.008c0.054-1.332,0.101-2.665,0.101-4.004 C431.997,229.932,380.064,178,316,178c-60.012,0-109.382,45.575-115.388,104.006c-8.414-2.602-17.342-4.005-26.614-4.005 C124.294,278.001,84,318.295,84,368c0,49.704,40.294,89.998,89.998,89.998h257.999c44.182,0,80.003-35.814,80.003-79.995 C512,333.814,476.178,298,431.997,298z\"></path> </g> </g></svg></Button>\n");
-    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('position',this,true)\"><svg viewBox=\"0 0 512 512\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"#ffffff\" stroke=\"#ffffff\"><g stroke-width=\"0\"></g><g istroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g><path fill=\"#ffffff\" d=\"M256 17.108c-75.73 0-137.122 61.392-137.122 137.122.055 23.25 6.022 46.107 11.58 56.262L256 494.892l119.982-274.244h-.063c11.27-20.324 17.188-43.18 17.202-66.418C393.122 78.5 331.73 17.108 256 17.108zm0 68.56a68.56 68.56 0 0 1 68.56 68.562A68.56 68.56 0 0 1 256 222.79a68.56 68.56 0 0 1-68.56-68.56A68.56 68.56 0 0 1 256 85.67z\"></path></g></svg></Button>\n");
-    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('mheard',this,true)\"><svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 32 32\" xml:space=\"preserve\" fill=\"#000000\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <style type=\"text/css\"> .linesandangles_een{fill:#ffffff;} </style> <path class=\"linesandangles_een\" d=\"M25,13c0,3.348-2.208,7.455-4.286,9.618c-0.527,0.549-0.902,1.188-1.299,1.863 C18.447,26.131,17.35,28,14,28c-3.616,0-5.077-2.068-6.043-3.437c-0.238-0.337-0.464-0.657-0.664-0.856l1.414-1.414 C9.028,22.614,9.301,23,9.59,23.41C10.49,24.683,11.42,26,14,26c2.205,0,2.796-1.007,3.69-2.531 c0.417-0.711,0.891-1.517,1.581-2.236C21.064,19.366,23,15.687,23,13c0-3.86-3.14-7-7-7s-7,3.14-7,7H7c0-4.962,4.038-9,9-9 S25,8.038,25,13z M12,17h-1v2h1c1.206,0,3-0.799,3-3c0-1.639-0.994-2.5-2-2.833v-0.161C13.006,12.503,13.177,10,16,10 s2.994,2.503,3,3.005L20,13h1c0-1.729-1.045-5-5-5s-5,3.271-5,5l0.014,1.975L11.988,15C12.45,15.012,13,15.195,13,16 S12.45,16.988,12,17z\"></path> </g></svg></Button>\n");
-    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('path',this,true)\"><svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g><path fill=\"#ffffff\" fill-rule=\"evenodd\" d=\"M13 0a3 3 0 00-1.65 5.506 7.338 7.338 0 01-.78 1.493c-.22.32-.472.635-.8 1.025a1.509 1.509 0 00-.832.085 12.722 12.722 0 00-1.773-1.124c-.66-.34-1.366-.616-2.215-.871a1.5 1.5 0 10-2.708 1.204c-.9 1.935-1.236 3.607-1.409 5.838a1.5 1.5 0 101.497.095c.162-2.07.464-3.55 1.25-5.253.381-.02.725-.183.979-.435.763.23 1.367.471 1.919.756a11.13 11.13 0 011.536.973 1.5 1.5 0 102.899-.296c.348-.415.64-.779.894-1.148.375-.548.665-1.103.964-1.857A3 3 0 1013 0zm-1.5 3a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0z\" clip-rule=\"evenodd\"></path></g></svg></Button>\n");
+    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('wx',this,true)\"><svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 512 512\" xml:space=\"preserve\" fill=\"#000000\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g > <style type=\"text/css\"> .st0{fill:currentColor;} </style> <g> <path class=\"st0\" d=\"M115.958,269.922c16.999-10.12,36.842-15.916,58.04-15.916c2.556,0,5.127,0.078,7.682,0.234 c7.199-24.681,20.957-46.355,39.203-63.12c-3.49-39.437-36.562-70.32-76.879-70.32c-42.647,0-77.207,34.56-77.207,77.199 C66.798,230.766,87.194,258.719,115.958,269.922z\"></path> <rect x=\"135.652\" y=\"54.002\" class=\"st0\" width=\"16.696\" height=\"45.911\"></rect> <polygon class=\"st0\" points=\"102.184,108.88 79.232,69.116 64.772,77.467 87.724,117.232 \"></polygon> <polygon class=\"st0\" points=\"15.114,133.233 54.878,156.185 63.23,141.726 23.466,118.774 \"></polygon> <polygon class=\"st0\" points=\"45.919,189.654 0,189.654 0,206.35 45.919,206.342 \"></polygon> <polygon class=\"st0\" points=\"15.114,262.77 23.466,277.23 63.23,254.27 54.878,239.811 \"></polygon> <rect x=\"240.478\" y=\"114.523\" transform=\"matrix(0.4998 0.8661 -0.8661 0.4998 243.5358 -146.7501)\" class=\"st0\" width=\"16.694\" height=\"45.913\"></rect> <polygon class=\"st0\" points=\"223.228,77.467 208.776,69.116 185.817,108.88 200.269,117.232 \"></polygon> <path class=\"st0\" d=\"M431.997,298c-0.031,0-0.062,0.008-0.101,0.008c0.054-1.332,0.101-2.665,0.101-4.004 C431.997,229.932,380.064,178,316,178c-60.012,0-109.382,45.575-115.388,104.006c-8.414-2.602-17.342-4.005-26.614-4.005 C124.294,278.001,84,318.295,84,368c0,49.704,40.294,89.998,89.998,89.998h257.999c44.182,0,80.003-35.814,80.003-79.995 C512,333.814,476.178,298,431.997,298z\"></path> </g> </g></svg></Button>\n");
+    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('position',this,true)\"><svg viewBox=\"0 0 512 512\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"currentColor\" stroke=\"currentColor\"><g stroke-width=\"0\"></g><g istroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g><path fill=\"currentColor\" d=\"M256 17.108c-75.73 0-137.122 61.392-137.122 137.122.055 23.25 6.022 46.107 11.58 56.262L256 494.892l119.982-274.244h-.063c11.27-20.324 17.188-43.18 17.202-66.418C393.122 78.5 331.73 17.108 256 17.108zm0 68.56a68.56 68.56 0 0 1 68.56 68.562A68.56 68.56 0 0 1 256 222.79a68.56 68.56 0 0 1-68.56-68.56A68.56 68.56 0 0 1 256 85.67z\"></path></g></svg></Button>\n");
+    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('mheard',this,true)\"><svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 32 32\" xml:space=\"preserve\" fill=\"#000000\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <style type=\"text/css\"> .linesandangles_een{fill:currentColor;} </style> <path class=\"linesandangles_een\" d=\"M25,13c0,3.348-2.208,7.455-4.286,9.618c-0.527,0.549-0.902,1.188-1.299,1.863 C18.447,26.131,17.35,28,14,28c-3.616,0-5.077-2.068-6.043-3.437c-0.238-0.337-0.464-0.657-0.664-0.856l1.414-1.414 C9.028,22.614,9.301,23,9.59,23.41C10.49,24.683,11.42,26,14,26c2.205,0,2.796-1.007,3.69-2.531 c0.417-0.711,0.891-1.517,1.581-2.236C21.064,19.366,23,15.687,23,13c0-3.86-3.14-7-7-7s-7,3.14-7,7H7c0-4.962,4.038-9,9-9 S25,8.038,25,13z M12,17h-1v2h1c1.206,0,3-0.799,3-3c0-1.639-0.994-2.5-2-2.833v-0.161C13.006,12.503,13.177,10,16,10 s2.994,2.503,3,3.005L20,13h1c0-1.729-1.045-5-5-5s-5,3.271-5,5l0.014,1.975L11.988,15C12.45,15.012,13,15.195,13,16 S12.45,16.988,12,17z\"></path> </g></svg></Button>\n");
+    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('path',this,true)\"><svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g><path fill=\"currentColor\" fill-rule=\"evenodd\" d=\"M13 0a3 3 0 00-1.65 5.506 7.338 7.338 0 01-.78 1.493c-.22.32-.472.635-.8 1.025a1.509 1.509 0 00-.832.085 12.722 12.722 0 00-1.773-1.124c-.66-.34-1.366-.616-2.215-.871a1.5 1.5 0 10-2.708 1.204c-.9 1.935-1.236 3.607-1.409 5.838a1.5 1.5 0 101.497.095c.162-2.07.464-3.55 1.25-5.253.381-.02.725-.183.979-.435.763.23 1.367.471 1.919.756a11.13 11.13 0 011.536.973 1.5 1.5 0 102.899-.296c.348-.415.64-.779.894-1.148.375-.548.665-1.103.964-1.857A3 3 0 1013 0zm-1.5 3a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0z\" clip-rule=\"evenodd\"></path></g></svg></Button>\n");
     // NBR-W2: Menueknopf fuer die Nachbarschaftsmatrix -- 3x3-Raster als Icon, Konzept 4.5.
-    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('neighbours',this,true)\"><svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\"><g stroke=\"#ffffff\" stroke-width=\"2\"><rect x=\"3\" y=\"3\" width=\"5\" height=\"5\"></rect><rect x=\"9.5\" y=\"3\" width=\"5\" height=\"5\"></rect><rect x=\"16\" y=\"3\" width=\"5\" height=\"5\"></rect><rect x=\"3\" y=\"9.5\" width=\"5\" height=\"5\"></rect><rect x=\"9.5\" y=\"9.5\" width=\"5\" height=\"5\"></rect><rect x=\"16\" y=\"9.5\" width=\"5\" height=\"5\"></rect><rect x=\"3\" y=\"16\" width=\"5\" height=\"5\"></rect><rect x=\"9.5\" y=\"16\" width=\"5\" height=\"5\"></rect><rect x=\"16\" y=\"16\" width=\"5\" height=\"5\"></rect></g></svg></Button>\n");
-    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('rxlog',this,true)\"><svg viewBox=\"0 0 32 32\" version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xmlns:sketch=\"http://www.bohemiancoding.com/sketch/ns\" fill=\"#ffffff\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <title>book-album</title> <desc>Created with Sketch Beta.</desc><defs></defs><g stroke=\"none\" stroke-width=\"1\" fill=\"none\" fill-rule=\"evenodd\" sketch:type=\"MSPage\"> <g sketch:type=\"MSLayerGroup\" transform=\"translate(-412.000000, -99.000000)\" fill=\"#ffffff\"> <path d=\"M442,124 C442,125.104 441.073,125.656 440,126 C440,126 434.557,127.515 429,128.977 L429,104 L440,101 C441.104,101 442,101.896 442,103 L442,124 L442,124 Z M427,128.998 C421.538,127.53 416,126 416,126 C414.864,125.688 414,125.104 414,124 L414,103 C414,101.896 414.896,101 416,101 L427,104 L427,128.998 L427,128.998 Z M440,99 C440,99 434.211,100.594 428.95,102 C428.291,102.025 427.627,102 426.967,102 C421.955,100.656 416,99 416,99 C413.791,99 412,100.791 412,103 L412,124 C412,126.209 413.885,127.313 416,128 C416,128 421.393,129.5 426.967,131 L428.992,131 C434.612,129.5 440,128 440,128 C442.053,127.469 444,126.209 444,124 L444,103 C444,100.791 442.209,99 440,99 L440,99 Z\" sketch:type=\"MSShapeGroup\"> </path> </g> </g> </g></svg></Button>\n");
-    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('spectrum',this,true)\"><svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><g><path d=\"M13,11v4M9,7v8m8-6v6\" style=\"fill:none;stroke:#ffffff;stroke-linecap:round;stroke-linejoin:round;stroke-width:2;\"></path><path d=\"M3,19H21M5,3V21\" style=\"fill:none;stroke:#ffffff;stroke-linecap:round;stroke-linejoin:round;stroke-width:2;\"></path></g></svg></Button>\n");
+    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('neighbours',this,true)\"><svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\"><g stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"3\" width=\"5\" height=\"5\"></rect><rect x=\"9.5\" y=\"3\" width=\"5\" height=\"5\"></rect><rect x=\"16\" y=\"3\" width=\"5\" height=\"5\"></rect><rect x=\"3\" y=\"9.5\" width=\"5\" height=\"5\"></rect><rect x=\"9.5\" y=\"9.5\" width=\"5\" height=\"5\"></rect><rect x=\"16\" y=\"9.5\" width=\"5\" height=\"5\"></rect><rect x=\"3\" y=\"16\" width=\"5\" height=\"5\"></rect><rect x=\"9.5\" y=\"16\" width=\"5\" height=\"5\"></rect><rect x=\"16\" y=\"16\" width=\"5\" height=\"5\"></rect></g></svg></Button>\n");
+    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('rxlog',this,true)\"><svg viewBox=\"0 0 32 32\" version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xmlns:sketch=\"http://www.bohemiancoding.com/sketch/ns\" fill=\"currentColor\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g> <title>book-album</title> <desc>Created with Sketch Beta.</desc><defs></defs><g stroke=\"none\" stroke-width=\"1\" fill=\"none\" fill-rule=\"evenodd\" sketch:type=\"MSPage\"> <g sketch:type=\"MSLayerGroup\" transform=\"translate(-412.000000, -99.000000)\" fill=\"currentColor\"> <path d=\"M442,124 C442,125.104 441.073,125.656 440,126 C440,126 434.557,127.515 429,128.977 L429,104 L440,101 C441.104,101 442,101.896 442,103 L442,124 L442,124 Z M427,128.998 C421.538,127.53 416,126 416,126 C414.864,125.688 414,125.104 414,124 L414,103 C414,101.896 414.896,101 416,101 L427,104 L427,128.998 L427,128.998 Z M440,99 C440,99 434.211,100.594 428.95,102 C428.291,102.025 427.627,102 426.967,102 C421.955,100.656 416,99 416,99 C413.791,99 412,100.791 412,103 L412,124 C412,126.209 413.885,127.313 416,128 C416,128 421.393,129.5 426.967,131 L428.992,131 C434.612,129.5 440,128 440,128 C442.053,127.469 444,126.209 444,124 L444,103 C444,100.791 442.209,99 440,99 L440,99 Z\" sketch:type=\"MSShapeGroup\"> </path> </g> </g> </g></svg></Button>\n");
+    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('spectrum',this,true)\"><svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><g><path d=\"M13,11v4M9,7v8m8-6v6\" style=\"fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:2;\"></path><path d=\"M3,19H21M5,3V21\" style=\"fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:2;\"></path></g></svg></Button>\n");
     if(bMCP23017) {
-        web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('mcp23017',this,true)\"><svg width=\"48\" height=\"48\" version=\"1.1\" viewBox=\"0 0 12.7 12.7\" xmlns=\"http://www.w3.org/2000/svg\"><g fill=\"none\" stroke=\"#ffffff\" stroke-linejoin=\"round\"><rect x=\".78644\" y=\".78644\" width=\"11.127\" height=\"5.4354\" stroke-width=\"1.0\"/><g stroke-linecap=\"round\" stroke-width=\"1.0\"><path d=\"m0.79071 8.2113h11.119\"/><path d=\"m0.79679 9.7926h11.119\"/><path d=\"m0.79679 11.38h11.119\"/></g></g></svg></Button>\n");
+        web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('mcp23017',this,true)\"><svg width=\"48\" height=\"48\" version=\"1.1\" viewBox=\"0 0 12.7 12.7\" xmlns=\"http://www.w3.org/2000/svg\"><g fill=\"none\" stroke=\"currentColor\" stroke-linejoin=\"round\"><rect x=\".78644\" y=\".78644\" width=\"11.127\" height=\"5.4354\" stroke-width=\"1.0\"/><g stroke-linecap=\"round\" stroke-width=\"1.0\"><path d=\"m0.79071 8.2113h11.119\"/><path d=\"m0.79679 9.7926h11.119\"/><path d=\"m0.79679 11.38h11.119\"/></g></g></svg></Button>\n");
     }
 
     // Setup Button (Image as base64 and split t0 several print() so RAK can handle it)
@@ -1851,14 +1868,14 @@ void deliver_scaffold(bool bget_password)
     web_client.print("IuNTE5NzYgOS4xMzA4IDIuNjYyMjcgOS42NjI2NiAyLjk4NTE4IDEwLjA4MzVDMy4xMzI1NiAxMC4yNzU2IDMuMzM5NyAxMC40MzcgMy42NjExOSAxMC42MzlDNC4xMzM4IDEwLjkzNiA0LjQzNzg5IDExLjQ0MTkgNC40Mzc4NiAxMkM0LjQzNzgzIDEyLjU1ODEgNC4xMzM3NSAxMy4wNjM5IDMuNjYxMTggMTMuMzYwOEMzLjMzOTY1IDEzLjU2MjkgMy4xMzI0OCAxMy43MjQ0IDIuOTg1MDggMTMuOTE2NUMyLjY2MjE3IDE0LjMzNzMgMi41MTk2NiAxNC44NjkxIDIuNTg4OSAxNS4zOTVDMi42NDA4MiAxNS43ODk0IDIuODczNzkgMTYuMTkzIDMuMzM5NzMgMTdDMy44MDU2OCAxNy44MDcgNC4wMzg2NSAxOC4yMTA2IDQuMzU0MjYgMTguNDUyN0M0Ljc3NTA4IDE4Ljc3NTYgNS4zMDY5NCAxOC45MTgxIDUuODMyODQgMTguODQ4OUM2LjA3Mjg5IDE4LjgxNzMgNi4zMTYzMiAxOC43MTg2IDYuNjUyMDQgMTguNTQxMkM3LjE0NTQ3IDE4LjI4MDQgNy43MzU1NiAxOC4yNyA4LjIxODkgMTguNTQ5QzguNzAyMjQgMTguODI4MSA4Ljk4ODI2IDE5LjM0NDMgOS4wMDkxMSAxOS45MDIxQzkuMDIzMzEgMjAuMjgxNSA5LjA1OTU3IDIwLjU0MTcgOS4xNTIyMyAyMC43NjU0QzkuMzU1MjIgMjEuMjU1NCA5Ljc0NDU3IDIxLjY0NDggMTAuMjM0NiAyMS44NDc4QzEwLjYwMjIgMjIgMTEuMDY4MSAyMiAxMiAyMkMxMi45MzE5IDIyIDEzLjM5NzggMjIgMTMuNzY1NCAyMS44NDc4QzE0LjI1NTQgMjEuNjQ0OCAxNC42NDQ4IDIxLjI1NTQgMTQuODQ3NyAyMC43NjU0QzE0Ljk0MDQgM");
     web_client.print("jAuNTQxNyAxNC45NzY3IDIwLjI4MTUgMTQuOTkwOSAxOS45MDJDMTUuMDExNyAxOS4zNDQzIDE1LjI5NzcgMTguODI4MSAxNS43ODEgMTguNTQ5QzE2LjI2NDMgMTguMjY5OSAxNi44NTQ0IDE4LjI4MDQgMTcuMzQ3OSAxOC41NDEyQzE3LjY4MzYgMTguNzE4NiAxNy45MjcgMTguODE3MiAxOC4xNjcgMTguODQ4OEMxOC42OTI5IDE4LjkxODEgMTkuMjI0OCAxOC43NzU2IDE5LjY0NTYgMTguNDUyN0MxOS45NjEyIDE4LjIxMDUgMjAuMTk0MiAxNy44MDcgMjAuNjYwMSAxNi45OTk5QzIxLjEyNjEgMTYuMTkyOSAyMS4zNTkxIDE1Ljc4OTQgMjEuNDExIDE1LjM5NUMyMS40ODAyIDE0Ljg2OTEgMjEuMzM3NyAxNC4zMzcyIDIxLjAxNDggMTMuOTE2NEMyMC44Njc0IDEzLjcyNDMgMjAuNjYwMiAxMy41NjI4IDIwLjMzODcgMTMuMzYwOEMxOS44NjYyIDEzLjA2MzkgMTkuNTYyMSAxMi41NTggMTkuNTYyMSAxMS45OTk5QzE5LjU2MjEgMTEuNDQxOCAxOS44NjYyIDEwLjkzNjEgMjAuMzM4NyAxMC42MzkyQzIwLjY2MDMgMTAuNDM3MSAyMC44Njc1IDEwLjI3NTcgMjEuMDE0OSAxMC4wODM1QzIxLjMzNzggOS42NjI3MyAyMS40ODAzIDkuMTMwODcgMjEuNDExMSA4LjYwNDk3QzIxLjM1OTIgOC4yMTA1NSAyMS4xMjYyIDcuODA3MDMgMjAuNjYwMiA3QzIwLjE5NDMgNi4xOTI5NyAxOS45NjEzIDUuNzg5NDUgMTkuNjQ1NyA1LjU0NzI3QzE5LjIyNDkgNS4yMjQzNiAxOC42OTMgNS4wODE4NSAxOC4xNjcxIDUuMTUxMDlDMTcuOTI3MSA1LjE4MjY5IDE3LjY4MzcgNS4y");
     web_client.println("ODEzNiAxNy4zNDc5IDUuNDU4OEMxNi44NTQ1IDUuNzE5NTkgMTYuMjY0NCA1LjczMDAyIDE1Ljc4MTEgNS40NTA5NkMxNS4yOTc3IDUuMTcxOTEgMTUuMDExNyA0LjY1NTY2IDE0Ljk5MDkgNC4wOTc5NEMxNC45NzY3IDMuNzE4NDggMTQuOTQwNCAzLjQ1ODMzIDE0Ljg0NzcgMy4yMzQ2M0MxNC42NDQ4IDIuNzQ0NTggMTQuMjU1NCAyLjM1NTIzIDEzLjc2NTQgMi4xNTIyNFoiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiPjwvcGF0aD48L2c+PC9zdmc+\"></Button>\n");
-    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('remote',this,true)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke=\"#ffffff\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"11\" r=\"2\"></circle><path d=\"M8.5 7.5a5 5 0 0 0 0 7M15.5 7.5a5 5 0 0 1 0 7M5.5 4.5a9 9 0 0 0 0 13M18.5 4.5a9 9 0 0 1 0 13M12 13v8M9 21h6\"></path></g></svg></Button>\n");   // RM GUI W2b: Remote
+    web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('remote',this,true)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"11\" r=\"2\"></circle><path d=\"M8.5 7.5a5 5 0 0 0 0 7M15.5 7.5a5 5 0 0 1 0 7M5.5 4.5a9 9 0 0 0 0 13M18.5 4.5a9 9 0 0 1 0 13M12 13v8M9 21h6\"></path></g></svg></Button>\n");   // RM GUI W2b: Remote
 
-    web_client.println("<Button class=\"nav_button extra_space\" onclick=\"if(confirm('Node will reboot, are you sure?')){callfunction('reboot','');}\"><svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#FFFFFF\" stroke-width=\"0.032\"></g><g><path d=\"m 8 0 c -0.550781 0 -1 0.449219 -1 1 v 5 c 0 0.550781 0.449219 1 1 1 s 1 -0.449219 1 -1 v -5 c 0 -0.550781 -0.449219 -1 -1 -1 z m -7 1 l 2.050781 2.050781 c -2.117187 2.117188 -2.652343 5.355469 -1.332031 8.039063 c 1.324219 2.683594 4.214844 4.238281 7.179688 3.851562 c 2.96875 -0.386718 5.367187 -2.625 5.960937 -5.554687 c 0.59375 -2.933594 -0.75 -5.929688 -3.335937 -7.433594 c -0.476563 -0.28125 -1.089844 -0.117187 -1.367188 0.359375 s -0.117188 1.089844 0.359375 1.367188 c 1.851563 1.078124 2.808594 3.207031 2.382813 5.3125 c -0.421876 2.101562 -2.128907 3.691406 -4.253907 3.96875 c -2.128906 0.273437 -4.183593 -0.828126 -5.128906 -2.753907 s -0.566406 -4.226562 0.949219 -5.742187 l 1.535156 1.535156 v -4.003906 c 0 -0.519532 -0.449219 -0.996094 -1 -0.996094 z m 0 0 \" fill=\"#FFFFFF\"></path></g></svg></Button>\n");
+    web_client.println("<Button class=\"nav_button extra_space\" onclick=\"if(confirm('Node will reboot, are you sure?')){callfunction('reboot','');}\"><svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"currentColor\" stroke-width=\"0.032\"></g><g><path d=\"m 8 0 c -0.550781 0 -1 0.449219 -1 1 v 5 c 0 0.550781 0.449219 1 1 1 s 1 -0.449219 1 -1 v -5 c 0 -0.550781 -0.449219 -1 -1 -1 z m -7 1 l 2.050781 2.050781 c -2.117187 2.117188 -2.652343 5.355469 -1.332031 8.039063 c 1.324219 2.683594 4.214844 4.238281 7.179688 3.851562 c 2.96875 -0.386718 5.367187 -2.625 5.960937 -5.554687 c 0.59375 -2.933594 -0.75 -5.929688 -3.335937 -7.433594 c -0.476563 -0.28125 -1.089844 -0.117187 -1.367188 0.359375 s -0.117188 1.089844 0.359375 1.367188 c 1.851563 1.078124 2.808594 3.207031 2.382813 5.3125 c -0.421876 2.101562 -2.128907 3.691406 -4.253907 3.96875 c -2.128906 0.273437 -4.183593 -0.828126 -5.128906 -2.753907 s -0.566406 -4.226562 0.949219 -5.742187 l 1.535156 1.535156 v -4.003906 c 0 -0.519532 -0.449219 -0.996094 -1 -0.996094 z m 0 0 \" fill=\"currentColor\"></path></g></svg></Button>\n");
 
     // if the suer has set a password, we deliver a logout button
     if (strlen(meshcom_settings.node_webpwd) > 0)
     {
-        web_client.println("<Button class=\"nav_button\" onclick=\"if(confirm('Logging out, are you sure?')){logout()};\"><svg fill=\"#ffffff\" viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g><path d=\"M7.707,8.707,5.414,11H17a1,1,0,0,1,0,2H5.414l2.293,2.293a1,1,0,1,1-1.414,1.414l-4-4a1,1,0,0,1,0-1.414l4-4A1,1,0,1,1,7.707,8.707ZM21,1H13a1,1,0,0,0,0,2h7V21H13a1,1,0,0,0,0,2h8a1,1,0,0,0,1-1V2A1,1,0,0,0,21,1Z\"></path></g></svg></Button>\n");
+        web_client.println("<Button class=\"nav_button\" onclick=\"if(confirm('Logging out, are you sure?')){logout()};\"><svg fill=\"currentColor\" viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke-width=\"0\"></g><g stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g><path d=\"M7.707,8.707,5.414,11H17a1,1,0,0,1,0,2H5.414l2.293,2.293a1,1,0,1,1-1.414,1.414l-4-4a1,1,0,0,1,0-1.414l4-4A1,1,0,1,1,7.707,8.707ZM21,1H13a1,1,0,0,0,0,2h7V21H13a1,1,0,0,0,0,2h8a1,1,0,0,0,1-1V2A1,1,0,0,0,21,1Z\"></path></g></svg></Button>\n");
     }
     web_client.printf("</div>\n<div id=\"head_layer\"><p class=\"font-small\">Meshcom %s%s</p><p class=\"font-bold\">%s</p></div>\n</div>\n", SOURCE_VERSION, SOURCE_VERSION_WEB_SUB, meshcom_settings.node_call);
     if(gwRegBlocked())
@@ -2213,7 +2230,7 @@ void sub_page_mheard()
     web_client.println("<div id=\"content_inner\">");
     // W4d: Legende fuer die zweite Kaertchenzeile (title= wirkt auf dem
     // Telefon nicht, deshalb als Text).
-    web_client.print("<p style=\"font-size:var(--fs-s);color:#555;max-width:900px;\">"
+    web_client.print("<p style=\"font-size:var(--fs-s);color:var(--mcmute);max-width:900px;\">"
                      "Stations I heard directly in the last 3 h, newest first. "
                      "Last heard: minutes since I last received it directly. "
                      "Hears me: its own reports say it hears me, at this SNR. "
@@ -2681,7 +2698,7 @@ void sub_page_path()
 
     // Legende, wie bei sub_page_neighbours() unten: title= wirkt auf dem
     // Telefon nicht, deshalb stehen dieselben Erklaerungen hier als Text.
-    web_client.print("<p style=\"font-size:var(--fs-s);color:#555;\">"
+    web_client.print("<p style=\"font-size:var(--fs-s);color:var(--mcmute);\">"
                       "Hops: 0 = me, 1 = direct neighbour, 2+ = reached via other nodes."
                       " | Firmware: the version the station puts into its own frames, '-' until one arrives or beyond 2 hops."
                       " | Hears me: SNR at which that neighbour last reported hearing me, '-' if unknown or not a direct/2-hop row."
@@ -2979,11 +2996,11 @@ void sub_page_neighbours()
         // Zeilenfarbe nach Rolle, nicht mehr nach <verdict> (6.1, Regel 2):
         // Zeile 0 blau, der Super-Node gruen, E_self weiterhin rot.
         if (X == 0)
-            web_client.print("<tr style=\"background-color:#d9ecff;\">");
+            web_client.print("<tr class=\"nbr-me\">");
         else if ((int)i == superI)
-            web_client.print("<tr style=\"background-color:#d9f5d9;\">");
+            web_client.print("<tr class=\"nbr-super\">");
         else if (rowESelf)
-            web_client.print("<tr style=\"background-color:#ffd9d9;\">");
+            web_client.print("<tr class=\"nbr-eself\">");
         else
             web_client.print("<tr>");
         web_client.printf("<td class=\"font-bold\">%u ", (unsigned)(i + 1));
@@ -3137,7 +3154,7 @@ void sub_page_neighbours()
     // Legende (6.1, Kopf): title= wirkt auf dem Telefon nicht, deshalb
     // stehen dieselben Erklaerungen hier zusaetzlich als Text (W4c: Cov dazu,
     // die "Covered by"-Spalte der geloeschten Zeilentabelle).
-    web_client.print("<p style=\"font-size:var(--fs-s);color:#555;\">"
+    web_client.print("<p style=\"font-size:var(--fs-s);color:var(--mcmute);\">"
                       "D/I: Direct: heard by me over the air. Indirect: only via a neighbour."
                       " | G: Gateway: a HEY addressed to HG was seen from this node. 'no' means not observed."
                       " | M: Mesh: relays foreign frames, from its last position frame."
