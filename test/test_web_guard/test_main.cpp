@@ -528,13 +528,21 @@ void test_same_origin_post_with_matching_origin_passes(void)
 void test_read_only_gets_need_no_proof(void)
 {
     static const char *const ro[] = {"/rmstatus", "/config.json", "/rmnodes", "/rmheard", "/getparam/?x=y", "/?getmessages",
-                                     "/?page=setup", "/?page=remote", "/", "/favicon.ico", "/style.css"};
+                                     "/?page=setup", "/?page=remote", "/", "/favicon.ico", "/style.css",
+                                     // the gzip CSS/JS assets of the GUI (web_functions.cpp deliver_web_asset)
+                                     "/mc.css?v=8116ab29", "/mc.js?v=13d9a7c3", "/mcau.js?v=48fa6fe6", "/mcrm.js?v=7230b9c3"};
     for (size_t i = 0; i < sizeof(ro) / sizeof(ro[0]); i++)
     {
         std::string line = std::string("GET ") + ro[i] + " HTTP/1.1";
         expect(WG_OK, req(line.c_str(), {"Host: 192.168.68.71", "User-Agent: curl/8.7.1", "Accept: */*"}), ro[i], ro[i]);
         expect(WG_OK, req(line.c_str(), {"Host: dk5en-1.local", "Referer: http://attacker.example/"}), ro[i], ro[i]);
     }
+    // a script/style sub-resource of the page: same-origin fetch metadata, Dest script|style
+    static const char *const dest[] = {"script", "style"};
+    for (size_t i = 0; i < 2; i++)
+        expect(WG_OK, req("GET /mc.js?v=13d9a7c3 HTTP/1.1", {"Host: 192.168.68.71", "Sec-Fetch-Site: same-origin",
+                                                              (std::string("Sec-Fetch-Dest: ") + dest[i]).c_str()}),
+               "/mc.js", dest[i]);
 }
 
 void test_xmc_header_name_case_and_value(void)
@@ -659,8 +667,8 @@ void test_regression_curl_style_request_passes(void)
     expect(WG_OK, cfg, "/config.json", "header-less curl, read-only path");
 }
 
-// MC_WEB_GUARD: by default only the /rm* paths and the remote page are guarded.
-void test_guard_applies_default_only_rm_and_remote_page(void)
+// MC_WEB_GUARD=0 (guardAll false): only the /rm* paths and the remote page are guarded. The build default is 1.
+void test_guard_applies_only_rm_and_remote_page_when_flag_off(void)
 {
     const char *open_paths[] = {"/setparam/?onewire=on", "/callfunction/?x", "/", "/?sendmessage=hello",
                                 "/?page=settings", "/config.json", "/getparam/?x"};
@@ -671,6 +679,8 @@ void test_guard_applies_default_only_rm_and_remote_page(void)
     for (size_t i = 0; i < sizeof(rm_paths) / sizeof(rm_paths[0]); i++)
         TEST_ASSERT_TRUE_MESSAGE(webGuardAppliesTo(rm_paths[i], false), rm_paths[i]);
 }
+
+void test_guard_default_is_on(void) { TEST_ASSERT_EQUAL(1, MC_WEB_GUARD); }
 
 void test_guard_applies_all_when_flag_set(void)
 {
@@ -804,8 +814,8 @@ void test_upd_actions_need_xmc(void)
     std::string folded = req("GET /callfunction/?updapply= HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1", " 2"});
     std::string lower = req("GET /callfunction/?updcheck= HTTP/1.1", {"Host: 192.168.68.71", "x-mc:1"});
     std::string intext = req("GET /callfunction/?updcheck=%0d%0aX-MC:%201 HTTP/1.1", {"Host: 192.168.68.71"});
-    const char *fns[] = {"updcheck", "updinstall", "updapply"};
-    for (size_t i = 0; i < 3; i++)
+    const char *fns[] = {"updcheck", "updinstall", "updapply", "otaupdate", "reboot"};
+    for (size_t i = 0; i < 5; i++)
     {
         TEST_ASSERT_TRUE_MESSAGE(webGuardCallAllowed(fns[i], with.c_str(), with.size()), fns[i]);
         TEST_ASSERT_FALSE_MESSAGE(webGuardCallAllowed(fns[i], without.c_str(), without.size()), fns[i]);
@@ -815,7 +825,6 @@ void test_upd_actions_need_xmc(void)
     TEST_ASSERT_TRUE(webGuardCallAllowed("updcheck", lower.c_str(), lower.size()));
     TEST_ASSERT_FALSE_MESSAGE(webGuardCallAllowed("updcheck", intext.c_str(), intext.size()), "X-MC text in the query is inert");
     TEST_ASSERT_TRUE(webGuardCallAllowed("sendpos", without.c_str(), without.size()));
-    TEST_ASSERT_TRUE(webGuardCallAllowed("reboot", without.c_str(), without.size()));
     TEST_ASSERT_FALSE(webGuardCallAllowed("updcheck", NULL, 0));
 }
 
@@ -953,7 +962,8 @@ int main(int, char **)
     RUN_TEST(test_regression_img_csrf_setparam_get_is_rejected);
     RUN_TEST(test_regression_dns_rebinding_host_is_rejected);
     RUN_TEST(test_regression_curl_style_request_passes);
-    RUN_TEST(test_guard_applies_default_only_rm_and_remote_page);
+    RUN_TEST(test_guard_applies_only_rm_and_remote_page_when_flag_off);
+    RUN_TEST(test_guard_default_is_on);
     RUN_TEST(test_guard_applies_all_when_flag_set);
     RUN_TEST(test_guard_applies_null_path);
     RUN_TEST(test_guard_applies_wrapper_follows_compile_flag);

@@ -2,8 +2,21 @@
 // Definitions for hmac_sha256.h (RM-01, DRY-05). Arduino-free, no dynamic
 // allocation. All word loads and stores are explicit big-endian byte
 // operations, no type punning (nRF52 builds with -Ofast).
+// ESP32 (QA-DRY-07): the SHA-256 core is mbedtls (already in the image for
+// TLS/OTA); nRF52 and the host keep the portable core. HMAC, hexLower and
+// ctEqual are shared.
+// BENCH CHECK NEEDED: the mbedtls branch is host-untested (no ESP32 define in the
+// native envs). Verify RM tag round trip with a known key (old vs new firmware) and
+// an OTA DOWNLOAD digest match (fw_update_net stageFinish).
+// external_radio_glue.cpp glueHmac (mbedtls_md_hmac) is left alone on purpose: it is
+// a fail-closed bool backend behind a function pointer (test stubs depend on it)
+// and already uses mbedtls, so folding it in saves no bytes.
 
 #include "hmac_sha256.h"
+
+#if defined(ESP32)
+#include <mbedtls/sha256.h>
+#endif
 
 namespace hmac_sha256_detail
 {
@@ -15,6 +28,7 @@ void wipe(void *p, size_t n)
         *v++ = 0;
 }
 
+#if !defined(ESP32)
 static uint32_t rotr(uint32_t x, unsigned n)
 {
     return (x >> n) | (x << (32u - n));
@@ -96,8 +110,33 @@ static void compress(uint32_t h[8], const uint8_t *blk)
     h[7] += hh;
     wipe(w, sizeof(w));
 }
+#endif // !ESP32
 } // namespace hmac_sha256_detail
 
+#if defined(ESP32)
+// mbedtls_sha256_* without _ret: builds on IDF 4.4 (mbedtls 2.x, void) and 5.x (3.x, int).
+// Return values are not checked (software/hardware SHA-256 does not fail here), so
+// there is no error path that could leave a constant digest or tag behind.
+void sha256Init(Sha256Ctx &c)
+{
+    mbedtls_sha256_init(&c.ctx);
+    mbedtls_sha256_starts(&c.ctx, 0);
+}
+
+void sha256Update(Sha256Ctx &c, const uint8_t *data, size_t n)
+{
+    if (n == 0 || data == NULL)
+        return;
+    mbedtls_sha256_update(&c.ctx, data, n);
+}
+
+void sha256Final(Sha256Ctx &c, uint8_t out[32])
+{
+    mbedtls_sha256_finish(&c.ctx, out);
+    mbedtls_sha256_free(&c.ctx);
+    hmac_sha256_detail::wipe(&c, sizeof(c));
+}
+#else
 void sha256Init(Sha256Ctx &c)
 {
     c.h[0] = 0x6a09e667;
@@ -167,6 +206,7 @@ void sha256Final(Sha256Ctx &c, uint8_t out[32])
         hmac_sha256_detail::storeBe32(out + 4 * i, c.h[i]);
     hmac_sha256_detail::wipe(&c, sizeof(c));
 }
+#endif // ESP32
 
 void sha256(const uint8_t *data, size_t n, uint8_t out[32])
 {

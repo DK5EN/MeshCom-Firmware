@@ -1,3 +1,4 @@
+#if !defined(NRF52_SERIES) || HAS_NRF_ETH   // Ethernet only; host twins do not define NRF52_SERIES
 #include <SPI.h>
 #include <RAK13800_W5100S.h>
 #include <Arduino.h>
@@ -160,3 +161,4 @@ void sendUDP()
         }
     }
 }
+#endif

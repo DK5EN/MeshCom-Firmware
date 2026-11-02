@@ -441,7 +441,11 @@ void wifiConnect() {
  // actual g_ota bookkeeping (docs/safeboot-ota-contract.md).
  unsigned long ota_progress_millis = 0;
 
- void onOTAStart() {
+ static void fwStageDrop(bool dropLast);
+
+void onOTAStart() {
+  // A web upload supersedes any staged record; keep 'last' (reinstall guard).
+  fwStageDrop(false);
    Serial.println("OTA update started!");
    Serial.println("[SAFEBOOT];ota;start");
  }

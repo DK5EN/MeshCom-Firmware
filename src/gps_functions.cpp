@@ -82,6 +82,13 @@ no more in use
 static HardwareSerial GPSSerial(1);  // UART1
 #endif
 
+// UART the GPS module hangs on (same call forms on both)
+#if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
+#define GPS_UART Serial1
+#else
+#define GPS_UART GPSSerial
+#endif
+
 // GPS-06: Die wirksamen UART-Pins. Voreinstellung sind die Pins der Variante;
 // ein Board mit GPS_FALLBACK_RX_PIN/GPS_FALLBACK_TX_PIN (T-Deck ohne Plus)
 // wechselt in detectBaudrate() auf die Zweitbelegung, wenn auf der ersten kein
@@ -291,17 +298,9 @@ static int gpsScanBauds()
             // Die innere Schleife war unbegrenzt: bei einem dauerhaft
             // sendenden Modul bleibt available() beliebig lange wahr. Sie
             // erbt jetzt dasselbe 1500-ms-Fenster wie die äußere.
-            #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-            while (Serial1.available() && (millis() - start < 1500) && !bFrameOK)
-            #else
-            while (GPSSerial.available() && (millis() - start < 1500) && !bFrameOK)
-            #endif
+            while (GPS_UART.available() && (millis() - start < 1500) && !bFrameOK)
             {
-                #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-                c = char(Serial1.read());
-                #else
-                c = char(GPSSerial.read());
-                #endif
+                c = char(GPS_UART.read());
 
                 // Pruefsumme ueber den ROHEN Strom -- der Filter unten laesst
                 // '.' und '-' nicht durch, beide stehen in jedem realen Satz.
@@ -330,11 +329,7 @@ static int gpsScanBauds()
           Serial.printf("[GPS ]...%lu baud --> %i chars%s\n", GPS_BAUDS[iGpsBaud], GPS_BAUDS_RX[iGpsBaud],
                         bFrameOK ? " (NMEA ok)" : "");
 
-        #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-        Serial1.end();
-        #else
-        GPSSerial.end();
-        #endif
+        GPS_UART.end();
 
         if(bFrameOK)
             ipos = iGpsBaud;
@@ -445,17 +440,10 @@ void sendUBX_CFG_PRT() {  // Binäres Paket senden
   if(iGPSDEBUG >= 2)
     Serial.printf("[GPS ]...UBX_CFG_PRT %li\n", new_baud);
 
-  #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
   for (int i = 0; i < (int)sizeof(UBX_CFG_PRT); i++)
   {
-    Serial1.write(UBX_CFG_PRT[i]);
+    GPS_UART.write(UBX_CFG_PRT[i]);
   }
-  #else
-  for (int i = 0; i < sizeof(UBX_CFG_PRT); i++)
-  {
-    GPSSerial.write(UBX_CFG_PRT[i]);
-  }
-  #endif
   delay(100); // Kurze Pause für das Modul
 }
 
@@ -475,17 +463,10 @@ void sendUBX_CFG_RATE() {  // Binäres Paket senden
   if(iGPSDEBUG >= 2)
     Serial.println("[GPS ]...Sende UBX_CFG_RATE");
 
-  #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
   for (int i = 0; i < (int)sizeof(UBX_CFG_RATE); i++)
   {
-    Serial1.write(UBX_CFG_RATE[i]);
+    GPS_UART.write(UBX_CFG_RATE[i]);
   }
-  #else
-  for (int i = 0; i < sizeof(UBX_CFG_RATE); i++)
-  {
-    GPSSerial.write(UBX_CFG_RATE[i]);
-  }
-  #endif
   delay(100); // Kurze Pause für das Modul
 }
 
@@ -546,17 +527,9 @@ String readUBX() {
     // obere Schranke; ohne Fütterung reboot der Knoten mitten in der
     // GPS-Erkennung. Die Schranke selbst gehört noch gezogen (S2).
     meshcom_wdt_feed();
-    #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-    while (Serial1.available()) {
-    #else
-    while (GPSSerial.available()) {
-    #endif
+    while (GPS_UART.available()) {
       if (ver.length() > 500) { break; }  //TODO: mehr Zeichen für ganzen Versions-String
-      #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-      ver = ver + char(Serial1.read());
-      #else
-      ver = ver + char(GPSSerial.read());
-      #endif
+      ver = ver + char(GPS_UART.read());
       startTimeout = millis() + 500;  // retrigger timeout
     }
   }
@@ -568,13 +541,8 @@ String readUBXbin() {
   ver = "";
     while ((int32_t)(millis() - startTimeout) < 0) {
     meshcom_wdt_feed();   // N-25/B-9: gleiches gleitendes Timeout wie readUBX()
-    #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-    while (Serial1.available()) {
-      int c = Serial1.read();
-    #else
-    while (GPSSerial.available()) {
-      int c = GPSSerial.read();
-    #endif
+    while (GPS_UART.available()) {
+      int c = GPS_UART.read();
 
       if ((ver.length() > 500) || (c == 0x0D)) { break; }  //TODO: mehr Zeichen für ganzen Versions-String
       if (c == 0xB5) { c = 0x75; }
@@ -590,23 +558,14 @@ String readUBXbin() {
 void WaitPause() {
   meshcom_wdt_feed();   // N-25: die erste Schleife wartet bis zu 1000 ms
   startTimeout = millis() + 1000;
-  #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-  while ((!Serial1.available()) && ((int32_t)(millis() - startTimeout) < 0)) { delay(5); } // auf Block von Zeichen warten
-  #else
-  while ((!GPSSerial.available()) && ((int32_t)(millis() - startTimeout) < 0)) { delay(5); } // auf Block von Zeichen warten
-  #endif
+  while ((!GPS_UART.available()) && ((int32_t)(millis() - startTimeout) < 0)) { delay(5); } // auf Block von Zeichen warten
   if(iGPSDEBUG >= 2)
     Serial.printf("[GPS ]...wait");
   startTimeout = millis() + 50;  // für Serial Sync Zeichenblock lesen und Pause von 50ms abwarten
   while ((int32_t)(millis() - startTimeout) < 0) {
     meshcom_wdt_feed();   // N-25: 50-ms-Timeout wird pro Byte neu gesetzt
-    #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-    if (Serial1.available()) {
-      Serial1.read();
-    #else
-    if (GPSSerial.available()) {
-      GPSSerial.read();
-    #endif
+    if (GPS_UART.available()) {
+      GPS_UART.read();
       startTimeout = millis() + 50;  // retrigger timeout
     }
   }
@@ -620,11 +579,7 @@ void WaitPause() {
 // Hilfsfunktion zum Senden
 void sendUBXCommand(String cmd)
 {
-  #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-  Serial1.println(cmd);
-  #else
-  GPSSerial.println(cmd);
-  #endif
+  GPS_UART.println(cmd);
   delay(100); // Kurze Pause für das Modul
 }
 
@@ -699,35 +654,19 @@ void SetupUBLOX()
 void SetupL76K() {
   // Initialize the L76K Chip, use GPS + GLONASS + GALILEO
   Serial.printf("[GPS ]>>> $PCAS04,D,D,9*10\n");
-  #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-  Serial1.write("$PCAS04,D,D,9*10\r\n");
-  #else
-  GPSSerial.write("$PCAS04,D,D,9*10\r\n");
-  #endif
+  GPS_UART.write("$PCAS04,D,D,9*10\r\n");
   delay(250);
   // Wiederholrate 1s
   Serial.printf("[GPS ]>>> $PCAS02,1000*2E\n");
-  #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-  Serial1.write("$PCAS02,1000*2E\r\n");
-  #else
-  GPSSerial.write("$PCAS02,1000*2E\r\n");
-  #endif
+  GPS_UART.write("$PCAS02,1000*2E\r\n");
   delay(250);
   // Switch to portable Mode
   Serial.printf("[GPS ]>>> $PCAS11,0*1D\n");
-  #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-  Serial1.write("$PCAS11,0*1D\r\n");
-  #else
-  GPSSerial.write("$PCAS11,0*1D\r\n");
-  #endif
+  GPS_UART.write("$PCAS11,0*1D\r\n");
   delay(250);
   // ask for only RMC and GGA
   Serial.printf("[GPS ]>>> $PCAS03,1,0,0,0,1,0,0,0,0,0,,,0,0*02\n");
-  #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-  Serial1.write("$PCAS03,1,0,0,0,1,0,0,0,0,0,,,0,0*02\r\n");
-  #else
-  GPSSerial.write("$PCAS03,1,0,0,0,1,0,0,0,0,0,,,0,0*02\r\n");
-  #endif
+  GPS_UART.write("$PCAS03,1,0,0,0,1,0,0,0,0,0,,,0,0*02\r\n");
   Serial.printf("[GPS ]...L76K config finished\n");
 
   // Baudrate auf 38400 umstellen falls erforderlich
@@ -778,13 +717,8 @@ bool GPSprobe() {
   startTimeout = millis() + WAIT_DURATION;
   if(iGPSDEBUG >= 2)
     Serial.printf("[GPS ]...clear NMEA-Buffer\n");
-  #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-  while (Serial1.available()) {  // clear RX-Buffer
-    ver = ver + char(Serial1.read());
-  #else
-  while (GPSSerial.available()) {  // clear RX-Buffer
-    ver = ver + char(GPSSerial.read());
-  #endif
+  while (GPS_UART.available()) {  // clear RX-Buffer
+    ver = ver + char(GPS_UART.read());
 
     meshcom_wdt_feed();   // N-25: bis zu WAIT_DURATION = 2000 ms
 
@@ -819,11 +753,7 @@ bool GPSprobe() {
   // get device info
   Serial.printf("[GPS ]>>> $PCAS06,0*1B\n");
   WaitPause(); // Pause zwischen Blöcken erreicht
-  #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-  Serial1.write("$PCAS06,0*1B\r\n");
-  #else
-  GPSSerial.write("$PCAS06,0*1B\r\n");
-  #endif
+  GPS_UART.write("$PCAS06,0*1B\r\n");
 
   ver = readUBX();
 
@@ -989,17 +919,9 @@ void WZ_GPS_Feed()
         return;
 
     // Alle verfuegbaren Bytes lesen (non-blocking)
-    #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-    while (Serial1.available())
-    #else
-    while (GPSSerial.available())
-    #endif
+    while (GPS_UART.available())
     {
-        #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
-        int ic = Serial1.read();
-        #else
-        int ic = GPSSerial.read();
-        #endif
+        int ic = GPS_UART.read();
 
         if (gps.encode(char(ic))) { updateGPSdata = true; }
 
@@ -1148,13 +1070,7 @@ int WZ_GPS_Loop() {
                 snprintf(cTimeSource, sizeof(cTimeSource), (char*)"GPS");
             }
 
-            meshcom_settings.node_date_year = MyClock.Year();
-            meshcom_settings.node_date_month = MyClock.Month();
-            meshcom_settings.node_date_day = MyClock.Day();
-        
-            meshcom_settings.node_date_hour = MyClock.Hour();
-            meshcom_settings.node_date_minute = MyClock.Minute();
-            meshcom_settings.node_date_second = MyClock.Second();
+            syncNodeDateFromClock();
 
 
             // position -> variables
@@ -1293,13 +1209,7 @@ int WZ_GPS_Loop() {
                 MyClock.setCurrentTime(meshcom_settings.node_utcoff, gpsData.year, gpsData.month, gpsData.day, gpsData.hour, gpsData.minute, gpsData.second);
                 snprintf(cTimeSource, sizeof(cTimeSource), (char*)"GPS");
                 
-                meshcom_settings.node_date_year = MyClock.Year();
-                meshcom_settings.node_date_month = MyClock.Month();
-                meshcom_settings.node_date_day = MyClock.Day();
-            
-                meshcom_settings.node_date_hour = MyClock.Hour();
-                meshcom_settings.node_date_minute = MyClock.Minute();
-                meshcom_settings.node_date_second = MyClock.Second();
+                syncNodeDateFromClock();
             }
 
             posinfo_direction = 0;

@@ -1,28 +1,21 @@
 // LoRa Queue card wording check (docs/lora-qrt-dk5en98-db0taw14-20261018-verdict.md, Finding 11).
 //
-// Offline: extracts mcRenderQueue() from the println() literals in
-// src/web_functions/web_functions.cpp, runs it in jsdom against a fixture #mcq
+// Offline: takes mcRenderQueue() from /mc.js (the gunzipped blob of
+// src/web_functions/web_assets.h, made from web/mc.js), runs it in jsdom against a fixture #mcq
 // element and asserts the back-pressure state is worded for what it is (it only
 // reacts to the node's own typed messages) and that the ring condition line
 // (queued, drops, TX/RX share) is shown. Needs no node.
 //
 // Prerequisite: npm i jsdom@24 (anywhere; set NODE_PATH). Run:
 //   node tools/webgui_queue_test.js
-const fs = require('fs');
-const path = require('path');
 const { JSDOM } = require('jsdom');
 
-const SRC = path.join(__dirname, '..', 'src', 'web_functions', 'web_functions.cpp');
-const lines = fs.readFileSync(SRC, 'utf8').split('\n');
-const a = lines.findIndex((l) => l.includes('web_client.println("var mcQueueOpen=true;");'));
-let b = -1;
-for (let i = a; i < lines.length; i++) if (lines[i].includes('println("</script>')) { b = i; break; }
-if (a < 0 || b < 0) { console.log('FAIL cannot locate queue script in source'); process.exit(1); }
-let script = '';
-for (const l of lines.slice(a, b)) {
-  const m = l.trim().match(/^web_client\.println\("(.*)"\);$/);
-  if (m) script += m[1].replace(/\\(["\\n])/g, (_, c) => (c === 'n' ? '\n' : c)) + '\n';
-}
+const { loadAssets } = require('./webgui_assets');
+
+const MC_JS = loadAssets().MC_JS;
+const a = MC_JS.indexOf('var mcQueueOpen=true;');
+if (a < 0) { console.log('FAIL cannot locate queue script in mc.js'); process.exit(1); }
+const script = MC_JS.slice(a) + '\n';   // the queue block is the tail of mc.js
 
 let failures = 0;
 function check(name, cond, extra) {

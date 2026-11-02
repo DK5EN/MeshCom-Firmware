@@ -3,25 +3,23 @@
 // characters let a Polish or emoji-heavy message pass the counter and then be
 // cut short on the node.
 //
-// The JS lives as a C string inside src/web_functions/web_functions.cpp; this
-// test lifts that println() line out of the source, unescapes it and runs it
+// The JS lives in src/web_functions/web/mc.js (served gzipped as /mc.js); this
+// test lifts that line out of the shipped blob (web_assets.h) and runs it
 // against a two-element stub DOM. No node, no jsdom needed.
 //
 //   node --test tools/tests/test_webgui_charsleft.mjs
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 
-const SRC = new URL('../../src/web_functions/web_functions.cpp', import.meta.url);
+const { loadAssets } = createRequire(import.meta.url)('../webgui_assets.js');
 
 function loadCounter() {
-  const line = readFileSync(SRC, 'utf8')
-    .split('\n')
-    .find((l) => l.includes('web_client.println(') && l.includes('function updateCharsLeft()'));
-  assert.ok(line, 'updateCharsLeft() println not found in web_functions.cpp');
-  const lit = line.slice(line.indexOf('println(') + 'println('.length, line.lastIndexOf(');'));
-  const js = JSON.parse(lit); // a C string literal with only \" and \n escapes is valid JSON
+  const js = loadAssets()
+    .MC_JS.split('\n')
+    .find((l) => l.includes('function updateCharsLeft()'));
+  assert.ok(js, 'updateCharsLeft() not found in mc.js');
   const els = {
     sendcall: { value: '' },
     messagetext: { value: '' },

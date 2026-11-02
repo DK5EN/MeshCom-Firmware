@@ -22,7 +22,9 @@
 #include <TinyGPSPlus.h>
 
 // MeshCom nrf52 functions
+#if HAS_NRF_ETH
 #include <RAK13800_W5100S.h>
+#endif
 #include <WisBlock-API.h>
 
 #include <nrf_eth.h>
@@ -171,8 +173,10 @@ void sendHeartbeat();
 
 #include "printfdeb_functions.h"
 
+#if defined(ENABLE_RAK_GPS)
 #include <SparkFun_u-blox_GNSS_Arduino_Library.h>
 SFE_UBLOX_GNSS myGPS;
+#endif
 
 // UBLOX Modul auf Factory-Set zurück setzen
 // derzeit nur im esp32_gps realisiert
@@ -1285,6 +1289,7 @@ void nrf52setup()
 
     seedRandomFromHw();   // ETH-04 F3: after init_ble() (SoftDevice up), before the DHCP xid
 
+#if HAS_NRF_ETH
     if (bGATEWAY || bWEBSERVER)
     {
         //////////////////////////////////////////////////////
@@ -1340,6 +1345,9 @@ void nrf52setup()
         meshcom_settings.node_hasIPaddress = false;
         neth.hasETHHardware = false;
     }
+#else
+    meshcom_settings.node_hasIPaddress = false;   // no Ethernet in this build
+#endif
 }   
 
 void nrf52loop()
@@ -1431,6 +1439,7 @@ void nrf52loop()
     }
     #endif
 
+#if HAS_NRF_ETH
     if(meshcom_settings.node_hasIPaddress)
     {
         INSTR_SECTION("eth_state");
@@ -1485,6 +1494,7 @@ void nrf52loop()
         }
     }
     else
+#endif
     {
         bNTPDateTimeValid = false;
     }
@@ -1495,17 +1505,9 @@ void nrf52loop()
         INSTR_SECTION("clock");
         MyClock.CheckEvent();
         
-        if(MyClock.Year() > 2023)
-            meshcom_settings.node_date_year = MyClock.Year();
-        else
+        syncNodeDateFromClock();
+        if(MyClock.Year() <= 2023)
             meshcom_settings.node_date_year = 0;
-
-        meshcom_settings.node_date_month = MyClock.Month();
-        meshcom_settings.node_date_day = MyClock.Day();
-
-        meshcom_settings.node_date_hour = MyClock.Hour();
-        meshcom_settings.node_date_minute = MyClock.Minute();
-        meshcom_settings.node_date_second = MyClock.Second();
 
         // Starttime setzen
         if(meshcom_settings.node_date_year > 2023 && meshcom_settings.node_update[0] == 0x00)
@@ -2399,6 +2401,7 @@ void nrf52loop()
     // the DHCP renew check, then (below) either the gateway UDP get/send or
     // the TM-45 NTP-only harvest -- exactly one of the latter two per pass.
 
+#if HAS_NRF_ETH
     // TM-35 / N-20 instrumentation: link edges and the 60-s heartbeat
     ethLinkPoll();
     ethLinkHeartbeat();
@@ -2493,6 +2496,7 @@ void nrf52loop()
 
     // C4 carve-out: the gateway service block lives in gateway_service_nrf52.cpp
     gatewayService_nrf52();
+#endif
 
     #if defined(SHTC3)
 
@@ -2743,6 +2747,7 @@ void nrf52loop()
         }
     }
 
+#if HAS_NRF_ETH
     if(bEXTUDP)
     {
         // ETH-03: one number for the whole guard-hold -- how long the SPI
@@ -2808,6 +2813,7 @@ void nrf52loop()
         }
 
     }
+#endif
 
     if (resendPing == 0)
         resendPing = millis();

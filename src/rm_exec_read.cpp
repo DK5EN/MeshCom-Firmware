@@ -25,7 +25,9 @@
 #include "txring_functions.h"
 #include "uptime_min.h"
 #if defined(NRF52_SERIES)
+#if HAS_NRF_ETH
 #include <RAK13800_W5100S.h> // IPAddress for nrf_eth.h
+#endif
 #include <nrf_eth.h>         // ethIsStaticConfigured()
 #endif
 #if defined(ENABLE_MSGSTORE)

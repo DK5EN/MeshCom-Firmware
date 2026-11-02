@@ -115,6 +115,34 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   2026-10-27 05:35 (194 s without keepalive, then -67 instead of -55 dBm). Report: Desktop
   `logauswertung-dk5en-98-soak-20261025.html`, artifact <https://claude.ai/artifact/XwSCwExCxEqog8vW8yv3xo>; logs
   rpizero `~/meshlog/dk5en-98-soak-20261025/`. Details: [campaign-tx-pool.md](campaign-tx-pool.md), "DK5EN-98 soak".
+- **QA review of `fork-dev` f0a81c8 and its fix campaign (2026-10-25/26, branch `claude/fork-dev-code-review-xdxqzv`, merged 2026-11-02):**
+  **Rebased 2026-11-02 onto `fork-dev` `42bbe18f`** (was base `8681fcb4`; the 19 commits are now `55dcdc9`..HEAD, messages
+  unchanged). Conflicts in 3 commits: `fd163e1` test_command_setters (both test sets kept), `6b25f84` web_setup table (WX-01 `uv`/`wind`
+  as WSP rows, `windpin`/`windcal` stay explicit rungs, WEB-LED-01 `boardled` explicit), `591a9e7` gzip web assets (fork-dev WEB-DARK-01,
+  WEB-A11Y-01, WEB-PWD-01 CSS/JS ported into `src/web_functions/web/`, `web_assets.h` regenerated, `webgui_settings_test.js` and
+  `webgui_theme_test.js` read the assets). Container gate `--stage 1,2`: Unity 3440 cases, 3437 ok, 1 failed, 1 skipped (TARGET baseline
+  3427/3424/1/1; the one red on both sides is PF-T1 `test_kadenz_unabhaengig`); pytest 1489 passed after one flaky
+  `test_mc_console::test_nonce_without_password_names_the_key` (passes 5/5 isolated and in the full rerun; baseline 1478); node GUI
+  tests same counts as TARGET (settings 85, theme 137); nRF52 link t_echo 54.2 %, T114 50.7 %, RAK4631 80.8 % flash (TARGET 85.6/82.5/88.6).
+  Advisor range-diff: 16 of 19 commits identical, 3 differ only in the conflict hunks. **Local gate 2026-11-02 (closed, merged
+  into `fork-dev`):** TARGET had moved to `61867a20` (docs only on top of the rebase base), merged into the branch. `--stage 1,2`
+  baseline `61867a20` 3426 Unity cases 0 red, branch 3439 cases 0 red (PF-T1 does not fail on macOS; pytest 1477 to 1489, no flake this
+  run). Board builds, `MC_AU_DEV_CHANNEL=1`, 35 of 36 non-native envs build on both sides (`esp32-external-radio` needs a host/port overlay,
+  fails on both): flash falls in every env (ESP32 -205 to -222 KB, t_deck -298 KB, t_deck_pro -186 KB, t5_epaper -222 KB, vision-master-e290-otp
+  -65 KB, safeboot -24.9 KB, RAK4631 -63 KB, T114 -256 KB, t_echo -256 KB); static RAM ESP32 +0.5 to +1.1 KB, RAK4631 -2.5 KB,
+  T114 -8.4 KB, t_echo -8.7 KB. No fix needed. Table: [review/qa-review-fork-dev-20261025.md](review/qa-review-fork-dev-20261025.md) section 8.7,
+  numbers in `tools/bench/runs/qa-review-local-gate-20261102.summary`. **Hardware untested**, bench list section 8.6 (DK5EN-92 / DK5EN-90).
+  [review/qa-review-fork-dev-20261025.md](review/qa-review-fork-dev-20261025.md) (section 8 = result); raw reports in
+  `review/qa-20261025/`. 17 work packages (WP1-WP17) as commits `52a8d5bd`..`17793944`, all cloud-built and host-tested, **not
+  benched**. Fixed: QA-NET-04, QA-STAB-01/02/03/04/06, QA-NET-02 (nRF52 settings masking), QA-AU-01/05/09/11/12/15, `MC_WEB_GUARD=1`
+  default plus `otaupdate`/`reboot` need X-MC, no CORS headers, size levers (`-fno-exceptions`, `CORE_DEBUG_LEVEL=0`, gzip web assets,
+  nRF52 Ethernet as a per-env build flag off on T114/t_echo, T-Deck LVGL/fonts, Safeboot gzip page), DRY items. Not changed by
+  decision: QA-NET-01, stack canaries. Gate: 83 Unity envs, 3021/3028 ok (known gcc-13 failures `test_kadenz_unabhaengig`,
+  `native_udp_frame_twin`; a WP5 source-pin failure in `native_command_setters` fixed in the closing commit), pytest 1422, all 32
+  CI envs build, `au_stage_check` 27 envs 0 refused (T-Beam family reserve now ≥371 KB). Safeboot headroom 7 KB -> 31 KB, T114/t_echo
+  -244 KB. **Open:** bench list in report section 8.6 (DK5EN-92/-90), first `ci-proof-*` run for WP17, app tolerance of `bt_code` -1
+  (WP4), then cut the upstream PRs from `upstream/dev`. Still open from the report: QA-SIZE-06/09/12 (sensors/GPS/OLED, no field data),
+  protocol-level items (QA-RX-04/05, QA-AU-06), GET `tempoffsetoutdoor` UNKNOWN bug (needs OK).
 - **`v4.40a.10.25` released 2026-10-25** (CI, Latest, tag on `61077a8c`, after two cancelled cuts: SNF-ACK-01 and upstream
   #1237 came in): TXP-01 own text sent once, WIFI-HEAP-01 raw ICMP probe (TD-21/21b), TD-20/TD-22 T-Deck heap, TD-23
   backlight (fork PR #1), SNF-ACK-01 mailbox tombstone, upstream #1237 BLE app settings; pages rework (fork PR #2).

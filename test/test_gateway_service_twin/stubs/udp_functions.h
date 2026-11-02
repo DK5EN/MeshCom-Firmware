@@ -32,3 +32,4 @@ void getMeshComUDP();
 void sendMeshComHeartbeat();
 void resetMeshComUDP();
 void ntpHarvestUDP();
+void wifiDnsRefreshServer();

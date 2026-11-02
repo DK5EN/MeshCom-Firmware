@@ -17,6 +17,15 @@
 // extudp_functions.h, which is outside the U1 carve's file set).
 #include "udp_frame.h"
 
+// nRF52 without Ethernet (HAS_NRF_ETH=0, T114/t_echo): there is no socket to
+// open, so the EthernetUDP object and every function touching it compile to
+// empty stubs; bEXTUDP can never be switched on there (see command_functions).
+// If an old settings image still carries the EXTUDP bit, queueExtern() keeps
+// writing the ring, which just wraps over itself: nothing drains or sends it.
+#if defined(NRF52_SERIES) && !HAS_NRF_ETH
+#define EXT_NO_SOCKET 1
+#endif
+
 // PT-01 (native_extern): none of the network transport below (SPI/WiFi/
 // Ethernet headers, the UdpExtern socket object, and every function that
 // touches it) is reachable from getExtern()/handleExternTelemetry(), which
@@ -34,7 +43,7 @@
 #elif defined(ESP32)
   #include <WiFi.h>
   #include <WiFiClient.h>
-#else
+#elif !defined(EXT_NO_SOCKET)
   #include <RAK13800_W5100S.h> // Click to install library: http://librarymanager/All#RAK13800_W5100S
   #include <nrf52/nrf_eth.h>
 #endif
@@ -51,6 +60,7 @@ String str_ip;
 // getExtern() nor handleExternTelemetry() reference them, and IPAddress
 // isn't available without the network headers guarded out above.
 #ifndef NATIVE_BUILD
+#if !defined(EXT_NO_SOCKET)
 IPAddress apip;
 
 #ifdef BOARD_T_ETH_ELITE
@@ -63,6 +73,7 @@ IPAddress apip;
   IPAddress extern_node_ip;
   EthernetUDP UdpExtern;
 #endif
+#endif // !EXT_NO_SOCKET
 #endif // !NATIVE_BUILD
 
 unsigned char incomingExtPacket[UDP_TX_BUF_SIZE];  // buffer for incoming packets
@@ -99,6 +110,92 @@ static int externQueueWrite = 0;
 // and is not part of the getExtern()/handleExternTelemetry() input path this
 // native build tests -- guarded out with it.
 #ifndef NATIVE_BUILD
+#if defined(ESP32)
+#include "lwip/dns.h"
+
+// QA-STAB-01: WiFi.hostByName() blocks loopTask for up to 16 s (task WDT is
+// 5 s), so the extern host is asked via lwIP directly and the result arrives
+// by callback; startExternUDP() is called every pass and polls the state.
+// Own instance, not the gateway server's s_dnsSrv in udp_functions.cpp.
+// nRF52 has no resolver and keeps its behaviour (see startExternUDP).
+static struct
+{
+  char name[64];
+  IPAddress result;
+  volatile bool pending;
+  volatile bool done;
+} s_extDns = {{0}, IPAddress(0,0,0,0), false, false};
+
+static void extDnsCb(const char *name, const ip_addr_t *ipaddr, void *arg)
+{
+  if(ipaddr != NULL && ipaddr->u_addr.ip4.addr != 0)
+    s_extDns.result = IPAddress(ipaddr->u_addr.ip4.addr);
+  else
+    s_extDns.result = IPAddress(0,0,0,0);
+  s_extDns.pending = false;
+  s_extDns.done = true;
+}
+
+// true: ip holds the resolved address. false: pending or failed, caller
+// returns without latching hasExternIPaddress.
+static bool extDnsResolve(const char *host, IPAddress &ip)
+{
+  static uint32_t last_log = 0;
+  static uint32_t fail_ms = 0;
+  static bool failed = false;
+  uint32_t now = millis();
+
+  if(s_extDns.pending)
+    return false;
+
+  if(s_extDns.done && strncmp(s_extDns.name, host, sizeof(s_extDns.name)) == 0)
+  {
+    s_extDns.done = false;
+    if((uint32_t)s_extDns.result != 0)
+    {
+      failed = false;
+      ip = s_extDns.result;
+      return true;
+    }
+    failed = true;
+    fail_ms = now;
+    Serial.printf("[EXT] DNS lookup of %s failed, will retry\n", host);
+    return false;
+  }
+  s_extDns.done = false;
+
+  if(failed && (uint32_t)(now - fail_ms) < 10000)   // do not hammer the resolver
+    return false;
+
+  snprintf(s_extDns.name, sizeof(s_extDns.name), "%s", host);
+  s_extDns.result = IPAddress(0,0,0,0);
+
+  ip_addr_t addr;
+  err_t err = dns_gethostbyname(s_extDns.name, &addr, extDnsCb, NULL);
+  if(err == ERR_OK)
+  {
+    ip = IPAddress(addr.u_addr.ip4.addr);
+    failed = false;
+    return (uint32_t)ip != 0;
+  }
+  if(err == ERR_INPROGRESS)
+  {
+    s_extDns.pending = true;
+    if((uint32_t)(now - last_log) > 30000 || last_log == 0)
+    {
+      Serial.printf("[EXT] resolving %s ...\n", host);
+      last_log = now;
+    }
+    return false;
+  }
+  failed = true;
+  fail_ms = now;
+  Serial.printf("[EXT] DNS lookup of %s failed (err %d), will retry\n", host, (int)err);
+  return false;
+}
+#endif
+
+#if !defined(EXT_NO_SOCKET)
 void startExternUDP()
 {
   #ifdef BOARD_T_ETH_ELITE
@@ -166,6 +263,25 @@ void startExternUDP()
   // (nrf52_main.cpp:2467 / esp32_main.cpp:4002) tests !hasExternIPaddress on
   // every pass, so leaving the flag clear IS the retry. The log is rate-limited
   // so a node that genuinely has no socket left does not flood the console.
+  // QA-STAB-01: the hostname lookup runs before begin(), so a pending or
+  // failed lookup returns cheaply instead of re-opening the socket each pass.
+  // A literal IP needs no lookup (path below); nRF52 has no resolver and
+  // keeps its behaviour (returning there would keep a hostname node from
+  // ever starting its socket).
+  #if defined(ESP32)
+  bool extByName = false;
+  if(WiFi.isConnected())
+  {
+    IPAddress extLit;
+    if(!extLit.fromString(meshcom_settings.node_extern))
+    {
+      if(!extDnsResolve(meshcom_settings.node_extern, apip))
+        return;
+      extByName = true;
+    }
+  }
+  #endif
+
   if(UdpExtern.begin(EXTERN_PORT) == 0)
   {
       static uint32_t last_fail_log = 0;
@@ -191,7 +307,8 @@ void startExternUDP()
 
   Serial.println("WiFI is open");
   
-  if(WiFi.hostByName(meshcom_settings.node_extern, apip) == 1)
+  // Hostname already resolved above (apip); literal IPs take the else path.
+  if(extByName)
   {
     Serial.printf("[EXT] URL:%s to IP:%s\n", meshcom_settings.node_extern, apip.toString().c_str());
     // str_ip feeds the "now sending to IP" line below; it was only set in
@@ -230,6 +347,11 @@ void startExternUDP()
 
   sendExternHeartbeat();
 }
+#else
+void startExternUDP()
+{
+}
+#endif // EXT_NO_SOCKET
 #endif // !NATIVE_BUILD
 
 
@@ -424,6 +546,7 @@ void getExtern(unsigned char incoming[], int len)
 // hands the datagram to getExtern() below -- not part of what this native
 // build tests, guarded out with the socket it depends on.
 #ifndef NATIVE_BUILD
+#if !defined(EXT_NO_SOCKET)
 void getExternUDP()
 {
   #ifdef ESP32
@@ -517,6 +640,11 @@ void getExternUDP()
                   (unsigned)uxTaskGetStackHighWaterMark(NULL), (unsigned long)millis());
   }
 }
+#else
+void getExternUDP()
+{
+}
+#endif // EXT_NO_SOCKET
 #endif // !NATIVE_BUILD
 
 // PT-01: sendExtern() (and everything below it -- queueExtern(),
@@ -526,6 +654,40 @@ void getExternUDP()
 // it is reachable from getExtern()/handleExternTelemetry(), the inbound
 // parser this native build tests, so it is guarded out with the socket.
 #ifndef NATIVE_BUILD
+#if !defined(EXT_NO_SOCKET)
+// One datagram to the EXTUDP peer. resetOnError=false keeps sendExternNotice()'s
+// historic behaviour (write result ignored, endPacket() always called).
+static bool extSendDatagram(const uint8_t *buf, size_t len, bool resetOnError)
+{
+  UdpExtern.beginPacket(apip , EXTERN_PORT);
+  bool ok = UdpExtern.write(buf, len);
+  if(!ok && resetOnError)
+  {
+    resetExternUDP();
+    return false;
+  }
+  UdpExtern.endPacket();
+  return ok;
+}
+
+// Serial log of an outgoing datagram, printed in two halves for long payloads
+static void extLogOut(const char *tag, const char *buf)
+{
+  if(strlen(buf) < 10)
+  {
+    Serial.printf("%s %s Len: %i\n", tag, buf, strlen(buf));
+  }
+  else
+  {
+    int iklng=strlen(buf) / 2;
+
+    String strKurz = buf;
+
+    Serial.printf("%s %s", tag, strKurz.substring(0, iklng).c_str());
+    Serial.printf("%s Len: %i\n", strKurz.substring(iklng, strlen(buf)).c_str(), strlen(buf));
+  }
+}
+
 void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen, int16_t rssi, int8_t snr)
 {
   (void)bUDP;
@@ -778,56 +940,18 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
 
   if(bEXTUDP && hasExternIPaddress && (int)strlen(meshcom_settings.node_extern) > 7)
   {
-    UdpExtern.beginPacket(apip , EXTERN_PORT);
+    extLogOut("[EXT] Out:", c_json);
 
-    if(strlen(c_json) < 10)
-    {
-      Serial.printf("[EXT] Out: %s Len: %i\n", c_json, strlen(c_json));
-    }
-    else
-    {
-      int iklng=strlen(c_json) / 2;
-
-      String strKurz = c_json;
-
-      Serial.printf("[EXT] Out: %s", strKurz.substring(0, iklng).c_str());
-      Serial.printf("%s Len: %i\n", strKurz.substring(iklng, strlen(c_json)).c_str(), strlen(c_json));
-    }
-
-    if (!UdpExtern.write((uint8_t*)c_json, strlen(c_json)))
-    {
-      resetExternUDP();
+    if (!extSendDatagram((uint8_t*)c_json, strlen(c_json), true))
       return;
-    }
-
-    UdpExtern.endPacket();
 
     if((strcmp(src_type, "node") == 0 || strcmp(src_type, "lora") == 0) && strlen(c_tjson) > 0)
     {
       // Telemetrie
-      UdpExtern.beginPacket(apip , EXTERN_PORT);
+      extLogOut("[EXT] Tele-Out:", c_tjson);
 
-      if(strlen(c_tjson) < 10)
-      {
-        Serial.printf("[EXT] Tele-Out: %s Len: %i\n", c_tjson, strlen(c_tjson));
-      }
-      else
-      {
-        int iklng=strlen(c_tjson) / 2;
-
-        String strKurz = c_tjson;
-
-        Serial.printf("[EXT] Tele-Out: %s", strKurz.substring(0, iklng).c_str());
-        Serial.printf("%s Len: %i\n", strKurz.substring(iklng, strlen(c_tjson)).c_str(), strlen(c_tjson));
-      }
-
-      if (!UdpExtern.write((uint8_t*)c_tjson, strlen(c_tjson)))
-      {
-        resetExternUDP();
+      if (!extSendDatagram((uint8_t*)c_tjson, strlen(c_tjson), true))
         return;
-      }
-
-      UdpExtern.endPacket();
     }
   }
   else
@@ -842,6 +966,12 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
   Serial.printf("[EXT];tx;len;%u;stack_hwm;%u;ms;%lu\n", (unsigned)strlen(c_json),
                 (unsigned)uxTaskGetStackHighWaterMark(NULL), (unsigned long)millis());
 }
+#else
+void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen, int16_t rssi, int8_t snr)
+{
+  (void)bUDP; (void)src_type; (void)buffer; (void)buflen; (void)rssi; (void)snr;
+}
+#endif // EXT_NO_SOCKET
 
 void queueExtern(char *src_type, uint8_t buffer[500], uint16_t buflen, int16_t rssi, int8_t snr)
 {
@@ -912,6 +1042,7 @@ void queueExternAck(uint32_t msg_id, uint8_t status, const char *from, const cha
 // bytes first. Same guard order and same write-fails-so-reset pattern as
 // sendExtern()'s send block, so a socket failure on an ack datagram is
 // handled identically to one on a text/position datagram.
+#if !defined(EXT_NO_SOCKET)
 static void sendExternJson(const uint8_t *json, uint16_t jlen)
 {
   #ifdef ESP32
@@ -931,18 +1062,16 @@ static void sendExternJson(const uint8_t *json, uint16_t jlen)
     return;
   }
 
-  UdpExtern.beginPacket(apip, EXTERN_PORT);
-
   Serial.printf("[EXT] Ack-Out: %.*s Len: %u\n", (int)jlen, (const char*)json, (unsigned)jlen);
 
-  if (!UdpExtern.write(json, jlen))
-  {
-    resetExternUDP();
-    return;
-  }
-
-  UdpExtern.endPacket();
+  extSendDatagram(json, jlen, true);
 }
+#else
+static void sendExternJson(const uint8_t *json, uint16_t jlen)
+{
+  (void)json; (void)jlen;
+}
+#endif // EXT_NO_SOCKET
 
 void flushExternQueue()
 {
@@ -985,6 +1114,7 @@ void  sendExternHeartbeat()
 // (group, DM call, or "*"), forwarded through from bp_origin_dst /
 // bp_episode_dst in loop_functions.cpp -- see externNoticeJson() for why a
 // DM dst is still safe here.
+#if !defined(EXT_NO_SOCKET)
 void sendExternNotice(const char *text, const char *dst)
 {
   #ifdef ESP32
@@ -1019,11 +1149,16 @@ void sendExternNotice(const char *text, const char *dst)
   if(json_len == 0)
     return;
 
-  UdpExtern.beginPacket(apip, EXTERN_PORT);
-  UdpExtern.write((const uint8_t *)c_json, json_len);
-  UdpExtern.endPacket();
+  extSendDatagram((const uint8_t *)c_json, json_len, false);
 }
+#else
+void sendExternNotice(const char *text, const char *dst)
+{
+  (void)text; (void)dst;
+}
+#endif // EXT_NO_SOCKET
 
+#if !defined(EXT_NO_SOCKET)
 void resetExternUDP()
 {
   #ifdef ESP32
@@ -1040,6 +1175,11 @@ void resetExternUDP()
     startExternUDP();
   }
 }
+#else
+void resetExternUDP()
+{
+}
+#endif // EXT_NO_SOCKET
 
 // JSN-01: strEsc() used to live here and hand-escaped '"'/'\\' before handing
 // the string to ArduinoJson, which escapes JSON strings itself on

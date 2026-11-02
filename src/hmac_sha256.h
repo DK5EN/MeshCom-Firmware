@@ -1,10 +1,12 @@
 // Portable SHA-256 (RFC 6234 / FIPS 180-4) and HMAC-SHA256 (RFC 2104).
 //
-// Arduino-free, no mbedtls, no dynamic allocation, C++11-safe. Declarations only;
+// No Arduino dependency, no dynamic allocation, C++11-safe. Declarations only;
 // the definitions live in hmac_sha256.cpp so the compress function and the K table
 // exist once per image instead of once per includer (DRY-05).
-// Builds on the host, ESP32 and nRF52 (arm-none-eabi gcc 7, -Ofast): all word
+// Host and nRF52 (arm-none-eabi gcc 7, -Ofast) use the portable core: all word
 // loads and stores are explicit big-endian byte operations, no type punning.
+// ESP32 runs the SHA-256 core on mbedtls (QA-DRY-07); same API, same output.
+// The ESP32 branch is host-untested: needs a bench check (RM tag, OTA digest).
 //
 // RM-01 (docs/concept-open-issues-20261004.md section 6.3).
 //
@@ -17,12 +19,20 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#if defined(ESP32)
+#include <mbedtls/sha256.h>
+#endif
+
 struct Sha256Ctx
 {
+#if defined(ESP32)
+    mbedtls_sha256_context ctx;
+#else
     uint32_t h[8];
     uint64_t len; // message length in bytes so far
     uint8_t buf[64];
     size_t blen; // bytes pending in buf, 0..63
+#endif
 };
 
 namespace hmac_sha256_detail

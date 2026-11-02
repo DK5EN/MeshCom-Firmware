@@ -81,7 +81,9 @@
 
 #if defined(NRF52_SERIES)
 #include "nrf52/settings_store_nrf52.h" // settingsStoreDump() -- --dumpsettings
+#if HAS_NRF_ETH
 #include <RAK13800_W5100S.h>            // IPAddress for nrf_eth.h
+#endif
 #include <nrf_eth.h>                    // ethIsStaticConfigured() for the GWU status helpers
 // LRF W1c: boot counters of the RX-silence tracker (nrf52_main.cpp).
 extern void rxSilenceGetStats(uint32_t *silences, uint32_t *longest_s, uint32_t *total_s);
@@ -1171,6 +1173,58 @@ static void cmdPosRange(const char *label, const char *range, const char *msg_te
     }
 }
 
+// Auto-reboot after a --setown* change once ip/gw/ms are either all set or all empty (the setown* rungs).
+static void cmdOwnNetRebootCheck()
+{
+    if((strlen(meshcom_settings.node_ownip) >= 7 && strlen(meshcom_settings.node_owngw) >= 7 && strlen(meshcom_settings.node_ownms) >= 7) ||
+       (strlen(meshcom_settings.node_ownip) < 7 && strlen(meshcom_settings.node_owngw) < 7 && strlen(meshcom_settings.node_ownms) < 7))
+    {
+        #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
+        printfdeb("Auto. Reboot after 15 sec.");
+        rebootAuto = millis() + 15 * 1000;
+        #endif
+    }
+}
+
+// Same for --setssid/--setpwd (inline: only referenced outside BOARD_RAK4630, avoids -Wunused-function there).
+inline void cmdWifiRebootCheck()
+{
+    if((strlen(meshcom_settings.node_pwd) > 1 && strlen(meshcom_settings.node_ssid) > 1) ||
+       (strlen(meshcom_settings.node_pwd) == 0 && strlen(meshcom_settings.node_ssid) == 0))
+    {
+        #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
+        printfdeb("Auto. Reboot after 15 sec.");
+        rebootAuto = millis() + 15 * 1000;
+        #endif
+    }
+}
+
+// Copy a --setssid/--setpwd argument; "none" clears the field.
+inline void cmdWifiCredSet(char *dst, size_t dstSize, const char *arg)
+{
+    snprintf(dst, dstSize, "%s", arg);
+
+    if(is_equ(dst, "none"))
+        memset(dst, 0x00, dstSize);
+}
+
+// --sethamnet/--setinet/--setnet: store the mode, echo to the app, save and schedule the reboot (bInfo stays in the rung).
+static void cmdSetHamnetOnly(int mode, bool ble, const char *msg_text)
+{
+    meshcom_settings.node_hamnet_only = mode;
+
+    if(ble)
+    {
+        addBLECommandBack((char*)msg_text);
+    }
+
+    save_settings();
+
+    #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
+    rebootAuto = millis() + 5 * 1000;
+    #endif
+}
+
 // --help text of --updchan: the dev channel exists only in fork builds (fw_update.h)
 #if defined(MC_AU_DEV_CHANNEL)
 #define AU_UPDCHAN_HELP "prod/dev       update source: prod icssw-org, dev DK5EN"
@@ -1245,6 +1299,15 @@ void commandAction(char *umsg_text, bool ble)
     if(commandMatches(msg_text+2, "board led steady") && !boardLedPinUsable())   // WEB-LED-01: same refusal as "on"
     {
         printfdeb("\n--board led refused: LED pin is used by OneWire/DHT (see --info, --owgpio)\n");
+        return;
+    }
+#endif
+#if defined(NRF52_NO_ETH)
+    // No uplink in this build: refuse before the row saves the flag and announces HG to the
+    // neighbours. "--gateway off" stays allowed so a stale flag from older firmware can be cleared.
+    if(commandMatches(msg_text+2, "gateway on"))
+    {
+        printfdeb(NRF52_NO_ETH_MSG);
         return;
     }
 #endif
@@ -1468,13 +1531,7 @@ void commandAction(char *umsg_text, bool ble)
 
         MyClock.CheckEvent();
             
-        meshcom_settings.node_date_year = MyClock.Year();
-        meshcom_settings.node_date_month = MyClock.Month();
-        meshcom_settings.node_date_day = MyClock.Day();
-
-        meshcom_settings.node_date_hour = MyClock.Hour();
-        meshcom_settings.node_date_minute = MyClock.Minute();
-        meshcom_settings.node_date_second = MyClock.Second();
+        syncNodeDateFromClock();
 
         return;
     }
@@ -1568,9 +1625,7 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"setlog ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+9);
-        if(_owner_c[strlen(_owner_c)-1] == 0x0a)
-            _owner_c[strlen(_owner_c)-1] = 0x00;
+        cmdArgCopyTrim(_owner_c, sizeof(_owner_c), msg_text+9);
         
         sVar = _owner_c;
         sVar.trim();
@@ -3343,6 +3398,10 @@ void commandAction(char *umsg_text, bool ble)
     #endif
     if(commandCheck(msg_text+2, (char*)"webserver on") == 0)
     {
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        bReturn = true;
+        #else
         #ifndef BOARD_RAK4630
         if(meshcom_settings.node_netmode == 0 && strlen(meshcom_settings.node_ssid) < 3)
         {
@@ -3367,13 +3426,16 @@ void commandAction(char *umsg_text, bool ble)
         }
 
         bReturn = true;
+        #endif
     }
     else
     if(commandCheck(msg_text+2, (char*)"webpwd ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+9);
-        if(_owner_c[strlen(_owner_c)-1] == 0x0a)
-            _owner_c[strlen(_owner_c)-1] = 0x00;
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        return;
+        #endif
+        cmdArgCopyTrim(_owner_c, sizeof(_owner_c), msg_text+9);
         sVar = _owner_c;
 
         sVar.trim();
@@ -3405,6 +3467,10 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"webtimer 0") == 0)
     {
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        return;
+        #endif
         web_timer = 0;
 
         return;
@@ -3413,12 +3479,10 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"setname ") == 0 || commandCheck(msg_text+2, (char*)"operatorname ") == 0)
     {
         if(commandCheck(msg_text+2, (char*)"operatorname ") == 0)
-            snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+15);
+            cmdArgCopyTrim(_owner_c, sizeof(_owner_c), msg_text+15);
         else
-            snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+10);
+            cmdArgCopyTrim(_owner_c, sizeof(_owner_c), msg_text+10);
 
-        if(_owner_c[strlen(_owner_c)-1] == 0x0a)
-            _owner_c[strlen(_owner_c)-1] = 0x00;
         sVar = _owner_c;
 
         sVar.trim();
@@ -3450,6 +3514,9 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"extudp on") == 0)
     {
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        #else
         if((int)strlen(meshcom_settings.node_extern) < 7)
         {
             printfdeb("\nPlease set EXPUDP IP first\n");
@@ -3467,12 +3534,17 @@ void commandAction(char *umsg_text, bool ble)
 
             save_settings();
         }
+        #endif
 
         bReturn = true;
     }
     else
     if(commandCheck(msg_text+2, (char*)"extudpip") == 0)
     {
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        return;
+        #endif
         // max. 40 char
         msg_text[50]=0x00;
 
@@ -3864,9 +3936,8 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"softser send") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+15);
-        if(_owner_c[strlen(_owner_c)-1] == 0x0a)
-            _owner_c[strlen(_owner_c)-1] = 0x00;
+        // "--softser send" without argument: msg_text+15 would lie past the terminator
+        cmdArgCopyTrim(_owner_c, sizeof(_owner_c), strlen(msg_text) > 15 ? msg_text+15 : "");
 
         sendSOFTSER(_owner_c);
 
@@ -4182,12 +4253,10 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"atxt ") == 0 || commandCheck(msg_text+2, (char*)"aprscomment ") == 0)
     {
         if(commandCheck(msg_text+2, (char*)"aprscomment ") == 0)
-            snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+14);
+            cmdArgCopyTrim(_owner_c, sizeof(_owner_c), msg_text+14);
         else
-            snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+7);
+            cmdArgCopyTrim(_owner_c, sizeof(_owner_c), msg_text+7);
 
-        if(_owner_c[strlen(_owner_c)-1] == 0x0a)
-            _owner_c[strlen(_owner_c)-1] = 0x00;
         sVar = _owner_c;
 
         sVar.trim();
@@ -4212,9 +4281,7 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"setcall ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+10);
-        if(_owner_c[strlen(_owner_c)-1] == 0x0a)
-            _owner_c[strlen(_owner_c)-1] = 0x00;
+        cmdArgCopyTrim(_owner_c, sizeof(_owner_c), msg_text+10);
         
         sVar = _owner_c;
         sVar.trim();
@@ -4243,7 +4310,7 @@ void commandAction(char *umsg_text, bool ble)
 
         String sShort = convertCallToShort(meshcom_settings.node_call);
         bSameCall = bSameCall && sShort.equals(meshcom_settings.node_short);
-        snprintf(meshcom_settings.node_short, sizeof(meshcom_settings.node_short), "%s", sShort.c_str());
+        snprintf(meshcom_settings.node_short, sizeof(meshcom_settings.node_short), "%.5s", sShort.c_str());
 
         printfdeb("Call:%s Short:%s set\n", meshcom_settings.node_call, meshcom_settings.node_short);
 
@@ -4261,9 +4328,7 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"setudpcall ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+13);
-        if(_owner_c[strlen(_owner_c)-1] == 0x0a)
-            _owner_c[strlen(_owner_c)-1] = 0x00;
+        cmdArgCopyTrim(_owner_c, sizeof(_owner_c), msg_text+13);
         
         sVar = _owner_c;
         sVar.trim();
@@ -4287,9 +4352,7 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"pingcall ") == 0)
     {
-        snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+11);
-        if(_owner_c[strlen(_owner_c)-1] == 0x0a)
-            _owner_c[strlen(_owner_c)-1] = 0x00;
+        cmdArgCopyTrim(_owner_c, sizeof(_owner_c), msg_text+11);
         
         sVar = _owner_c;
         sVar.trim();
@@ -4442,26 +4505,16 @@ void commandAction(char *umsg_text, bool ble)
         // max. 32 char
         msg_text[10+32]=0x00;
 
-        snprintf(meshcom_settings.node_ssid, sizeof(meshcom_settings.node_ssid), "%s", msg_text+10);
+        cmdWifiCredSet(meshcom_settings.node_ssid, sizeof(meshcom_settings.node_ssid), msg_text+10);
 
         if(ble)
         {
             bWifiSetting = true;
         }
 
-        if(is_equ(meshcom_settings.node_ssid, "none"))
-            memset(meshcom_settings.node_ssid, 0x00, sizeof(meshcom_settings.node_ssid));
-
         save_settings();
 
-        if((strlen(meshcom_settings.node_pwd) > 1 && strlen(meshcom_settings.node_ssid) > 1) ||
-           (strlen(meshcom_settings.node_pwd) == 0 && strlen(meshcom_settings.node_ssid) == 0))
-        {
-            #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
-            printfdeb("Auto. Reboot after 15 sec.");
-            rebootAuto = millis() + 15 * 1000; // 15 Sekunden
-            #endif
-        }
+        cmdWifiRebootCheck();
 
         return;
     }
@@ -4471,26 +4524,16 @@ void commandAction(char *umsg_text, bool ble)
         // max. 63 char
         msg_text[63+9]=0x00;
 
-        snprintf(meshcom_settings.node_pwd, sizeof(meshcom_settings.node_pwd), "%s", msg_text+9);
+        cmdWifiCredSet(meshcom_settings.node_pwd, sizeof(meshcom_settings.node_pwd), msg_text+9);
 
         if(ble)
         {
             bWifiSetting = true;
         }
 
-        if(is_equ(meshcom_settings.node_pwd, "none"))
-            memset(meshcom_settings.node_pwd, 0x00, sizeof(meshcom_settings.node_pwd));
-
         save_settings();
 
-        if((strlen(meshcom_settings.node_pwd) > 1 && strlen(meshcom_settings.node_ssid) > 1) ||
-           (strlen(meshcom_settings.node_pwd) == 0 && strlen(meshcom_settings.node_ssid) == 0))
-        {
-            #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
-            printfdeb("Auto. Reboot after 15 sec.");
-            rebootAuto = millis() + 15 * 1000; // 10 Sekunden
-            #endif
-        }
+        cmdWifiRebootCheck();
 
         return;
     }
@@ -4608,6 +4651,17 @@ void commandAction(char *umsg_text, bool ble)
     }
     else
 #endif
+#if defined(NRF52_NO_ETH)
+    // The static IP set is read by the W5100S driver only; storing it here would just trigger
+    // the auto-reboot below. The fields stay as they are so the settings layout is unchanged.
+    if(commandMatches(msg_text+2, "setownip ") || commandMatches(msg_text+2, "setowndns ") ||
+       commandMatches(msg_text+2, "setowngw ") || commandMatches(msg_text+2, "setownms ") ||
+       commandMatches(msg_text+2, "setownntp "))
+    {
+        printfdeb(NRF52_NO_ETH_MSG);
+        return;
+    }
+#endif
     if(commandCheck(msg_text+2, (char*)"setownip ") == 0)
     {
         // max. 40 char
@@ -4622,14 +4676,7 @@ void commandAction(char *umsg_text, bool ble)
 
         save_settings();
 
-        if((strlen(meshcom_settings.node_ownip) >= 7 && strlen(meshcom_settings.node_owngw) >= 7 && strlen(meshcom_settings.node_ownms) >= 7) ||
-           (strlen(meshcom_settings.node_ownip) < 7 && strlen(meshcom_settings.node_owngw) < 7 && strlen(meshcom_settings.node_ownms) < 7))
-        {
-            #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
-            printfdeb("Auto. Reboot after 15 sec.");
-            rebootAuto = millis() + 15 * 1000; // 10 Sekunden
-            #endif
-        }
+        cmdOwnNetRebootCheck();
 
         return;
     }
@@ -4657,14 +4704,7 @@ void commandAction(char *umsg_text, bool ble)
         // die Asymmetrie mit ihm zu entsorgen. Der tote Block trug ausserdem msg_text+11
         // statt +12 -- das haette dem Wert ein Leerzeichen vorangestellt, "setowndns " belegt
         // die Indizes 2..11.
-        if((strlen(meshcom_settings.node_ownip) >= 7 && strlen(meshcom_settings.node_owngw) >= 7 && strlen(meshcom_settings.node_ownms) >= 7) ||
-           (strlen(meshcom_settings.node_ownip) < 7 && strlen(meshcom_settings.node_owngw) < 7 && strlen(meshcom_settings.node_ownms) < 7))
-        {
-            #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
-            printfdeb("Auto. Reboot after 15 sec.");
-            rebootAuto = millis() + 15 * 1000; // 10 Sekunden
-            #endif
-        }
+        cmdOwnNetRebootCheck();
 
         return;
     }
@@ -4683,14 +4723,7 @@ void commandAction(char *umsg_text, bool ble)
 
         save_settings();
 
-        if((strlen(meshcom_settings.node_ownip) >= 7 && strlen(meshcom_settings.node_owngw) >= 7 && strlen(meshcom_settings.node_ownms) >= 7) ||
-           (strlen(meshcom_settings.node_ownip) < 7 && strlen(meshcom_settings.node_owngw) < 7 && strlen(meshcom_settings.node_ownms) < 7))
-        {
-            #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
-            printfdeb("Auto. Reboot after 15 sec.");
-            rebootAuto = millis() + 15 * 1000; // 10 Sekunden
-            #endif
-        }
+        cmdOwnNetRebootCheck();
 
         return;
     }
@@ -4708,14 +4741,7 @@ void commandAction(char *umsg_text, bool ble)
 
         save_settings();
 
-        if((strlen(meshcom_settings.node_ownip) >= 7 && strlen(meshcom_settings.node_owngw) >= 7 && strlen(meshcom_settings.node_ownms) >= 7) ||
-           (strlen(meshcom_settings.node_ownip) < 7 && strlen(meshcom_settings.node_owngw) < 7 && strlen(meshcom_settings.node_ownms) < 7))
-        {
-            #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
-            printfdeb("Auto. Reboot after 15 sec.");
-            rebootAuto = millis() + 15 * 1000; // 10 Sekunden
-            #endif
-        }
+        cmdOwnNetRebootCheck();
 
         return;
     }
@@ -4734,114 +4760,52 @@ void commandAction(char *umsg_text, bool ble)
 
         save_settings();
 
-        if((strlen(meshcom_settings.node_ownip) >= 7 && strlen(meshcom_settings.node_owngw) >= 7 && strlen(meshcom_settings.node_ownms) >= 7) ||
-           (strlen(meshcom_settings.node_ownip) < 7 && strlen(meshcom_settings.node_owngw) < 7 && strlen(meshcom_settings.node_ownms) < 7))
-        {
-            #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
-            printfdeb("Auto. Reboot after 15 sec.");
-            rebootAuto = millis() + 15 * 1000; // 10 Sekunden
-            #endif
-        }
+        cmdOwnNetRebootCheck();
 
         return;
     }
     else
     if(commandCheck(msg_text+2, (char*)"sethamnet on") == 0 || commandCheck(msg_text+2, (char*)"setinet off") == 0)
     {
-        meshcom_settings.node_hamnet_only = 1;
-        
-        if(ble)
-        {
-            addBLECommandBack((char*)msg_text);
-        }
-
-        save_settings();
+        cmdSetHamnetOnly(1, ble, msg_text);
 
         bInfo=true;
-
-        #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
-        rebootAuto = millis() + 5 * 1000; // 5 Sekunden
-        #endif
 
         return;
     }
     else
     if(commandCheck(msg_text+2, (char*)"setinet on") == 0 || commandCheck(msg_text+2, (char*)"sethamnet off") == 0)
     {
-        meshcom_settings.node_hamnet_only = 3;
-        
-        if(ble)
-        {
-            addBLECommandBack((char*)msg_text);
-        }
-
-        save_settings();
+        cmdSetHamnetOnly(3, ble, msg_text);
 
         bInfo=true;
-
-        #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
-        rebootAuto = millis() + 5 * 1000; // 5 Sekunden
-        #endif
 
         return;
     }
     else
     if(commandCheck(msg_text+2, (char*)"setnet auto") == 0 || commandCheck(msg_text+2, (char*)"setinet auto") == 0)
     {
-        meshcom_settings.node_hamnet_only = 2;
-
-        if(ble)
-        {
-            addBLECommandBack((char*)msg_text);
-        }
-
-        save_settings();
+        cmdSetHamnetOnly(2, ble, msg_text);
 
         bInfo=true;
-
-        #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
-        rebootAuto = millis() + 5 * 1000; // 5 Sekunden
-        #endif
 
         return;
     }
     else
     if(commandCheck(msg_text+2, (char*)"setnet inet") == 0)
     {
-        meshcom_settings.node_hamnet_only = 3;
-
-        if(ble)
-        {
-            addBLECommandBack((char*)msg_text);
-        }
-
-        save_settings();
+        cmdSetHamnetOnly(3, ble, msg_text);
 
         bInfo=true;
-
-        #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
-        rebootAuto = millis() + 5 * 1000; // 5 Sekunden
-        #endif
 
         return;
     }
     else
     if(commandCheck(msg_text+2, (char*)"setnet hamnet") == 0)
     {
-        meshcom_settings.node_hamnet_only = 1;
-
-        if(ble)
-        {
-            addBLECommandBack((char*)msg_text);
-        }
-
-        save_settings();
+        cmdSetHamnetOnly(1, ble, msg_text);
 
         bInfo=true;
-
-        #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
-        rebootAuto = millis() + 5 * 1000; // 5 Sekunden
-        #endif
 
         return;
     }
@@ -5850,8 +5814,9 @@ void commandAction(char *umsg_text, bool ble)
         }
         else if(casecmp(_owner_c, (char*)"apply") == 0)
         {
-            // operator action (bench): hand over now, no update window, no idle / phone / battery
-            // test. Needs a valid staged record; fwNetLoadRecord() drops a stale one.
+            // operator action (bench): hand over now, no update window, no idle / phone
+            // test; the battery floor still applies (QA-AU-09). Needs a valid staged
+            // record; fwNetLoadRecord() drops a stale one.
             FwStageRecord _rec;
             if(_auBusy)
             {
@@ -5868,6 +5833,12 @@ void commandAction(char *umsg_text, bool ble)
                 {
                     // AU-16: the Safeboot handover guard would refuse anyway; stop before the NVS marker
                     Serial.printf("[ERR];safeboot;bootloader_dio;renew with the web flasher\n");
+                    return;
+                }
+                if(!fwBattOk(battHardwarePresent(), global_batt))
+                {
+                    // QA-AU-09: the erase + rewrite of ota_0 must not start on a weak battery
+                    Serial.printf("[AU];apply;refuse;battery\n");
                     return;
                 }
                 if(fwNetSafebootOld())
@@ -6213,17 +6184,25 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"ethstat") == 0)
     {
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        #else
         extern void ethStat();
         ethStat();
+        #endif
         return;
     }
     else
     if(commandCheck(msg_text+2, (char*)"udplog on") == 0 || commandCheck(msg_text+2, (char*)"udplog off") == 0)
     {
         // TM-38 follow-up / TM-39: nRF52 parity for the per-datagram [UDP];rx/tx marker
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        #else
         extern bool bUDPLOG;
         bUDPLOG = (commandCheck(msg_text+2, (char*)"udplog on") == 0);
         Serial.printf("[UDP];log;%d\n", bUDPLOG ? 1 : 0);
+        #endif
         return;
     }
     #endif
@@ -6569,8 +6548,12 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"ethdrop") == 0)
     {
         // TM-35 bench hook: run the firmware's recovery path (resetDHCP), timed
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        #else
         extern void ethDrop();
         ethDrop();
+        #endif
         return;
     }
     #endif
@@ -6831,6 +6814,10 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"srvip ") == 0)
     {
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        return;
+        #endif
         // TM-31 bench hook: MeshCom server override (0.0.0.0 clears), RAM only,
         // takes effect at the next startMeshComUDP() (--reboot or WiFi restart).
         extern IPAddress bench_srvip;
@@ -6891,6 +6878,10 @@ void commandAction(char *umsg_text, bool ble)
         // txfail/kod) prints asynchronously off the [NTP];... markers
         // NtpAsync::loop()/tryConsume() already emit -- see
         // tools/bench/experiments/ntpsync.py, which parses exactly those.
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        return;
+        #endif
         extern NtpAsync timeClient;
 
         if(!meshcom_settings.node_hasIPaddress)

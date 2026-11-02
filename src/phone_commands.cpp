@@ -400,13 +400,7 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE])
 
 			MyClock.CheckEvent();
 				
-			meshcom_settings.node_date_year = MyClock.Year();
-			meshcom_settings.node_date_month = MyClock.Month();
-			meshcom_settings.node_date_day = MyClock.Day();
-
-			meshcom_settings.node_date_hour = MyClock.Hour();
-			meshcom_settings.node_date_minute = MyClock.Minute();
-			meshcom_settings.node_date_second = MyClock.Second();
+			syncNodeDateFromClock();
 
 			if (bBLEDEBUG)
 			{
