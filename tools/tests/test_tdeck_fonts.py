@@ -62,3 +62,60 @@ def test_lv_conf_declares_every_font() -> None:
         text = conf.read_text()
         for n in names:
             assert f"LV_FONT_DECLARE({n})" in text, f"{conf.parent.name}: {n} not declared"
+
+
+COVER_H = ROOT / "src" / "t-deck" / "tdeck_text_cover.h"
+
+
+def _header_cover_set() -> set[int]:
+    """Codepoints >= 0x80 that tdeck_font_covers() in tdeck_text_cover.h accepts."""
+    text = COVER_H.read_text(encoding="utf-8")
+    m = re.search(r"static inline bool tdeck_font_covers\(uint32_t cp\)\s*\{(.*?)\n\}", text, re.S)
+    assert m, "tdeck_font_covers() not found"
+    body = m.group(1)
+    cps: set[int] = set()
+    for lo, hi in re.findall(r"cp >= (0x[0-9A-Fa-f]+) && cp <= (0x[0-9A-Fa-f]+)", body):
+        cps.update(range(int(lo, 16), int(hi, 16) + 1))
+    for c in re.findall(r"case (0x[0-9A-Fa-f]+):", body):
+        cps.add(int(c, 16))
+    return {c for c in cps if c >= 0x80}  # ASCII and LF come from the Montserrat fallback
+
+
+def _font_cmap_set(font: Path) -> set[int]:
+    """Codepoints in the cmaps of one lv_font_conv output file."""
+    text = font.read_text()
+    lists = {
+        name: [int(v, 16) for v in re.findall(r"0x[0-9a-fA-F]+", body)]
+        for name, body in re.findall(r"static const uint16_t (unicode_list_\d+)\[\]\s*=\s*\{(.*?)\};", text, re.S)
+    }
+    block = re.search(r"cmaps\[\]\s*=\s*\{(.*?)\n\};", text, re.S)
+    assert block, f"{font.name}: no cmaps[]"
+    cps: set[int] = set()
+    entries = re.findall(r"\{\s*(\.range_start.*?)\}", block.group(1), re.S)
+    assert entries, f"{font.name}: no cmap entries"
+    for e in entries:
+        start = int(re.search(r"\.range_start = (\d+)", e).group(1))
+        length = int(re.search(r"\.range_length = (\d+)", e).group(1))
+        kind = re.search(r"\.type = LV_FONT_FMT_TXT_CMAP_(\w+)", e).group(1)
+        if kind.startswith("FORMAT0"):
+            cps.update(range(start, start + length))
+        elif kind.startswith("SPARSE"):
+            name = re.search(r"\.unicode_list = (\w+)", e).group(1)
+            n = int(re.search(r"\.list_length = (\d+)", e).group(1))
+            assert len(lists[name]) == n, f"{font.name}: {name} length"
+            cps.update(start + off for off in lists[name])
+        else:
+            raise AssertionError(f"{font.name}: unhandled cmap type {kind}")
+    return cps
+
+
+def test_cover_list_matches_every_font_cmap() -> None:
+    covered = _header_cover_set()
+    assert len(covered) > 200, "parser found suspiciously few codepoints"
+    for f in _fonts():
+        cmap = _font_cmap_set(f)
+        assert cmap == covered, (
+            f"{f.name} vs tdeck_text_cover.h: only in font "
+            f"{sorted(f'U+{c:04X}' for c in cmap - covered)}, only in header "
+            f"{sorted(f'U+{c:04X}' for c in covered - cmap)}"
+        )

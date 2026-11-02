@@ -24,16 +24,16 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   `esp32_flash.cpp` are part of the Safeboot image). **Not done:** no bench node besides DK5EN-92 (local build of the
   same commit) runs the release; own beacons at prio 2 and the boot-time ping-target clean-up are host-tested only.
 
-- **CHARS-01 national characters (2026-11-02, fork-dev, not released):** (A) E290 / Wireless Paper: sp2ong's
-  patch `0004` from #1221 applied with his authorship (`6eda5f8a`) plus `native_gfx_charmap` env and ini baseline
-  (`08041fda`); Polish, German, `°`, `€`. Host-tested, E290 builds; **E290 bench (glyphs, ghosting with
-  `E290_FULL_EVERY=0`) open, no E290 in the fleet.** (B) T-Deck / T-Deck Plus: Latin fonts `mc_font_latin_12..20`
-  (Montserrat U+00A0-U+017F plus `– — ‘ ’ “ ” „ • … €`, fallback to the built-in Montserrat for ASCII and symbols),
-  `utf8ascii()` gone from the message path, U+202F becomes a space. Flash +70 KB. Benched on DK5EN-14: outgoing
-  bubble and a DM received from DK5EN-98 (DE, PL, FR, ES, PT, punctuation, `€`) render correctly. Regression test
-  `tools/tests/test_tdeck_fonts.py` (sub-pixel font renders blank with `LV_USE_FONT_SUBPX 0`). Open: French, Spanish
-  and Portuguese letters on E290 (about 40 glyphs into sp2ong's fonts, ask him on #1221), upstream PRs.
-  Concept: [concept-national-chars-20261101.md](concept-national-chars-20261101.md).
+- **CHARS-01 national characters end to end (2026-11-02, fork-dev, not released):** one feature across every
+  display path, both back ends and the web GUI. sp2ong's E290 patch (`6eda5f8a`, #1221) is the origin; on top: a
+  shared fallback `src/text_fold.{h,cpp}` used by every display (letters the font lacks fold to ASCII, `ä` -> `ae`,
+  `ł` -> `l`, `€` -> `EUR`), `utf8ascii()` removed, OLED in Latin-1 (real `ä é ñ`), E290 +69 glyphs (FR/ES/PT,
+  punctuation), T-Deck Latin fonts (`23e03fed`) plus fallback for the rest, web GUI and T-Deck no longer cut a
+  message at the first `{`. Back ends: MCProxy `6df61da`, mc-chat `bb2ae3b` (same charset policy both ways,
+  150-byte checks in bytes, weather contract in bytes). Firmware W1 `6b94c253`, W2 committed after it; gate stage
+  1,2 PASS (88 envs, 3324/3324), Opus advisor on every wave. **Open:** W3 bench (DK5EN-14 first) and the upstream PR
+  (German, credit sp2ong first; only when the feature ships). Campaign:
+  [campaign-chars01-e2e-20261102.md](campaign-chars01-e2e-20261102.md).
 
 - **RM1 `upd chan prod|dev` (2026-10-31, fork-dev `636e681b`, not released):** remote update-channel switch
   DEV/MAIN for McApp. One setter `auSetChannel()` for RM1, `--updchan` and `/setparam updchan`; a switch clears the

@@ -117,13 +117,16 @@ void test_latin1_complete(void)
     }
 }
 
-void test_unknown_characters_dropped(void)
+void test_unknown_characters_fold(void)
 {
     char out[64];
-    conv("a\xC5\x99" "b", out, sizeof(out));                       // ř (Czech): no glyph yet -> dropped
-    TEST_ASSERT_EQUAL_STRING("ab", out);
-    conv("x\xF0\x9F\x98\x80y", out, sizeof(out));                  // emoji (4 bytes) -> dropped
-    TEST_ASSERT_EQUAL_STRING("xy", out);
+    conv("a\xC5\x99" "b", out, sizeof(out));                       // ř (Czech): no glyph -> text_fold ASCII "r"
+    TEST_ASSERT_EQUAL_STRING("arb", out);
+    conv("x\xF0\x9F\x98\x80y", out, sizeof(out));                  // emoji (4 bytes) -> "?"
+    TEST_ASSERT_EQUAL_STRING("x?y", out);
+    conv("\xE2\x82\xAC", out, sizeof(out));                       // € still has its glyph
+    TEST_ASSERT_EQUAL_UINT8(0x9A, (uint8_t)out[0]);
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)out[1]);
 }
 
 void test_invalid_and_cut_off_sequences(void)
@@ -148,6 +151,31 @@ void test_output_is_bounded(void)
     TEST_ASSERT_EQUAL_UINT(0, gfx_utf8_to_font("abc", 3, out, 0));
 }
 
+void test_zwj_sequences_collapse_to_one_question_mark(void)
+{
+    char out[64];
+    conv("\xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x91\xA7", out, sizeof(out));   // family: man ZWJ woman ZWJ girl
+    TEST_ASSERT_EQUAL_STRING("?", out);
+    conv("a\xF0\x9F\x8F\xB3\xEF\xB8\x8F\xE2\x80\x8D\xF0\x9F\x8C\x88" "b", out, sizeof(out));        // rainbow flag: flag FE0F ZWJ rainbow
+    TEST_ASSERT_EQUAL_STRING("a?b", out);
+    conv("\xF0\x9F\x98\x80\xF0\x9F\x98\x80", out, sizeof(out));                                            // two emoji without ZWJ stay two
+    TEST_ASSERT_EQUAL_STRING("??", out);
+    conv("\xF0\x9F\x98\x80\xE2\x80\x8D" "a\xF0\x9F\x98\x80", out, sizeof(out));                           // a letter ends the join
+    TEST_ASSERT_EQUAL_STRING("?a?", out);
+}
+
+void test_expansion_that_does_not_fit_ends_the_text(void)
+{
+    char out[4];
+    // U+0132 -> "IJ" needs 2 bytes, only 1 left after 'a': stop, do not write the later 'b'
+    size_t n = gfx_utf8_to_font("a\xC4\xB2" "b", 4, out, 3);
+    TEST_ASSERT_EQUAL_UINT(1, n);
+    TEST_ASSERT_EQUAL_STRING("a", out);
+    n = gfx_utf8_to_font("a\xC4\xB2" "b", 4, out, 4);                                                         // fits exactly: "aIJ", then 'b' does not
+    TEST_ASSERT_EQUAL_STRING("aIJ", out);
+    TEST_ASSERT_EQUAL_UINT(3, n);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -162,8 +190,10 @@ int main(int, char **)
     RUN_TEST(test_portuguese);
     RUN_TEST(test_punctuation);
     RUN_TEST(test_latin1_complete);
-    RUN_TEST(test_unknown_characters_dropped);
+    RUN_TEST(test_unknown_characters_fold);
     RUN_TEST(test_invalid_and_cut_off_sequences);
     RUN_TEST(test_output_is_bounded);
+    RUN_TEST(test_zwj_sequences_collapse_to_one_question_mark);
+    RUN_TEST(test_expansion_that_does_not_fit_ends_the_text);
     return UNITY_END();
 }
