@@ -90,7 +90,7 @@ $4 each. Total about $60 to $80, 5 to 6 h wall-clock.
 ## Open after the cloud session (operator's machine)
 
 - Done 2026-11-02: BAT-04 W3 bench (AXP2101 T-Beam, Heltec V3 unchanged), WX-01 bench without sensors, TLM-03
-  fixed and benched, upstream PRs [#1250](https://github.com/icssw-org/MeshCom-Firmware/pull/1250) (BAT-04) and
+  fixed and benched, upstream PRs merged: [#1250](https://github.com/icssw-org/MeshCom-Firmware/pull/1250) (BAT-04) and
   [#1251](https://github.com/icssw-org/MeshCom-Firmware/pull/1251) (WX-01 + TLM-03, field test necessary).
 - Open: AXP192 bench (none in the fleet), WX-01 field test with real sensors, comments on #1073 and #999.
 - Follow-ups: BAT-04b (BQ boards, needs a periodic `PPM`/`bq27220` poll); RM read reply without UV/wind (LoRa byte

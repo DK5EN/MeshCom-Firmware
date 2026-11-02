@@ -1,17 +1,14 @@
 # RESUME -- pick up here
 
 **Stand:** 2026-11-02, branch `fork-dev`, last release **`v4.40a.11.01`** (Latest, tag on `47f339ad`, 68 assets, built by CI).
-Base is upstream `dev` e564506a (merged into fork-dev 2026-11-02 as `7296aaf6`, tree unchanged): our
+Base is upstream `dev` 4f60051c (merged into fork-dev 2026-11-02 as `560e65ab`, tree unchanged): our
 [#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243), [#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244),
 [#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245), [#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247)
 (LRF ping/beacon/RX-silence), [#1248](https://github.com/icssw-org/MeshCom-Firmware/pull/1248) (REVIEW.md) and
-[#1249](https://github.com/icssw-org/MeshCom-Firmware/pull/1249) (CHARS-01 national characters, TD-25/TD-24, closes #1221)
-plus sp2ong's #1246 (E290 OTP refresh default) are upstream; their branches and worktrees are removed. Open upstream
-PRs since 2026-11-02:
-[#1250](https://github.com/icssw-org/MeshCom-Firmware/pull/1250) (BAT-04 charge state and BLE `IS2`, closes #1073,
-branch `pr/bat04-charge-state`, worktree `../MeshCom-PR-bat04`) and
-[#1251](https://github.com/icssw-org/MeshCom-Firmware/pull/1251) (WX-01 UV/wind/gust plus the TLM-03 T# fix, field test
-necessary, closes #999, branch `pr/wx01-uv-wind`, worktree `../MeshCom-PR-wx01`). Fork-only firmware left: the `dev` AU
+[#1249](https://github.com/icssw-org/MeshCom-Firmware/pull/1249) (CHARS-01 national characters, TD-25/TD-24, closes #1221),
+[#1250](https://github.com/icssw-org/MeshCom-Firmware/pull/1250) (BAT-04 charge state and BLE `IS2`, closes #1073) and
+[#1251](https://github.com/icssw-org/MeshCom-Firmware/pull/1251) (WX-01 UV/wind/gust plus the TLM-03 T# fix, closes #999)
+plus sp2ong's #1246 (E290 OTP refresh default) are upstream; their branches and worktrees are removed. No upstream PR of ours is open. Fork-only firmware left: the `dev` AU
 channel, RM1 `upd chan`, `--gateway lab` (2fe7ebd4).
 Next step: TD-22 soak and TD-23 UAT.
 
@@ -184,8 +181,8 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   release build of `9e4d8781`; its 24 h soak was stopped 2026-10-25 11:24 after 6 min (operator, TXP-01 bench). Open:
   a new soak after the pending T-Deck PR, GUI visual check on the device ([campaign-tdeck-heap-wifi-20261025.md](campaign-tdeck-heap-wifi-20261025.md)).
 - **Campaign resume points with open steps:**
-  - BAT-04 (upstream #1073) and WX-01 + TLM-03 (upstream #999): implemented and benched 2026-11-02, upstream PRs
-    #1250 and #1251 open (all 33 default envs build, no host-suite regression against `upstream/dev`). Open: WX-01
+  - BAT-04 (upstream #1073) and WX-01 + TLM-03 (upstream #999): implemented and benched 2026-11-02, merged upstream
+    as #1250 and #1251 (not released). Open: WX-01
     field test with a real LTR390 and anemometer; AXP192 current path host-tested only. Resume point:
     [campaign-bat04-wx01-cloud-20261102.md](campaign-bat04-wx01-cloud-20261102.md).
   - Log-report fixes (LRF): W0-W2 done 2026-11-01 (ping target locked, own beacons at prio 2, RX-silence logging on
