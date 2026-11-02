@@ -3,7 +3,8 @@
 Optional LTR390 UV sensor and reed-switch anemometer on ESP32 boards, reported as the telemetry values `uvindex`
 and `wind`. Upstream issue #999 (Mosei1984, Heltec WiFi LoRa 32 V2). Backlog row `WX-01`.
 
-**State:** plan only, nothing dispatched. Execute with `/orchestrate-waves`, starting at W0.
+**State:** Q1-Q3 answered 2026-11-02; runs in the cloud together with BAT-04, schedule and setup in
+[campaign-bat04-wx01-cloud-20261102.md](campaign-bat04-wx01-cloud-20261102.md).
 
 **Verdict (2026-11-02):** feasible and small. No wire-format change: the values ride in the existing APRS `T#`
 telemetry frame, whose 5 analog slots are picked by name from `node_values` (`sendTelemetry()`,
@@ -20,13 +21,15 @@ telemetry frame, whose 5 analog slots are picked by name from `node_values` (`se
   field report can be answered by reference.
 - **Scope:** issue items 1 to 3 (UV sensor, wind counter with averaging, telemetry names). Item 4 (ePaper
   weather receiver) is out of scope: display-layer work on a maintainer board family, separate decision.
+- **Q1 = add `gust`** (highest 3 s mean within the telemetry interval, km/h, third telemetry name `gust`).
+  **Q2 = no** averaging of existing values. **Q3 = one** upstream PR, credit Mosei1984 (#999).
 - **We build it; the reply on #999 is posted by the operator** (or by us with an explicit OK at that time).
 
 ## Facts from recon (2026-11-02, verify again in W0)
 
 | Fact                       | Where                                                                                                                                                                                                                                                                                          | Consequence                                                                             |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Telemetry value names      | `sendTelemetry()` knows `batt co2 gasres hum onewire press proz qnh temp vbus vcurrent`                                                                                                                                                                                                        | Add `uvindex` and `wind` as two more branches                                           |
+| Telemetry value names      | `sendTelemetry()` knows `batt co2 gasres hum onewire press proz qnh temp vbus vcurrent`                                                                                                                                                                                                        | Add `uvindex`, `wind` and `gust` as three more branches                                 |
 | Sensor on/off flags        | `node_sset2`, `node_sset3`, `node_sset4` have no free bit (sset3 is clamped at 65535)                                                                                                                                                                                                          | New settings members needed, not flag bits                                              |
 | Settings layout            | X-macro `src/meshcom_settings.h` (`M(type, name, default)`), suites `native_settings_members_esp32/nrf52`, `native_settings_roundtrip`, `native_esp32_settings_nvs`                                                                                                                            | New members ESP32-only, so the nRF52 layout (three copies on the RAK) does not move     |
 | Sensor integration pattern | AHT20: toggle table `src/command_functions.cpp:625`, boot read `src/esp32/esp32_main.cpp:1500`, poll `esp32_main.cpp:5130` (60 s), status print `command_functions.cpp:7093`, JSON `sensdoc` `:7634`, web switch `web_functions.cpp:3793`, `web_setup.cpp:517`, RM read `rm_exec_read.cpp:113` | Same eight touch points for each new sensor                                             |
@@ -75,12 +78,12 @@ W2 and W3 both touch `src/loop_functions.cpp`, so they run one after the other. 
 
 - **W1a:** `ltr390_calc.h` converts known raw counts to UVI within 0.1 of a hand calculation from the datasheet;
   the driver returns "not found" cleanly without a device on the bus (no hang, no I2C error storm).
-- **W1b:** `wx_avg.h` mean, reset and empty-window behaviour tested (empty window reports "no value", not 0);
+- **W1b:** `wx_avg.h` mean, gust (max of 3 s means), reset and empty-window behaviour tested (empty window reports "no value", not 0);
   pulse-to-speed conversion tested at 0, 1 and 10 Hz with the default and a custom calibration.
 - **W2:** defaults off; settings roundtrip and member suites green on both platforms; nRF52 member list unchanged
   (`native_settings_members_nrf52` byte-identical); `--windpin` rejects the pins of the board's LoRa, I2C, GPS
   and button; RAK build answers `--uv on` with "not supported on this board".
-- **W3:** `node_values` with `uvindex` or `wind` fills the slot with the averaged value; without a sensor the
+- **W3:** `node_values` with `uvindex`, `wind` or `gust` fills the slot with the averaged value; without a sensor the
   slot keeps the existing "no value" behaviour of the other names; the window resets after each `T#` frame.
 
 ### Gate (after every wave)
@@ -103,21 +106,18 @@ The PR carries this section in German, the issue comment in English. Placeholder
 - **Status:** the sensor status print shows `LTR390: on (found|error)` and `WIND: on (pin <n>, cal <f>)`; the JSON
   sensor record carries `UV`, `UVF`, `WIND`, `WINDP`.
 - **Log lines under `--wxdebug on`:** `[LTR390] raw=<counts> gain=18 res=20 uvi=<x.x>` per 60 s tick;
-  `[WIND] pulses=<n>/<s> s hz=<f> kmh=<f>` per tick; `[WX] T# uvindex=<avg> (n=<samples>) wind=<avg> (n=<samples>)`
+  `[WIND] pulses=<n>/<s> s hz=<f> kmh=<f>` per tick; `[WX] T# uvindex=<avg> (n=<samples>) wind=<avg> (n=<samples>) gust=<max>`
   when telemetry is sent.
-- **Telemetry check:** `node_values` must name the slots, for example `--values uvindex,wind,temp,hum,press`, and
+- **Telemetry check:** `node_values` must name the slots, for example `--values uvindex,wind,gust,temp,hum`, and
   `PARM`/`UNIT` must match (`UVI`, `km/h`).
 - **What to send with a report:** `--info`, the status print, 10 minutes of serial log with `--wxdebug on`, the
   board, the GPIO used and the anemometer model (pulses per revolution).
 - **Known limits:** ESP32 only; no RAK4631; only tested host-side and without sensors on the bench (field test
-  necessary); wind is the mean over the telemetry interval, no gust value.
+  necessary); wind is the mean over the telemetry interval, gust the highest 3 s mean in it.
 
 ## Open questions
 
-- **Q1:** a gust value (max of 3 s windows) as a third name `gust`? Cheap in W1b, not asked for in the issue.
-- **Q2:** average the existing values (`temp`, `hum`, `press`) over the telemetry interval too, as the issue
-  proposes? Changes upstream behaviour; ask the maintainers in the PR, default no.
-- **Q3:** one upstream PR or two (UV, wind)? Default one, credit Mosei1984 (#999) for the proposal.
+None; Q1-Q3 answered (see Operator decisions).
 
 ## Wave log
 

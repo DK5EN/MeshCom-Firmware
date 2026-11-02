@@ -1,12 +1,12 @@
 # Campaign BAT-04: battery charge state and current (upstream issue #1073)
 
-| Item      | Value                                                                                                                                       |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Started   | 2026-11-02 (plan only, nothing implemented)                                                                                                 |
-| Baseline  | `fork-dev` at `adbf723f`. Code facts below were read at this commit                                                                         |
-| Request   | icssw-org/MeshCom-Firmware#1073 (DD8BA): show whether the battery is charging or discharging, including the current, on the T-Beam          |
-| Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; Opus advisor gate before every commit; one upstream PR afterwards via `/submit-pr` |
-| Status    | Open. Operator decisions Q1-Q4 (section 3) are needed before W1                                                                             |
+| Item      | Value                                                                                                                                                                                |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Started   | 2026-11-02 (plan only, nothing implemented)                                                                                                                                          |
+| Baseline  | `fork-dev` at `adbf723f`. Code facts below were read at this commit                                                                                                                  |
+| Request   | icssw-org/MeshCom-Firmware#1073 (DD8BA): show whether the battery is charging or discharging, including the current, on the T-Beam                                                   |
+| Mechanics | `/orchestrate-waves`; one commit per wave on `fork-dev`; Opus advisor gate before every commit; one upstream PR afterwards via `/submit-pr`                                          |
+| Status    | Open. Q1-Q4 answered 2026-11-02 (recommendations accepted); runs in the cloud with WX-01, schedule in [campaign-bat04-wx01-cloud-20261102.md](campaign-bat04-wx01-cloud-20261102.md) |
 
 Line numbers drift. Every brief must `grep -n` the named symbol before trusting a line number in this document.
 
@@ -53,7 +53,7 @@ Line numbers drift. Every brief must `grep -n` the named symbol before trusting 
 | APRS position          | `src/loop_functions.cpp`, `/B=%03d`                                                            | percent                         |
 | RM1 `status`           | `bat=` field                                                                                   | percent                         |
 
-## 3. Operator decisions (open, needed before W1)
+## 3. Operator decisions (answered 2026-11-02: all four recommendations accepted)
 
 | #   | Question                                                                    | Recommendation                                                                                          |
 | --- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |

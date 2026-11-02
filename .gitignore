@@ -447,6 +447,8 @@ compile_commands.json
 # .claude/ (settings, commands, skills) is private and stays local; the blanket .*
 # rule above already hides it, this line makes that explicit.
 .claude/
+# Exception (2026-11-02, cloud campaign BAT-04 + WX-01): .claude/agents/{scout,implementer}.md and
+# .claude/skills/orchestrate-waves/SKILL.md are force-added (git add -f) so a cloud session can dispatch.
 build/ALL_BUILD.vcxproj
 build/ALL_BUILD.vcxproj.filters
 build/cmake_install.cmake
