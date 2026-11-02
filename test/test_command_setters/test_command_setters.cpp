@@ -1059,7 +1059,7 @@ static void test_web_temp_offset_takes_comma_and_leading_zero()
     size_t n = 0;
     for (size_t at = set.find("cmdDecimalComma(value);"); at != std::string::npos; at = set.find("cmdDecimalComma(value);", at + 1))
         ++n;
-    TEST_ASSERT_EQUAL_INT(2, (int)n);
+    TEST_ASSERT_EQUAL_INT(3, (int)n);   // indoor/outdoor offset + WX-01 windcal
 }
 
 // Web "setvia": the OK/FAIL check must compare against the form --via stores

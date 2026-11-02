@@ -8,7 +8,7 @@ Resume point for one cloud session that implements and build-tests two campaigns
 The two campaign docs hold design, acceptance criteria and their own wave logs. This doc holds the joint
 schedule, the cloud setup and the rules a cloud session cannot read from the operator's machine.
 
-**State:** C0-C3 committed; next C4 (WX-W3), then C5 (BAT-04 BLE register `IS2`, operator decision 2026-11-02).
+**State:** C0-C4 committed; next C5 (BAT-04 BLE register `IS2`, operator decision 2026-11-02).
 
 ## Operator decisions (2026-11-02)
 
@@ -91,6 +91,9 @@ $4 each. Total about $60 to $80, 5 to 6 h wall-clock.
 
 - BAT-04 W3 bench (AXP2101 T-Beam, AXP192 if in the fleet, BQ board, Heltec V3 byte-identical check).
 - WX-01 bench step 6 (DK5EN-1, `--uv on` / `--wind on` without hardware).
+- **TLM-03** (pre-existing): T# goes on air only when `node_parm_1` is set (soft-serial XML path); decide whether to
+  fix it before the WX-01 PR, otherwise the PR states it as a known limit.
+- RM read reply without UV/wind (LoRa byte budget); decide whether a later RM field is wanted.
 - Upstream PRs via `/submit-pr` (German bodies), comments on #1073 and #999 including the WX-01 field-test
   debugging section.
 
@@ -102,6 +105,7 @@ $4 each. Total about $60 to $80, 5 to 6 h wall-clock.
 | C0    | - (committed with C1)                                      | contract compiles (`-fsyntax-only`); no gate on its own                                                                                                                                                                                       | -                                                                                                                                                                                                                             | `src/batt_charge.h` stubs, `global_batt_charge` in both battery files (`batt_function_old.cpp` too: T-Beam, Heltec, RAK and the BQ boards build the old file), three native envs, `ENABLE_LTR390`/`ENABLE_WIND` in `[esp32]` build_flags (`t_deck_pro` and `t5_epaper` do not inherit `[esp32]` flags, so they stay without WX-01). Scout findings in the BAT-04 doc |
 | C1+C2 | BAT-04 firmware commit and WX-01 W1 commit (see `git log`) | stage 1,2 PASS: 92 Unity envs, 3383/3383, pytest 1478, golden regenerated (3 new native envs, `ENABLE_*` flags); 7 clean builds green                                                                                                         | BAT-04: REWORK (AXP192 VBUS ADC enable dropped, 4095.5 mA I2C-failure bound, exact guard pin), then APPROVED. WX-01 W1: REWORK (PCNT cannot debounce a reed contact, LTR390 rate/resolution, `ltr390End`/wfac), then APPROVED | BAT rework applied by the orchestrator (few lines, fail-before/pass-after pins); WX rework by a fresh Sonnet-high implementer. Deltas in the table below                                                                                                                                                                                                             |
 | C3    | WX-01 W2 commit (see `git log`)                            | stage 1 Unity 93 envs 3395/3395, golden selftest clean after the fixes below, pytest 1478; 7 clean gate builds green; R2 sweep 24/24 further ESP32 envs green (`esp32-external-radio` excluded: pre-existing `#error`, needs a build overlay) | REWORK (empty `LORA_DIO0` macro broke T-Beam Supreme, radio/SPI pins missing from `--windpin`, `SE` JSON over the BLE budget), then APPROVED with the R2-sweep condition                                                      | Rework by a fresh Sonnet-high implementer. Orchestrator fixes for the golden lints: one rung per `--windpin`/`--windcal` with an `#if` body, rungs moved out of the `#ifdef OneWire_GPIO` block, "not supported" for `--uv`/`--wind` on/off via `commandMatches()` (the toggle lint ignores `#if` guards), `--help` lines, toggle-lint row pin 84 -> 88              |
+| C4    | WX-01 W3 commit (see `git log`)                            | Unity 94 envs 3400/3400, golden selftest clean, pytest 1478, node web tests pass; 7 clean gate builds + 24 ESP32 sweep envs green; `[WX] T#` in V2/V3 images, 0 in RAK                                                                        | APPROVED; finding TLM-03 (pre-existing: no T# on air unless `node_parm_1` is set by the soft-serial XML path) recorded as a known blocker for the on-air acceptance                                                           | Orchestrator fixes: web `windpin`/`windcal` input validation, window reset on `--uv on`/`--wind on`, info lines renamed to the setup labels (`info_switch_lint`), decimal-comma pin 2 -> 3. RM read not extended (105-byte LoRa budget)                                                                                                                              |
 
 ### Baseline board builds (`8681fcb4`, `MC_AU_DEV_CHANNEL=1`, clean)
 
@@ -153,3 +157,17 @@ proof for `LTR390` / `[WIND]` moves to C3/C4.
 | `wiscore_rak4631`        | 716008        | +456        | +1000       | 99404       | `LTR390` 0, `[WIND]` 0 |
 
 RAK growth since C1 is the "not supported on this board" answers and the `--windpin`/`--windcal` help lines.
+
+### C4 board builds (clean), delta to C3
+
+| Env                      | Flash (bytes) | Delta to C3 | Delta to C0 |
+| ------------------------ | ------------- | ----------- | ----------- |
+| `ttgo_tbeam`             | 2039409       | +2472       | +8320       |
+| `ttgo_tbeam_supreme`     | 1955925       | +2488       | +8484       |
+| `heltec_wifi_lora_32_V2` | 2008665       | +2532       | +7704       |
+| `heltec_wifi_lora_32_V3` | 1919773       | +2700       | +7812       |
+| `t_deck_pro`             | 2320525       | +16         | +1760       |
+| `t5_epaper`              | 4835073       | 0           | +1316       |
+| `wiscore_rak4631`        | 715992        | -16         | +984        |
+
+RAM unchanged against C3 on every env.

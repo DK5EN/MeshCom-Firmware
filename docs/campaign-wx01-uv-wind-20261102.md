@@ -3,7 +3,7 @@
 Optional LTR390 UV sensor and reed-switch anemometer on ESP32 boards, reported as the telemetry values `uvindex`
 and `wind`. Upstream issue #999 (Mosei1984, Heltec WiFi LoRa 32 V2). Backlog row `WX-01`.
 
-**State:** Q1-Q3 answered 2026-11-02; runs in the cloud together with BAT-04, schedule and setup in
+**State:** W1-W3 implemented and committed in the cloud session 2026-11-02 (field test necessary; TLM-03 blocks T# on air); Q1-Q3 answered 2026-11-02; runs in the cloud together with BAT-04, schedule and setup in
 [campaign-bat04-wx01-cloud-20261102.md](campaign-bat04-wx01-cloud-20261102.md).
 
 **Verdict (2026-11-02):** feasible and small. No wire-format change: the values ride in the existing APRS `T#`
@@ -104,21 +104,31 @@ W2 and W3 both touch `src/loop_functions.cpp`, so they run one after the other. 
 
 The PR carries this section in German, the issue comment in English. Placeholders are filled in W4.
 
-- **Enable:** `--uv on`, `--wind on`, `--windpin <gpio>`, `--windcal <km/h per Hz>`, then `--wxdebug on`.
-- **Status:** the sensor status print shows `LTR390: on (found|error)` and `WIND: on (pin <n>, cal <f>)`; the BLE
-  sensor record `S1` carries `UV`, `UVF`, `WIND`, `WINDP`.
-- **Log lines under `--wxdebug on`:** `[LTR390] raw=<counts> gain=18 res=20 uvi=<x.x>` per 60 s tick;
-  `[WIND] pulses=<n>/<s> s hz=<f> kmh=<f>` per tick; `[WX] T# uvindex=<avg> (n=<samples>) wind=<avg> (n=<samples>) gust=<max>`
-  when telemetry is sent.
+- **Enable:** `--wxdebug on` first (the one-time `[LTR390] not found` line is only printed when debug is already on
+  at sensor start), then `--uv on`, `--windpin <gpio>`, `--windcal <km/h per Hz>`, `--wind on`.
+- **Status:** the console sensor status print shows `LTR390: on (found|error)` and `WIND: on (pin <n>, cal <f>)`;
+  the web info page shows `UV (LTR390): on (found|error), UVI <x>, mean <x|-> (n=<k>)` and
+  `Anemometer: on (pin <n>), <x> km/h, mean <x|->, gust <x|->`; the BLE sensor record `S1` carries `UV`, `UVF`, `WIND`,
+  `WINDP`. Mean and gust cover the time since the last T# value frame (since switch-on or boot while telemetry is
+  inactive).
+- **Log lines under `--wxdebug on`:** `[LTR390] raw=<counts> gain=18 res=20 uvi=<x.x>` every 60 s;
+  `[WIND] pulses=<n>/<s> s hz=<f> kmh=<f>` every second (60 lines per minute);
+  `[WX] T# uvindex=<avg|-> (n=<samples>) wind=<avg|-> (n=<samples>) gust=<max|->` each time a T# value frame is
+  built.
 - **Telemetry check:** `node_values` must name the slots, for example `--values uvindex,wind,gust,temp,hum`, and
-  `PARM`/`UNIT` must match (`UVI`, `km/h`).
+  `PARM`/`UNIT` must match (`UVI`, `km/h`). **Known blocker (TLM-03, pre-existing):** on a normal node no T# frame
+  goes on air: `sendTelemetry(1)` returns unless `node_parm_1` is set, and only the soft-serial XML path sets it
+  (`src/tinyxml_functions.cpp`); `--parm` writes `node_parm`. Until TLM-03 is fixed, the values are visible on the web
+  info page, in the status print and in BLE `S1`, but not in T#.
 - **What to send with a report:** `--info`, the status print, 10 minutes of serial log with `--wxdebug on`, the
   board, the GPIO used and the anemometer model (pulses per revolution).
-- **Known limits:** ESP32 only; no RAK4631; only tested host-side and without sensors on the bench (field test
-  necessary); wind is the mean over the telemetry interval, gust the highest 3 s mean in it. The reed contact is
-  debounced in software (3 ms per transition, GPIO interrupt), which caps the counter at about 166 Hz (about 400 km/h
-  at 2.4 km/h per Hz); a close that follows a release within 3 ms is missed once, the counter re-syncs on the next
-  pulse. The LTR390 window factor is 1.0 (no cover glass).
+- **Known limits:** ESP32 only; no RAK4631, T-Deck Pro, T5 e-paper (they do not inherit the `[esp32]` flags); only
+  tested host-side and without sensors on the bench (field test necessary). Wind is the mean since the previous T#
+  value frame (normally one telemetry interval, up to five after the PARM/UNIT/EQNS/BITS rotation), gust the highest
+  3 s mean in that window. The reed contact is debounced in software (3 ms per transition, GPIO interrupt), which
+  caps the counter at about 166 Hz (about 400 km/h at 2.4 km/h per Hz); a close that follows a release within 3 ms
+  is missed once, the counter re-syncs on the next pulse. The LTR390 window factor is 1.0 (no cover glass). The RM
+  read reply is not extended (LoRa answer with a 105-byte budget, REVIEW R4).
 
 ## Open questions
 
@@ -132,3 +142,4 @@ None; Q1-Q3 answered (see Operator decisions).
 | W0   | -                           | -             | -                                                                                                                                                                                                            | Scout (C0): recon table confirmed; `sendTelemetry()` absent sensor sends the stored value (0.0 default), no omit; ESP32-only members go into `MESHCOM_SETTINGS_MEMBERS_ESP32`; framework arduino-esp32 2.0.17 / IDF 4.4.7; `Wire.begin(I2C_SDA, I2C_SCL)` in `esp32setup()` before the sensor boot reads; no device at 0x53 in the code                                                                                                         |
 | W1   | see C1 row of the cloud doc | see cloud doc | REWORK (PCNT cannot debounce a reed contact; LTR390 MEAS_RATE, resolution range, `ltr390End`/wfac), then APPROVED                                                                                            | Rework by a fresh Sonnet-high implementer: GPIO-ISR debouncer, wrap-safe pulse delta, `ltr390End()`, `ltr390SetWfac()`. Host tests 14 + 17. **W2 must reject in `--windpin`:** LoRa, I2C, GPS, button pins, flash pins (classic 6-11, S3 26-32) and classic 34-39 (no internal pull-up)                                                                                                                                                         |
 | W2   | see C3 row of the cloud doc | see cloud doc | REWORK (empty `LORA_DIO0` on T-Beam Supreme broke the build; radio/SPI pins missing from the `--windpin` reserved list; `SE` JSON over the BLE budget), then APPROVED with condition "build every ESP32 env" | Settings `node_wx_flags`/`node_wind_pin`/`node_wind_cal` (ESP32 member block, persist-only schema rows `node_wxflags`/`node_windpin`/`node_windcal`, not exported to the config JSON). `--windpin` rejects about 90 board pin macros (radio, SPI, I2C, GPS, button, Ethernet, SD), flash pins, classic 34-39, octal-PSRAM 33-37 and pins the chip lacks (`src/wx_pins.h`). UV 60 s gate, wind 1 s gate with measured seconds. JSON keys in `S1` |
+| W3   | see C4 row of the cloud doc | see cloud doc | APPROVED (TLM-03 blocker for the on-air acceptance recorded above; doc mismatches fixed)                                                                                                                     | `src/wx_telemetry.h` (value text, `[WX]` line), `uvindex`/`wind`/`gust` in `sendTelemetry()` with the window reset after each T# value frame, web setup switches/inputs and info lines, web POST/GET. Orchestrator: web `windpin` accepts only one integer, `windcal` accepts a decimal comma; window reset on `--uv on` / `--wind on`. `src/rm_exec_read.cpp` deliberately not touched (LoRa byte budget)                                      |
