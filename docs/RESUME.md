@@ -29,8 +29,10 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 - **TD-25 / TD-24 T-Deck fixes (2026-11-02, fork-dev, not released):** the message input on T-Deck/Plus and
   T-Deck Pro caps UTF-8 bytes like the web GUI (149, minus callsign + 2 for a DM), cuts on a code-point boundary
   and shows "N bytes left" (`src/msg_input_budget.h`, test `test_msg_input_budget`). The first bubble of a new
-  conversation removes the "No messages" hint. Opus advisor APPROVED. **Open:** bench on DK5EN-14 (label layout,
-  150 x `ż`, DM from a new peer, passed 2026-11-02, operator); upstream PR #1249; new TD-26 (Pro sends a 9-character call as a broadcast).
+  conversation removes the "No messages" hint. Opus advisor APPROVED. Bench on DK5EN-14 (label layout,
+  150 x `ż`, DM from a new peer) passed 2026-11-02 (operator). Upstream in
+  [#1249](https://github.com/icssw-org/MeshCom-Firmware/pull/1249). **Open:** T-Deck Pro not benched; new TD-26 (Pro
+  sends a 9-character call as a broadcast).
 
 - **CHARS-01 national characters end to end (2026-11-02, fork-dev, not released):** one feature across every
   display path, both back ends and the web GUI. sp2ong's E290 patch (`6eda5f8a`, #1221) is the origin; on top: a
@@ -40,8 +42,11 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   message at the first `{`. Back ends: MCProxy `6df61da`, mc-chat `bb2ae3b` (same charset policy both ways,
   150-byte checks in bytes, weather contract in bytes). Firmware W1 `6b94c253`, W2 committed after it; gate stage
   1,2 PASS (88 envs, 3324/3324), Opus advisor on every wave. Follow-ups W2b closed: E290/WP status lines per
-  font, firmware filter strips U+2066-2069, MCProxy drops inbound text empty after the filter. **Open:** W3 bench (DK5EN-14 first) and the upstream PR
-  (German, credit sp2ong first; only when the feature ships). Campaign:
+  font, firmware filter strips U+2066-2069, MCProxy drops inbound text empty after the filter. DK5EN-14 bench
+  passed 2026-11-02 (operator). **Upstream PR [#1249](https://github.com/icssw-org/MeshCom-Firmware/pull/1249)**
+  (2026-11-02, closes #1221; sp2ong's commit first with him as author; 33 board envs build, scope suites green).
+  **Open:** no OLED, T-Deck Pro, T5 or E290 bench in the fork (E290 tested by sp2ong); after the merge: re-sync and
+  remove the worktree `../MeshCom-PR-next`. Campaign:
   [campaign-chars01-e2e-20261102.md](campaign-chars01-e2e-20261102.md).
 
 - **RM1 `upd chan prod|dev` (2026-10-31, fork-dev `636e681b`, not released):** remote update-channel switch
@@ -192,7 +197,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   **merge** `upstream/dev` (not rebase) to re-sync.
 - All PRs target upstream `dev`; PR text is German and lists files, functions and the why.
   Minimal, targeted changes only. DK5EN never merges upstream himself (the maintainers review and merge).
-- Merged upstream PRs of ours since 4.40a: #1200, #1201, #1207, #1208, #1213, #1214, #1224, #1233, #1235.
+- Merged upstream PRs of ours since 4.40a: #1200, #1201, #1207, #1208, #1213, #1214, #1224, #1233, #1235, #1243, #1244, #1245, #1247.
 - Nothing temporary remains in `src/` (`389ace0d` reverted 2026-10-15).
 
 ## Last release and flasher policy
