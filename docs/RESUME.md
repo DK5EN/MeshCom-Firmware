@@ -1,13 +1,15 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-11-01, branch `fork-dev`, last release **`v4.40a.11.01`** (Latest, tag on `47f339ad`, 68 assets, built by CI).
-Base is upstream `dev` 147812e0: the official `v4.40a.10.28` (10203967) plus our
-[#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243) (HEY-UP-01),
-[#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244) (UDP-05) and
-[#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245) (WEB-AUTH-01), all merged 2026-10-31. Open upstream PR:
-[#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247) (2026-11-01, branch `pr/lrf-ping-beacon-rxsilence`,
-worktree `../MeshCom-PR-next`): LRF ping target lock, own beacons at prio 2, RX-silence diagnostics. Fork-only
-firmware left: the `dev` AU channel, RM1 `upd chan`, `--gateway lab` (2fe7ebd4) and the E290 refresh default. Next step: TD-22 soak and TD-23 UAT.
+**Stand:** 2026-11-02, branch `fork-dev`, last release **`v4.40a.11.01`** (Latest, tag on `47f339ad`, 68 assets, built by CI).
+Base is upstream `dev` c56eb198 (merged into fork-dev 2026-11-02, tree unchanged): our
+[#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243), [#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244),
+[#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245) and [#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247)
+(LRF ping/beacon/RX-silence) plus sp2ong's #1246 (E290 OTP refresh default) are upstream. Open upstream PRs:
+[#1248](https://github.com/icssw-org/MeshCom-Firmware/pull/1248) (REVIEW.md) and
+[#1249](https://github.com/icssw-org/MeshCom-Firmware/pull/1249) (2026-11-02, branch `pr/national-characters`, worktree
+`../MeshCom-PR-next`): CHARS-01 national characters on every display (sp2ong's commit first, he is author) plus TD-25 and
+TD-24; closes #1221. Fork-only firmware left: the `dev` AU channel, RM1 `upd chan`, `--gateway lab` (2fe7ebd4).
+Next step: TD-22 soak and TD-23 UAT.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
@@ -28,7 +30,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   T-Deck Pro caps UTF-8 bytes like the web GUI (149, minus callsign + 2 for a DM), cuts on a code-point boundary
   and shows "N bytes left" (`src/msg_input_budget.h`, test `test_msg_input_budget`). The first bubble of a new
   conversation removes the "No messages" hint. Opus advisor APPROVED. **Open:** bench on DK5EN-14 (label layout,
-  150 x `ż`, DM from a new peer); new TD-26 (Pro sends a 9-character call as a broadcast).
+  150 x `ż`, DM from a new peer, passed 2026-11-02, operator); upstream PR #1249; new TD-26 (Pro sends a 9-character call as a broadcast).
 
 - **CHARS-01 national characters end to end (2026-11-02, fork-dev, not released):** one feature across every
   display path, both back ends and the web GUI. sp2ong's E290 patch (`6eda5f8a`, #1221) is the origin; on top: a
