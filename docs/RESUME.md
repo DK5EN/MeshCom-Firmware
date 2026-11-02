@@ -146,6 +146,8 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   release build of `9e4d8781`; its 24 h soak was stopped 2026-10-25 11:24 after 6 min (operator, TXP-01 bench). Open:
   a new soak after the pending T-Deck PR, GUI visual check on the device ([campaign-tdeck-heap-wifi-20261025.md](campaign-tdeck-heap-wifi-20261025.md)).
 - **Campaign resume points with open steps:**
+  - BAT-04 charge state and current (upstream #1073): plan only, 2026-11-02. Next: operator answers Q1-Q4, then W0
+    ([campaign-bat04-charge-state-20261102.md](campaign-bat04-charge-state-20261102.md)).
   - Log-report fixes (LRF): W0-W2 done 2026-11-01 (ping target locked, own beacons at prio 2, RX-silence logging on
     nRF52 and ESP32 with end-reason ages; benched on DK5EN-90 (RAK) and DK5EN-1 (Heltec V3, W3), not released).
     Next: release candidate (operator go), field capture
