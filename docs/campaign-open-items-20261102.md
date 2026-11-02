@@ -17,7 +17,7 @@ committed and pushed; the bench checks listed at the end are done later by the o
 
 | Wave | Agent | Items | Exclusive files | Status |
 |---|---|---|---|---|
-| W0 | orchestrator | BOOT-01, UCH-01 | `src/configuration_global.h` (macro), 9 title strings, web logo; `tools/webgui_rm_test.js` | in progress |
+| W0 | orchestrator | BOOT-01, UCH-01 | `src/configuration_global.h` (macro), 9 title strings, web logo; `tools/webgui_rm_test.js` | done (`59b41a2`, `ffe097aa`) |
 | W1 | A | TD-25 helper + T-Deck Pro, TD-26 | `src/msg_input_budget.h` (new), `src/t-deck-pro/ui_deckpro.cpp`, `test/native_msgbudget/`, env in `platformio.ini` (gate) | planned |
 | W1 | B | TD-27, TD-28, TD-29 | `src/t-deck/lv_obj_functions.cpp` (layout only) | planned |
 | W1 | C | WEB-DARK-01, WEB-A11Y-01 | CSS / nav in `src/web_functions/web_functions.cpp`, `web_login_page.cpp`, `web_rm_page.cpp` | planned |
@@ -33,7 +33,12 @@ then commit + push and update this doc, `docs/RESUME.md`, `docs/BACKLOG.md`.
 
 ## Wave log
 
-- W0: started 2026-11-02.
+- W0 (2026-11-02): BOOT-01 (`MESHCOM_TITLE`, static_assert against `SOURCE_VERSION`), UCH-01
+  (flag-0 path UCH-00; before: `FAIL UCH-01` + harness TypeError, after: all passed in both flags).
+  Container gate baseline at `3bf9af0`: 5 red steps. Fixed: two GCC-only test build errors
+  (`test_msgid_counter` missing `<cstdio>`, `test_udp_frame_twin` address of a temporary array).
+  ENV, fixed in the container: de_DE locale, shallow clone (`fe8f10d0`), espressif32 platform.
+  Open as PF-T1: `test_pos_filter` cadence bound under glibc; the cloud gate keeps it as the one known red.
 
 ## Bench checks left for the operator
 
