@@ -469,3 +469,29 @@ DK5EN-90 (nRF52, RAK4631):
 2. **WP8:** RAK4631 mit Ethernet (W5100S): Netz, Net-Console, `--gateway on`; TinyUSB-CDC-Enumeration und Serial; UF2-Bootloader; GPS. Auf T114/t_echo (falls verfügbar): `--gateway on` wird abgelehnt, `--gateway off` funktioniert, Boot und BLE ohne Ethernet-Code.
 3. **WP12/13/14:** nRF52-Gegenstücke (`udp_frame`, Uhr, `nbrExclusive`) auf Regression prüfen, HMAC unverändert (kein mbedtls).
 4. **WP16:** nRF52-Web-GUI: AU-CSS-Regeln gelten jetzt überall (disabled Buttons gedimmt).
+
+### 8.7 Rebase auf fork-dev 42bbe18f (2026-11-02)
+
+Die 19 Commits wurden von Basis `8681fcb4` auf `fork-dev` `42bbe18f` (BAT-04, WX-01, TLM-03, BOOT-01, UCH-01, TD-26..30, WEB-DARK-01,
+WEB-A11Y-01, WEB-PWD-01, WEB-LED-01, BAT-05, TXP-02) umgesetzt. Commit-Nachrichten sind unveraendert.
+
+| Commit | Konflikt | Aufloesung |
+| --- | --- | --- |
+| `fd163e1` (cmd arg copy) | Testdatei-Ende | Beide Testsaetze bleiben erhalten (BAT-04/WX-01 und `test_cmd_arg_copy_trim_empty_and_lf`). |
+| `6b25f84` (web_setup-Tabelle) | Fallkette von WX-01 | `uv`/`wind` sind jetzt `WSP_ONOFF`-Zeilen ohne RO-Fallback, wie bisher. `windpin`/`windcal` bleiben explizite Zweige (strenges sscanf, Dezimalkomma, Toleranz). `boardled` (dreistufig) bleibt explizit. |
+| `591a9e7` (gzip-Web-Assets) | Inline-CSS/JS | Die fork-dev-Aenderungen (Palette, Navigationsfarben, WP-JS, RM-Farben) sind zeilengenau nach `web/mc.css`, `mc.js` und `mcrm.js` portiert, `web_assets.h` ist neu erzeugt. `webgui_settings_test.js` und `webgui_theme_test.js` lesen die Assets. |
+
+Gate (Cloud-Container, `--stage 1,2`):
+
+| | TARGET 42bbe18f | Rebase |
+| --- | --- | --- |
+| Unity-Faelle | 3427, davon 1 rot (PF-T1) | 3440, davon 1 rot (PF-T1) |
+| pytest | 1478 | 1489 (ein Flake in test_mc_console, der Rerun ist gruen) |
+| node GUI | settings 85, theme 137 | settings 85, theme 137 |
+| nRF52-Flash t_echo / T114 / RAK | 85,6 / 82,5 / 88,6 % | 54,2 / 50,7 / 80,8 % |
+
+Advisor: 16 von 19 Commits sind patch-identisch, 3 unterscheiden sich nur in den Konflikt-Hunks. Kein fork-dev-Verhalten verloren, kein
+Review-Fix zurueckgenommen.
+
+Offen: der Build aller Board-Envs mit `MC_AU_DEV_CHANNEL=1` und der RAM/Flash-Vergleich gegen `42bbe18f`. Er lief in der Cloud nicht,
+weil im espressif-penv Python-Abhaengigkeiten fehlen. Hardware ist nicht getestet.

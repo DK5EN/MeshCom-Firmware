@@ -117,6 +117,16 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   `logauswertung-dk5en-98-soak-20261025.html`, artifact <https://claude.ai/artifact/XwSCwExCxEqog8vW8yv3xo>; logs
   rpizero `~/meshlog/dk5en-98-soak-20261025/`. Details: [campaign-tx-pool.md](campaign-tx-pool.md), "DK5EN-98 soak".
 - **QA review of `fork-dev` f0a81c8 and its fix campaign (2026-10-25/26, branch `claude/fork-dev-code-review-xdxqzv`, not merged):**
+  **Rebased 2026-11-02 onto `fork-dev` `42bbe18f`** (was base `8681fcb4`; the 19 commits are now `55dcdc9`..HEAD, messages
+  unchanged). Conflicts in 3 commits: `fd163e1` test_command_setters (both test sets kept), `6b25f84` web_setup table (WX-01 `uv`/`wind`
+  as WSP rows, `windpin`/`windcal` stay explicit rungs, WEB-LED-01 `boardled` explicit), `591a9e7` gzip web assets (fork-dev WEB-DARK-01,
+  WEB-A11Y-01, WEB-PWD-01 CSS/JS ported into `src/web_functions/web/`, `web_assets.h` regenerated, `webgui_settings_test.js` and
+  `webgui_theme_test.js` read the assets). Container gate `--stage 1,2`: Unity 3440 cases, 3437 ok, 1 failed, 1 skipped (TARGET baseline
+  3427/3424/1/1; the one red on both sides is PF-T1 `test_kadenz_unabhaengig`); pytest 1489 passed after one flaky
+  `test_mc_console::test_nonce_without_password_names_the_key` (passes 5/5 isolated and in the full rerun; baseline 1478); node GUI
+  tests same counts as TARGET (settings 85, theme 137); nRF52 link t_echo 54.2 %, T114 50.7 %, RAK4631 80.8 % flash (TARGET 85.6/82.5/88.6).
+  Advisor range-diff: 16 of 19 commits identical, 3 differ only in the conflict hunks. **Open:** board-env build plus RAM/flash
+  comparison against `42bbe18f` with `MC_AU_DEV_CHANNEL=1` (not done in the cloud: espressif penv missing Python deps), then merge.
   [review/qa-review-fork-dev-20261025.md](review/qa-review-fork-dev-20261025.md) (section 8 = result); raw reports in
   `review/qa-20261025/`. 17 work packages (WP1-WP17) as commits `52a8d5bd`..`17793944`, all cloud-built and host-tested, **not
   benched**. Fixed: QA-NET-04, QA-STAB-01/02/03/04/06, QA-NET-02 (nRF52 settings masking), QA-AU-01/05/09/11/12/15, `MC_WEB_GUARD=1`
