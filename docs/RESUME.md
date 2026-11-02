@@ -1,14 +1,13 @@
 # RESUME -- pick up here
 
 **Stand:** 2026-11-02, branch `fork-dev`, last release **`v4.40a.11.01`** (Latest, tag on `47f339ad`, 68 assets, built by CI).
-Base is upstream `dev` c56eb198 (merged into fork-dev 2026-11-02, tree unchanged): our
+Base is upstream `dev` e564506a (merged into fork-dev 2026-11-02 as `7296aaf6`, tree unchanged): our
 [#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243), [#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244),
-[#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245) and [#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247)
-(LRF ping/beacon/RX-silence) plus sp2ong's #1246 (E290 OTP refresh default) are upstream. Open upstream PRs:
-[#1248](https://github.com/icssw-org/MeshCom-Firmware/pull/1248) (REVIEW.md) and
-[#1249](https://github.com/icssw-org/MeshCom-Firmware/pull/1249) (2026-11-02, branch `pr/national-characters`, worktree
-`../MeshCom-PR-next`): CHARS-01 national characters on every display (sp2ong's commit first, he is author) plus TD-25 and
-TD-24; closes #1221. Also open since 2026-11-02:
+[#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245), [#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247)
+(LRF ping/beacon/RX-silence), [#1248](https://github.com/icssw-org/MeshCom-Firmware/pull/1248) (REVIEW.md) and
+[#1249](https://github.com/icssw-org/MeshCom-Firmware/pull/1249) (CHARS-01 national characters, TD-25/TD-24, closes #1221)
+plus sp2ong's #1246 (E290 OTP refresh default) are upstream; their branches and worktrees are removed. Open upstream
+PRs since 2026-11-02:
 [#1250](https://github.com/icssw-org/MeshCom-Firmware/pull/1250) (BAT-04 charge state and BLE `IS2`, closes #1073,
 branch `pr/bat04-charge-state`, worktree `../MeshCom-PR-bat04`) and
 [#1251](https://github.com/icssw-org/MeshCom-Firmware/pull/1251) (WX-01 UV/wind/gust plus the TLM-03 T# fix, field test
@@ -42,7 +41,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   and shows "N bytes left" (`src/msg_input_budget.h`, test `test_msg_input_budget`). The first bubble of a new
   conversation removes the "No messages" hint. Opus advisor APPROVED. Bench on DK5EN-14 (label layout,
   150 x `ż`, DM from a new peer) passed 2026-11-02 (operator). Upstream in
-  [#1249](https://github.com/icssw-org/MeshCom-Firmware/pull/1249). **Open:** T-Deck Pro not benched; new TD-26 (Pro
+  [#1249](https://github.com/icssw-org/MeshCom-Firmware/pull/1249) (merged 2026-11-02). **Open:** T-Deck Pro not benched; new TD-26 (Pro
   sends a 9-character call as a broadcast).
 
 - **CHARS-01 national characters end to end (2026-11-02, fork-dev, not released):** one feature across every
@@ -56,8 +55,8 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   font, firmware filter strips U+2066-2069, MCProxy drops inbound text empty after the filter. DK5EN-14 bench
   passed 2026-11-02 (operator). **Upstream PR [#1249](https://github.com/icssw-org/MeshCom-Firmware/pull/1249)**
   (2026-11-02, closes #1221; sp2ong's commit first with him as author; 33 board envs build, scope suites green).
-  **Open:** no OLED, T-Deck Pro, T5 or E290 bench in the fork (E290 tested by sp2ong); after the merge: re-sync and
-  remove the worktree `../MeshCom-PR-next`. Campaign:
+  Merged upstream 2026-11-02 and re-synced (`7296aaf6`). **Open:** no OLED, T-Deck Pro, T5 or E290 bench in the
+  fork (E290 tested by sp2ong). Campaign:
   [campaign-chars01-e2e-20261102.md](campaign-chars01-e2e-20261102.md).
 
 - **RM1 `upd chan prod|dev` (2026-10-31, fork-dev `636e681b`, not released):** remote update-channel switch
@@ -212,7 +211,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   **merge** `upstream/dev` (not rebase) to re-sync.
 - All PRs target upstream `dev`; PR text is German and lists files, functions and the why.
   Minimal, targeted changes only. DK5EN never merges upstream himself (the maintainers review and merge).
-- Merged upstream PRs of ours since 4.40a: #1200, #1201, #1207, #1208, #1213, #1214, #1224, #1233, #1235, #1243, #1244, #1245, #1247.
+- Merged upstream PRs of ours since 4.40a: #1200, #1201, #1207, #1208, #1213, #1214, #1224, #1233, #1235, #1243, #1244, #1245, #1247, #1248, #1249.
 - Nothing temporary remains in `src/` (`389ace0d` reverted 2026-10-15).
 
 ## Last release and flasher policy
