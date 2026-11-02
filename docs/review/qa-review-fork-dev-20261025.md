@@ -493,5 +493,62 @@ Gate (Cloud-Container, `--stage 1,2`):
 Advisor: 16 von 19 Commits sind patch-identisch, 3 unterscheiden sich nur in den Konflikt-Hunks. Kein fork-dev-Verhalten verloren, kein
 Review-Fix zurueckgenommen.
 
-Offen: der Build aller Board-Envs mit `MC_AU_DEV_CHANNEL=1` und der RAM/Flash-Vergleich gegen `42bbe18f`. Er lief in der Cloud nicht,
-weil im espressif-penv Python-Abhaengigkeiten fehlen. Hardware ist nicht getestet.
+### 8.7.1 Lokales Gate (2026-11-02, macOS, `MC_AU_DEV_CHANNEL=1`)
+
+`origin/fork-dev` stand inzwischen auf `61867a20` (nur `docs/RESUME.md` ueber `42bbe18f`), per Merge in den Branch geholt (konfliktfrei).
+Baseline = `61867a20` im eigenen Worktree, Gate = Branch plus Merge. Zahlen: `tools/bench/runs/qa-review-local-gate-20261102.summary`.
+
+| `--stage 1,2` | Baseline 61867a20 | Branch      |
+| ------------- | ----------------- | ----------- |
+| Unity-Faelle  | 3426, 0 rot       | 3439, 0 rot |
+| Unity-Envs    | 95                | 95          |
+| pytest        | 1477              | 1489        |
+| rote Steps    | 0                 | 0           |
+
+PF-T1 und der Flake in `test_mc_console` traten lokal nicht auf. Die Step-Listen beider Laeufe sind identisch.
+
+Board-Builds: 36 Nicht-native-Envs, je einmal, Baseline zuerst. 35 bauen auf beiden Seiten; `esp32-external-radio` scheitert auf beiden
+(`#error`: braucht `EXTERNAL_RADIO_HOST`/`_PORT` aus einem Build-Overlay, kein CI-Env). Bytes aus den `pio`-RAM-/Flash-Zeilen
+(RAM statisch, nRF52 ebenfalls). Flash sinkt in jedem Env, kein Env ist auf dem Branch gebrochen.
+
+| Env                         | RAM base | RAM neu | Delta RAM | Flash base | Flash neu | Delta Flash |                Flash % neu |
+| --------------------------- | -------: | ------: | --------: | ---------: | --------: | ----------: | -------------------------: |
+| esp32-safeboot              |   48 444 |  48 444 |        +0 |    713 663 |   688 739 |     -24 924 |                       20.2 |
+| esp32-S3-safeboot           |   43 740 |  43 740 |        +0 |    674 567 |   649 783 |     -24 784 |                       19.1 |
+| esp32-external-radio        |        - |       - |         - |          - |         - |           - | build scheitert auf beiden |
+| wiscore_rak4631             |   99 404 |  96 908 |    -2 496 |    721 984 |   658 740 |     -63 244 |                       80.8 |
+| E22-DevKitC                 |  104 936 | 105 952 |    +1 016 |  2 021 253 | 1 815 957 |    -205 296 |                       53.4 |
+| vision-master-e290          |  135 548 | 136 532 |      +984 |  1 965 537 | 1 743 329 |    -222 208 |                       51.2 |
+| vision-master-e290-otp      |  140 284 | 141 380 |    +1 096 |  1 965 681 | 1 901 045 |     -64 636 |                       55.9 |
+| t_deck                      |  149 492 | 149 980 |      +488 |  2 620 509 | 2 322 389 |    -298 120 |                       18.5 |
+| esp32-loraprs-e22           |  104 832 | 105 848 |    +1 016 |  2 020 989 | 1 815 737 |    -205 252 |                       53.3 |
+| T-ETH-ELITE_1262            |  130 500 | 131 268 |      +768 |  1 967 909 | 1 754 289 |    -213 620 |                       51.5 |
+| t_deck_plus                 |  149 492 | 149 980 |      +488 |  2 620 229 | 2 322 141 |    -298 088 |                       18.5 |
+| E22_1268_S3-DevKitC-1-N16R8 |  130 292 | 131 308 |    +1 016 |  1 943 733 | 1 734 777 |    -208 956 |                       51.0 |
+| ttgo_tbeam_SX1268           |  104 928 | 105 944 |    +1 016 |  2 051 905 | 1 833 585 |    -218 320 |                       53.9 |
+| LilyGo_T_Connect_Pro        |  130 796 | 131 828 |    +1 032 |  2 003 601 | 1 785 473 |    -218 128 |                       52.5 |
+| vision-master-e213          |  131 812 | 132 796 |      +984 |  1 918 441 | 1 703 605 |    -214 836 |                       50.1 |
+| vision-master-e213-preview  |  131 812 | 132 796 |      +984 |  1 918 557 | 1 703 697 |    -214 860 |                       50.1 |
+| heltec_wireless_tracker     |  130 052 | 131 068 |    +1 016 |  1 949 561 | 1 737 861 |    -211 700 |                       51.1 |
+| LilyGo_T3_S3_V1_3           |  130 280 | 131 296 |    +1 016 |  1 944 529 | 1 734 257 |    -210 272 |                       51.0 |
+| heltec_wifi_lora_32_V4      |  129 660 | 130 684 |    +1 024 |  1 926 589 | 1 717 801 |    -208 788 |                       50.5 |
+| heltec_wifi_lora_32_V3      |  129 524 | 130 548 |    +1 024 |  1 927 037 | 1 719 041 |    -207 996 |                       50.5 |
+| LilyGo_T-Beam-1W            |  130 228 | 131 244 |    +1 016 |  1 948 657 | 1 738 485 |    -210 172 |                       51.1 |
+| heltec_wifi_lora_32_V2      |  104 720 | 105 736 |    +1 016 |  2 015 797 | 1 807 537 |    -208 260 |                       53.1 |
+| esp32-loraprs-ra01          |  104 592 | 105 608 |    +1 016 |  2 013 393 | 1 806 241 |    -207 152 |                       53.1 |
+| E22_1262-DevKitC            |  104 936 | 105 952 |    +1 016 |  2 021 409 | 1 816 033 |    -205 376 |                       53.4 |
+| ttgo_tbeam                  |  104 848 | 105 864 |    +1 016 |  2 046 809 | 1 825 373 |    -221 436 |                       53.6 |
+| heltec_t114                 |   98 788 |  90 412 |    -8 376 |    670 128 |   413 632 |    -256 496 |                       50.7 |
+| ttgo-lora32-v21             |  104 752 | 105 768 |    +1 016 |  2 013 221 | 1 805 693 |    -207 528 |                       53.0 |
+| wireless-paper              |  131 452 | 132 428 |      +976 |  1 893 185 | 1 681 565 |    -211 620 |                       49.4 |
+| ttgo_tbeam_SX1262           |  104 928 | 105 944 |    +1 016 |  2 051 969 | 1 833 641 |    -218 328 |                       53.9 |
+| t_echo                      |  104 708 |  95 980 |    -8 728 |    697 796 |   441 448 |    -256 348 |                       54.2 |
+| t5_epaper                   |  129 840 | 130 744 |      +904 |  4 841 865 | 4 620 001 |    -221 864 |                       70.5 |
+| E22_1262_S3-DevKitC-1-N16R8 |  130 292 | 131 308 |    +1 016 |  1 943 797 | 1 734 785 |    -209 012 |                       51.0 |
+| ttgo_tbeam_supreme          |  129 868 | 130 900 |    +1 032 |  1 962 549 | 1 743 069 |    -219 480 |                       51.2 |
+| heltec_wireless_stick       |  129 524 | 130 548 |    +1 024 |  1 924 137 | 1 716 229 |    -207 908 |                       50.4 |
+| t_deck_pro                  |  154 544 | 155 640 |    +1 096 |  2 328 709 | 2 142 221 |    -186 488 |                       17.0 |
+| E22_XML-DevKitC             |  106 696 | 107 720 |    +1 024 |  2 039 641 | 1 827 281 |    -212 360 |                       53.7 |
+
+Kein Fix war noetig, kein Fix-Commit auf dem Branch. Hardware ist nicht getestet; Bench-Liste siehe 8.6 (DK5EN-92, DK5EN-90).
+
