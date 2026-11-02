@@ -1,7 +1,28 @@
 # National characters on node displays (CHARS-01)
 
-Status: open (2026-11-01). Backlog row `CHARS-01` in [`BACKLOG.md`](BACKLOG.md) section 3.2.
-Upstream issue: [icssw-org/MeshCom-Firmware#1221](https://github.com/icssw-org/MeshCom-Firmware/issues/1221).
+Status: implemented on `fork-dev` (2026-11-02), E290 bench and upstream PRs open. Backlog row `CHARS-01` in
+[`BACKLOG.md`](BACKLOG.md) section 3.2.
+
+## Result (2026-11-02)
+
+- **Part A done as planned:** sp2ong's patch applied with his authorship (`6eda5f8a`), env block placed by hand,
+  ini baseline regenerated (`08041fda`). Host gate green, both E290 envs build. **E290 bench still open:** no E290
+  in the fleet.
+- **Part B done, with two deviations from the plan below:**
+  - **Fallback fonts instead of full fonts.** `src/t-deck/fonts/mc_font_latin_N.c` carry only U+00A0-U+017F plus
+    `– — ‘ ’ “ ” „ • … €`; `.fallback` points at the built-in `lv_font_montserrat_N` for ASCII and `LV_SYMBOL_*`.
+    Flash +70 KB in total (sizes 12-18 linked, 20 unused), not 30-60 KB per size.
+  - **Phone punctuation added.** Phones replace `'` and `"` with `’` and `“ ”`. Without these glyphs French text would
+    show boxes, which looks worse than before. U+202F (narrow no-break space, French) is not in Montserrat; the
+    T-Deck message path maps it to a space.
+- **Bench DK5EN-14:** outgoing bubble (`::{TEST}` over 2323) and a DM received from DK5EN-98 via McApp render
+  German, Polish, French, Spanish, Portuguese, the punctuation and `€` correctly.
+- **Pitfall found by the advisor:** `lv_font_conv --lcd` makes a sub-pixel font, which LVGL with
+  `LV_USE_FONT_SUBPX 0` draws as blank gaps. Guarded by `tools/tests/test_tdeck_fonts.py`.
+- **Still open:** French, Spanish and Portuguese letters on E290 / Wireless Paper (about 40 glyphs into sp2ong's
+  fonts with `tools/gfxfont_add_glyphs.py`; ask him on #1221 first), upstream PRs (A by sp2ong or with his authorship,
+  B as our own).
+  Upstream issue: [icssw-org/MeshCom-Firmware#1221](https://github.com/icssw-org/MeshCom-Firmware/issues/1221).
 
 ## Verdict
 

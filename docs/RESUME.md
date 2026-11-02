@@ -24,6 +24,17 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   `esp32_flash.cpp` are part of the Safeboot image). **Not done:** no bench node besides DK5EN-92 (local build of the
   same commit) runs the release; own beacons at prio 2 and the boot-time ping-target clean-up are host-tested only.
 
+- **CHARS-01 national characters (2026-11-02, fork-dev, not released):** (A) E290 / Wireless Paper: sp2ong's
+  patch `0004` from #1221 applied with his authorship (`6eda5f8a`) plus `native_gfx_charmap` env and ini baseline
+  (`08041fda`); Polish, German, `°`, `€`. Host-tested, E290 builds; **E290 bench (glyphs, ghosting with
+  `E290_FULL_EVERY=0`) open, no E290 in the fleet.** (B) T-Deck / T-Deck Plus: Latin fonts `mc_font_latin_12..20`
+  (Montserrat U+00A0-U+017F plus `– — ‘ ’ “ ” „ • … €`, fallback to the built-in Montserrat for ASCII and symbols),
+  `utf8ascii()` gone from the message path, U+202F becomes a space. Flash +70 KB. Benched on DK5EN-14: outgoing
+  bubble and a DM received from DK5EN-98 (DE, PL, FR, ES, PT, punctuation, `€`) render correctly. Regression test
+  `tools/tests/test_tdeck_fonts.py` (sub-pixel font renders blank with `LV_USE_FONT_SUBPX 0`). Open: French, Spanish
+  and Portuguese letters on E290 (about 40 glyphs into sp2ong's fonts, ask him on #1221), upstream PRs.
+  Concept: [concept-national-chars-20261101.md](concept-national-chars-20261101.md).
+
 - **RM1 `upd chan prod|dev` (2026-10-31, fork-dev `636e681b`, not released):** remote update-channel switch
   DEV/MAIN for McApp. One setter `auSetChannel()` for RM1, `--updchan` and `/setparam updchan`; a switch clears the
   last check result, keeps a staged image, starts no check; console switch during a check answers busy. Flag builds
@@ -260,6 +271,8 @@ Hard bench rules:
 
 ## Last three sessions
 
+- **2026-11-02:** CHARS-01 waves A and B (national characters on E290 and T-Deck), see Open now. AU web GUI
+  button reads "Download" (`c4689942`).
 - **2026-11-01:** 24-h multi-node log analysis: five OE3 gateways, DB0AIS and two HB9 Heltec V3, every claim
   adversarially verified; nine self-contained HTML reports in `docs/log-reports/2026-11-01-24h/` and the reusable
   pipeline `tools/logreport/`. Findings: RAK4631 auto-ping has no count limit (ESP32/RAK difference, decision
@@ -268,6 +281,3 @@ Hard bench rules:
 - **2026-10-25:** T-Deck heap/WiFi campaign: field RCA reproduced on DK5EN-14 (~250 messages wedge the IP path while
   WiFi stays associated); TD-20, TD-21/21b and TD-22 fixed and benched; slow LAN ping traced to WiFi modem sleep
   (WIFI-PS-01, accepted).
-- **2026-10-24 (late):** TRK-02 measurement campaign (web flasher vs PRG/GPIO0): `dtr_replay.py`, 80 replays
-  plus one Chrome install on DK5EN-1, 0 clicks; TRK-03 T-Beam first-boot TRACK bit confirmed on DK5EN-92
-  (erased and restored) and fixed with a native test.
