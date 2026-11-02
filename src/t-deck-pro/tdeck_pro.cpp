@@ -45,7 +45,7 @@ uint8_t *decodebuffer = NULL;
 lv_timer_t *flush_timer = NULL;
 int disp_refr_mode = DISP_REFR_MODE_PART;
 
-const char HelloWorld1[] = "   T-Deck-Pro\n\n   MeshCom 4.0\n";
+const char HelloWorld1[] = "   T-Deck-Pro\n\n   " MESHCOM_TITLE "\n";
 const char HelloWorld2[] = "   @ by icssw.org\n   OE1KBC & OE1KFR";
 
 bool peri_init_st[E_PERI_NUM_MAX] = {0};

@@ -8,6 +8,21 @@
 #define SOURCE_VERSION_SUB "a"
 #define SOURCE_VERSION_WEB_SUB "a"
 
+// BOOT-01: product title on every boot screen, TFT splash and the web logo.
+// Was a hard-coded "MeshCom 4.0" in nine places and drifted from the 4.40
+// firmware. MESHCOM_VERSION_SHORT must stay the prefix of SOURCE_VERSION
+// (checked below), so bumping SOURCE_VERSION to 4.50 without it fails the build.
+#define MESHCOM_VERSION_SHORT "4.4"
+#define MESHCOM_TITLE "MeshCom " MESHCOM_VERSION_SHORT
+#ifdef __cplusplus
+constexpr bool meshcomVersionPrefixOk(const char *s, const char *p)
+{
+    return *p == '\0' ? true : (*s == *p && meshcomVersionPrefixOk(s + 1, p + 1));
+}
+static_assert(meshcomVersionPrefixOk(SOURCE_VERSION, MESHCOM_VERSION_SHORT),
+              "BOOT-01: MESHCOM_VERSION_SHORT must be the prefix of SOURCE_VERSION");
+#endif
+
 // Werkseinstellung des Rufzeichens und der zugehoerige "Node ist noch nicht
 // konfiguriert"-Test. Beides stand bisher als Literal an fuenf Stellen in drei
 // Images (esp32_main, nrf52_main, safeboot) und wurde dort unterschiedlich

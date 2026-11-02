@@ -1932,7 +1932,7 @@ void esp32setup()
         char cvers[22];
         snprintf(cvers, sizeof(cvers), "FW %s/%-1.1s <%s>", SOURCE_VERSION, SOURCE_VERSION_SUB, getCountry(meshcom_settings.node_country).c_str());
         String  version = cvers;
-        displayTFT("MeshCom 4.0", version, "@BY ICSSW.ORG", "OE1KBC, OE1KFR",  "...starting now", 5000);
+        displayTFT(MESHCOM_TITLE, version, "@BY ICSSW.ORG", "OE1KBC, OE1KFR",  "...starting now", 5000);
     #else
         startDisplay((char*)"...starting now", (char*)"@BY ICSSW.ORG", (char*)"OE1KBC, OE1KFR");
     #endif

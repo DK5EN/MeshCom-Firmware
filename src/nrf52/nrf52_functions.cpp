@@ -62,7 +62,7 @@ void startDisplay(char line1[20], char line2[20], char line3[20])
     do
     {
         u8g2->setFont(u8g2_font_10x20_mf);
-        u8g2->drawStr(5, 15, "MeshCom 4.0");
+        u8g2->drawStr(5, 15, MESHCOM_TITLE);
         u8g2->setFont(u8g2_font_6x10_mf);
         snprintf(cvers, sizeof(cvers), "FW %s/%s <%s>", SOURCE_VERSION, SOURCE_VERSION_SUB, getCountry(meshcom_settings.node_country).c_str());
         u8g2->drawStr(5, 25, cvers);
