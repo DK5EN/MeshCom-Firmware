@@ -9,6 +9,7 @@ Open-source MeshCom Firmware. We contribute via PRs against the **upstream DEV b
 - `docs/RESUME.md`: current state, last release, open items. Read it first in a fresh session.
 - `docs/BACKLOG.md`: open work and operator decisions. `docs/architecture/08-defect-catalogue.md`: defect IDs.
 - Campaign docs (`docs/campaign-*.md`) are the resume points of multi-wave work; keep them and `RESUME.md` current per wave.
+- Reviews (own PRs, wave verdicts, foreign upstream PRs): `REVIEW.md` is the standard (R1-R4: complete across platforms, every env builds, checked against every surface and sanitizer, LoRa byte budget); it stays byte-identical to `upstream/dev`. Fork-only rules live in `docs/review-fork.md`.
 
 ## Branch Model
 
