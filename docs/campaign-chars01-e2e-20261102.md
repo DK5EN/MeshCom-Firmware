@@ -80,7 +80,9 @@ Flash target after the commit: DK5EN-14 (T-Deck Plus), operator request 2026-11-
 
 ## Open after wave 2
 
-- W3: bench (DK5EN-14 T-Deck Plus flashed first; OLED board with the test sentence; E290 not in the fleet),
+- **DK5EN-14 (T-Deck Plus) runs `61789ead`** (USB flash 2026-11-02, hash verified, identity guard ok, `--info`
+  build Nov 2 2026). Visual check of the test sentence on its screen still open.
+- W3: bench ( OLED board with the test sentence; E290 not in the fleet),
   concept doc and PR draft (German, sp2ong credit first; see memory `chars01-pr-attribution-and-scope`).
 - Follow-ups (BACKLOG CHARS-01): E290/WP status lines (TEMP `°C`, a UTF-8 SSID) print raw UTF-8 bytes into the
   extended GFX font and show two wrong glyphs; `onebutton_functions.cpp:199` prints E290 glyph codes to serial;
