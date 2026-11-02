@@ -193,6 +193,8 @@ listed files, every behaviour gets a test that fails on the stub and passes afte
   volatile values, no `Charge:` line; BLE `I`/`IS1` same keys, no `IS2`; web Battery row unchanged (the info page gains
   the WX-01 lines `UV (LTR390): off` / `Anemometer: off`). With a cell from boot both builds read 4.12 V. A cell
   hot-plugged into a running node is not detected on either build: pre-existing, BACKLOG `BAT-05`.
+- Heltec V3 on battery (USB unplugged, cell from boot): `3.98 V / 73 %` on console and web, no `Charge:` line, no
+  reboot.
 - Not observed: `full` (cell at 95-99 %). Not benched: an AXP192 T-Beam (none in the fleet, so the signed mA path is
   host-tested only), (the Heltec V3 check followed the same day, line above).
 

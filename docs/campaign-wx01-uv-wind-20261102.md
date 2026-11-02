@@ -146,6 +146,9 @@ unconditionally since upstream v4.34x.05.16). Fixed before the WX-01 upstream PR
 - `--windpin 21` (I2C) and `--windpin 38` (button) rejected with the pin-class message.
 - 75 s with both on: no reboot (uptime continuous); both switched off again afterwards.
 - Still needed: a field test with a real LTR390 and anemometer (no bench hardware).
+- TLM-03 on hardware (DK5EN-92, gateway, fork-dev `328e858a`): with `--parm Batt --unit V --values batt --ptime 5` the
+  node sent `DK5EN-92>100001:DK5EN-92 :T#012,4.06` as `TX-UDP` (gateway: server upload only, no LoRa), visible with
+  `--setinfo on` (`NEW-TMY`). Settings reset to `none` / ptime 15 afterwards.
 
 ## Wave log
 
