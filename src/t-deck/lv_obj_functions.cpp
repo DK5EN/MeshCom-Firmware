@@ -998,8 +998,8 @@ void setDisplayLayout(lv_obj_t *parent)
     lv_textarea_set_text_selection(setup_name, false);
     lv_obj_align_to(setup_name, setup_name_label, LV_ALIGN_OUT_RIGHT_MID, 0, 0);
     lv_obj_set_size(setup_name, 160, 35);
-    lv_obj_set_style_pad_all(setup_callsign, 2, LV_PART_MAIN);
-    lv_obj_set_style_pad_top(setup_callsign, 8, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(setup_name, 2, LV_PART_MAIN);
+    lv_obj_set_style_pad_top(setup_name, 8, LV_PART_MAIN);
     lv_obj_set_scrollbar_mode(setup_name, LV_SCROLLBAR_MODE_OFF);
     lv_textarea_set_text(setup_name, "");
     lv_textarea_set_max_length(setup_name, 20);
@@ -1022,8 +1022,8 @@ void setDisplayLayout(lv_obj_t *parent)
     lv_textarea_set_text_selection(setup_comment, false);
     lv_obj_align(setup_comment, LV_ALIGN_LEFT_MID, 75, 0);
     lv_obj_set_size(setup_comment, 210, 35);
-    lv_obj_set_style_pad_all(setup_callsign, 2, LV_PART_MAIN);
-    lv_obj_set_style_pad_top(setup_callsign, 8, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(setup_comment, 2, LV_PART_MAIN);
+    lv_obj_set_style_pad_top(setup_comment, 8, LV_PART_MAIN);
     lv_obj_set_scrollbar_mode(setup_comment, LV_SCROLLBAR_MODE_OFF);
     lv_textarea_set_text(setup_comment, "");
     lv_textarea_set_max_length(setup_comment, 40);

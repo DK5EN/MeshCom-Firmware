@@ -913,6 +913,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
     rxBufIndex = nextBuf;
     rxBufInUse[rxBufIndex] = true;
     memcpy(rxPayloadCopy[rxBufIndex], payload, rxSize);
+    // BL-02: zero the tail so a shorter frame never carries bytes of an older one
+    if(rxSize < UDP_TX_BUF_SIZE)
+        memset(rxPayloadCopy[rxBufIndex] + rxSize, 0, UDP_TX_BUF_SIZE - rxSize);
     payload = rxPayloadCopy[rxBufIndex];
     size = rxSize;
     taskEXIT_CRITICAL();
