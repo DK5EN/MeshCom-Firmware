@@ -89,14 +89,12 @@ $4 each. Total about $60 to $80, 5 to 6 h wall-clock.
 
 ## Open after the cloud session (operator's machine)
 
-- BAT-04 W3 bench (AXP2101 T-Beam, AXP192 if in the fleet, Heltec V3 byte-identical check incl. BLE `I`/`IS1`; `IS2`
-  on the T-Beam). BAT-04b (BQ boards, needs a periodic `PPM`/`bq27220` poll) stays a follow-up.
-- WX-01 bench step 6 (DK5EN-1, `--uv on` / `--wind on` without hardware).
-- **TLM-03** (pre-existing): T# goes on air only when `node_parm_1` is set (soft-serial XML path); decide whether to
-  fix it before the WX-01 PR, otherwise the PR states it as a known limit.
-- RM read reply without UV/wind (LoRa byte budget); decide whether a later RM field is wanted.
-- Upstream PRs via `/submit-pr` (German bodies), comments on #1073 and #999 including the WX-01 field-test
-  debugging section.
+- Done 2026-11-02: BAT-04 W3 bench (AXP2101 T-Beam, Heltec V3 unchanged), WX-01 bench without sensors, TLM-03
+  fixed and benched, upstream PRs [#1250](https://github.com/icssw-org/MeshCom-Firmware/pull/1250) (BAT-04) and
+  [#1251](https://github.com/icssw-org/MeshCom-Firmware/pull/1251) (WX-01 + TLM-03, field test necessary).
+- Open: AXP192 bench (none in the fleet), WX-01 field test with real sensors, comments on #1073 and #999.
+- Follow-ups: BAT-04b (BQ boards, needs a periodic `PPM`/`bq27220` poll); RM read reply without UV/wind (LoRa byte
+  budget), decide whether a later RM field is wanted.
 
 ## Wave log
 

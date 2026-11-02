@@ -3,7 +3,9 @@
 Optional LTR390 UV sensor and reed-switch anemometer on ESP32 boards, reported as the telemetry values `uvindex`
 and `wind`. Upstream issue #999 (Mosei1984, Heltec WiFi LoRa 32 V2). Backlog row `WX-01`.
 
-**State:** W1-W3 implemented and committed in the cloud session 2026-11-02 (field test necessary; TLM-03 blocks T# on air); Q1-Q3 answered 2026-11-02; runs in the cloud together with BAT-04, schedule and setup in
+**State:** W1-W3 and the TLM-03 fix implemented 2026-11-02, benched without sensors; upstream PR
+[#1251](https://github.com/icssw-org/MeshCom-Firmware/pull/1251) open (field test necessary, debug section included).
+Open: field test with real sensors, #999 comment; Q1-Q3 answered 2026-11-02; runs in the cloud together with BAT-04, schedule and setup in
 [campaign-bat04-wx01-cloud-20261102.md](campaign-bat04-wx01-cloud-20261102.md).
 
 **Verdict (2026-11-02):** feasible and small. No wire-format change: the values ride in the existing APRS `T#`
