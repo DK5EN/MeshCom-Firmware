@@ -179,6 +179,19 @@ listed files, every behaviour gets a test that fails on the stub and passes afte
 - Heltec V3: `--info`, web and BLE `I` byte-identical to the previous build.
 - Evidence: summaries under `tools/bench/runs/harness/`, cited in the wave section of this doc.
 
+### W3 result (2026-11-02, DK5EN-92, T-Beam AXP2101, fork-dev `328e858a`)
+
+| Step             | Console `--info`      | Web Battery row                        | BLE `IS2`                           |
+| ---------------- | --------------------- | -------------------------------------- | ----------------------------------- |
+| USB in, no cell  | `Charge: no battery`  | `5.186V (100%) max 4.200V, no battery` | `{"TYP":"IS2","CHG":"no battery"}`  |
+| USB in, cell in  | `Charge: charging`    | `4.189V (99%) max 4.200V, charging`    | `{"TYP":"IS2","CHG":"charging"}`    |
+| USB out, cell in | `Charge: discharging` | `4.146V (95%) max 4.200V, discharging` | `{"TYP":"IS2","CHG":"discharging"}` |
+
+- No `CHGMA` anywhere (AXP2101 has no current ADC), as designed. `I` and `IS1` unchanged; uptime continuous across
+  the USB unplug (no reboot). BLE via `tools/bench/ble_golden.py` (one `--info` write), web via Chrome and the page text.
+- Not observed: `full` (cell at 95-99 %). Not benched: an AXP192 T-Beam (none in the fleet, so the signed mA path is
+  host-tested only), and the Heltec V3 byte-identical check (DK5EN-1 not on the bench today).
+
 ### W4 (docs and upstream)
 
 - This doc, `docs/RESUME.md`, BACKLOG row BAT-04, defect catalogue entry.

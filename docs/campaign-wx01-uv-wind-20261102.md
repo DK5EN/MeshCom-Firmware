@@ -140,6 +140,13 @@ On a node without the soft-serial app no `T#` frame went on air at all (periodic
 unconditionally since upstream v4.34x.05.16). Fixed before the WX-01 upstream PR (operator decision):
 `src/telemetry_app.h`, both timer call sites, test `native_telemetry_app`. BACKLOG row `TLM-03`.
 
+## Bench (2026-11-02, DK5EN-92, T-Beam, fork-dev `328e858a`, no sensor attached)
+
+- `--uv on`: `LTR390: on (error)`; `--wind on`: "wind on, but no pin set"; `WIND: on (pin 0, cal 2.40)`.
+- `--windpin 21` (I2C) and `--windpin 38` (button) rejected with the pin-class message.
+- 75 s with both on: no reboot (uptime continuous); both switched off again afterwards.
+- Still needed: a field test with a real LTR390 and anemometer (no bench hardware).
+
 ## Wave log
 
 | Wave | Commit                      | Gate          | Advisor                                                                                                                                                                                                      | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                           |
