@@ -18,7 +18,6 @@ Open-source MeshCom Firmware. We contribute via PRs against the **upstream DEV b
 - Sync upstream by cherry-pick; never merge fork history into upstream.
 - After icssw-org squash-merges a PR of ours, **merge** `upstream/dev` (not rebase) to re-sync.
 - All PRs target upstream `dev`, with the description in German. DK5EN never merges upstream himself; the maintainers review and merge.
-- Temporary fork commit `389ace0d` (OE Internet server lost in upstream #1209): revert it once the upstream fix lands.
 
 ## Releases
 

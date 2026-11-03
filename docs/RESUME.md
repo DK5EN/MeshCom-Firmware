@@ -10,7 +10,9 @@ Base is upstream `dev` 4f60051c (merged into fork-dev 2026-11-02 as `560e65ab`, 
 [#1251](https://github.com/icssw-org/MeshCom-Firmware/pull/1251) (WX-01 UV/wind/gust plus the TLM-03 T# fix, closes #999)
 plus sp2ong's #1246 (E290 OTP refresh default) are upstream; their branches and worktrees are removed. No upstream PR of ours is open. Fork-only firmware left: the `dev` AU
 channel, RM1 `upd chan`, `--gateway lab` (2fe7ebd4).
-Next step: TD-22 soak and TD-23 UAT.
+Upstream `dev` is fully merged (nothing to sync, 2026-11-03). Unreleased on `fork-dev`: backlog sweep W0/W1
+(`7e99ad40`, `2c1108e2`) and the open-items campaign. Fork-only firmware still candidate for upstream PRs: the `dev` AU channel,
+RM1 `upd chan`, `--gateway lab`. Next step: operator bench checks (campaign-open-items), TD-22 soak, TD-23 UAT.
 
 This page is the current state only. Dated session entries live in the archive journals (see "Where things
 are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
@@ -238,7 +240,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   **merge** `upstream/dev` (not rebase) to re-sync.
 - All PRs target upstream `dev`; PR text is German and lists files, functions and the why.
   Minimal, targeted changes only. DK5EN never merges upstream himself (the maintainers review and merge).
-- Merged upstream PRs of ours since 4.40a: #1200, #1201, #1207, #1208, #1213, #1214, #1224, #1233, #1235, #1243, #1244, #1245, #1247, #1248, #1249.
+- Merged upstream PRs of ours since 4.40a: #1200, #1201, #1207, #1208, #1213, #1214, #1224, #1233, #1235, #1243, #1244, #1245, #1247, #1248, #1249, #1250, #1251.
 - Nothing temporary remains in `src/` (`389ace0d` reverted 2026-10-15).
 
 ## Last release and flasher policy
