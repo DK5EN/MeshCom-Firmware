@@ -245,7 +245,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Last release and flasher policy
 
-- `v4.40a.10.24` (tag on `c8f0be5b`, CI-built), 66 assets, Latest. Base official `v4.40a.hbserver`.
+- `v4.40a.11.01` (tag on `47f339ad`, CI-built), 68 assets, Latest. Base official `v4.40a.hbserver`.
 - CI builds and publishes since `v4.40a.10.11`: `MeshCom CI` (`.github/workflows/meshcom-ci.yml`) fires on
   `v*` tags (release, Latest) and `ci-proof-*` tags (draft; delete draft and tag afterwards). Recipe:
   `/release-firmware` (includes the T-Beam idle-heap step against `tools/heap_baseline.json`).
@@ -259,9 +259,9 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 - Host: `tools/regression.sh --stage 1,2`. With the bench fleet attached: `--stage all`. The
   `/full-regression` skill wraps it.
-- Stage 1: every `[env:native*]` (77 envs, 2741 Unity cases on 2026-10-23) plus `test/golden/selftest.sh`
+- Stage 1: every `[env:native*]` (88 envs, 3324 Unity cases on 2026-11-02) plus `test/golden/selftest.sh`
   and the nRF52 board link checks.
-- Stage 2: ruff lint gate, pytest over `tools/bench`, `tools/tests`, `tools/mock` (1190 cases on 2026-10-23),
+- Stage 2: ruff lint gate, pytest over `tools/bench`, `tools/tests`, `tools/mock` (1473 cases on 2026-11-01),
   the `test/test_nbrlog` scripts, node tests, the jsdom page tests and the `--self-test` tools.
 - Stage 3: `tools/bench/bench_suite.py` (nodes matched by USB serial, identity guard as the gate,
   `prepare <node>`, per-board harness, OTA with its own image build, web GUI badge, mesh exchange;
@@ -328,6 +328,9 @@ Hard bench rules:
 
 ## Last three sessions
 
+- **2026-11-03:** Upstream check: `upstream/dev` (`4f60051c`) fully merged, no PR of ours open. Docs cleanup
+  (obsolete `389ace0d` note dropped). Backlog sweep W0/W1 (`7e99ad40`, `2c1108e2`) is on `fork-dev`, not released.
+  Branch clean-up (`origin/backup/fork-dev-code-review-*`, `origin/claude/fork-dev-code-review-*`) pending.
 - **2026-11-02:** CHARS-01 waves A and B (national characters on E290 and T-Deck), see Open now. AU web GUI
   button reads "Download" (`c4689942`).
 - **2026-11-01:** 24-h multi-node log analysis: five OE3 gateways, DB0AIS and two HB9 Heltec V3, every claim
@@ -335,6 +338,3 @@ Hard bench rules:
   pipeline `tools/logreport/`. Findings: RAK4631 auto-ping has no count limit (ESP32/RAK difference, decision
   open), own prio-4/5 beacons starve at busy nodes (age floor misses prio 4/5), OE3XIA deaf receiver (bench test
   pending), ACK relays without cancel path. Session review: LOGREP-01.
-- **2026-10-25:** T-Deck heap/WiFi campaign: field RCA reproduced on DK5EN-14 (~250 messages wedge the IP path while
-  WiFi stays associated); TD-20, TD-21/21b and TD-22 fixed and benched; slow LAN ping traced to WiFi modem sleep
-  (WIFI-PS-01, accepted).
