@@ -328,6 +328,8 @@ Hard bench rules:
 
 ## Last three sessions
 
+- **2026-11-04:** Ideas until end of 2027 written up for discussion with OE1KBC and OE1KFR, not decided and not sequenced: [ROADMAP.md](ROADMAP.md),
+  [hardware principles](hardware-guiding-principles.md), [market analysis](market-analysis-meshtastic-meshcore-20261104.md). Backlog rows IDEE-01..20; DEF-GWLINK closed.
 - **2026-11-03:** Upstream check: `upstream/dev` (`4f60051c`) fully merged, no PR of ours open. Docs cleanup
   (obsolete `389ace0d` note dropped). Backlog sweep W0/W1 (`7e99ad40`, `2c1108e2`) is on `fork-dev`, not released.
   Branch clean-up (`origin/backup/fork-dev-code-review-*`, `origin/claude/fork-dev-code-review-*`) pending.
