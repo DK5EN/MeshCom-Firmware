@@ -245,7 +245,11 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Last release and flasher policy
 
-- `v4.40a.11.01` (tag on `47f339ad`, CI-built), 68 assets, Latest. Base official `v4.40a.hbserver`.
+- `v4.40a.11.01` (tag on `47f339ad`, CI-built), 68 assets, Latest.
+- Upstream (icssw-org), checked 2026-11-06: Latest is `v4.40a.10.28` (published 2026-10-28, tag on `10203967`, the #1240
+  merge), 68 assets including 28 `.autoupdate` (zlib, `78 da`, sampled on two), so upstream CI builds them, first in this
+  release. `upstream/dev` is at `4f60051c`, 31 commits after that tag (#1243 to #1251), none released upstream yet.
+  `fork-dev` is 0 commits behind `upstream/dev`.
 - CI builds and publishes since `v4.40a.10.11`: `MeshCom CI` (`.github/workflows/meshcom-ci.yml`) fires on
   `v*` tags (release, Latest) and `ci-proof-*` tags (draft; delete draft and tag afterwards). Recipe:
   `/release-firmware` (includes the T-Beam idle-heap step against `tools/heap_baseline.json`).
