@@ -622,15 +622,19 @@ inline FwAction fwTick(FwTimer &t, const FwPolicyIn &in, bool stagedPending, uin
 // by hand. No update window and no mode requirement (works with auto-update off); a connected phone
 // and a battery below the floor (AU-D17) still hold it back. Safeboot capability and the 8 s reply
 // delay are checked by the caller.
-// Minutes since the last successful check ("upd" ck=), -1 when unknown. lastCheckEpoch and now are
-// both time(): seconds since boot until NTP/GPS set the system clock, an epoch afterwards. A pair from
-// different domains (clock set in between) or a clock that went back is unknown.
+// Value stored as a check/stage timestamp (AU-22): node UTC, 0 while the node clock is not valid.
+inline uint32_t fwNodeStamp(bool clockOk, int64_t utc)
+{
+    return (clockOk && utc > 0) ? (uint32_t)utc : 0u;
+}
+// Minutes since the last successful check ("upd" ck=), -1 when unknown. lastCheckEpoch and now are node UTC
+// (fwNodeStamp), 0 while the node clock is not valid. Unknown: no check yet, the check ran before the clock was
+// set (stored 0), the clock is unset now (0), or the clock went back. A value below the node-clock floor
+// (node_date_year > 2023, i.e. 2024-01-01) is no UTC stamp and counts as unknown.
 inline int32_t fwCheckAgeMin(uint32_t lastCheckEpoch, int64_t now)
 {
-    const int64_t kEpochMin = 1700000000; // below: seconds since boot (system clock not set)
-    if (lastCheckEpoch == 0 || now < (int64_t)lastCheckEpoch)
-        return -1;
-    if (((int64_t)lastCheckEpoch >= kEpochMin) != (now >= kEpochMin))
+    const int64_t kUtcMin = 1704067200; // 2024-01-01T00:00:00Z
+    if ((int64_t)lastCheckEpoch < kUtcMin || now < kUtcMin || now < (int64_t)lastCheckEpoch)
         return -1;
     return (int32_t)((now - (int64_t)lastCheckEpoch) / 60);
 }

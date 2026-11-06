@@ -3702,6 +3702,7 @@ void commandAction(char *umsg_text, bool ble)
             {
                 printfdeb("\nEXTERNAL-IP:%s refused - %s\n", meshcom_settings.node_extern, extudp_target_reason(tv));
                 snprintf(meshcom_settings.node_extern, sizeof(meshcom_settings.node_extern), "%s", "");
+                extudpRequestPeerRefresh();   // EXT-PEER-01: the field is empty now, stop sending to the old peer
                 return;
             }
         }
@@ -3712,6 +3713,8 @@ void commandAction(char *umsg_text, bool ble)
         }
 
         save_settings();
+
+        extudpRequestPeerRefresh();   // EXT-PEER-01: socket task re-resolves apip, see extudp_functions.cpp
 
         bReturn = true;
     }

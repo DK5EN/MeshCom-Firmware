@@ -514,6 +514,7 @@ class CharacteristicCallbacks : public NimBLECharacteristicCallbacks {
 #define CHARACTERISTIC_UUID_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
 static SemaphoreHandle_t s_bleLife = NULL;         // created in esp32setup(); NULL = no guarding (DISABLE_BLE)
+static volatile bool s_bleHeaderDirty = false;     // TD-34: BLE switched by console/other task, loop refreshes the T-Deck icon
 static volatile bool s_bleDown = false;            // BLE stack stopped by esp32BlePause() (or a failed resume)
 static volatile bool s_bleResumeFailed = false;    // the last esp32BleResume() failed; the loop retries
 static volatile bool s_bleGuard = false;           // BLE guard (spec 7): set/cleared by the loop task only; esp32BleResume() refuses while set
@@ -817,6 +818,8 @@ bool esp32BleResume(void)
 // (esp32BleResume() honours it).
 void esp32SetBleEnabled(bool on)
 {
+    // TD-34: the header icon follows node_bleon; the loop repaints it (LVGL is not touched from the caller's task)
+    s_bleHeaderDirty = true;
 #if !defined(DISABLE_BLE)
     if(s_bleLife == NULL || s_bleDown || pServer == NULL)
         return;
@@ -4529,6 +4532,13 @@ void esp32loop()
     #endif
 
     // BLE
+    if(s_bleHeaderDirty)
+    {
+        s_bleHeaderDirty = false;
+        #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+        tdeck_update_header_bt();
+        #endif
+    }
     if (deviceConnected)
     {
     	g_ble_uart_is_connected = true;

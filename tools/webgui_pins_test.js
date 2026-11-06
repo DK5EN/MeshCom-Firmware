@@ -100,7 +100,8 @@ w.fetch = (url, opt) => {
     return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(JSON.parse(JSON.stringify(pinStatus))) });
   }
   if (url.indexOf('/setparam/?') === 0 && setStatus === 401) return Promise.resolve({ ok: false, status: 401, json: () => Promise.reject(new SyntaxError('not json')) });
-  if (url.indexOf('/setparam/?') === 0) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(setReply) });
+  // the node answers 422 with a JSON body for WS_RETURNCODE_FAIL (web_functions.cpp), 200 for OKAY
+  if (url.indexOf('/setparam/?') === 0) return Promise.resolve({ ok: setStatus < 400, status: setStatus, json: () => Promise.resolve(setReply) });
   return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) });
 };
 if (MUT !== 'nohdr') w.eval(wrapper);
@@ -225,6 +226,25 @@ const rows = () => w.document.querySelectorAll('#pn_body tr');
   setReply = { returncode: 0 };
   $('pn_led_steady').click(); await settle();
   check('next success clears the message', $('pn_msg').textContent === '');
+
+  // WEB-PIN-01: the page is STALE. It still shows A2 as an output (level button visible) while the node already has
+  // the pin as an input (changed from the console or another browser, no poll in between). The node answers the
+  // mcpoutA2 request with HTTP 422 and returncode 1 (web_functions.cpp: WS_RETURNCODE_FAIL -> 422). The page says so,
+  // re-reads the true state at once and then shows A2 as an input without a level button.
+  pinStatus.mcp.pins[2].d = 'out'; pinStatus.mcp.pins[2].l = 0;
+  runTimers(5000); await settle();
+  check('stale-page setup: A2 shows as output with a level button', !rows()[2].querySelectorAll('button')[2].hidden && rows()[2].querySelectorAll('button')[1].textContent === 'out');
+  pinStatus.mcp.pins[2].d = 'in';          // the node changes behind the page's back: NO poll here
+  setStatus = 422; setReply = { returncode: 1, returnValue: 'on' };
+  n = calls.length;
+  rows()[2].querySelectorAll('button')[2].click(); await settle();
+  check('mcpout on a stale output row sends mcpoutA2=on', calls[n] && calls[n].url === '/setparam/?mcpoutA2=on' && calls[n].xmc === '1', JSON.stringify(calls[n]));
+  check('mcpout refused (HTTP 422, pin is an input now): message shown', /refused/.test($('pn_msg').textContent), $('pn_msg').textContent);
+  check('mcpout refused: true state re-read at once (no timer needed)', calls.slice(n + 1).some((x) => x.url === '/pinstatus'));
+  check('mcpout refused: A2 now an input, level button hidden', rows()[2].querySelectorAll('button')[2].hidden && rows()[2].querySelectorAll('button')[1].textContent === 'in');
+  setStatus = 200; setReply = { returncode: 0 };
+  pinStatus.mcp.pins[2].d = 'out';
+  runTimers(5000); await settle();
 
   // busy pad: buttons off, text says why; RM hold shown
   pinStatus.led = { fitted: 1, mode: 'steady', busy: 1, rm: 'flash', state: 'off' };

@@ -158,7 +158,7 @@ struct FwNetStatus
     char stagedTag[24];    // tag of the valid FWS2 record, "" if none
     bool staged;           // a valid FWS2 record exists in NVS
     char lastErr[48];      // short reason of the last failed job, "" otherwise
-    uint32_t lastCheckEpoch; // time() at the last successful CHECK, 0 if none this boot
+    uint32_t lastCheckEpoch; // node UTC at the last successful CHECK, 0 if none this boot or the node clock was not valid
     uint32_t bytesDone;    // DOWNLOAD / STAGELAN progress (compressed bytes written); reset to 0 when a
                            // job starts and NOT cleared at its end (it then equals progLen on success). Only
                            // meaningful together with state == FWS_BUSY and job DOWNLOAD / STAGELAN: the
@@ -188,6 +188,10 @@ bool fwNetStartLan(const char *url, uint32_t ilen, const char *tag);
 // boot partition, clears the loop breadcrumb and restarts. Returns false (and does not
 // restart) if there is no Safeboot partition; it does not return on success.
 bool auRebootToSafeboot(void);
+
+// Node time (node_date_*) as a UTC instant; ok = false (and 0) while no GPS/RTC/NTP has set the node clock.
+// The libc clock is never set on this firmware, so time() must not be used for wall-clock stamps.
+int64_t fwNetNodeUtc(bool &ok);
 
 // Thread-safe snapshot (portMUX). Never blocks on the network.
 void fwNetGetStatus(FwNetStatus &out);

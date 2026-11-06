@@ -814,6 +814,21 @@ void test_schedule_reads_the_node_clock_not_the_libc_clock(void)
     TEST_ASSERT_TRUE_MESSAGE(cand != std::string::npos && tz != std::string::npos && cand < tz, "tzParse runs before the candidate check");
 }
 
+void test_no_libc_clock_anywhere_in_the_au_net_files(void)
+{
+    // The section scan above covers the schedule only. The same trap (time(nullptr) is seconds since boot, the libc
+    // clock is never set) must not creep into the rest of the auto-update and remote-management code either.
+    const char *files[] = {"src/esp32/fw_update_net.cpp", "src/esp32/rm_au_esp32.cpp"};
+    const char *clocks[] = {"time(nullptr)", "time(NULL)", "time(0)", "time(&"};
+    for (size_t f = 0; f < sizeof(files) / sizeof(files[0]); f++)
+    {
+        const std::string src = readRepoFile(files[f]);
+        TEST_ASSERT_TRUE_MESSAGE(src.size() > 1000, files[f]);   // really read, not an empty stub
+        for (size_t i = 0; i < sizeof(clocks) / sizeof(clocks[0]); i++)
+            TEST_ASSERT_TRUE_MESSAGE(src.find(clocks[i]) == std::string::npos, (std::string(files[f]) + ": " + clocks[i]).c_str());
+    }
+}
+
 void test_console_verbs_have_their_own_errors_and_help(void)
 {
     const std::string c = readRepoFile("src/command_functions.cpp");
@@ -879,6 +894,7 @@ int main(int, char **)
     RUN_TEST(test_auto_install_guard_still_in_place);
     RUN_TEST(test_schedule_module_cannot_start_an_install);
     RUN_TEST(test_schedule_reads_the_node_clock_not_the_libc_clock);
+    RUN_TEST(test_no_libc_clock_anywhere_in_the_au_net_files);
     RUN_TEST(test_console_verbs_have_their_own_errors_and_help);
     return UNITY_END();
 }

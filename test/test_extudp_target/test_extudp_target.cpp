@@ -6,6 +6,8 @@
 #include <unity.h>
 
 #include <extudp_target.h>
+#include <extudp_refresh.h>
+#include <mcpout_refusal.h>
 
 void setUp(void)    {}
 void tearDown(void) {}
@@ -73,6 +75,59 @@ static void test_parser_is_strict(void)
     TEST_ASSERT_FALSE(extudp_parse_ipv4("mcapp.local", v));
 }
 
+// extudp_refresh_decide(requested, bEXTUDP, socketOpen, mayOpenHere)
+//   mayOpenHere: this platform opens the socket from the refresh itself (nRF52 with Ethernet up, where the only
+//   other restart is the 15-minute web timer); ESP32 restarts every pass and passes false.
+static void test_peer_refresh_decision(void)
+{
+    // nothing requested: nothing happens, whatever the state
+    for(int on = 0; on < 2; on++)
+        for(int open = 0; open < 2; open++)
+            for(int here = 0; here < 2; here++)
+                TEST_ASSERT_EQUAL(EXTUDP_REFRESH_NONE, extudp_refresh_decide(false, on, open, here));
+    // socket open: reset (re-resolve apip)
+    TEST_ASSERT_EQUAL(EXTUDP_REFRESH_RESET, extudp_refresh_decide(true, true, true, false));
+    TEST_ASSERT_EQUAL(EXTUDP_REFRESH_RESET, extudp_refresh_decide(true, true, true, true));
+    // EXTUDP off: never reach the socket code, drop the request (also an open socket cannot exist then)
+    TEST_ASSERT_EQUAL(EXTUDP_REFRESH_DROP, extudp_refresh_decide(true, false, true,  true));
+    TEST_ASSERT_EQUAL(EXTUDP_REFRESH_DROP, extudp_refresh_decide(true, false, false, true));
+    TEST_ASSERT_EQUAL(EXTUDP_REFRESH_DROP, extudp_refresh_decide(true, false, false, false));
+}
+
+// RAK outage: --extudpip <refused>|none closed the socket, the next valid --extudpip must open it now, not at the
+// next 15-minute web tick. Only where the platform may do so (Ethernet up, N-20: never on an uninitialised W5100S).
+static void test_peer_refresh_opens_a_closed_socket_where_allowed(void)
+{
+    TEST_ASSERT_EQUAL(EXTUDP_REFRESH_START, extudp_refresh_decide(true, true, false, true));
+    // Ethernet not up (or ESP32, which restarts itself every pass): forget it, never touch the socket
+    TEST_ASSERT_EQUAL(EXTUDP_REFRESH_DROP,  extudp_refresh_decide(true, true, false, false));
+}
+
+// WEB-PIN-01 (web GUI mcpout<P>): validate the port first, refuse an input pin
+// without running --setout. io bit set == OUTPUT (command_functions.cpp --setout).
+static void test_mcpout_refusal(void)
+{
+    uint16_t bm = 0;
+    TEST_ASSERT_EQUAL(MCPOUT_PORT_OK, mcpout_check_port("A0", 0x0001, bm));
+    TEST_ASSERT_EQUAL_HEX16(0x0001, bm);
+    TEST_ASSERT_EQUAL(MCPOUT_PORT_OK, mcpout_check_port("B7", 0x8000, bm));
+    TEST_ASSERT_EQUAL_HEX16(0x8000, bm);
+    TEST_ASSERT_EQUAL(MCPOUT_PORT_OK, mcpout_check_port("B0", 0x0100, bm));
+    TEST_ASSERT_EQUAL_HEX16(0x0100, bm);
+    // pin configured as input: refused
+    TEST_ASSERT_EQUAL(MCPOUT_PORT_IS_INPUT, mcpout_check_port("A0", 0x0000, bm));
+    TEST_ASSERT_EQUAL(MCPOUT_PORT_IS_INPUT, mcpout_check_port("A3", 0xFFF7, bm));
+    TEST_ASSERT_EQUAL(MCPOUT_PORT_IS_INPUT, mcpout_check_port("B2", 0x00FF, bm));
+    // a neighbouring output bit does not count
+    TEST_ASSERT_EQUAL(MCPOUT_PORT_IS_INPUT, mcpout_check_port("A1", 0x0001, bm));
+    // malformed ports are invalid, never input/output
+    TEST_ASSERT_EQUAL(MCPOUT_PORT_INVALID, mcpout_check_port("A8", 0xFFFF, bm));
+    TEST_ASSERT_EQUAL(MCPOUT_PORT_INVALID, mcpout_check_port("C0", 0xFFFF, bm));
+    TEST_ASSERT_EQUAL(MCPOUT_PORT_INVALID, mcpout_check_port("A", 0xFFFF, bm));
+    TEST_ASSERT_EQUAL(MCPOUT_PORT_INVALID, mcpout_check_port("A00", 0xFFFF, bm));
+    TEST_ASSERT_EQUAL(MCPOUT_PORT_INVALID, mcpout_check_port("", 0xFFFF, bm));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -83,5 +138,8 @@ int main(int, char **)
     RUN_TEST(test_ordinary_hosts_and_hostnames_pass);
     RUN_TEST(test_unusable_mask_skips_the_directed_rule_only);
     RUN_TEST(test_parser_is_strict);
+    RUN_TEST(test_peer_refresh_decision);
+    RUN_TEST(test_peer_refresh_opens_a_closed_socket_where_allowed);
+    RUN_TEST(test_mcpout_refusal);
     return UNITY_END();
 }

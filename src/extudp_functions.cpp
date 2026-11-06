@@ -1,4 +1,5 @@
 #include <extudp_target.h>
+#include <extudp_refresh.h>
 #include "mc_text.h"
 #include <Arduino.h>
 #include <atomic>
@@ -48,6 +49,7 @@
 #elif !defined(EXT_NO_SOCKET)
   #include <RAK13800_W5100S.h> // Click to install library: http://librarymanager/All#RAK13800_W5100S
   #include <nrf52/nrf_eth.h>
+  extern NrfETH neth;   // nrf52_main.cpp; EXT-PEER-01 reads neth.hasIPaddress
 #endif
 #endif // !NATIVE_BUILD
 
@@ -119,7 +121,7 @@ static int externQueueWrite = 0;
 // 5 s), so the extern host is asked via lwIP directly and the result arrives
 // by callback; startExternUDP() is called every pass and polls the state.
 // Own instance, not the gateway server's s_dnsSrv in udp_functions.cpp.
-// nRF52 has no resolver and keeps its behaviour (see startExternUDP).
+// nRF52 has no resolver: a hostname peer does not start the socket there (see startExternUDP).
 static struct
 {
   char name[64];
@@ -229,6 +231,11 @@ void startExternUDP()
   if(hasExternIPaddress)
     return;
 
+  // EXT-PEER-01: an empty field ("--extudpip none", or a refused target that was blanked) is no peer: no DNS lookup,
+  // no socket, no latch. Same threshold as the send path and resetExternUDP().
+  if((int)strlen(meshcom_settings.node_extern) <= 7)
+    return;
+
   #ifdef BOARD_T_ETH_ELITE
   extern_node_ip = ETH.localIP();
   #elif defined(ESP32)
@@ -267,9 +274,8 @@ void startExternUDP()
   // so a node that genuinely has no socket left does not flood the console.
   // QA-STAB-01: the hostname lookup runs before begin(), so a pending or
   // failed lookup returns cheaply instead of re-opening the socket each pass.
-  // A literal IP needs no lookup (path below); nRF52 has no resolver and
-  // keeps its behaviour (returning there would keep a hostname node from
-  // ever starting its socket).
+  // A literal IP needs no lookup (path below); nRF52 has no resolver, so a
+  // hostname peer is refused there at the address parse below (EXT-PEER-01).
   #if defined(ESP32)
   bool extByName = false;
   if(WiFi.isConnected())
@@ -303,7 +309,16 @@ void startExternUDP()
   #if defined(ESP32)
   if(!WiFi.isConnected())
   {
-    Serial.println("[EXT] no WiFI connection open");
+    // reached on every pass while the link is down (also after a peer refresh): say it every 30 s only
+    static uint32_t last_nowifi_log = 0;
+    static bool first_nowifi = true;
+    uint32_t now = millis();
+    if(first_nowifi || (uint32_t)(now - last_nowifi_log) > 30000)
+    {
+      Serial.println("[EXT] no WiFI connection open");
+      last_nowifi_log = now;
+      first_nowifi = false;
+    }
     return;
   }
 
@@ -322,7 +337,20 @@ void startExternUDP()
   {
     str_ip = meshcom_settings.node_extern;
 
-    apip.fromString(str_ip);
+    // EXT-PEER-01: the result used to be ignored. A name that is no dotted quad (RAK has no resolver:
+    // "mcapp.local" passes the target check) left apip on the OLD peer and latched, so the node logged
+    // "now sending to IP <name>" and sent to the previous host. Do not latch; said once per target.
+    if(!apip.fromString(str_ip))
+    {
+      static String s_unparsed;
+      if(s_unparsed != str_ip)
+      {
+        s_unparsed = str_ip;
+        Serial.printf("[EXT] target %s is not an IP address and cannot be resolved here -- set --extudpip to a dotted IP\n", str_ip.c_str());
+      }
+      UdpExtern.stop();   // no latch means no RESET later: do not hold a W5100S socket without a reader
+      return;   // hasExternIPaddress stays false
+    }
 
     Serial.printf("[EXT] to IP:%s\n", str_ip.c_str());
   }
@@ -560,8 +588,28 @@ void getExtern(unsigned char incoming[], int len)
 // build tests, guarded out with the socket it depends on.
 #ifndef NATIVE_BUILD
 #if !defined(EXT_NO_SOCKET)
+// EXT-PEER-01: set from the command/web task, consumed by getExternUDP() (the socket's only user).
+static std::atomic<bool> s_peerRefresh{false};
+
+void extudpRequestPeerRefresh()
+{
+  s_peerRefresh.store(true);
+}
+
 void getExternUDP()
 {
+  // EXT-PEER-01: consumed (cleared) on every pass. This function only runs while EXTUDP is on (callers gate
+  // on bEXTUDP), so a request made while it is off stays set until it is switched on; the first pass then drops
+  // or acts on it, and startExternUDP() reads node_extern fresh, so the leftover is harmless.
+  // mayOpenHere: nRF52 only, and only with Ethernet up -- never socket code on an uninitialised W5100S (N-20).
+  // ESP32 restarts the socket every pass (esp32_main.cpp) and never needs START.
+  #if defined(ESP32) || defined(BOARD_T_ETH_ELITE)
+  const bool mayOpenHere = false;
+  #else
+  const bool mayOpenHere = neth.hasIPaddress;
+  #endif
+  ExtudpRefreshAction refresh = extudp_refresh_decide(s_peerRefresh.exchange(false), bEXTUDP, hasExternIPaddress, mayOpenHere);
+
   #ifdef ESP32
     if(bWIFIAP)
       return;
@@ -570,8 +618,21 @@ void getExternUDP()
   if(!bEXTUDP)
     return;
 
+  // START: socket closed by "--extudpip none" / a refused target; open it now instead of at the 15-minute web tick
+  if(refresh == EXTUDP_REFRESH_START)
+  {
+    startExternUDP();
+    return;
+  }
+
   if(!hasExternIPaddress)
     return;
+
+  if(refresh == EXTUDP_REFRESH_RESET)
+  {
+    resetExternUDP();   // closes the socket; reopens (new apip) when EXTUDP is on and node_extern is a peer
+    return;
+  }
 
   extRegTick();
 
@@ -657,6 +718,10 @@ void getExternUDP()
 }
 #else
 void getExternUDP()
+{
+}
+
+void extudpRequestPeerRefresh()
 {
 }
 #endif // EXT_NO_SOCKET

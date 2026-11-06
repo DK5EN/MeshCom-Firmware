@@ -281,3 +281,5 @@ GET /pinstatus
 	Cached state only, no I2C access in the request: an output level is the commanded one (the chip is written from it),
 	an input level is the last sample of the 5 s refresh. The Pins page polls it every 5 s while it is shown and
 	switches through /setparam/ (boardled=off|flash|steady, mcpout<P>=on|off, mcpio<P>=in|out, mcpname<P>=text).
+	mcpout<P> on a pin that is configured as input (or an invalid port) answers returncode 1 and changes nothing; the Pins page shows
+	"The node refused the change." and re-reads the state.

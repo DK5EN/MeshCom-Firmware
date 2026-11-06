@@ -250,4 +250,4 @@ Rules:
 - Values are not filtered: free text such as `ATXT`, `NAME`, `PARM` and the WiFi `SSID` is sent as
   stored.
 
-The reply goes to the peer resolved when EXTUDP started. After `--extudpip`, switch EXTUDP off and on, or replies keep going to the old address.
+The reply goes to the configured peer. `--extudpip` takes effect at once, without switching EXTUDP off and on. On a RAK the peer must be a dotted IP address: it has no resolver, so a hostname leaves the socket closed and the serial console says why.

@@ -428,6 +428,136 @@ static void test_wiring_reg_out_log_is_debug_only(void)
     TEST_ASSERT_EQUAL_INT(2, n);
 }
 
+// ---- EXT-PEER-01 and the wave's other cross-file wiring (not compiled on the host, pinned in the source text) ----
+
+static size_t find_after(const std::string &s, const char *needle, size_t from, const char *msg)
+{
+    const size_t p = s.find(needle, from);
+    TEST_ASSERT_TRUE_MESSAGE(p != std::string::npos, msg);
+    return p;
+}
+
+// getExternUDP() is the only task that touches the socket: it consumes the flag on every pass, before any early return,
+// and acts on the decision. Callers gate on bEXTUDP, so a request made while EXTUDP is off waits for the first pass after
+// it is switched on, which is harmless (extudp_refresh.h).
+static void test_wiring_get_extern_udp_consumes_the_peer_refresh_flag(void)
+{
+    const std::string src = read_repo_file("src/extudp_functions.cpp");
+    const size_t flag = find_after(src, "static std::atomic<bool> s_peerRefresh", 0, "s_peerRefresh flag is gone");
+    const std::string tail = src.substr(flag);
+    const std::string body = function_body(tail, "void getExternUDP()\n{");
+    const size_t dec = find_after(body, "extudp_refresh_decide(s_peerRefresh.exchange(false)", 0, "the flag is not consumed in the decision call");
+    const size_t ex = dec;
+    const size_t firstReturn = find_after(body, "return;", 0, "getExternUDP() has no return");
+    TEST_ASSERT_TRUE_MESSAGE(ex < firstReturn, "the flag must be consumed before the first early return");
+    // RESET -> resetExternUDP(), START -> startExternUDP(), each right under its own test
+    const size_t rst = find_after(body, "refresh == EXTUDP_REFRESH_RESET", 0, "no RESET branch");
+    const size_t rstCall = find_after(body, "resetExternUDP();", rst, "RESET does not call resetExternUDP()");
+    TEST_ASSERT_TRUE_MESSAGE(rstCall - rst < 80, "resetExternUDP() is not under the RESET test");
+    const size_t st = find_after(body, "refresh == EXTUDP_REFRESH_START", 0, "no START branch");
+    const size_t stCall = find_after(body, "startExternUDP();", st, "START does not call startExternUDP()");
+    TEST_ASSERT_TRUE_MESSAGE(stCall - st < 80, "startExternUDP() is not under the START test");
+    // the only place the platform allows opening: nRF52 with Ethernet up (never on an uninitialised W5100S, N-20)
+    const size_t gate = find_after(body, "const bool mayOpenHere = neth.hasIPaddress;", 0, "the nRF52 open gate (neth.hasIPaddress) is missing");
+    find_after(body, "bEXTUDP, hasExternIPaddress, mayOpenHere);", dec, "the decision does not use the Ethernet gate");
+    TEST_ASSERT_TRUE_MESSAGE(gate < dec, "the Ethernet gate must be evaluated before the decision");
+}
+
+// Both hooks sit inside the extudpip branch: one before the refusal return (the field is emptied there), one
+// after save_settings() on the accepted path.
+static void test_wiring_extudpip_requests_a_peer_refresh_on_both_paths(void)
+{
+    const std::string src = read_repo_file("src/command_functions.cpp");
+    const size_t a = find_after(src, "commandCheck(msg_text+2, (char*)\"extudpip\") == 0", 0, "extudpip branch not found");
+    const size_t b = find_after(src, "\n    else\n    if(commandCheck(", a, "end of the extudpip branch not found");
+    const std::string br = src.substr(a, b - a);
+    const char *hook = "extudpRequestPeerRefresh();";
+    size_t n = 0, pos = 0;
+    while ((pos = br.find(hook, pos)) != std::string::npos) { n++; pos += 5; }
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)n, "expected exactly two refresh hooks in the extudpip branch");
+    // and none anywhere else in the file
+    size_t all = 0; pos = 0;
+    while ((pos = src.find(hook, pos)) != std::string::npos) { all++; pos += 5; }
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, (int)all, "a refresh hook outside the extudpip branch");
+    const size_t refuse = find_after(br, "extudp_target_reason(tv)", 0, "refusal path not found");
+    const size_t refuseRet = find_after(br, "return;", refuse, "refusal path has no return");
+    const size_t h1 = find_after(br, hook, refuse, "no hook on the refusal path");
+    TEST_ASSERT_TRUE_MESSAGE(h1 < refuseRet, "the refusal hook must come before the refusal return");
+    const size_t save = find_after(br, "save_settings();", refuseRet, "accepted path has no save_settings()");
+    const size_t h2 = find_after(br, hook, save, "no hook after save_settings()");
+    TEST_ASSERT_TRUE_MESSAGE(h2 > save && h2 > h1, "the second hook must follow save_settings()");
+}
+
+// startExternUDP(): an empty node_extern (after "--extudpip none" or a refusal) must not reach DNS, begin() or the
+// latch. Same threshold as the send path and resetExternUDP().
+static void test_wiring_start_extern_udp_has_the_empty_field_gate(void)
+{
+    const std::string src = read_repo_file("src/extudp_functions.cpp");
+    const std::string body = function_body(src, "void startExternUDP()\n{");
+    const size_t latch = find_after(body, "if(hasExternIPaddress)", 0, "startExternUDP() lost its latched check");
+    const size_t gate = find_after(body, "if((int)strlen(meshcom_settings.node_extern) <= 7)", latch, "no empty-field gate after the latch check");
+    const size_t ret = find_after(body, "return;", gate, "empty-field gate does not return");
+    TEST_ASSERT_TRUE_MESSAGE(ret - gate < 80, "empty-field gate does not return directly");
+    TEST_ASSERT_TRUE_MESSAGE(gate < find_after(body, "extDnsResolve(", 0, "no DNS call"), "gate must precede the DNS lookup");
+    TEST_ASSERT_TRUE_MESSAGE(gate < find_after(body, "UdpExtern.begin(", 0, "no begin()"), "gate must precede begin()");
+    TEST_ASSERT_TRUE_MESSAGE(gate < find_after(body, "hasExternIPaddress=true;", 0, "no latch"), "gate must precede the latch");
+}
+
+// startExternUDP(): a literal-IP parse failure (RAK: "mcapp.local" passes the target check) must not latch with
+// apip still on the old peer.
+static void test_wiring_start_extern_udp_checks_the_literal_ip_parse(void)
+{
+    const std::string src = read_repo_file("src/extudp_functions.cpp");
+    const std::string body = function_body(src, "void startExternUDP()\n{");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("\n    apip.fromString(str_ip);") == std::string::npos, "apip.fromString() result is ignored again");
+    const size_t parse = find_after(body, "if(!apip.fromString(str_ip))", 0, "apip.fromString() result is not tested");
+    const size_t ret = find_after(body, "return;", parse, "parse failure does not return");
+    const size_t stop = find_after(body, "UdpExtern.stop();", parse, "a failed parse keeps the socket bound");
+    TEST_ASSERT_TRUE_MESSAGE(stop < ret, "UdpExtern.stop() must come before the return of the parse failure");
+    const size_t latch = find_after(body, "hasExternIPaddress=true;", 0, "no latch");
+    TEST_ASSERT_TRUE_MESSAGE(ret < latch, "a failed parse must return before the latch");
+    TEST_ASSERT_TRUE_MESSAGE(ret - parse < 500, "the parse failure block is too long to be a plain return");
+}
+
+// The "no WiFI connection" line is reached on every pass while the link is down: rate-limited.
+static void test_wiring_no_wifi_log_is_rate_limited(void)
+{
+    const std::string src = read_repo_file("src/extudp_functions.cpp");
+    const std::string body = function_body(src, "void startExternUDP()\n{");
+    const size_t msg = find_after(body, "[EXT] no WiFI connection open", 0, "no-WiFi message is gone");
+    TEST_ASSERT_TRUE_MESSAGE(body.rfind("30000", msg) != std::string::npos && msg - body.rfind("30000", msg) < 300,
+                             "the no-WiFi message is not under a 30 s limiter");
+}
+
+// WEB-PIN-01: the web handler validates the port (and refuses an input pin) before --setout runs.
+static void test_wiring_web_mcpout_checks_the_port_before_the_command(void)
+{
+    const std::string src = read_repo_file("src/web_functions/web_setup.cpp");
+    const size_t a = find_after(src, "equals(\"mcpout\")", 0, "mcpout branch not found");
+    const size_t b = find_after(src, "equals(\"mcpname\")", a, "end of the mcpout branch not found");
+    const std::string br = src.substr(a, b - a);
+    const size_t chk = find_after(br, "mcpout_check_port(", 0, "mcpout_check_port() is not called");
+    const size_t cmd = find_after(br, "commandAction(", 0, "mcpout does not run the command");
+    TEST_ASSERT_TRUE_MESSAGE(chk < cmd, "mcpout_check_port() must come before commandAction()");
+    const size_t fail = find_after(br, "WS_RETURNCODE_FAIL", chk, "no FAIL answer after the check");
+    TEST_ASSERT_TRUE_MESSAGE(fail < cmd, "the refusal must be answered before commandAction()");
+}
+
+// TD-34: switching BLE from the console sets a dirty flag; the loop (the only task that may touch LVGL) repaints.
+static void test_wiring_ble_header_repaint_goes_through_the_loop(void)
+{
+    const std::string src = read_repo_file("src/esp32/esp32_main.cpp");
+    const std::string setter = function_body(src, "void esp32SetBleEnabled(bool on)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(setter.find("s_bleHeaderDirty = true;") != std::string::npos, "esp32SetBleEnabled() does not set the dirty flag");
+    TEST_ASSERT_TRUE_MESSAGE(setter.find("tdeck_update_header_bt") == std::string::npos, "esp32SetBleEnabled() must not call LVGL itself");
+    const std::string loop = function_body(src, "void esp32loop()\n{");
+    const size_t c = find_after(loop, "if(s_bleHeaderDirty)", 0, "esp32loop() does not consume the flag");
+    const std::string blk = loop.substr(c, 260);
+    const size_t clr = find_after(blk, "s_bleHeaderDirty = false;", 0, "the flag is not cleared in the loop");
+    const size_t upd = find_after(blk, "tdeck_update_header_bt();", clr, "the loop does not repaint the header next to the flag");
+    TEST_ASSERT_TRUE(clr < upd);
+}
+
 static void test_error_and_done_json(void)
 {
     char b[64];
@@ -484,6 +614,13 @@ int main(int, char **)
     RUN_TEST(test_paused_run_stalls_after_24_8_days_unless_reset);
     RUN_TEST(test_wiring_reset_extudp_clears_the_register_state);
     RUN_TEST(test_wiring_reg_out_log_is_debug_only);
+    RUN_TEST(test_wiring_get_extern_udp_consumes_the_peer_refresh_flag);
+    RUN_TEST(test_wiring_extudpip_requests_a_peer_refresh_on_both_paths);
+    RUN_TEST(test_wiring_start_extern_udp_has_the_empty_field_gate);
+    RUN_TEST(test_wiring_start_extern_udp_checks_the_literal_ip_parse);
+    RUN_TEST(test_wiring_no_wifi_log_is_rate_limited);
+    RUN_TEST(test_wiring_web_mcpout_checks_the_port_before_the_command);
+    RUN_TEST(test_wiring_ble_header_repaint_goes_through_the_loop);
     RUN_TEST(test_error_and_done_json);
     RUN_TEST(test_limiter);
     return UNITY_END();

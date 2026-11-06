@@ -1356,12 +1356,17 @@ static void test_safeboot_why_dio_wins_over_old(void)
 
 static void test_check_age_min(void)
 {
-    // the clock domain of time(): an epoch once NTP/GPS set the system clock, seconds since boot before
-    TEST_ASSERT_EQUAL_INT32(-1, fwCheckAgeMin(0u, 5000));                     // no check this boot
-    TEST_ASSERT_EQUAL_INT32(2, fwCheckAgeMin(100u, 100 + 150));               // unset clock: uptime seconds
-    TEST_ASSERT_EQUAL_INT32(37, fwCheckAgeMin(1792260000u, 1792260000 + 37 * 60 + 59)); // set clock
-    TEST_ASSERT_EQUAL_INT32(-1, fwCheckAgeMin(100u, 1792260000));            // clock set after the check
-    TEST_ASSERT_EQUAL_INT32(-1, fwCheckAgeMin(1792260000u, 1792250000));     // clock went back
+    // AU-22: both stamps are node UTC (node_date_*), 0 while the node clock is not valid; never uptime seconds
+    TEST_ASSERT_EQUAL_INT32(-1, fwCheckAgeMin(0u, 1792260000));               // no check / check before the clock was set
+    TEST_ASSERT_EQUAL_INT32(-1, fwCheckAgeMin(100u + 0u, 100 + 150));         // old uptime-seconds pair is no longer valid
+    TEST_ASSERT_EQUAL_INT32(-1, fwCheckAgeMin(1792260000u, 0));               // clock unset now
+    TEST_ASSERT_EQUAL_INT32(37, fwCheckAgeMin(1792260000u, 1792260000 + 37 * 60 + 59)); // both valid
+    TEST_ASSERT_EQUAL_INT32(-1, fwCheckAgeMin(1792260000u, 1792250000));      // clock went back
+    // stamp stored by CHECK / STAGE: the node UTC, 0 when the clock is invalid
+    TEST_ASSERT_EQUAL_UINT32(0u, fwNodeStamp(false, 1792260000));
+    TEST_ASSERT_EQUAL_UINT32(0u, fwNodeStamp(true, 0));
+    TEST_ASSERT_EQUAL_UINT32(0u, fwNodeStamp(true, -5));
+    TEST_ASSERT_EQUAL_UINT32(1792260000u, fwNodeStamp(true, 1792260000));
 }
 
 static void test_go_decide_notready_low_battery(void)

@@ -16,6 +16,9 @@ void queueExtern(char *src_type, uint8_t buffer[264], uint16_t buflen, int16_t r
 void flushExternQueue();
 void sendExternHeartbeat();
 void resetExternUDP();
+// EXT-PEER-01: --extudpip (command path, web setparam goes through it) changed node_extern. Any task may call this;
+// getExternUDP() re-resolves the peer (resetExternUDP()) when the socket is open. No-op stub on EXT_NO_SOCKET builds.
+void extudpRequestPeerRefresh();
 
 // EXTUDP register query (src/ext_reg.h, docs/ext_udp_telemetry.md): getExtern()
 // hands {"type":"reg","q":...} to extRegQuery(); extRegTick() (called from

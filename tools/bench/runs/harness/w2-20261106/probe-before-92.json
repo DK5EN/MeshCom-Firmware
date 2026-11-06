@@ -1,0 +1,15 @@
+{
+ "host": "192.168.68.71",
+ "call": "DK5EN-92",
+ "info_ext_before": [
+  "...EXTUDP off ...EXT IP  ...NOPMOTHER off"
+ ],
+ "orig": {
+  "peer": "",
+  "extudp": "off"
+ },
+ "A_control_peer_me_after_toggle": true,
+ "B_cmd_me_to_other_reply_at_me": true,
+ "C_control_peer_other_after_toggle": false,
+ "D_cmd_other_to_me_reply_at_me": false
+}

@@ -1,0 +1,6 @@
+START ['...EXTUDP off ...EXT IP  ...NOPMOTHER off', '...Webserver  on / Webpwd <> / Gateway on', '...IP address   : 192.168.68.66', '...EXTUDP off ...EXT IP  ...NOPMOTHER off', '...Webserver  on / Webpwd <> / Gateway on', '...IP address   : 192.168.68.66']
+BOOT_NOETH ['...EXTUDP off ...EXT IP  ...NOPMOTHER off', '...Webserver  off / Webpwd <> / Gateway off']
+EXT lines []
+ALIVE_AFTER_REFRESH ['...EXTUDP on ...EXT IP 192.168.68.73 ...NOPMOTHER off', '...Webserver  off / Webpwd <> / Gateway off']
+info took 5.6
+RESTORED ['...EXTUDP off ...EXT IP  ...NOPMOTHER off', '...Webserver  on / Webpwd <> / Gateway on', '...IP address   : 192.168.68.66']

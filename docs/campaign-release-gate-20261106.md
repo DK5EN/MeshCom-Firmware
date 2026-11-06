@@ -10,6 +10,9 @@ Resume point. Everything still needed before the next release. Predecessor: `doc
 - Push of `fork-dev` and a `ci-proof-*` draft build are approved for W4.
 - Soak: 1 h on CI images, heap compared with `v4.40a.11.01`.
 - `CHARS-02` closed as accepted, no Latin-2 font.
+- `AU-22`: `ck=` may read -1 when a check ran before the node clock was set.
+- `TD-34`: one brief to find the `--disptest` cause; otherwise it stays in the backlog, out of this release (INSTRUMENT only).
+- Bench setup changed: DK5EN-14 is on the bench for the Safeboot update; DK5EN-1 is reachable over WiFi only.
 
 ## Starting evidence for the heap
 
@@ -24,7 +27,7 @@ pass. Reproduce on a non-INSTRUMENT image first.
 | ---- | --------------------------------------------------------------------------------------- | ------------------------ | ------ |
 | W0   | Heap root cause on DK5EN-92: idle curves 11.01 against HEAD, with and without a browser | orchestrator, bench      | done   |
 | W1   | Heap fix: idle flat within 1 KB over 30 min, 10 of 10 "Check now" with a browser open   | orchestrator, advisor    | done   |
-| W2   | AU-22, EXT-PEER-01, WEB-PIN-01, TD-34, each with a regression test                      | 3 implementers, advisor  | open   |
+| W2   | AU-22, EXT-PEER-01, WEB-PIN-01, TD-34, each with a regression test                      | 3 implementers, advisor  | done   |
 | W3   | RX-TX-02: sender frame counts against the tool count, to TEST at 2 dBm or less          | orchestrator, bench      | open   |
 | W4   | Push, `ci-proof-*` draft build, CI images on the four bench nodes                       | orchestrator             | open   |
 | W5   | Chrome GUI pass (RAK, T-Deck, T-Beam, Setup grid), Safeboot `/ota`, manipulated         | orchestrator, serialized | open   |
@@ -36,21 +39,19 @@ need the RM password file.
 
 ## Next
 
-W2. Create `piolock.sh` in the session scratchpad first (mkdir lock, see the `pio-lock-script-for-waves` memory); every `pio` call in a
-brief goes through it. Code points: AU-22 `src/esp32/fw_update_net.cpp` near `time(nullptr)` (use the node date fields, as
-`src/fw_schedule.h` does); EXT-PEER-01 `--extudpip` at `src/command_functions.cpp:3678`, deferred refresh in `getExternUDP()` behind a
-flag, no direct `resetExternUDP()` on a RAK; WEB-PIN-01 `mcpout` at `src/web_functions/web_setup.cpp:662`; TD-34 `--ble off` at
-`src/command_functions.cpp:6385`, `--disptest` at `:6917`. Bench state: DK5EN-92 runs a local release build of the AU-23 fix, the
-others INSTRUMENT builds of `e7a6fbeb`; addresses move, sweep the start pages (92 `.71`, 14 `.68`, 90 `.66`, 1 `.73` on 11-06).
+W3, RX-TX-02: `--loratx` 60 frames at 3 s finished 46 and 40 of 60 and the tool matched 28 and 22 ids. Compare sender queue against tool
+count, to TEST at 2 dBm or less. Bench state: DK5EN-92 (`.71`), DK5EN-14 (`.68`) and DK5EN-90 (`.66`) run local release builds of the W2
+tree; DK5EN-1 (`.73`, WiFi only) still runs an INSTRUMENT build of `e7a6fbeb`. All USB except DK5EN-1. The W2 probe for the W5 EXTUDP run
+is `w2_probe_after.py` in the session scratchpad: register query replies as the probe, `--serial` for the RAK.
 
 ## W2 file ownership
 
-| Agent | Item                    | Exclusive files                                                                                      |
-| ----- | ----------------------- | ---------------------------------------------------------------------------------------------------- |
-| A     | AU-22                   | `src/esp32/fw_update_net.cpp`, its native test                                                       |
-| B     | EXT-PEER-01, WEB-PIN-01 | `src/extudp_functions.*`, `src/web_functions/web_setup.cpp`, Pins page assets, `tools/webgui_*`      |
-| C     | TD-34                   | `src/t-deck/*`, `src/esp32/esp32_main.cpp` if `--disptest` needs it                                  |
-| Orch  | Hotspots                | `src/command_functions.cpp`, `platformio.ini`, `tools/regression.sh`, `docs/BACKLOG.md`, `RESUME.md` |
+| Agent | Item                    | Exclusive files                                                                                                                  |
+| ----- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| A     | AU-22                   | `src/esp32/fw_update_net.*`, `src/esp32/rm_au_esp32.cpp`, `src/fw_update.h`, `test/test_fw_update`                               |
+| B     | EXT-PEER-01, WEB-PIN-01 | `src/extudp_functions.*`, `src/web_functions/web_setup.cpp`, `web/mc.js`, `tools/webgui_pins_test.js`, `test/test_extudp_target` |
+| C     | TD-34                   | `src/t-deck/*`, `src/esp32/esp32_main.cpp` (`--ble` path, `--disptest` if needed)                                                |
+| Orch  | Hotspots                | `src/command_functions.cpp`, `platformio.ini`, `tools/regression.sh`, `docs/BACKLOG.md`, `RESUME.md`                             |
 
 ## Wave log
 
@@ -63,3 +64,11 @@ others INSTRUMENT builds of `e7a6fbeb`; addresses move, sweep the start pages (9
   and verified 1.27 MB in 14 s. Rejected: a wait or a BLE cycle on the same stack (no change, 15 of 20); `constexpr` for `wsParams`
   (does not compile, lambda conversion). Open: idle -4.6 KB against 11.01 goes to W6 for the baseline decision. A
   `webflash.py` reboot into Safeboot applies a staged image first and the upload then fails: clear or apply a stage before flashing.
+- W2 (2026-11-06, logs `w2-20261106/`): `AU-22`, `EXT-PEER-01`, `WEB-PIN-01` fixed, `TD-34` `--ble off` icon fixed; `--disptest` stays in the
+  backlog. Fail-before on unfixed DK5EN-92: the reply stayed at the old peer and missed the new one (`probe-before-92.json`), `mcpout` on
+  an input pin answered `returncode` 0 (`mcpout-before-92.json`). Pass-after on DK5EN-92 and DK5EN-90, console and web
+  (`probe-after-*.json`): peer moves, `none` then valid, refused target, RAK hostname; `mcpout` 422; RAK with Ethernet uninitialised stayed
+  alive (`n20-rak.summary`). Icon checked by eye. Gate: Unity 101 envs, 3602 cases; stage 2 pass; 6 builds; RAK flash 82.4 %. Two advisor
+  rework rounds; the small second list was applied by the orchestrator without a third pass, its scans mutation-tested. Accepted: a RAK
+  hostname peer no longer serves inbound traffic (release note). A refused target blanks the peer in RAM only; the old peer returns after
+  a reboot unless a later save persists the blank. Not run: WiFi down during a peer change on ESP32, `ck=` on a node.

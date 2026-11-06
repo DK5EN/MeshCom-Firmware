@@ -904,14 +904,15 @@ const char *runCheck(FwChannel ch)
     else if (newer && !installable)
         auLog("[AU];refuse;nodigest\n");
 
-    const time_t now = time(nullptr);
+    bool clkOk = false;
+    const int64_t nowUtc = fwNetNodeUtc(clkOk);
     portENTER_CRITICAL(&s_mux);
     copyStr(s_st.availTag, sizeof(s_st.availTag), iz.tag);
     s_st.availNewer = newer;
     s_st.installable = installable;
     s_st.zlen = zlen;
     s_st.ilen = ilen;
-    s_st.lastCheckEpoch = now > 0 ? (uint32_t)now : 0;
+    s_st.lastCheckEpoch = fwNodeStamp(clkOk, nowUtc);
     s_av.checked = true;
     s_av.found = iz.found && iz.size > 0;
     s_av.haveDigest = iz.haveDigest;
@@ -1311,8 +1312,9 @@ const char *stageFinish(Stage &sg, const char *err, const char *tag, uint32_t il
         rec.ilen = ilen;
         rec.crc32 = crc;
         memcpy(rec.sha256, dig, sizeof(rec.sha256));
-        const time_t now = time(nullptr);
-        rec.ts = now > 0 ? (uint32_t)now : 0;
+        bool clkOk = false;
+        const int64_t nowUtc = fwNetNodeUtc(clkOk);
+        rec.ts = fwNodeStamp(clkOk, nowUtc);
         uint8_t enc[FW_STAGE_ENC_LEN];
         const size_t el = fwRecordEncode(rec, enc, sizeof(enc));
         Preferences p;
@@ -1947,6 +1949,11 @@ bool schedFill(FwSchedIn &in, SchedOff &so, char *tag, bool &sim, bool &jumped)
     return true;
 }
 } // namespace
+
+int64_t fwNetNodeUtc(bool &ok)
+{
+    return schedNowUtc(ok);
+}
 
 bool fwNetSchedGet(FwSchedView &v)
 {

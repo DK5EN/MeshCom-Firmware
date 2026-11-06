@@ -15,6 +15,7 @@ This file contains all web-based setup functions
 #include <msgstore_api.h> // stage 3 store node: store/storecall/storetime/storeslots/storenotice setparam mapping
 #endif
 #include <blocked_calls.h> // BLK-01
+#include <mcpout_refusal.h> // WEB-PIN-01
 #include <string>
 
 
@@ -669,23 +670,23 @@ void webSetup_setParam(setupStruct *setupData){
             return;
         }
 
-        snprintf(message_text, sizeof(message_text), "--setout %s %s", port.c_str(), setupData->paramValue.c_str());
-        commandAction(message_text, bPhoneReady);
-        
+        // WEB-PIN-01: validate the port first; --setout silently ignores a pin that is
+        // configured as input, so the answer must not be OKAY for it.
         //MCP Module has 16 IO Ports named A0...7 and B0...7 ... but internally they are 0....15
-        if((port.charAt(0)!='A' && port.charAt(0)!='B') || port.charAt(1)<'0' || port.charAt(1)>'7') {
+        uint16_t bitmask = 0;
+        if(mcpout_check_port(port.c_str(), meshcom_settings.node_mcp17io, bitmask) != MCPOUT_PORT_OK)
+        {
             setupData->returnCode = WS_RETURNCODE_FAIL;
             return;
         }
-        uint8_t t_io = (uint8_t)port.charAt(1) - 48;            //ASCII '0' is numarically 48
-        if(port.charAt(0)=='B') t_io+=8;
 
-        uint16_t bitmask = 1 << t_io;
-        bool outputEnabled = (meshcom_settings.node_mcp17out & bitmask) > 0;  // check PIN set to OUTPUT
+        snprintf(message_text, sizeof(message_text), "--setout %s %s", port.c_str(), setupData->paramValue.c_str());
+        commandAction(message_text, bPhoneReady);
 
+        // mc.js (Pins page) ignores returnValue and re-polls /pinstatus; the value is the
+        // inverted command, i.e. the next switch action (legacy contract, unchanged).
         setupData->returnCode = WS_RETURNCODE_OKAY;
-        outputEnabled = (setupData->paramValue.compareTo("on")==0);
-        setupData->returnValue = outputEnabled?"off":"on";
+        setupData->returnValue = (setupData->paramValue.compareTo("on")==0)?"off":"on";
 
         return;
     } else
