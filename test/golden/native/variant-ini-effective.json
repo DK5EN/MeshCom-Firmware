@@ -4296,6 +4296,25 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_screen_shadow": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1"
+  ],
+  "build_src_filter": [
+   "-<*>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
+  ],
+  "platform": "native",
+  "test_filter": [
+   "test_screen_shadow"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_serial_esp32": {
   "build_flags": [
    "-std=gnu++17",
