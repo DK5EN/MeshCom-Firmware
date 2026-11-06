@@ -34,6 +34,15 @@ pass. Reproduce on a non-INSTRUMENT image first.
 Operator: BLE and RAK secrets with a real phone (checklist from W5); slow client dummynet needs sudo; the RM round trip may
 need the RM password file.
 
+## Next
+
+W2. Create `piolock.sh` in the session scratchpad first (mkdir lock, see the `pio-lock-script-for-waves` memory); every `pio` call in a
+brief goes through it. Code points: AU-22 `src/esp32/fw_update_net.cpp` near `time(nullptr)` (use the node date fields, as
+`src/fw_schedule.h` does); EXT-PEER-01 `--extudpip` at `src/command_functions.cpp:3678`, deferred refresh in `getExternUDP()` behind a
+flag, no direct `resetExternUDP()` on a RAK; WEB-PIN-01 `mcpout` at `src/web_functions/web_setup.cpp:662`; TD-34 `--ble off` at
+`src/command_functions.cpp:6385`, `--disptest` at `:6917`. Bench state: DK5EN-92 runs a local release build of the AU-23 fix, the
+others INSTRUMENT builds of `e7a6fbeb`; addresses move, sweep the start pages (92 `.71`, 14 `.68`, 90 `.66`, 1 `.73` on 11-06).
+
 ## W2 file ownership
 
 | Agent | Item                    | Exclusive files                                                                                      |
