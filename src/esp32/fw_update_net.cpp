@@ -18,6 +18,9 @@
 #include <esp_partition.h>
 #include <esp_rom_crc.h>
 #include <esp_system.h>
+#include <lwip/priv/tcp_priv.h> // tcp_tw_pcbs: twPurge()
+#include <lwip/tcp.h>
+#include <lwip/tcpip.h>
 // ROM tinfl: the dry-run inflate in stageFinish. IDF 5 has a top-level miniz.h and turns the
 // <chip>/rom/ form into a #warning forwarder; IDF 4.4 (the app build) only has <chip>/rom/miniz.h
 // and a deprecated rom/miniz.h with a #warning. Both warnings break src/ under -Werror.
@@ -135,6 +138,7 @@ void fwNetLastInstalledTag(char *out, size_t n)
 #ifndef FWNET_MIN_IFREE_PSRAM
 #define FWNET_MIN_IFREE_PSRAM 24000u
 #endif
+#define FWNET_GATE_SETTLE_MS 500u        // idle task frees the stacks of deleted tasks (NimBLE) before the second reading
 #define FWNET_BLK 4096u                  // staging block, heap-allocated per job
 #define FWNET_JSON_MAX (300u * 1024u)    // releases/latest is about 65 KB; hard cap
 #define FWNET_IDLE_MS 20000u             // no byte for this long = stall
@@ -663,6 +667,36 @@ static bool twoRecBufProbe()
     return ok;
 }
 
+// Web requests are closed by the server, so each leaves a pcb in TIME_WAIT for 2 x MSL = 120 s, about 224 B of heap and
+// about 3.6 KB in a browser session (measured on DK5EN-92, 2026-11-06): enough to fail the gate right after the pages were
+// used. lwIP itself recycles these under pressure (tcp_kill_timewait); abort runs on the tcpip thread and sends nothing.
+volatile uint32_t s_twPurged = 0;
+volatile bool s_twDone = false;
+
+void twPurgeOnTcpip(void *)
+{
+    uint32_t n = 0;
+    while (tcp_tw_pcbs != nullptr)
+    {
+        tcp_abort(tcp_tw_pcbs);
+        n++;
+    }
+    s_twPurged = n;
+    s_twDone = true;
+}
+
+// Returns the number of pcbs freed; 0 if the tcpip thread did not answer in time.
+uint32_t twPurge()
+{
+    s_twPurged = 0;
+    s_twDone = false;
+    if (tcpip_callback(twPurgeOnTcpip, nullptr) != ERR_OK)
+        return 0;
+    for (uint32_t waited = 0; !s_twDone && waited < FW_SHED_MAX_MS; waited += FW_SHED_POLL_MS)
+        vTaskDelay(pdMS_TO_TICKS(FW_SHED_POLL_MS));
+    return s_twPurged;
+}
+
 // One evaluation of the pre-TLS gate; fr / bk / pb / ps / need receive the numbers it used.
 bool heapGateEval(uint32_t &fr, uint32_t &bk, uint32_t &pb, bool &ps, uint32_t &need)
 {
@@ -694,6 +728,9 @@ bool heapGateEval(uint32_t &fr, uint32_t &bk, uint32_t &pb, bool &ps, uint32_t &
 // and dropping the operator's console would not change the verdict); restored by shedRestore() at the end of the job on
 // every exit. KISS first and the gate is read again; the console session only if its estimate closes the gap.
 bool s_shedDone = false;
+bool s_gateFragmented = false; // the last refusal had enough free heap, but no room for the TLS record buffers
+volatile bool s_jobRestart = false;
+bool s_restartAvail = false;   // this run may still restart on a new stack
 bool s_shedAllowed = true; // set by fwNetTask before the job body
 uint8_t s_shedMask = 0;    // FW_SHED_* bits held now
 
@@ -738,7 +775,21 @@ bool heapGateOk()
         auHeapLine("gate", ";ok", false);
         return true;
     }
-    if (s_shedAllowed)
+    // Costs no service: drop the closed web sockets, let the idle task free what the BLE stop left behind.
+    {
+        const uint32_t before = fr;
+        const uint32_t purged = twPurge();
+        vTaskDelay(pdMS_TO_TICKS(FWNET_GATE_SETTLE_MS));
+        const bool ok = heapGateEval(fr, bk, pb, ps, need);
+        auLog("[AU];shed;tw;%u;free;%u;%u\n", (unsigned)purged, (unsigned)before, (unsigned)fr);
+        if (ok)
+        {
+            auHeapLine("gate", ";ok", false);
+            return true;
+        }
+    }
+    // Enough free heap and a restart left: the heap is split, stopping the console or KISS would not join it.
+    if (s_shedAllowed && !fwShedSkipForRestart(s_restartAvail, fr, need))
     {
         const uint8_t avail = auShedAvail();
         if (shedHold(fwShedFirst(s_shedAllowed, avail)))
@@ -761,6 +812,7 @@ bool heapGateOk()
         }
     }
     auHeapLine("gate", ";refuse", false);
+    s_gateFragmented = (fr >= need);
     auLog("[AU];refuse;lowheap;ifree;%u;iblk;%u;pblk;%u;psram;%u;twobuf;%u\n", (unsigned)fr, (unsigned)bk,
           (unsigned)pb, (unsigned)ps, (unsigned)s_twoBuf);
 #if INSTRUMENT_ENABLED
@@ -1434,7 +1486,13 @@ void fwNetTask(void *)
     bool blePaused = false;
     bool phoneHeld = false;
 #if AU_BLE_PAUSE
-    if (guarded)
+    const bool restarted = s_jobRestart; // second run on a new stack, see the end of the job body
+    s_jobRestart = false;
+    if (restarted)
+    {
+        blePaused = true; // still paused by the first run
+    }
+    else if (guarded)
     {
         // a chained DOWNLOAD finds BLE already down (the pause is kept for the whole guard)
         blePaused = esp32BleForcePause();
@@ -1459,11 +1517,30 @@ void fwNetTask(void *)
         auLog("[AU];shed;tft\n");
     }
     s_shedAllowed = fwShedAllowed(blePaused, guarded, phoneHeld);
+    s_gateFragmented = false;
+#if AU_BLE_PAUSE
+    s_restartAvail = !restarted && (blePaused || (guarded && esp32BleDown()));
+#endif
     const char *err = (s_argJob == FWJ_CHECK) ? runCheck((FwChannel)s_argCh)
 #if INSTRUMENT_ENABLED
                       : (s_argJob == FWJ_STAGELAN) ? runStageLan()
 #endif
                                                    : runDownload();
+#if AU_BLE_PAUSE
+    // Enough free heap, but split: the record buffers do not fit (DK5EN-92, 2026-11-06: 80 KB free, largest block 26.6 KB
+    // with this task's stack inside the big region, 38.9 KB with the stack elsewhere; a wait or a BLE cycle on this stack
+    // changes nothing). Run the job once more on a new stack, allocated now that BLE has freed its heap; this stack is
+    // freed behind it. BLE stays paused for the new task; the job stays BUSY, so a guard is held meanwhile.
+    if (fwJobRestartDue(blePaused || (guarded && esp32BleDown()), restarted, s_gateFragmented,
+                        err != nullptr && strcmp(err, "lowheap") == 0))
+    {
+        s_jobRestart = true;
+        auLog("[AU];shed;restart\n");
+        if (xTaskCreatePinnedToCore(fwNetTask, "fwnet", FWNET_TASK_STACK, nullptr, 1, nullptr, FWNET_CORE) == pdPASS)
+            vTaskDelete(nullptr);
+        s_jobRestart = false;
+    }
+#endif
     auHeapLine("peak", "", true);
     heapMark("end"); // after every client object is gone
     allocFailMark("end");

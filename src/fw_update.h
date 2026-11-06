@@ -1069,6 +1069,19 @@ inline bool fwShedAllowed(bool blePaused, bool guarded, bool phoneHeld)
     return blePaused || guarded || !phoneHeld;
 }
 
+// The gate refused with enough free heap, because the job's own stack splits the big block: one more run on a new stack,
+// allocated with BLE already down. Only once per job.
+inline bool fwJobRestartDue(bool bleDown, bool restarted, bool fragmented, bool lowheap)
+{
+    return bleDown && !restarted && fragmented && lowheap;
+}
+
+// Shedding frees small pieces and cannot join a split heap: leave the services up while a restart can still fix it.
+inline bool fwShedSkipForRestart(bool restartAvail, uint32_t freeNow, uint32_t need)
+{
+    return restartAvail && freeNow >= need;
+}
+
 // First stage: KISS TCP only (cheap, nobody is typing into it). avail = what the node could stop (FW_SHED_* bits).
 inline uint8_t fwShedFirst(bool allowed, uint8_t avail)
 {

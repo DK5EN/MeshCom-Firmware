@@ -19,6 +19,8 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
+- **Release gate 2026-11-06, in progress:** `docs/campaign-release-gate-20261106.md` holds the wave plan, decisions and state. T-Beam heap (`AU-23`) fixed in W1.
+
 - **Bench fixes and features 2026-11-06, not released:** `docs/campaign-bench-fixes-20261106.md` (W1-W5, `408657be` to
   `e7a6fbeb`). Bench images on all four nodes are INSTRUMENT builds of `e7a6fbeb`; nodes restored from the vault. DK5EN-90 is
   on `.66`. Still needs CI images: soak, Safeboot `/ota` page, manipulated `.autoupdate`, BLE, RAK secrets with a real phone.

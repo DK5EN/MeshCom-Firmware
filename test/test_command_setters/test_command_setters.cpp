@@ -1901,7 +1901,7 @@ static void test_shed_is_gated_staged_and_polled(void)
     const size_t g = net.find("bool heapGateOk()");
     TEST_ASSERT_TRUE_MESSAGE(g != std::string::npos, "heapGateOk missing");
     const std::string gate = net.substr(g, net.find("const char *runCheck(", g) - g);
-    TEST_ASSERT_TRUE_MESSAGE(gate.find("if (s_shedAllowed)") != std::string::npos && gate.find("shedHold(") != std::string::npos, "heapGateOk does not shed behind the permission");
+    TEST_ASSERT_TRUE_MESSAGE(gate.find("if (s_shedAllowed && !fwShedSkipForRestart(s_restartAvail, fr, need))") != std::string::npos && gate.find("shedHold(") != std::string::npos, "heapGateOk does not shed behind the permission");
     TEST_ASSERT_TRUE_MESSAGE(gate.find("fwShedFirst(") < gate.find("fwShedSecond("), "console stage before the KISS stage");
     // [AU];shed;fail only when something was shed (s_shedDone), else the plain refuse line stands alone
     const size_t sf = net.find("[AU];shed;fail;");

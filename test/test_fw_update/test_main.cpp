@@ -1660,6 +1660,24 @@ static void test_shed_allowed_not_while_a_phone_holds_ble(void)
     TEST_ASSERT_TRUE(fwShedAllowed(false, false, false));
 }
 
+// A refusal with enough free heap: the job's own stack splits the big block, one restart on a new stack (DK5EN-92, 2026-11-06)
+static void test_job_restart_once_only_for_a_split_heap(void)
+{
+    TEST_ASSERT_TRUE(fwJobRestartDue(true, false, true, true));
+    TEST_ASSERT_FALSE(fwJobRestartDue(false, false, true, true)); // BLE up: a phone holds it, a new stack does not help
+    TEST_ASSERT_FALSE(fwJobRestartDue(true, true, true, true));   // only once per job
+    TEST_ASSERT_FALSE(fwJobRestartDue(true, false, false, true)); // too little free heap
+    TEST_ASSERT_FALSE(fwJobRestartDue(true, false, true, false)); // the job ended for another reason
+}
+
+static void test_shed_skipped_while_a_restart_can_fix_the_split(void)
+{
+    TEST_ASSERT_TRUE(fwShedSkipForRestart(true, 80000u, 76000u));
+    TEST_ASSERT_TRUE(fwShedSkipForRestart(true, 76000u, 76000u));
+    TEST_ASSERT_FALSE(fwShedSkipForRestart(true, 75999u, 76000u)); // short of heap: shedding can help
+    TEST_ASSERT_FALSE(fwShedSkipForRestart(false, 80000u, 76000u)); // restart used: shed as before
+}
+
 static void test_shed_first_stage_is_kiss_only(void)
 {
     TEST_ASSERT_EQUAL_UINT8(FW_SHED_KISS, fwShedFirst(true, FW_SHED_KISS | FW_SHED_CONSOLE));
@@ -1874,6 +1892,8 @@ int main(int, char **)
     RUN_TEST(test_bleguard_watchdog_cap_and_wrap);
     RUN_TEST(test_bleguard_release_words_and_phone_rule);
     RUN_TEST(test_shed_allowed_not_while_a_phone_holds_ble);
+    RUN_TEST(test_job_restart_once_only_for_a_split_heap);
+    RUN_TEST(test_shed_skipped_while_a_restart_can_fix_the_split);
     RUN_TEST(test_shed_first_stage_is_kiss_only);
     RUN_TEST(test_shed_second_stage_console_only_when_the_estimate_closes_the_gap);
     RUN_TEST(test_shed_settled_waits_only_for_what_was_shed);
