@@ -140,6 +140,7 @@ def parse_frames(lines, sender_call: str | None = None) -> dict[str, dict]:
     return out
 
 
+_SND_START = re.compile(r"\[INJ\];loratx;start;n;(\d+);")
 _SND_TX = re.compile(r"\[LOG\] TX x([0-9A-Fa-f]{8})\b")
 
 
@@ -163,6 +164,26 @@ def parse_sender(lines) -> dict[str, int]:
     if sent_ids:
         return {k: v for k, v in queued.items() if k in sent_ids}
     return queued
+
+
+def sender_counts(lines) -> dict[str, int]:
+    """RX-TX-02: where the requested frames went. Frames from an earlier run are not counted.
+
+    The ring takes one own frame per about 5 s (CSMA) and holds 20: at 3 s intervals it fills and refuses
+    (`requested - queued`), and frames that entered it go on air up to about 100 s later, long after the burst.
+    """
+    lines = list(lines)
+    requested = sum(int(m.group(1)) for m in map(_SND_START.search, lines) if m)
+    queued = {m.group(2).upper() for m in map(_SND_Q.search, lines) if m}
+    sent = {m.group(1).upper() for m in map(_SND_TX.search, lines) if m}
+    on_air = len(queued & sent)
+    return {
+        "requested": requested,
+        "queued": len(queued),
+        "refused_ring": requested - len(queued),
+        "on_air": on_air,
+        "still_queued": len(queued) - on_air,
+    }
 
 
 def parse_loop_gaps(lines) -> dict[str, dict]:
@@ -211,6 +232,7 @@ def analyse(dut_lines, ref_lines, sent: int | None = None, sender_lines=None,
     seen_any = seen_dut | seen_ref
     return {
         "arm": arm,
+        "sender": sender_counts(sender_lines) if sender_lines is not None else None,
         "frames_sent": sent,
         "seen_dut": len(seen_dut),
         "seen_ref": len(seen_ref),
@@ -232,6 +254,10 @@ def format_summary(s: dict) -> str:
         f"  loss DUT {s['dut_loss_pct']} %  ref {s['ref_loss_pct']} %",
         f"  irq_to_read_us n={on['n']} p50={on['irq_to_read_us_p50']} max={on['irq_to_read_us_max']}",
     ]
+    if s.get("sender"):
+        c = s["sender"]
+        rows.insert(1, f"  sender: requested {c['requested']}, ring refused {c['refused_ring']}, "
+                       f"on air {c['on_air']}, still queued {c['still_queued']}")
     for sect, g in sorted(s["instr_loop_dut"].items(), key=lambda kv: -kv[1]["max_ms"]):
         rows.append(f"  INSTR-LOOP {sect}: {g['count']} gaps, max {g['max_ms']} ms, total {g['total_ms']} ms")
     if not s["instr_loop_dut"]:
@@ -365,6 +391,17 @@ def wait_done(sender: NodeCapture, since: int, timeout: float) -> bool:
     return False
 
 
+def wait_drained(sender, timeout: float, poll: float = 1.0) -> bool:
+    """True once every queued burst frame went on air; a capture stopped earlier counts them as not sent."""
+    end = time.monotonic() + timeout
+    while True:
+        if sender_counts(sender.snapshot())["still_queued"] == 0:
+            return True
+        if time.monotonic() >= end:
+            return False
+        time.sleep(poll)
+
+
 def run_live(args: argparse.Namespace) -> int:
     import identity_guard
 
@@ -405,6 +442,8 @@ def run_live(args: argparse.Namespace) -> int:
             if not wait_done(caps["sender"], mark, n * args.interval_ms / 1000.0 + 30):
                 print("warning: no done marker from the sender", file=sys.stderr)
             left -= n
+        if not wait_drained(caps["sender"], args.drain_timeout):
+            print(f"warning: TX ring not drained after {args.drain_timeout:.0f} s", file=sys.stderr)
         time.sleep(args.settle)
     finally:
         if web:
@@ -456,6 +495,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--ref-host", default=None)
     ap.add_argument("--frames", type=int, default=60)
     ap.add_argument("--interval-ms", type=int, default=3000)
+    ap.add_argument("--drain-timeout", type=float, default=180.0,
+                    help="seconds to wait for queued frames to go on air before the settle time")
     ap.add_argument("--settle", type=float, default=10.0, help="seconds to keep capturing after the last frame")
     ap.add_argument("--web-load", action="store_true", help="GET / on the DUT in a loop during the burst")
     return ap

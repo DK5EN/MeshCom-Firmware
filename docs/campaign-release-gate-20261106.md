@@ -28,7 +28,7 @@ pass. Reproduce on a non-INSTRUMENT image first.
 | W0   | Heap root cause on DK5EN-92: idle curves 11.01 against HEAD, with and without a browser | orchestrator, bench      | done   |
 | W1   | Heap fix: idle flat within 1 KB over 30 min, 10 of 10 "Check now" with a browser open   | orchestrator, advisor    | done   |
 | W2   | AU-22, EXT-PEER-01, WEB-PIN-01, TD-34, each with a regression test                      | 3 implementers, advisor  | done   |
-| W3   | RX-TX-02: sender frame counts against the tool count, to TEST at 2 dBm or less          | orchestrator, bench      | open   |
+| W3   | RX-TX-02: sender frame counts against the tool count, to TEST at 2 dBm or less          | orchestrator, bench      | done   |
 | W4   | Push, `ci-proof-*` draft build, CI images on the four bench nodes                       | orchestrator             | open   |
 | W5   | Chrome GUI pass (RAK, T-Deck, T-Beam, Setup grid), Safeboot `/ota`, manipulated         | orchestrator, serialized | open   |
 |      | `.autoupdate`, slow client, EXTUDP, RM round trip, Ethernet                             |                          |        |
@@ -39,10 +39,10 @@ need the RM password file.
 
 ## Next
 
-W3, RX-TX-02: `--loratx` 60 frames at 3 s finished 46 and 40 of 60 and the tool matched 28 and 22 ids. Compare sender queue against tool
-count, to TEST at 2 dBm or less. Bench state: DK5EN-92 (`.71`), DK5EN-14 (`.68`) and DK5EN-90 (`.66`) run local release builds of the W2
-tree; DK5EN-1 (`.73`, WiFi only) still runs an INSTRUMENT build of `e7a6fbeb`. All USB except DK5EN-1. The W2 probe for the W5 EXTUDP run
-is `w2_probe_after.py` in the session scratchpad: register query replies as the probe, `--serial` for the RAK.
+W4: push `fork-dev` (approved), `ci-proof-*` draft build, CI images on the four bench nodes, then delete the draft and its tag. Bench state: DK5EN-92
+(`.71`), DK5EN-14 (`.68`) and DK5EN-90 (`.66`) run local release builds of the W2 tree; DK5EN-1 (`.73`, WiFi only, OTA) still runs an INSTRUMENT build
+of `e7a6fbeb`. The W2 probe for the W5 EXTUDP run is `w2_probe_after.py` in the session scratchpad: register query replies as the probe, `--serial` for
+the RAK. W5 also runs a peer change during a WiFi drop on ESP32.
 
 ## W2 file ownership
 
@@ -72,3 +72,9 @@ is `w2_probe_after.py` in the session scratchpad: register query replies as the 
   rework rounds; the small second list was applied by the orchestrator without a third pass, its scans mutation-tested. Accepted: a RAK
   hostname peer no longer serves inbound traffic (release note). A refused target blanks the peer in RAM only; the old peer returns after
   a reboot unless a later save persists the blank. Not run: WiFi down during a peer change on ESP32, `ck=` on a node.
+- W2 addendum: `--ble on` turns the icon yellow again, seen by the operator.
+- W3 (2026-11-06, `rx_stall_A_20261106-174753.json`, `-175117.json`): `RX-TX-02` settled, no firmware loss. 20 frames at 8 s: 20 of 20 at both receivers.
+  60 at 3 s with a 130 s settle: 59 queued, 59 on air, 59 at the T-Deck, 56 at the T-Beam. The T-Beam made only 4 TX lines in that run and two of the 3
+  misses sit next to relayed copies, so channel load is the likely cause, not proven. Replay of the 11-06 log: requested 60, ring refused 20, on air 22,
+  still queued 18. Tool only, no firmware change, so no advisor pass. Stage 2 pass, 21 tool tests, fail-before 4. The drain wait itself ran only in the
+  host tests. Burst frames reach the real mesh through relays (DK5EN-98, DL2JA-2): group TEST, but it loads the channel.

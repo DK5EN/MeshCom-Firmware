@@ -139,6 +139,53 @@ def test_sender_counts_only_transmitted_frames():
     assert set(rb.parse_sender(lines)) == {"00C20C7A", "00C20C7B"}
 
 
+def _rx_tx_02_lines():
+    # RX-TX-02: 3 requested, ring refused one, one queued frame still waits in the ring; x7A is from an earlier run
+    return [
+        "[INJ];loratx;start;n;3;ms;3000",
+        "[INJ];loratx;q;1;id;00C20C7B",
+        "[INJ];loratx;q;3;id;00C20C7C",
+        "[INJ];loratx;done;2/3",
+        "16:56:55 [LOG] TX x00C20C7A : H04 prio=3 src=o wait=3381 q=2 cad=0 len=37 t=245206",
+        "16:57:00 [LOG] TX x00C20C7B : H04 prio=3 src=o wait=5497 q=2 cad=0 len=37 t=250320",
+    ]
+
+
+def test_sender_counts_split_refused_from_still_queued():
+    c = rb.sender_counts(_rx_tx_02_lines())
+    assert c == {"requested": 3, "queued": 2, "refused_ring": 1, "on_air": 1, "still_queued": 1}
+
+
+def test_summary_reports_refused_and_undrained_frames():
+    s = rb.analyse([], [], sender_lines=_rx_tx_02_lines(), arm="A")
+    assert (s["sender"]["refused_ring"], s["sender"]["still_queued"]) == (1, 1)
+    text = rb.format_summary(s)
+    assert "ring refused 1" in text and "still queued 1" in text
+
+
+def test_wait_drained_returns_once_the_ring_is_empty():
+    class Sender:
+        def __init__(self):
+            self.calls = 0
+
+        def snapshot(self):
+            self.calls += 1
+            done = ["16:57:05 [LOG] TX x00C20C7C : H04 prio=3 src=o wait=1 q=0 cad=0 len=37 t=1"] if self.calls > 1 else []
+            return _rx_tx_02_lines() + done
+
+    snd = Sender()
+    assert rb.wait_drained(snd, 5.0, poll=0.0) is True
+    assert snd.calls == 2
+
+
+def test_wait_drained_gives_up_at_the_timeout():
+    class Sender:
+        def snapshot(self):
+            return _rx_tx_02_lines()
+
+    assert rb.wait_drained(Sender(), 0.0, poll=0.0) is False
+
+
 def test_sender_without_tx_lines_keeps_queued_set():
     lines = ["[INJ];loratx;q;1;id;00C20C7A", "[INJ];loratx;q;2;id;00C20C7B"]
     assert set(rb.parse_sender(lines)) == {"00C20C7A", "00C20C7B"}
