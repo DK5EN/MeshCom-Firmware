@@ -239,7 +239,8 @@ flashes whatever is attached.
 | test_mh_phone                | Unit          |    12 | native_mh_phone                                              |
 | test_millis_rollover         | Regression    |     4 | native                                                       |
 | test_msg_input_budget        | Regression    |     7 | native_msg_input_budget                                      |
-| test_screen_shadow           | Regression    |     5 | native_screen_shadow                                         | T-Deck screenshot: LVGL flush copy, clipping |
+| test_oled_shot               | Regression    |     5 | native_oled_shot                                             | OLED screenshot: u8g2 frame buffer layout (`src/oled_shot.h`) |
+| test_screen_shadow           | Regression    |     5 | native_screen_shadow                                         | T-Deck screenshot: LVGL flush copy, clipping                  |
 | test_msgid_counter           | Unit          |     6 | native                                                       |
 | test_msgstore                | Unit          |    60 | native                                                       |
 | test_msgstore_hook           | Unit          |     6 | native_msgstore_hook                                         |
@@ -273,7 +274,7 @@ flashes whatever is attached.
 | test_telemetry_app           | Regression    |     4 | native_telemetry_app                                         |
 | test_board_led               | Unit          |    13 | native_board_led                                             |
 | test_gw_reg_state            | Unit          |    35 | native_gw_reg_state                                          |
-| test_web_txbuf               | Unit          |    20 | native_web_txbuf                                             |
+| test_web_txbuf               | Unit          |    34 | native_web_txbuf                                             |
 | test_rm_text                 | Unit          |     8 | native_rm_text                                               |
 | test_rm_policy_rx            | Regression    |    16 | native_rm_policy_rx                                          |
 | test_rm_client_cmd           | Regression    |    15 | native_rm_client_cmd                                         |

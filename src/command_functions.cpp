@@ -48,6 +48,9 @@
 #include "ArduinoJson.h"
 #include "configuration.h"
 #include "configuration_global.h"
+#if INSTRUMENT_ENABLED && MC_HAS_U8G2
+#include "oled_shot.h"   // oledTextTest()
+#endif
 #include "regex_functions.h"
 #include "ping_target.h"   // LRF 2.1: one ping-target rule
 #include "lora_setchip.h"
@@ -1995,7 +1998,10 @@ void commandAction(char *umsg_text, bool ble)
             #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
             printdeb("--redrawlog on/off/refr/obj, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>, --tft on/off/state, --screencrc\n--spitrace on/off, --touch tap <x> <y> [ms] / down <x> <y> / up\n");
             #endif
-            printdeb("--ntpsync  request an immediate NTP refresh now\n--battprobe [n]  raw battery divider ADC capture, n cycles 1-10 (~7.5 s each)\n");
+            printdeb("--ntpsync  request an immediate NTP refresh now\n--battprobe [n]  raw battery divider ADC capture, n cycles 1-10 (~7.5 s each)\n\n");
+            #if MC_HAS_U8G2
+            printdeb("--oledtext [-10] [-t<s>] <text>  show UTF-8 test text on the OLED (fold + fonts as messages; -10 = 10x20; held 60 s or -t<s>), no TX\n");
+            #endif
             printdeb("(bench/instrument commands -- this is an INSTRUMENT_ENABLED=1 measurement build, see src/instrument.h -- not listed individually here)\n");
             delay(100);
             #endif
@@ -6543,6 +6549,33 @@ void commandAction(char *umsg_text, bool ble)
         oledStat();
         return;
     }
+    #if MC_HAS_U8G2
+    else
+    // --oledtext [-10] [-t<s>] <utf8 text>: show test text on the OLED, nothing is transmitted.
+    // Same fold (Latin-1) and fonts as the message display; 6x10 by default, -10 = 10x20, wrapped.
+    // Held <s> seconds (default 60, max 600), then the normal pages resume. A leading "-10"/"-t.."
+    // is an option, never text. Shoot it with tools/bench/oled_screenshot.py.
+    if(commandCheck(msg_text+2, (char*)"oledtext") == 0)
+    {
+        const char *p = msg_text + 10;       // "--oledtext" is 10 chars
+        int oFont = 0, oHold = 60;
+        for(;;)
+        {
+            while(*p == ' ') p++;
+            if(strncmp(p, "-10", 3) == 0 && (p[3] == ' ' || p[3] == 0x00)) { oFont = 1; p += 3; }
+            else if(strncmp(p, "-t", 2) == 0 && p[2] >= '0' && p[2] <= '9') { oHold = atoi(p + 2); p += 2; while(*p >= '0' && *p <= '9') p++; }
+            else break;
+        }
+        char otext[170] = {0};
+        snprintf(otext, sizeof(otext), "%s", p);
+        size_t ol = strlen(otext);
+        while(ol > 0 && (otext[ol-1] == '\n' || otext[ol-1] == '\r')) otext[--ol] = 0;
+        int orc = oledTextTest(otext, oFont, oHold);
+        Serial.printf("[OLEDTEXT];%s;font;%s;hold_s;%d\n", orc == 0 ? "ok" : (orc == 1 ? "no display" : "usage: --oledtext [-10] [-t<s>] <text>"),
+                      oFont ? "10x20" : "6x10", oHold);
+        return;
+    }
+    #endif
     #if defined(NRF52_SERIES)
     else
     if(commandCheck(msg_text+2, (char*)"ethdrop") == 0)

@@ -204,6 +204,24 @@ async function settle() { for (let i = 0; i < 6; i++) await flush(); }
     check('loadPage(other page) does not read /rmstatus for the card', !calls.slice(n).some((c) => c.url === '/rmstatus'));
     const src = fs.readFileSync(SRC, 'utf8');
     check('loadPage literal carries the raSt hook', src.includes("if(page=='setup'&&typeof raSt=='function')raSt();"));
+    // WEB-TX-01: a cut (chunked, incomplete) or refused page response must not leave the spinner running.
+    // XHR reports a cut chunked body as readyState 4 with status 0.
+    const MSG = 'Node did not answer completely. Please reload.';
+    for (const st of [0, 404, 500]) {
+      w.XMLHttpRequest = function () { this.open = function () {}; this.send = function () { this.readyState = 4; this.status = st; this.responseText = ''; this.onreadystatechange(); }; };
+      w.loadPage('info', sender, true); await settle();
+      check('loadPage with status ' + st + ' replaces the spinner by the incomplete-page message', f.textContent === MSG && !f.querySelector('.loader'), f.innerHTML);
+    }
+    w.XMLHttpRequest = function () { this.open = function () {}; this.send = function () { this.readyState = 4; this.status = 0; this.responseText = ''; this.onreadystatechange(); }; };
+    f.innerHTML = '<p>good table</p>';
+    w.loadPage('mheard', sender, false); await settle();
+    check('a failed background refresh keeps the page on screen', f.textContent === 'good table', f.innerHTML);
+    w.XMLHttpRequest = function () { this.open = function () {}; this.send = function () { this.readyState = 3; this.status = 200; this.responseText = 'part'; this.onreadystatechange(); }; };
+    w.loadPage('info', sender, true); await settle();
+    check('loadPage keeps the spinner while the response is still arriving (readyState 3)', !!f.querySelector('.loader') && f.textContent !== MSG, f.innerHTML);
+    w.XMLHttpRequest = function () { this.open = function () {}; this.send = function () { this.readyState = 4; this.status = 200; this.responseText = '<p>ok</p>'; this.onreadystatechange(); }; };
+    w.loadPage('info', sender, true); await settle();
+    check('loadPage with status 200 shows the page, not the message', f.innerHTML === '<p>ok</p>', f.innerHTML);
   }
 
   // lock text (W1d)
@@ -331,6 +349,21 @@ async function settle() { for (let i = 0; i < 6; i++) await flush(); }
       const dom2 = new JSDOM('<div id="c">' + render(1) + '</div>');
       check('WEB-LED-01 stored mode flash is the pressed button', [...dom2.window.document.querySelectorAll('button')].map((b) => b.getAttribute('aria-pressed')).join() === 'false,true,false');
       check('WEB-LED-01 info page and getparam report the mode name', /boardLedModeName\(boardLedModeGet\(\)\)/.test(info) && /boardLedModeName\(boardLedModeGet\(\)\)/.test(ws));
+    }
+    { // WEB-DUP-01: every id the setup page generates is unique (helper first argument = DOM id; literal id="..." too)
+      const ids = [...setup.matchAll(/_create_setup_\w+_element\(\s*"([^"]+)"/g)].map((x) => x[1]).concat([...setup.matchAll(/\bid=\\"([\w-]+)\\"/g)].map((x) => x[1]));
+      const dups = ids.filter((x, i) => ids.indexOf(x) !== i);
+      check('WEB-DUP-01 setup page has no duplicate DOM ids (' + ids.length + ' ids)', ids.length > 20 && dups.length === 0, dups.join());
+      check('WEB-DUP-01 ext. UDP IP text field keeps POST name extudpip, switch keeps extudp', /_create_setup_textinput_element\("extudpip", "ext\. UDP IP"[^;]*"extudpip", 50/.test(setup) && /_create_setup_switch_element\("extudp", "ext UDP"/.test(setup));
+    }
+    { // WEB-LED-02: the three LED buttons carry one width class, the shipped CSS gives it one fixed width
+      const body = (/_create_setup_led_mode_element\(const char id\[\][^;{]*\)\n\{([\s\S]*?)\n\}\n/.exec(wf) || [])[1] || '';
+      const cls = /class=\\"([^"\\]*)\\" id=\\"%s_%s\\"/.exec(body);
+      const css = ASSETS.MC_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+      const rule = /\.mcledgrp\s+\.mcledbtn\s*\{([^}]*)\}/.exec(css);
+      check('WEB-LED-02 all three LED buttons share the mcledbtn class (one loop, one format)', !!cls && /\bmcledbtn\b/.test(cls[1]) && /mcledgrp/.test(body), cls && cls[1]);
+      check('WEB-LED-02 shipped mc.css gives .mcledbtn one fixed width', !!rule && /(^|;)\s*width:\s*[\d.]+(em|px|rem)/.test(rule[1]) && /box-sizing:\s*border-box/.test(rule[1]), rule && rule[1]);
+      check('WEB-LED-02 LED group wraps at narrow widths and uses no hard colours (dark mode follows the .mctab vars)', /\.mcledgrp\s*\{[^}]*flex-wrap:\s*wrap/.test(css) && !/#[0-9a-f]{3,6}\b/i.test(rule ? rule[1] : '#'));
     }
     check('LED-08 setparam chargeled issues --charge led on|off through commandAction', /paramName\.equals\("chargeled"\)[\s\S]{0,260}"--charge led %s"[\s\S]{0,200}commandAction\(message_text/.test(ws));
     check('LED-08 both parameters can be read back (getparam)', (ws.match(/paramName\.equals\("boardled"\)/g) || []).length === 2 && (ws.match(/paramName\.equals\("chargeled"\)/g) || []).length === 2);

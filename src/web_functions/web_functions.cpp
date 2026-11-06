@@ -11,6 +11,8 @@
 #include <configuration.h>
 #include <debugconf.h>
 #include "web_functions.h"
+#include "web_oled_shot.h"
+#include "web_txbuf.h"     // WEB-TX-01: webTxBeginChunked in send_http_header
 #include "esp32/netif_mtu.h" // NMTU-01 (lwIP part ESP32 only)
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
@@ -1233,6 +1235,12 @@ void work_webpage(void)
                             sub_screen_rgb565();
                         }
 #endif
+#if OLED_SHOT_WEB
+                        else if (web_header.startsWith("GET /screen.oled"))
+                        { // bench screenshot, tools/bench/oled_screenshot.py
+                            sub_screen_oled();
+                        }
+#endif
                         else if (web_header.indexOf("/config.json") >= 0)
                         { // CS-03: download the configuration as a file
                             // ### !!function will generate a HTML header itself
@@ -1441,7 +1449,7 @@ void deliver_scaffold(bool bget_password)
     // WEB-AUTH-01: login(), logout(), mcLoginFocus() -- challenge-response, must stay after the X-MC wrapper (mc.js above)
     webLoginScaffoldJs();
     // this function is used to load content depending on the navigation button pressed
-    web_client.println("function loadPage(page,sender,useSpinner) {" AU_LP_LEAVE "if(typeof rmPageLeave=='function')rmPageLeave();cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;if(typeof mcLoginFocus=='function')mcLoginFocus();mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='remote'&&cpage=='remote')rmPageInit();" AU_LP_INIT "if(page=='setup'&&typeof raSt=='function')raSt();}};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
+    web_client.println("function loadPage(page,sender,useSpinner) {" AU_LP_LEAVE "if(typeof rmPageLeave=='function')rmPageLeave();cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;if(typeof mcLoginFocus=='function')mcLoginFocus();mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='remote'&&cpage=='remote')rmPageInit();" AU_LP_INIT "if(page=='setup'&&typeof raSt=='function')raSt();}else if(this.readyState==4&&useSpinner)document.getElementById('content_layer').innerHTML='Node did not answer completely. Please reload.';};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
     web_client.println("</script>\n");
 #if defined(ESP32)
     web_client.println("<script src=\"/mcau.js?v=" WEB_MC_AU_JS_TAG "\"></script>"); // AU web GUI: Info page Auto update row
@@ -3335,7 +3343,7 @@ void sub_page_setup()
     _create_setup_textinput_element("owndns", "DNS", String(meshcom_settings.node_dns), "192.168.2.1", "setowndns", 50, false, true);             // create Textinput-Element including Label and Button
     _create_setup_textinput_element("ownntp", "NTP", String(meshcom_settings.node_ownntp), "192.168.2.1", "setownntp", 50, false, true);          // create Textinput-Element including Label and Button
 
-    _create_setup_textinput_element("extudp", "ext. UDP IP", String(meshcom_settings.node_extern), "192.168.100.100", "extudpip", 50, false, false); // create Textinput-Element including Label and Button
+    _create_setup_textinput_element("extudpip", "ext. UDP IP", String(meshcom_settings.node_extern), "192.168.100.100", "extudpip", 50, false, false); // create Textinput-Element including Label and Button
 
     web_client.println("</div><div class=\"grid grid2\">");
     #if defined(HAS_ETHERNET)
@@ -4307,11 +4315,13 @@ void send_http_header(uint16_t http_status_code, uint8_t content_type, const cha
     // No Access-Control-Allow-* headers: the GUI is same-origin and no cross-origin consumer is documented
     if (extra_header && extra_header[0])
         web_client.println(extra_header); // WEB-AUTH-01: Set-Cookie of the login / logout answers
+    web_client.println("Transfer-Encoding: chunked");                         // WEB-TX-01: a cut page is visibly incomplete
     web_client.println("Connection: close");                                  // tell broser that the connection will be closed (in opposite to keep-alive)
     web_client.println("Cache-Control: no-cache, no-store, must-revalidate"); // set caching policy
     web_client.println("Pragma: no-cache");                                   // Disable caching or request/respinse
     web_client.println("Expires: 0");                                         // set cache expiring time to 0
     web_client.println();                                                     // two CR-LF marks the end of the header
+    webTxBeginChunked(web_client);                                            // WEB-TX-01: every flush from here on is one chunk
 }
 
 /**
@@ -4397,12 +4407,12 @@ void _create_setup_switch_element(const char id[], const char labelText[], const
 __attribute__((unused)) static void _create_setup_led_mode_element(const char id[], const char labelText[], const char descriptionText[], int mode)
 {
     web_client.printf("<label id=\"%s_lbl\" for=\"%s_off\">%s <span class=\"font-small\">(%s)</span></label>\n", id, id, labelText, descriptionText);
-    web_client.printf("<div role=\"group\" aria-labelledby=\"%s_lbl\">\n", id);
+    web_client.printf("<div class=\"mcledgrp\" role=\"group\" aria-labelledby=\"%s_lbl\">\n", id);
     const char *names[3] = {"off", "flash", "steady"};
     for (int i = 0; i < 3; i++)
     {
         const bool on = (mode == i);
-        web_client.printf("<button type=\"button\" class=\"mctab%s\" id=\"%s_%s\" aria-pressed=\"%s\" onclick=\"setvalue('%s','%s',true)\">%s</button>\n",
+        web_client.printf("<button type=\"button\" class=\"mctab mcledbtn%s\" id=\"%s_%s\" aria-pressed=\"%s\" onclick=\"setvalue('%s','%s',true)\">%s</button>\n",
                           on ? " mctab-on" : "", id, names[i], on ? "true" : "false", id, names[i], names[i]);
     }
     web_client.println("</div>");

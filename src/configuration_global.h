@@ -4,6 +4,13 @@
 // ihn einziehen; die uebrigen Envs kamen mit genau einem Include davon.
 #pragma once
 
+// CONFIG_IDF_TARGET_* below come from sdkconfig. Without this include the header picks the
+// classic-ESP32 branch on an S3 whenever it is reached before <Arduino.h>.
+// Native test envs define ESP32 too but have no sdkconfig.h.
+#if defined(ESP32) && __has_include(<sdkconfig.h>)
+#include <sdkconfig.h>
+#endif
+
 #define SOURCE_VERSION "4.40"
 #define SOURCE_VERSION_SUB "a"
 #define SOURCE_VERSION_WEB_SUB "a"

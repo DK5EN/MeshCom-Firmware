@@ -10,6 +10,8 @@ Values are case-sensitive.
 The Web-API is currently using the GET - request method. We may change that to POST later.
 The Web-API is not yet finished or stable. We will add or change things. Please stay in touch with us if you rely on the Web-API. 
 
+Page and JSON responses sent with the standard header (send_http_header) use chunked transfer encoding (Transfer-Encoding: chunked, no Content-Length), so a response that the node cut off is detectable as incomplete: the terminating zero-length chunk is missing and the HTTP client reports a network error.
+
 
 
 ============================================

@@ -2515,105 +2515,32 @@ static void update_header_wifi_indicator(void)
     if(header_wifi_icon == NULL)
         return;
 
-    // If the user explicitly disabled Wi‑Fi via the T‑Deck Settings, show
-    // the Wi‑Fi icon as 'off' (white) regardless of configured SSID.
-    {
-        if(!meshcom_settings.node_wifion)
-        {
-            if (bDEBUG)
-                Serial.printf("[TDECK]...update_header_wifi_indicator: node_wifion=false, WiFi.status=%d, ssid='%s'\n", (int)WiFi.status(), meshcom_settings.node_ssid);
-            
-            // TD-30: stays visible (dimmed, struck through) so a tap can switch WiFi back on
-            text_color_set_if_changed(header_wifi_icon, lv_palette_main(LV_PALETTE_GREY));
-            label_set_if_changed(header_wifi_icon, LV_SYMBOL_WIFI);
-            lv_obj_set_style_text_opa(header_wifi_icon, LV_OPA_40, LV_PART_MAIN);
-            lv_obj_set_style_text_decor(header_wifi_icon, LV_TEXT_DECOR_STRIKETHROUGH, LV_PART_MAIN);
-            lv_obj_clear_flag(header_wifi_icon, LV_OBJ_FLAG_HIDDEN);
-            return;
-        }
-        lv_obj_set_style_text_opa(header_wifi_icon, LV_OPA_COVER, LV_PART_MAIN);
-        lv_obj_set_style_text_decor(header_wifi_icon, LV_TEXT_DECOR_NONE, LV_PART_MAIN);
-    }
+    // TD-33: on = yellow (LIME), off = grey, always fully opaque. Same rule for BLE.
+    // The icon shows the switch the user toggles, so every tap flips it.
+    bool wifi_on = meshcom_settings.node_wifion;
 
-    // AP mode considered connected
-    // Check actual WiFi state for Green (Connected or AP created)
-    bool is_connected = (WiFi.status() == WL_CONNECTED);
-    bool is_ap_active = (WiFi.getMode() == WIFI_MODE_AP) || (WiFi.getMode() == WIFI_MODE_APSTA);
+    if (bDEBUG)
+        Serial.printf("[TDECK]...update_header_wifi_indicator: node_wifion=%d, on=%d, WiFi.status=%d\n", (int)wifi_on, (int)wifi_on, (int)WiFi.status());
 
-    if(is_connected || is_ap_active)
-    {
-        text_color_set_if_changed(header_wifi_icon, lv_palette_main(LV_PALETTE_GREEN));
-        label_set_if_changed(header_wifi_icon, LV_SYMBOL_WIFI);
-        lv_obj_clear_flag(header_wifi_icon, LV_OBJ_FLAG_HIDDEN);
-        return;
-    }
-
-    // If configured/enabled but not yet connected/active -> Red
-    // Only if global switch is ON (which we checked above, but double check logic)
-    if (bWIFIAP || bWEBSERVER || (strlen(meshcom_settings.node_ssid) > 1))
-    {
-        text_color_set_if_changed(header_wifi_icon, lv_palette_main(LV_PALETTE_LIME));  //ex lv_palette_main(LV_PALETTE_RED)
-        label_set_if_changed(header_wifi_icon, LV_SYMBOL_WIFI);
-        lv_obj_clear_flag(header_wifi_icon, LV_OBJ_FLAG_HIDDEN);
-    }
-    else
-    {
-        // Not enabled/configured -> White
-        text_color_set_if_changed(header_wifi_icon, lv_palette_main(LV_PALETTE_GREY)); //ex lv_color_white()
-        label_set_if_changed(header_wifi_icon, LV_SYMBOL_WIFI);
-        lv_obj_clear_flag(header_wifi_icon, LV_OBJ_FLAG_HIDDEN);   // TD-30: stay tappable
-    }
+    text_color_set_if_changed(header_wifi_icon, lv_palette_main(wifi_on ? LV_PALETTE_LIME : LV_PALETTE_GREY));
+    label_set_if_changed(header_wifi_icon, LV_SYMBOL_WIFI);
+    lv_obj_set_style_text_opa(header_wifi_icon, LV_OPA_COVER, LV_PART_MAIN);
+    // not colour alone (BITV): off keeps the strike-through, stays visible and tappable (TD-30)
+    lv_obj_set_style_text_decor(header_wifi_icon, wifi_on ? LV_TEXT_DECOR_NONE : LV_TEXT_DECOR_STRIKETHROUGH, LV_PART_MAIN);
+    lv_obj_clear_flag(header_wifi_icon, LV_OBJ_FLAG_HIDDEN);
 }
 
 static void update_header_bt_indicator(void)
 {
     if(header_bt_icon == NULL)
         return;
-    // Always render the icon glyph in white
-    text_color_set_if_changed(header_bt_icon, lv_palette_main(LV_PALETTE_GREY)); //ex lv_color_white()
+
+    // TD-33: on = yellow (LIME), off = grey, always fully opaque
+    bool ble_on = meshcom_settings.node_bleon;
+    text_color_set_if_changed(header_bt_icon, lv_palette_main(ble_on ? LV_PALETTE_LIME : LV_PALETTE_GREY));
     label_set_if_changed(header_bt_icon, LV_SYMBOL_BLUETOOTH);
-
-    // TD-30: BLE switched off by the user: dimmed + struck through, nothing else to show
-    if(!meshcom_settings.node_bleon)
-    {
-        lv_obj_set_style_text_opa(header_bt_icon, LV_OPA_40, LV_PART_MAIN);
-        lv_obj_set_style_text_decor(header_bt_icon, LV_TEXT_DECOR_STRIKETHROUGH, LV_PART_MAIN);
-        return;
-    }
     lv_obj_set_style_text_opa(header_bt_icon, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_text_decor(header_bt_icon, LV_TEXT_DECOR_NONE, LV_PART_MAIN);
-
-    /* KBC
-    // Ensure a square touch/visual area for the icon
-    lv_obj_set_size(header_bt_icon, 22, 22);
-    lv_obj_set_style_text_align(header_bt_icon, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(header_bt_icon, 0, LV_PART_MAIN);
-
-    // Default: no border / transparent background
-    lv_obj_set_style_border_width(header_bt_icon, 0, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(header_bt_icon, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_radius(header_bt_icon, 12, LV_PART_MAIN);
-    */
-
-    // deviceConnected is set by NimBLE callbacks
-    if (deviceConnected)
-    {
-        // Connected: blue logo
-        text_color_set_if_changed(header_bt_icon, lv_palette_main(LV_PALETTE_LIME)); //ex lv_color_make(0x00, 0x00, 0xff)
-    }
-    else
-    {
-        // BLE advertising active: white glyph with white ring
-        if (strlen(cBLEName) > 1)
-        {
-            //ex lv_obj_set_style_border_width(header_bt_icon, 2, LV_PART_MAIN);
-            lv_obj_set_style_border_color(header_bt_icon, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN); //ex lv_color_white()
-        }
-        else
-        {
-            // BLE disabled: plain white glyph, no border (default above)
-        }
-    }
+    lv_obj_set_style_text_decor(header_bt_icon, ble_on ? LV_TEXT_DECOR_NONE : LV_TEXT_DECOR_STRIKETHROUGH, LV_PART_MAIN);
 }
 
 /* Public wrappers so other modules can trigger a header refresh */
@@ -5120,7 +5047,12 @@ static void tdeckAppendVia(const NbrMask &entry, char *out, size_t outlen)
             continue;
         int n = snprintf(out + used, outlen - used, used ? "/%s" : "%s", rv.call);
         if (n < 0 || (size_t)n >= outlen - used)
+        {
+            out[used] = '\0';                // no half call in the Path column
+            if (used + 3 < outlen)
+                snprintf(out + used, outlen - used, "/+");
             break;
+        }
         used += (size_t)n;
     }
 }
@@ -5199,8 +5131,8 @@ void tdeck_refresh_path_view()
 
     uint16_t now_min = uptimeMin16();
 
-    char buf[64];
-    char via[48];
+    char buf[200];   // TD-34: was 64/48, cut long via chains
+    char via[160];
     uint16_t row = 0;
 
     tdeck_tbl_set(path_ta, row, 0, (char*)"Call");
@@ -5224,7 +5156,8 @@ void tdeck_refresh_path_view()
 
         tdeckAppendVia(v.entry, via, sizeof(via));
         snprintf(buf, sizeof(buf), "%u%s/%s", (unsigned)v.hops, v.gw ? "G" : "", via);
-        tdeck_tbl_set(path_ta, row, 2, buf);
+        // TD-34: path column wraps (no TEXT_CROP), the row grows; set_cell_value recomputes the height
+        lv_table_set_cell_value(path_ta, row, 2, buf);
 
         row++;
     }

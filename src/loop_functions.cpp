@@ -3921,6 +3921,92 @@ void DisplayPong(char line1[20], char line2[20], char line3[20], char line4[20])
     #endif
 }
 
+#if INSTRUMENT_ENABLED && MC_HAS_U8G2
+#include "oled_shot.h"
+
+// GET /screen.oled source: the u8g2 buffer itself, no copy. A torn read is fine for a bench tool.
+int oledShotSource(const uint8_t **buf, size_t *len, int *w, int *h)
+{
+    if(u8g2 == NULL)
+        return 1;
+    if(bDisplayIsOff || bDisplayOff)
+        return 2;
+    if(u8g2->getBufferTileHeight() * 8 < u8g2->getDisplayHeight())
+        return 3;
+    *w = (int)u8g2->getBufferTileWidth() * 8;
+    *h = (int)u8g2->getBufferTileHeight() * 8;
+    *len = (size_t)(*w) * (size_t)(*h) / 8u;
+    *buf = u8g2->getBufferPtr();
+    return 0;
+}
+
+// --oledtext: the message path's fold (text_fold -> Latin-1) and fonts (6x10_tf as sendDisplay1306,
+// 10x20_mf as DisplayPong), drawn straight into the panel like DisplayPong. Nothing is transmitted.
+// DisplayOffWait holds the frame; when it runs out esp32_main/nrf52_main resume the normal pages.
+int oledTextTest(const char *utf8, int font, int hold_s)
+{
+    if(u8g2 == NULL)
+        return 1;
+    if(utf8 == NULL || utf8[0] == 0x00)
+        return 2;
+
+    char fold[200];
+    size_t n = text_fold(utf8, strnlen(utf8, 160), fold, sizeof(fold), TF_LATIN1);
+    for(size_t i = 0; i < n; i++)
+        if((uint8_t)fold[i] < 0x20)
+            fold[i] = ' ';
+    fold[n] = 0x00;
+
+    const bool big = (font == 1);
+    const int cols = big ? 12 : 21;                 // 128 px / glyph width
+    const int rows = big ? 3 : 6;
+    const int step = big ? 20 : 10;
+    const int base = big ? 17 : 9;                  // baseline of row 0
+
+    char lines[6][23];
+    int nl = 0;
+    size_t pos = 0;
+    while(pos < n && nl < rows)
+    {
+        while(pos < n && fold[pos] == ' ' && nl > 0)   // no blank lead on continuation lines
+            pos++;
+        size_t take = n - pos;
+        if(take > (size_t)cols)
+        {
+            take = cols;
+            if(fold[pos + cols] != ' ')
+                for(size_t k = cols; k > 0; k--)          // back up to the last blank in the row
+                    if(fold[pos + k - 1] == ' ')
+                    {
+                        take = k;
+                        break;
+                    }
+        }
+        memcpy(lines[nl], fold + pos, take);
+        lines[nl][take] = 0x00;
+        pos += take;
+        nl++;
+    }
+
+    u8g2->clearDisplay();
+    oledInvalidate();
+    u8g2->firstPage();
+    do
+    {
+        u8g2->setFont(big ? u8g2_font_10x20_mf : u8g2_font_6x10_tf);
+        for(int i = 0; i < nl; i++)
+            u8g2->drawStr(0, base + i * step, lines[i]);   // Latin-1 bytes, as the message display
+    } while (u8g2->nextPage());
+
+    if(hold_s < 1) hold_s = 1;
+    if(hold_s > 600) hold_s = 600;
+    DisplayOffWait = millis() + (unsigned long)hold_s * 1000UL;
+    if(DisplayOffWait == 0) DisplayOffWait = 1;
+    bDisplayIsOff = false;
+    return 0;
+}
+#endif
+
 // D3-02: shared epilogue for locally originated APRS frames -- advance the
 // message-id counter, persist it only at the high-water mark (see
 // msgid_counter.h; DO NOT reorder these three calls, the persist-on-step

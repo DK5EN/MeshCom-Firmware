@@ -97,6 +97,9 @@ input:where([type="checkbox"][role="switch"]):checked::before {left:1.8em;}
 /* content definitions -> message-page tab bar */
 #mctabs {margin:6px 0;}
 #content_inner .mctab {display:inline-flex;align-items:center;border:solid 1px var(--mcgray);background-color:var(--mcbg);border-radius:5px;padding:2px 8px;margin-right:4px;cursor:pointer;}
+/* WEB-LED-02: three-way LED buttons share one width */
+#content_inner .mcledgrp {display:flex;flex-wrap:wrap;gap:4px;}
+#content_inner .mcledgrp .mcledbtn {box-sizing:border-box;width:5.5em;justify-content:center;margin-right:0;}
 #content_inner .mctab-new {background-color:var(--mclightgreen);}
 #content_inner .mctab-on {background-color:var(--mclightblue);}
 .mcbadge {font-size:var(--fs-s);font-weight:bold;margin-left:4px;}
