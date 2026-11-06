@@ -189,6 +189,10 @@ async function mkPage(node, opts) {
   const assetsH = fs.readFileSync(path.join(ROOT, 'src', 'web_functions', 'web_assets.h'), 'utf8');
   check('the mcau.js blob and its <script> tag sit inside #if defined(ESP32)', /#if defined\(ESP32\)\n\/\/ mcau\.js[^\n]*\n#define WEB_MC_AU_JS_TAG[\s\S]*?\n#endif/.test(assetsH) && /#if defined\(ESP32\)\n\s+web_client\.println\("<script src=\\"\/mcau\.js\?v=" WEB_MC_AU_JS_TAG/.test(cpp) && /data-blepause/.test(cpp));
   check('the row ids the JS needs exist in the C++ row', ['au_tr', 'au_row', 'au_msg', 'au_sched', 'au_err', 'au_hint', 'au_btn'].every((i) => cpp.indexOf('id=\\"' + i + '\\"') >= 0));
+  { // the install plan fields emit label + input + button: in a 2 column grid the buttons wrap onto their own rows
+    const planGrid = (id) => { const head = cpp.slice(0, cpp.indexOf('_create_setup_textinput_element("' + id + '"')); return head.slice(head.lastIndexOf('</div><div class=\\"grid grid')).slice(0, 31); };
+    check('Setup: the install plan fields sit in a 3 column grid', ['audelay', 'autime'].every((i) => /grid grid3/.test(planGrid(i))));
+  }
   check('banner and .au-banner CSS are gone', !/au-banner|au_banner/.test(cpp));
   check('loadPage hooks auPageLeave/auPageInit through RAK-empty macros', /#define AU_LP_LEAVE ""/.test(cpp) && /" AU_LP_LEAVE "/.test(cpp) && /AU_LP_INIT/.test(cpp));
   check('GET /austatus route sets web_cors_ok = false and is ESP32 only', /#if defined\(ESP32\)\n\s+else if \(web_header\.startsWith\("GET \/austatus"\)\)\n\s+\{[^\n]*\n\s+web_cors_ok = false;/.test(cpp));

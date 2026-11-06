@@ -1,0 +1,42 @@
+{
+ "src": "DK5EN-1",
+ "dst": "DK5EN-92",
+ "steps": [
+  {
+   "cmd": "sync",
+   "args": "",
+   "ctr": 0,
+   "s": 5.0,
+   "reply": "RM1 0 ok ctr=0 v=4.40a 250ae064adb29a86",
+   "verified": true
+  },
+  {
+   "cmd": "status",
+   "args": "",
+   "ctr": 1,
+   "s": 5.5,
+   "reply": "RM1 1 ok v=4.40a up=14 bat=100 heap=62 s=GtdmWl p=2/0/20 rs=0 0c16df603ad568d9",
+   "verified": true
+  },
+  {
+   "cmd": "upd",
+   "args": "",
+   "ctr": 2,
+   "s": 5.0,
+   "reply": "RM1 2 ok m=notify c=dev n=0 a=v4.40a.11.01 st=- b=0 g=0 ck=4 e=- 69dab6061ad2a02a",
+   "verified": true
+  },
+  {
+   "cmd": "net",
+   "args": "",
+   "ctr": 3,
+   "s": 5.0,
+   "reply": "RM1 3 ok mtu=1280 srv=OE net=inet eff=inet 2a1f7348b48a73d7",
+   "verified": true
+  }
+ ],
+ "info_after": [
+  "Remote management (RM1): off"
+ ],
+ "pass": true
+}

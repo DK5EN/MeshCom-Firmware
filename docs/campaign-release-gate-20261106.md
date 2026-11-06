@@ -30,7 +30,7 @@ pass. Reproduce on a non-INSTRUMENT image first.
 | W2   | AU-22, EXT-PEER-01, WEB-PIN-01, TD-34, each with a regression test                      | 3 implementers, advisor  | done   |
 | W3   | RX-TX-02: sender frame counts against the tool count, to TEST at 2 dBm or less          | orchestrator, bench      | done   |
 | W4   | Push, `ci-proof-*` draft build, CI images on the four bench nodes                       | orchestrator             | done   |
-| W5   | Chrome GUI pass (RAK, T-Deck, T-Beam, Setup grid), Safeboot `/ota`, manipulated         | orchestrator, serialized | open   |
+| W5   | Chrome GUI pass (RAK, T-Deck, T-Beam, Setup grid), Safeboot `/ota`, manipulated         | orchestrator, serialized | done   |
 |      | `.autoupdate`, slow client, EXTUDP, RM round trip, Ethernet                             |                          |        |
 | W6   | 1 h soak on CI images, heap compared with 11.01                                         | orchestrator, background | open   |
 
@@ -39,16 +39,9 @@ need the RM password file.
 
 ## Next
 
-W5, serialized on the bench. All four nodes run the CI images of `44075ef3`: DK5EN-92 (`.71`), DK5EN-14 (`.68`), DK5EN-1 (`.73`, WiFi only) and DK5EN-90
-(`.66`). Addresses are DHCP: confirm with `identity_guard.py` first. The draft is deleted, so the CI images and `.autoupdate` files are only in
-`ci-images/` in the session scratchpad; if that is gone, re-run a `ci-proof-*` build for a soak on the same images. The W2 probe for the W5 EXTUDP run is
-`w2_probe_after.py` in the same scratchpad: register query replies as the probe, `--serial` for the RAK. W5 also runs a peer change during a WiFi drop on
-ESP32.
-
-W5 tools: GUI by Chrome, logs to `tools/bench/runs/harness/gui-20261106/`. Safeboot `tools/webflash.py --bin`. Manipulated `.autoupdate`: no bench tool
-exists, upload a corrupted copy through `/ota` by hand or script. Slow client `tools/bench/web_throttle.sh` (sudo, operator) with `web_stall_client.py`,
-recipe `docs/campaign-web-wdt-20261019.md:50`. EXTUDP `docs/bench-extudp-regression.md`. RM `tools/remote_cmd.py`. Ethernet `tools/bench/eth03_probe.py`, no
-recipe on file. W6 uses `tools/bench/heap_idle.py`; the 11.01 figure (68.7 KB) exists only in this doc, no raw log.
+W6: 1 h soak running on the CI images of `44075ef3`, without a browser or phone on the nodes, logs `tools/bench/runs/harness/w6-*.json`. Compare with
+11.01 (68.7 KB idle on DK5EN-92) and take the baseline decision: W0 measured -4.6 KB against the 3 KB tolerance. After W6: release decision. The CI images do not
+hold the W5 grid fix (`WEB-GRID-01`, a Setup layout string, no heap effect expected); the release build does.
 
 ## W2 file ownership
 
@@ -87,5 +80,19 @@ recipe on file. W6 uses `tools/bench/heap_idle.py`; the 11.01 figure (68.7 KB) e
 - W4 (2026-11-06): `fork-dev` pushed at `44075ef3`. `ci-proof-20261106-44075ef3` run 42258106988 green, 68 assets; draft and tag deleted afterwards. All four
   nodes run the CI images, build strings seen on the node and found in the image: DK5EN-92 17:08:29, DK5EN-14 17:34:44, DK5EN-1 17:19:23, DK5EN-90 17:10:31
   (UTC). Identity guard passed on all four, 2 dBm. The RAK took the CI `wiscore_rak4631.zip` by serial DFU with the 1200 touch ("Device programmed.")
-  instead of the UF2, which needs a hand on the reset button. `--update forget` answered `[AU];forget;ok` only on DK5EN-1; DK5EN-92 and DK5EN-14 sent no
+  instead of the UF2. `--dfu` over the console is the operator-named way into update mode, no reset button needed. `--update forget` answered `[AU];forget;ok` only on DK5EN-1; DK5EN-92 and DK5EN-14 sent no
   `[AU]` line over 2323 within 3 s, so a stage on them is not proven cleared, though both OTA flashes verified. No code change, so no gate run and no advisor pass.
+- W5 (2026-11-06, CI images, logs `w5-20261106/`): pass with one fix. Chrome tour RAK, T-Beam, T-Deck: all pages, no console errors. Check now on the T-Beam with a
+  browser open: no refusal; a second click inside 60 s answers 422 "try again in a minute", which is the cooldown. `WEB-GRID-01` found and fixed: the Firmware Update
+  card put 3 column rows into a 2 column grid; fail-before and mutation of `webgui_au_test.js`, checked in Chrome on DK5EN-14 with a local build, advisor approved.
+  Manipulated `.autoupdate` on DK5EN-92 (`au-manip-92.json`): flipped byte, wrong Adler, truncated, tampered image with old and matching MD5, other chip: 6 of 6
+  refused, each with its reason, heap steady; a clean upload recovered from `app_valid` false. Safeboot page in Chrome on DK5EN-14: a manipulated file is refused before
+  anything is written, the clean `.autoupdate` installs and the app returns. EXTUDP (`probe-*.json`): peer change passes on all four. WiFi drop on DK5EN-14
+  (`wifi-drop-14.json`): the peer changed during the drop holds after reconnect, no reboot. Slow client on DK5EN-92 at 2.5 s reply delay: `/`, setup and stall survived,
+  uptime continuous. RM round trip DK5EN-1 to DK5EN-92 (`rm-roundtrip.json`): 4 of 4 replies verified, about 5 s, relayed by DK5EN-98 over the server; `upd` shows `ck=4`,
+  so `AU-22` is seen on a node. Ethernet (`eth03-*.summary`): 20 datagrams at 0.5 s and 1.2 s on the RAK, no reset. Phone, operator: BLE on DK5EN-92 and DK5EN-90 with a DM and
+  its ACK, reconnect without pairing; on DK5EN-92 with the phone held the row offers "Pause Bluetooth and check", the check ends "up to date", no reboot, BLE returns by
+  itself. Not proven: the `AU-23` restart on a split heap under the phone guard (this run may not have hit a split heap). The RAK secrets check could not run:
+  `BLE-SET-01`, characteristic `0xF0A1` does not exist on the air. Gate: Unity 101 envs, 3602 cases; stage 2 pass, 1500 pytest. Only `t_deck_plus` was built with the fix
+  (change is inside `#if defined(ESP32)`); CI covers all envs at release. Bench nodes back on CI images; EXTUDP and RM off on the tested nodes. Pitfalls: `--extudp` over a
+  short serial session on the RAK took effect only at the next port open, so hold the session 2 s before and after; `/callfunction/?otaupdate` needs `X-MC: 1`.

@@ -3264,6 +3264,7 @@ void sub_page_setup()
             const int s_tm = (meshcom_settings.node_autime >= 0 && meshcom_settings.node_autime <= 1439) ? meshcom_settings.node_autime : FWSCHED_TIME_DEFAULT;
             char s_tms[8];
             snprintf(s_tms, sizeof(s_tms), "%02d:%02d", s_tm / 60, s_tm % 60);
+            web_client.println("</div><div class=\"grid grid3\">"); // text fields emit label + field + button
             _create_setup_textinput_element("audelay", "Planned install: days after release (0-7)", String(s_delay), "3", "audelay", 1, false, false);
             web_client.println("<label for=\"auday\">Planned install: weekday :</label>");
             web_client.println("<select id=\"auday\" name=\"auday\" style=\"grid-column:2/-1\" onchange=\"setvalue('auday',this.value,true);\">");

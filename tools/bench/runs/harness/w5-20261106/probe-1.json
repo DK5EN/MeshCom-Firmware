@@ -1,0 +1,27 @@
+{
+ "host": "192.168.68.73",
+ "call": "DK5EN-1",
+ "A_control_me": true,
+ "B_cmd_me_to_other": false,
+ "C_control_other": false,
+ "D_cmd_other_to_me": true,
+ "E_web_answer": [
+  200,
+  "{\"returncode\":0,\"extudpip\":\"192.168.68.71\"}\r\n"
+ ],
+ "E_web_me_to_other": false,
+ "F_web_other_to_me": true,
+ "N_none": false,
+ "V_valid_after_none": true,
+ "R_refused_lines": [],
+ "R_refused": false,
+ "V2_valid_after_refused": true,
+ "G_mcpout_input": [
+  422,
+  "{\"returncode\":1,\"mcpouta0\":\"\"}\r\n"
+ ],
+ "G_mcpout_badport": [
+  422,
+  "{\"returncode\":1,\"mcpoutc9\":\"\"}\r\n"
+ ]
+}

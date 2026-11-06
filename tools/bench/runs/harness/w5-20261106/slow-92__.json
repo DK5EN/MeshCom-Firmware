@@ -1,0 +1,24 @@
+{
+  "host": "192.168.68.71",
+  "mode": "normal",
+  "path": "/",
+  "rebooted": false,
+  "abort": null,
+  "bytes": 24764,
+  "ms": 10304,
+  "http_alive": true,
+  "request_error": null,
+  "evidence": [],
+  "web_lines": [],
+  "console_dropped": true,
+  "uptime_before_ms": 870934,
+  "uptime_after_ms": 895794,
+  "elapsed_ms": 24701,
+  "uptime_reset": false,
+  "after_boot": {
+    "reset_reason": 3,
+    "reset_name": "SW",
+    "last_loop_section": null,
+    "entered_ms": null
+  }
+}

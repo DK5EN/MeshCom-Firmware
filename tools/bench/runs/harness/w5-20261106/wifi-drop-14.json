@@ -1,0 +1,28 @@
+{
+ "host": "192.168.68.68",
+ "web_up_after_open_s": 0.1,
+ "A_control_me": true,
+ "web_down_while_off": true,
+ "web_up_after_on_s": 6.5,
+ "B_peer_changed_while_down_old_peer_silent": false,
+ "C_change_back_after_reconnect": true,
+ "boot_lines": [
+  "[BOOT] RESET_REASON=3 SW"
+ ],
+ "ext_lines": [
+  "[EXT]...now listening at IP 192.168.68.68, UDP port 1799",
+  "[EXT]...now sending   to IP 192.168.68.71, UDP port 1799",
+  "[EXT] Inc: {\"type\":\"reg\",\"q\":\"SN\"}",
+  "[EXT];rx;len;23;stack_hwm;4420;ms;519445",
+  "--extudpip 192.168.68.58",
+  "[EXT] to IP:192.168.68.58",
+  "[EXT]...now listening at IP 192.168.68.68, UDP port 1799",
+  "[EXT]...now sending   to IP 192.168.68.58, UDP port 1799",
+  "[EXT];tx;len;206;stack_hwm;4420;ms;524015",
+  "[EXT] Inc: {\"type\":\"reg\",\"q\":\"SN\"}",
+  "[EXT];rx;len;23;stack_hwm;4420;ms;528559",
+  "--extudpip none",
+  "--extudp off"
+ ],
+ "pass": true
+}

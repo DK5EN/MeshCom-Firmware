@@ -1,0 +1,132 @@
+{
+ "host": "192.168.68.71",
+ "env": "ttgo_tbeam",
+ "before": {
+  "call": "DK5EN-92",
+  "hardware": "TBEAM_AXP2101",
+  "build": "Nov  6 2026 / 17:08:47",
+  "version": "4.40a"
+ },
+ "cases": [
+  {
+   "case": "flip_mid_stream",
+   "bytes": 1236128,
+   "http": 400,
+   "body": "inflate_failed",
+   "state": "aborted",
+   "reason": "inflate_failed",
+   "app_valid": false,
+   "image_valid": false,
+   "heap_free": 265220,
+   "heap_block": 110592,
+   "expected": [
+    "inflate_failed"
+   ],
+   "pass": true,
+   "s": 15.6
+  },
+  {
+   "case": "truncated_half",
+   "bytes": 618064,
+   "http": 400,
+   "body": "incomplete_upload",
+   "state": "aborted",
+   "reason": "incomplete_upload",
+   "app_valid": false,
+   "image_valid": false,
+   "heap_free": 265196,
+   "heap_block": 110592,
+   "expected": [
+    "incomplete_upload"
+   ],
+   "pass": true,
+   "s": 8.2
+  },
+  {
+   "case": "adler_wrong",
+   "bytes": 1236128,
+   "http": 400,
+   "body": "inflate_failed",
+   "state": "aborted",
+   "reason": "inflate_failed",
+   "app_valid": false,
+   "image_valid": false,
+   "heap_free": 265216,
+   "heap_block": 110592,
+   "expected": [
+    "inflate_failed"
+   ],
+   "pass": true,
+   "s": 16.4
+  },
+  {
+   "case": "image_tampered_hash_original",
+   "bytes": 1236127,
+   "http": 400,
+   "body": "md5_mismatch",
+   "state": "aborted",
+   "reason": "md5_mismatch",
+   "app_valid": false,
+   "image_valid": false,
+   "heap_free": 265164,
+   "heap_block": 110592,
+   "expected": [
+    "md5_mismatch"
+   ],
+   "pass": true,
+   "s": 16.3
+  },
+  {
+   "case": "image_tampered_hash_matching",
+   "bytes": 1236127,
+   "http": 400,
+   "body": "activate_failed",
+   "state": "aborted",
+   "reason": "activate_failed",
+   "app_valid": false,
+   "image_valid": false,
+   "heap_free": 264996,
+   "heap_block": 110592,
+   "expected": [
+    "activate_failed",
+    "not_bootable",
+    "update_error"
+   ],
+   "pass": true,
+   "s": 16.8
+  },
+  {
+   "case": "other_chip_image",
+   "bytes": 1173401,
+   "http": 400,
+   "body": "activate_failed",
+   "state": "aborted",
+   "reason": "activate_failed",
+   "app_valid": false,
+   "image_valid": false,
+   "heap_free": 265176,
+   "heap_block": 110592,
+   "expected": [
+    "activate_failed",
+    "begin_failed",
+    "not_bootable",
+    "update_error",
+    "write_failed"
+   ],
+   "pass": true,
+   "s": 15.8
+  }
+ ],
+ "clean": {
+  "http": 200,
+  "state": "done",
+  "s": 30.0
+ },
+ "after": {
+  "call": "DK5EN-92",
+  "hardware": "TBEAM_AXP2101",
+  "build": "Nov  6 2026 / 17:08:47",
+  "version": "4.40a"
+ },
+ "pass": true
+}
