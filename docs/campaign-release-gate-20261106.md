@@ -32,7 +32,7 @@ pass. Reproduce on a non-INSTRUMENT image first.
 | W4   | Push, `ci-proof-*` draft build, CI images on the four bench nodes                       | orchestrator             | done   |
 | W5   | Chrome GUI pass (RAK, T-Deck, T-Beam, Setup grid), Safeboot `/ota`, manipulated         | orchestrator, serialized | done   |
 |      | `.autoupdate`, slow client, EXTUDP, RM round trip, Ethernet                             |                          |        |
-| W6   | 1 h soak on CI images, heap compared with 11.01                                         | orchestrator, background | open   |
+| W6   | 1 h soak on CI images, heap compared with 11.01                                         | orchestrator, background | done   |
 
 Operator: BLE and RAK secrets with a real phone (checklist from W5); slow client dummynet needs sudo; the RM round trip may
 need the RM password file.
@@ -104,3 +104,8 @@ CI build; a pure text or layout change gets the smoke test.
   `BLE-SET-01`, characteristic `0xF0A1` does not exist on the air. Gate: Unity 101 envs, 3602 cases; stage 2 pass, 1500 pytest. Only `t_deck_plus` was built with the fix
   (change is inside `#if defined(ESP32)`); CI covers all envs at release. Bench nodes back on CI images; EXTUDP and RM off on the tested nodes. Pitfalls: `--extudp` over a
   short serial session on the RAK took effect only at the next port open, so hold the session 2 s before and after; `/callfunction/?otaupdate` needs `X-MC: 1`.
+- W6 (2026-11-06, 19:54 to 20:59, CI images of `44075ef3`, `w6-idle-*.json`): no leak and no reboot; RAK up since 19:00:31. T-Beam 65728 at the start, 65184 at 20:14, 64128 at 20:19, 64016 at the end, so 112 B
+  over the last 40 min. Heltec 104748 to 103324, last 40 min flat. T-Deck swings between 68296 and 70120. Against 11.01 (68.7 KB) the T-Beam is 4.7 KB lower, above the 3 KB tolerance. The drop of about 1 KB between
+  20:14 and 20:19 (T-Beam and Heltec 1056 B each, T-Deck about 1.5 KB) sits in the one interval with a web request from the orchestrator (`/austatus` at 20:15): timing only, cause not proven, so the 65.2 KB before it is
+  the best figure without web use, still 3.5 KB below 11.01. The soak was not free of web use. The raw log is mixed (three runs shared one file), the per node figures are separate. The first start stopped after 60 s:
+  with `--setlog on` it needs `--boot-timeout-s 400`.

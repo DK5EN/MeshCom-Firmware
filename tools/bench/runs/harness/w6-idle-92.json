@@ -1,0 +1,68 @@
+{
+  "init_free": null,
+  "boot_marks": [
+    {
+      "label": "stat",
+      "free": 65728
+    },
+    {
+      "label": "stat",
+      "free": 65720
+    },
+    {
+      "label": "stat",
+      "free": 65184
+    },
+    {
+      "label": "stat",
+      "free": 65184
+    },
+    {
+      "label": "stat",
+      "free": 64128
+    },
+    {
+      "label": "stat",
+      "free": 64128
+    },
+    {
+      "label": "stat",
+      "free": 64128
+    },
+    {
+      "label": "stat",
+      "free": 64128
+    },
+    {
+      "label": "stat",
+      "free": 64128
+    },
+    {
+      "label": "stat",
+      "free": 64016
+    },
+    {
+      "label": "stat",
+      "free": 64016
+    },
+    {
+      "label": "stat",
+      "free": 64016
+    },
+    {
+      "label": "stat",
+      "free": 64016
+    }
+  ],
+  "last_mon_free": null,
+  "last_stat_free": 64016,
+  "idle_free": 64016,
+  "min_free": null,
+  "min_free_seen": 64016,
+  "largest_block": null,
+  "psram_last_free": null,
+  "samples": 13,
+  "firmware_version": "40a/20261101",
+  "channel": "net2323",
+  "raw_log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/harness/heap_idle_20261106_195530.log"
+}
