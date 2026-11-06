@@ -29,7 +29,7 @@ pass. Reproduce on a non-INSTRUMENT image first.
 | W1   | Heap fix: idle flat within 1 KB over 30 min, 10 of 10 "Check now" with a browser open   | orchestrator, advisor    | done   |
 | W2   | AU-22, EXT-PEER-01, WEB-PIN-01, TD-34, each with a regression test                      | 3 implementers, advisor  | done   |
 | W3   | RX-TX-02: sender frame counts against the tool count, to TEST at 2 dBm or less          | orchestrator, bench      | done   |
-| W4   | Push, `ci-proof-*` draft build, CI images on the four bench nodes                       | orchestrator             | open   |
+| W4   | Push, `ci-proof-*` draft build, CI images on the four bench nodes                       | orchestrator             | done   |
 | W5   | Chrome GUI pass (RAK, T-Deck, T-Beam, Setup grid), Safeboot `/ota`, manipulated         | orchestrator, serialized | open   |
 |      | `.autoupdate`, slow client, EXTUDP, RM round trip, Ethernet                             |                          |        |
 | W6   | 1 h soak on CI images, heap compared with 11.01                                         | orchestrator, background | open   |
@@ -39,10 +39,16 @@ need the RM password file.
 
 ## Next
 
-W4: push `fork-dev` (approved), `ci-proof-*` draft build, CI images on the four bench nodes, then delete the draft and its tag. Bench state: DK5EN-92
-(`.71`), DK5EN-14 (`.68`) and DK5EN-90 (`.66`) run local release builds of the W2 tree; DK5EN-1 (`.73`, WiFi only, OTA) still runs an INSTRUMENT build
-of `e7a6fbeb`. The W2 probe for the W5 EXTUDP run is `w2_probe_after.py` in the session scratchpad: register query replies as the probe, `--serial` for
-the RAK. W5 also runs a peer change during a WiFi drop on ESP32.
+W5, serialized on the bench. All four nodes run the CI images of `44075ef3`: DK5EN-92 (`.71`), DK5EN-14 (`.68`), DK5EN-1 (`.73`, WiFi only) and DK5EN-90
+(`.66`). Addresses are DHCP: confirm with `identity_guard.py` first. The draft is deleted, so the CI images and `.autoupdate` files are only in
+`ci-images/` in the session scratchpad; if that is gone, re-run a `ci-proof-*` build for a soak on the same images. The W2 probe for the W5 EXTUDP run is
+`w2_probe_after.py` in the same scratchpad: register query replies as the probe, `--serial` for the RAK. W5 also runs a peer change during a WiFi drop on
+ESP32.
+
+W5 tools: GUI by Chrome, logs to `tools/bench/runs/harness/gui-20261106/`. Safeboot `tools/webflash.py --bin`. Manipulated `.autoupdate`: no bench tool
+exists, upload a corrupted copy through `/ota` by hand or script. Slow client `tools/bench/web_throttle.sh` (sudo, operator) with `web_stall_client.py`,
+recipe `docs/campaign-web-wdt-20261019.md:50`. EXTUDP `docs/bench-extudp-regression.md`. RM `tools/remote_cmd.py`. Ethernet `tools/bench/eth03_probe.py`, no
+recipe on file. W6 uses `tools/bench/heap_idle.py`; the 11.01 figure (68.7 KB) exists only in this doc, no raw log.
 
 ## W2 file ownership
 
@@ -78,3 +84,8 @@ the RAK. W5 also runs a peer change during a WiFi drop on ESP32.
   misses sit next to relayed copies, so channel load is the likely cause, not proven. Replay of the 11-06 log: requested 60, ring refused 20, on air 22,
   still queued 18. Tool only, no firmware change, so no advisor pass. Stage 2 pass, 21 tool tests, fail-before 4. The drain wait itself ran only in the
   host tests. Burst frames reach the real mesh through relays (DK5EN-98, DL2JA-2): group TEST, but it loads the channel.
+- W4 (2026-11-06): `fork-dev` pushed at `44075ef3`. `ci-proof-20261106-44075ef3` run 42258106988 green, 68 assets; draft and tag deleted afterwards. All four
+  nodes run the CI images, build strings seen on the node and found in the image: DK5EN-92 17:08:29, DK5EN-14 17:34:44, DK5EN-1 17:19:23, DK5EN-90 17:10:31
+  (UTC). Identity guard passed on all four, 2 dBm. The RAK took the CI `wiscore_rak4631.zip` by serial DFU with the 1200 touch ("Device programmed.")
+  instead of the UF2, which needs a hand on the reset button. `--update forget` answered `[AU];forget;ok` only on DK5EN-1; DK5EN-92 and DK5EN-14 sent no
+  `[AU]` line over 2323 within 3 s, so a stage on them is not proven cleared, though both OTA flashes verified. No code change, so no gate run and no advisor pass.
