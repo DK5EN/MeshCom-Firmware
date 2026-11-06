@@ -262,3 +262,24 @@ static inline size_t auStatusJson(const AuUiIn &in, char *out, size_t cap)
     out[w.n] = 0;
     return w.n;
 }
+
+// Appends `"sched":"<notice>"` to the object auStatusJson() wrote (n chars, closing '}'), like fwJsonAppendUp.
+// Returns the new length; body is left as it was when it does not fit. An empty notice is still sent (the page
+// clears its line).
+static inline size_t auAppendSched(char *body, size_t cap, size_t n, const char *text)
+{
+    if (body == 0 || n < 2 || body[n - 1] != '}' || n >= cap)
+        return n;
+    AuJsonW w = {body, cap, n - 1, false};
+    w.key("sched");
+    w.str(text ? text : "");
+    w.put('}');
+    if (w.bad || w.n >= cap)
+    {
+        body[n - 1] = '}';
+        body[n] = 0;
+        return n;
+    }
+    body[w.n] = 0;
+    return w.n;
+}

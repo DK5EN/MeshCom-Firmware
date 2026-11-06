@@ -908,7 +908,7 @@ void test_setparam_update_names_need_xmc(void)
 {
     std::string with = req("GET /setparam/?updchan=dev HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
     std::string without = req("GET /setparam/?updchan=dev HTTP/1.1", {"Host: 192.168.68.71"});
-    const char *names[] = {"aumode", "autoupdate", "updchan"};
+    const char *names[] = {"aumode", "autoupdate", "updchan", "audelay", "auday", "autime"};
     const char *values[] = {"dev", "auto", "notify", "prod", ""};
     for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++)
         for (size_t v = 0; v < sizeof(values) / sizeof(values[0]); v++)
@@ -921,6 +921,7 @@ void test_setparam_update_names_need_xmc(void)
     // look-alike names are not update names
     TEST_ASSERT_TRUE(webGuardSetparamAllowed("rmstrict", "on", without.c_str(), without.size()));
     TEST_ASSERT_TRUE(webGuardSetparamAllowed("updchanx", "dev", without.c_str(), without.size()));
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("audelayx", "3", without.c_str(), without.size()));
 }
 
 int main(int, char **)

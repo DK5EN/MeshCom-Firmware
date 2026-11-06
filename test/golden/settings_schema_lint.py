@@ -306,6 +306,9 @@ FIELD_CLASSIFICATION: Dict[str, str] = {
     "node_rmstrict": PERSIST,  # added 2026-10-10, BF-01 (after the triage snapshot)
     "node_autoupd": PERSIST,  # added 2026-10-05, AU-03 / #1187 (after the triage snapshot)
     "node_updchan": PERSIST,  # added 2026-10-05, AU-03 / #1187 (after the triage snapshot)
+    "node_audelay": PERSIST,  # added 2026-11-06, AU install schedule (src/fw_schedule.h): days after the release
+    "node_auday": PERSIST,  # added 2026-11-06, AU install schedule: weekday 0 none / 1..7 Mon..Sun
+    "node_autime": PERSIST,  # added 2026-11-06, AU install schedule: install time as minute of day
     "node_parm": PERSIST,
     "node_parm_1": RUNTIME,
     "node_parm_id": RUNTIME,
@@ -366,9 +369,9 @@ FIELD_CLASSIFICATION: Dict[str, str] = {
     "valid_mark_1": RUNTIME,
     "valid_mark_2": RUNTIME,
 }
-assert len(FIELD_CLASSIFICATION) == 158, (
+assert len(FIELD_CLASSIFICATION) == 161, (
     f"FIELD_CLASSIFICATION has {len(FIELD_CLASSIFICATION)} entries, expected "
-    f"158 (157 + node_bleon TD-30; 156 + node_gwlab, F1 --gateway lab) -- TRIAGE_DOC section 3's original 147 minus auto_join, "
+    f"161 (158 + node_audelay/node_auday/node_autime, AU install schedule; 157 + node_bleon TD-30; 156 + node_gwlab, F1 --gateway lab) -- TRIAGE_DOC section 3's original 147 minus auto_join, "
     f"send_repeat_time and node_ackid, removed from struct s_meshcom_settings "
     f"outright in the D1-04 W3 struct merge (see the comment above this table), "
     f"plus node_ethmtu (2026-10-01, #1183), node_tz (2026-10-04, TZ-01) and "

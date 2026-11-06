@@ -39,6 +39,7 @@
 #include "printfdeb_functions.h"
 
 #include "via_functions.h"
+#include "udp_hold.h"   // udpHoldLoraHoldable(): own text of a gateway without IP
 #include "charset_filter.h"
 #include "msgid_counter.h"
 #include <counters_store.h>
@@ -5038,9 +5039,11 @@ int sendMessage(char *msg_text, int len, const char *src_override, unsigned int 
     bpRoute(bp_state.onSend(txRingDepth(), false, millis()));
 
 
-    if(bGATEWAY && meshcom_settings.node_hasIPaddress)
+    // UDP out. A gateway without an IP address still hands holdable text over:
+    // addNodeData() keeps a copy for the server-outage replay (udp_hold.h) and
+    // enqueues nothing. Everything else needs the IP address, as before.
+    if(bGATEWAY && (meshcom_settings.node_hasIPaddress || udpHoldLoraHoldable(msg_buffer, aprsmsg.msg_len)))
     {
-	    // UDP out
 		addNodeData(msg_buffer, aprsmsg.msg_len, 0, 0);
     }
 

@@ -9,6 +9,7 @@
 #include <debugconf.h>
 #include <nrf_eth.h>
 #include "udp_drain.h"
+#include "udp_hold.h"
 
 // C2/U2 carve of sendUDP() out of nrf52_main.cpp; see udp_drain.h for why it
 // moved and why the two platform copies are not merged. Moved unchanged.
@@ -58,6 +59,16 @@ void sendUDP()
             uint16_t myGen = bf_tail_gen(&udpOutRing);
             uint16_t msg_len = bf_peek(&udpOutRing, udpSnapshot + 1, sizeof(udpSnapshot) - 1);
             udpSnapshot[0] = (uint8_t)msg_len;
+
+            // Bench outage (--udphold outage on, INSTRUMENT builds): behave as if the
+            // server were dead, the frame is consumed without being sent. The flag is
+            // never set outside such a build (udp_hold.h).
+            if(udpHoldBenchOutage())
+            {
+                if (bf_tail_gen(&udpOutRing) == myGen)
+                    bf_pop(&udpOutRing);
+                return;
+            }
 
             // send it over UDP
             // DR-24: nRF52's shape -- key on the one result NrfETH::sendUDP()

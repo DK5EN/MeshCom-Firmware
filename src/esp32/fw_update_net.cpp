@@ -39,17 +39,22 @@
 #include <time.h>
 
 #include "../configuration_global.h"
+#include <loop_functions_extern.h> // schedule: node settings + clock source (after configuration_global.h)
+#include <meshcom_settings.h>
 #include "../fw_update.h"
 #include "../fw_update_assets.h"
 #include "../fw_update_http.h"
 #include "../fw_update_roots.h"
 #include "../hmac_sha256.h"
+#include "../rtc_offset.h"   // rtcOffsetSec(): fixed node_utcoff for the schedule
 #include "../instrument.h" // INSTRUMENT_ENABLED: the bench-only STAGELAN job
 #include "../net_console.h"  // Serial -> MSerial: the AU log lines reach the net console too
 #include "../safeboot/fw_apply.h"  // fwInflateStream (shared with Safeboot)
 #include "../safeboot/safeboot_id.h" // sbIdParse: the board marker in the inflated head
 #include "../safeboot/safeboot_ver.h" // SafebootVerScan, AU_SAFEBOOT_MIN
+#include "../tz_rule.h"        // tzParse/tzOffsetSec: local time of the schedule
 #include "fw_update_net.h"
+#include "rm_au_go.h"      // rmAuAutoGates(): the same "clock is valid" definition as the auto gate
 
 // Measurement stub (-DFWNET_STUB): the five entry points as no-ops, so the flash cost of
 // the real layer (TLS, HTTPClient, mbedtls) is the difference between the two builds.
@@ -71,6 +76,15 @@ void fwNetHeapNow(uint32_t *ifree, uint32_t *iblk)
 #if INSTRUMENT_ENABLED
 void fwNetSetHeapGateOverride(uint32_t) {}
 bool fwNetForgetLast(void) { return false; }
+#endif
+bool fwNetSchedGet(FwSchedView &v)
+{
+    memset(&v, 0, sizeof(v));
+    return false;
+}
+void fwNetSchedTick(void) {}
+#if INSTRUMENT_ENABLED
+void fwNetAutest(const char *) {}
 #endif
 bool fwNetStagedPending(void) { return false; }
 bool fwNetLoadRecord(FwStageRecord &) { return false; }
@@ -1738,6 +1752,257 @@ void fwNetForgetAvail(void)
     memset(&s_av, 0, sizeof(s_av));
     portEXIT_CRITICAL(&s_mux);
 }
+
+// ---------------------------------------------------------------------------
+// Install schedule (src/fw_schedule.h). Computes and shows a planned install time and logs when it is due.
+// It never starts a job: nothing in this section creates one, and the bench candidate
+// (INSTRUMENT `--autest release`) lives only in the RAM words below, never in s_st/s_av, so it cannot
+// reach the DOWNLOAD path (test/test_au_schedule pins that by source text).
+// ---------------------------------------------------------------------------
+namespace
+{
+struct SchedOff
+{
+    bool rule;
+    TzRule r;
+    int32_t fixed;
+};
+
+int32_t schedOff(int64_t utc, void *c)
+{
+    const SchedOff *s = (const SchedOff *)c;
+    if (s->rule)
+        return tzOffsetSec(&s->r, utc < 0 ? 0u : (uint32_t)utc);
+    return s->fixed;
+}
+
+char s_dueLogged[24]; // tag the due line was logged for; cleared while not due
+
+#if INSTRUMENT_ENABLED
+bool s_simOn = false;    // `--autest release`: a simulated candidate
+int64_t s_simRel = 0;    // its release instant, UTC
+int64_t s_jumpS = 0;     // `--autest jump`: seconds added to the clock of the schedule evaluation ONLY
+#endif
+
+// Node time as a UTC instant. ok = false while no GPS/RTC/NTP has set the node clock (then 0).
+int64_t schedNowUtc(bool &ok)
+{
+    bool tv = false, ph = false;
+    rmAuAutoGates(&tv, &ph);
+    ok = tv && meshcom_settings.node_date_year > 2023;
+    if (!ok)
+        return 0;
+    return rtcUtcFromLocalFields(meshcom_settings.node_date_year, meshcom_settings.node_date_month,
+                                 meshcom_settings.node_date_day, meshcom_settings.node_date_hour,
+                                 meshcom_settings.node_date_minute, meshcom_settings.node_date_second,
+                                 meshcom_settings.node_utcoff);
+}
+
+// Fills in/so/tag; false when there is no candidate release. sim/jumped are INSTRUMENT-only facts.
+// The clock is the node time (node_date_*) converted to UTC with node_utcoff: the libc clock is never set on this
+// firmware (no SNTP, no settimeofday), so it must not be read here. The candidate is checked first: with none, the
+// once-a-second tick returns before it parses the TZ string.
+bool schedFill(FwSchedIn &in, SchedOff &so, char *tag, bool &sim, bool &jumped)
+{
+    memset(&in, 0, sizeof(in));
+    sim = false;
+    jumped = false;
+    tag[0] = '\0';
+    char avail[24];
+    avail[0] = '\0';
+    bool haveCand = false;
+#if INSTRUMENT_ENABLED
+    if (s_simOn)
+    {
+        haveCand = true;
+        sim = true;
+    }
+#endif
+    if (!haveCand)
+    {
+        bool newer;
+        portENTER_CRITICAL(&s_mux);
+        newer = s_st.availNewer;
+        copyStr(avail, sizeof(avail), s_st.availTag);
+        portEXIT_CRITICAL(&s_mux);
+        if (!newer || avail[0] == '\0')
+            return false;
+    }
+
+    bool clockOk;
+    const int64_t now = schedNowUtc(clockOk);
+    in.clockValid = clockOk;
+    in.nowUtc = now;
+#if INSTRUMENT_ENABLED
+    if (s_jumpS != 0)
+    {
+        in.nowUtc += s_jumpS; // the evaluation clock only; the release year below uses the real clock
+        jumped = true;
+    }
+#endif
+    if (haveCand)
+    {
+#if INSTRUMENT_ENABLED
+        in.haveRelease = true;
+        in.releaseUtc = s_simRel;
+        copyStr(tag, 24, "sim");
+#endif
+    }
+    else
+    {
+        FwVersion v;
+        // the release date is the tag's MM.DD; the year comes from the clock, so no clock = no plan
+        int64_t rel;
+        if (!clockOk || !fwParseTag(avail, v) || !v.hasDate || !fwSchedReleaseFromMd(v.month, v.day, now, rel))
+            return false;
+        in.haveRelease = true;
+        in.releaseUtc = rel;
+        copyStr(tag, 24, avail);
+    }
+
+    so.rule = meshcom_settings.node_tz[0] != '\0' && tzParse(meshcom_settings.node_tz, &so.r);
+    so.fixed = rtcOffsetSec(meshcom_settings.node_utcoff);
+    in.off = schedOff;
+    in.ctx = &so;
+    in.delayDays = meshcom_settings.node_audelay;
+    in.weekday = meshcom_settings.node_auday;
+    in.minuteOfDay = meshcom_settings.node_autime;
+    return true;
+}
+} // namespace
+
+bool fwNetSchedGet(FwSchedView &v)
+{
+    memset(&v, 0, sizeof(v));
+    FwSchedIn in;
+    SchedOff so;
+    schedFill(in, so, v.tag, v.simulated, v.jumped);
+    fwSchedCompute(in, v.out);
+    if (v.out.state == FWSCHED_NO_CANDIDATE)
+    {
+        v.tag[0] = '\0';
+        return false;
+    }
+    fwSchedFormatWhen(in, v.out.installUtc, v.when, sizeof(v.when));
+    // bench candidate or clock jump: the notice says so (both flags are false in a default build)
+    fwSchedNotice(in, v.out, v.text, sizeof(v.text), v.simulated || v.jumped);
+    return true;
+}
+
+void fwNetSchedTick(void)
+{
+    FwSchedIn in;
+    SchedOff so;
+    char tag[24];
+    bool sim, jumped;
+    FwSchedOut out;
+    schedFill(in, so, tag, sim, jumped);
+    fwSchedCompute(in, out);
+    if (out.state != FWSCHED_DUE)
+    {
+        s_dueLogged[0] = '\0';
+        return;
+    }
+    if (strncmp(s_dueLogged, tag, sizeof(s_dueLogged) - 1) == 0 && s_dueLogged[0] != '\0')
+        return;
+    copyStr(s_dueLogged, sizeof(s_dueLogged), tag);
+    auLog("[AU];sched;due;blocked;auto_install_off\n");
+}
+
+#if INSTRUMENT_ENABLED
+namespace
+{
+void schedIso(int64_t t, char *b, size_t n)
+{
+    int64_t y;
+    unsigned m, d;
+    fw_sched_detail::civilFromDays(fw_sched_detail::floorDiv(t, 86400), y, m, d);
+    const int s = (int)fw_sched_detail::floorMod(t, 86400);
+    snprintf(b, n, "%04d-%02u-%02u %02d:%02d", (int)y, m, d, s / 3600, (s % 3600) / 60);
+}
+} // namespace
+
+// `--autest` (INSTRUMENT builds): RAM only, cleared by a reboot. Moves the clock of the schedule evaluation and
+// injects a candidate release; the system clock, RTC, GPS and NTP are never touched. No install, no download.
+void fwNetAutest(const char *a)
+{
+    while (*a == ' ')
+        a++;
+    if (strncmp(a, "off", 3) == 0 && (a[3] == '\0' || a[3] == ' '))
+    {
+        s_simOn = false;
+        s_jumpS = 0;
+        s_dueLogged[0] = '\0';
+    }
+    else if (strncmp(a, "jump ", 5) == 0)
+    {
+        const char *p = a + 5;
+        while (*p == ' ')
+            p++;
+        if (p[0] == '0' && p[1] == '\0')
+            s_jumpS = 0;
+        else if (p[0] == '+' && p[1] >= '0' && p[1] <= '9')
+        {
+            int64_t n = 0;
+            const char *q = p + 1;
+            while (*q >= '0' && *q <= '9' && n < 100000)
+                n = n * 10 + (*q++ - '0');
+            const int64_t unit = (*q == 'd') ? 86400 : (*q == 'h') ? 3600 : (*q == 'm') ? 60 : 0;
+            if (unit == 0 || q[1] != '\0' || n >= 100000 || s_jumpS + n * unit > 3650LL * 86400)
+            {
+                auLog("[ERR];autest;jump <+Nd|+Nh|+Nm|0>, at most +3650d in total\n");
+                return;
+            }
+            s_jumpS += n * unit;
+        }
+        else
+        {
+            auLog("[ERR];autest;jump <+Nd|+Nh|+Nm|0>\n");
+            return;
+        }
+        s_dueLogged[0] = '\0';
+    }
+    else if (strncmp(a, "release ", 8) == 0)
+    {
+        int y, mo, d, h, mi, used = 0;
+        int64_t v = 0;
+        if (sscanf(a + 8, "%d-%d-%d %d:%d%n", &y, &mo, &d, &h, &mi, &used) != 5 || a[8 + used] != '\0' ||
+            !fwSchedParseUtc(y, mo, d, h, mi, v))
+        {
+            auLog("[ERR];autest;release YYYY-MM-DD HH:MM (UTC)\n");
+            return;
+        }
+        s_simOn = true;
+        s_simRel = v;
+        s_dueLogged[0] = '\0';
+    }
+    else if (a[0] != '\0' && strcmp(a, "status") != 0)
+    {
+        auLog("[ERR];autest;status | jump <+Nd|+Nh|+Nm|0> | release YYYY-MM-DD HH:MM | off\n");
+        return;
+    }
+
+    char clk[24], rel[24];
+    FwSchedView v;
+    fwNetSchedGet(v);
+    bool clkOk;
+    const int64_t nowUtc = schedNowUtc(clkOk);
+    if (clkOk)
+        schedIso(nowUtc + s_jumpS, clk, sizeof(clk));
+    else
+        copyStr(clk, sizeof(clk), "no-clock");
+    schedIso(s_simRel, rel, sizeof(rel));
+    if (s_simOn)
+        auLog("[AU];autest;clock;%s;jump_s;%ld;sim;on;release;%s\n", clk, (long)s_jumpS, rel);
+    else
+        auLog("[AU];autest;clock;%s;jump_s;%ld;sim;off\n", clk, (long)s_jumpS);
+    static const char *const stn[] = {"none", "clock", "waiting", "due"};
+    auLog("[AU];sched;state;%s;install;%s;left;%dd%dh;tag;%s\n", stn[v.out.state], v.when[0] ? v.when : "-",
+                  (int)v.out.daysLeft, (int)v.out.hoursLeft, v.tag[0] ? v.tag : "-");
+    if (v.text[0])
+        auLog("[AU];sched;notice;%s\n", v.text);
+}
+#endif
 
 bool fwNetStagedPending(void)
 {

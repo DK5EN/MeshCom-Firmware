@@ -239,10 +239,12 @@ flashes whatever is attached.
 | test_mh_phone                | Unit          |    12 | native_mh_phone                                              |
 | test_millis_rollover         | Regression    |     4 | native                                                       |
 | test_msg_input_budget        | Regression    |     7 | native_msg_input_budget                                      |
-| test_pin_status              | Unit          |    13 | native_pin_status                                            | Pin status JSON: escaping, limits, LED and MCP state (`src/pin_status_json.h`) |
-| test_ext_reg                 | Unit          |    26 | native_ext_reg                                               | EXTUDP register query: request parse, secret filter (`src/ext_reg.h`)          |
-| test_oled_shot               | Regression    |     5 | native_oled_shot                                             | OLED screenshot: u8g2 frame buffer layout (`src/oled_shot.h`)                  |
-| test_screen_shadow           | Regression    |     5 | native_screen_shadow                                         | T-Deck screenshot: LVGL flush copy, clipping                                   |
+| test_pin_status              | Unit          |    13 | native_pin_status                                            | Pin status JSON: escaping, limits, LED and MCP state (`src/pin_status_json.h`)   |
+| test_ext_reg                 | Unit          |    26 | native_ext_reg                                               | EXTUDP register query: request parse, secret filter (`src/ext_reg.h`)            |
+| test_au_schedule             | Unit          |    44 | native_au_schedule                                           | Auto update schedule and notice, install stays off (`src/fw_schedule.h`)         |
+| test_udp_hold                | Unit          |    32 | native_udp_hold                                              | Server outage hold ring: text filter, release, replay, limits (`src/udp_hold.h`) |
+| test_oled_shot               | Regression    |     5 | native_oled_shot                                             | OLED screenshot: u8g2 frame buffer layout (`src/oled_shot.h`)                    |
+| test_screen_shadow           | Regression    |     5 | native_screen_shadow                                         | T-Deck screenshot: LVGL flush copy, clipping                                     |
 | test_msgid_counter           | Unit          |     6 | native                                                       |
 | test_msgstore                | Unit          |    60 | native                                                       |
 | test_msgstore_hook           | Unit          |     6 | native_msgstore_hook                                         |
@@ -281,7 +283,7 @@ flashes whatever is attached.
 | test_rm_policy_rx            | Regression    |    16 | native_rm_policy_rx                                          |
 | test_rm_client_cmd           | Regression    |    15 | native_rm_client_cmd                                         |
 | test_web_auth                | Unit          |    23 | native_web_auth                                              |
-| test_web_guard               | Unit          |    54 | native_web_guard                                             |
+| test_web_guard               | Unit          |    56 | native_web_guard                                             |
 | test_rtc_offset              | Regression    |     8 | native_rtc_offset                                            |
 | test_safeboot_state          | Unit          |    17 | native_safeboot                                              |
 | test_safeboot_ver            | Unit          |    16 | native_safeboot                                              |
@@ -289,7 +291,7 @@ flashes whatever is attached.
 | test_setlog_lines            | Unit          |    29 | native                                                       |
 | test_settings_members        | Contract      |     5 | native_settings_members_esp32, native_settings_members_nrf52 |
 | test_settings_roundtrip      | Contract      |     9 | native_settings_roundtrip                                    |
-| test_settings_sanitize       | Regression    |    17 | native                                                       |
+| test_settings_sanitize       | Regression    |    22 | native                                                       |
 | test_settings_store          | Unit          |    24 | native_settings_store                                        |
 | test_stor_announce           | Unit          |    22 | native_stor_announce                                         |
 | test_sto_notice              | Unit          |    26 | native                                                       |

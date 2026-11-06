@@ -12,9 +12,11 @@
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
+#include <string>
 
 #include <settings_sanitize.h>
 #include <prod_lock.h>
+#include <fw_schedule.h>
 
 static const RadioLimits ESP32_LIMITS = { -9, 22, 400.0f, 960.0f, 0, 0, 17 };
 static const RadioLimits NRF52_LIMITS = { 2, 22, 400.0e6f, 960.0e6f, 1, 1, 17 };
@@ -376,6 +378,45 @@ static void test_ping_target_ohne_terminator(void)
     TEST_ASSERT_EQUAL_STRING("", pc);
 }
 
+// Install schedule (src/fw_schedule.h): ESP32 has no decode() clamp (nRF52 has), so sanitize_loaded_settings()
+// must repair a corrupt delay / weekday / time itself. Unrepaired, node_audelay -1 prints "3" but computes as 0 and
+// node_autime 5000 prints 03:00 but computes as 23:59 (the planner clamps, the printer falls back to defaults).
+static void test_au_schedule_corrupt_values_go_to_defaults(void)
+{
+    int d = -1, w = 0, m = 5000;
+    TEST_ASSERT_EQUAL_INT(2, fwSchedSanitize(d, w, m));
+    TEST_ASSERT_EQUAL_INT(3, d);
+    TEST_ASSERT_EQUAL_INT(0, w);
+    TEST_ASSERT_EQUAL_INT(180, m);
+    int d2 = 99, w2 = -4, m2 = -1;
+    TEST_ASSERT_EQUAL_INT(3, fwSchedSanitize(d2, w2, m2));
+    TEST_ASSERT_EQUAL_INT(3, d2);
+    TEST_ASSERT_EQUAL_INT(0, w2);
+    TEST_ASSERT_EQUAL_INT(180, m2);
+    int dg = 7, wg = 7, mg = 1439; // valid edge values are kept
+    TEST_ASSERT_EQUAL_INT(0, fwSchedSanitize(dg, wg, mg));
+    TEST_ASSERT_EQUAL_INT(7, dg);
+    TEST_ASSERT_EQUAL_INT(1439, mg);
+}
+
+static void test_au_schedule_esp32_load_path_calls_the_repair(void)
+{
+    FILE *f = fopen("src/esp32/esp32_flash.cpp", "rb");
+    TEST_ASSERT_NOT_NULL_MESSAGE(f, "src/esp32/esp32_flash.cpp not readable (run from the repo root)");
+    static char buf[64 * 1024];
+    size_t n = 0, r;
+    std::string src;
+    while ((r = fread(buf, 1, sizeof(buf), f)) > 0)
+        src.append(buf, r), n += r;
+    fclose(f);
+    const size_t at = src.find("bool sanitize_loaded_settings(void)");
+    TEST_ASSERT_TRUE(at != std::string::npos);
+    const size_t end = src.find("\n}\n", at);
+    const std::string body = src.substr(at, end - at);
+    TEST_ASSERT_TRUE_MESSAGE(body.find("fixed += fwSchedSanitize(meshcom_settings.node_audelay, meshcom_settings.node_auday, meshcom_settings.node_autime)") != std::string::npos,
+                             "sanitize_loaded_settings() does not repair the install schedule settings");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -399,5 +440,7 @@ int main(int, char **)
     RUN_TEST(test_ping_target_ungueltig_wird_geleert);
     RUN_TEST(test_ping_target_gueltig_und_leer_bleiben);
     RUN_TEST(test_ping_target_ohne_terminator);
+    RUN_TEST(test_au_schedule_corrupt_values_go_to_defaults);
+    RUN_TEST(test_au_schedule_esp32_load_path_calls_the_repair);
     return UNITY_END();
 }

@@ -24,6 +24,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "fw_schedule.h" // planned install time + countdown notice (pure; never starts an install)
+
 // D14 (AU web GUI campaign): the automatic apply is physically impossible in this firmware line.
 // AU_AUTO_INSTALL is fixed 0; the automatic download start and the automatic handover in
 // esp32_main.cpp sit inside #if AU_AUTO_INSTALL and are not compiled. No flag or env can switch it on.
@@ -422,6 +424,30 @@ inline bool fwShouldInstall(const FwVersion &running, const FwVersion &cand, con
         return false;
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// install schedule (ESP32 glue lives in esp32/fw_update_net.cpp; the maths in fw_schedule.h)
+// ---------------------------------------------------------------------------
+// The plan is computed from the newest release the last CHECK saw (tag date) and the three settings
+// node_audelay / node_auday / node_autime. It is shown and logged. AU_AUTO_INSTALL stays 0: when the plan is due the
+// firmware logs "[AU];sched;due;blocked;auto_install_off" once and does nothing else.
+#if defined(ESP32)
+struct FwSchedView
+{
+    FwSchedOut out;
+    bool simulated; // INSTRUMENT: `--autest release` candidate (never installable)
+    bool jumped;    // INSTRUMENT: `--autest jump` offset in effect
+    char tag[24];   // candidate tag ("sim" for a simulated one)
+    char text[FWSCHED_NOTICE_MAX]; // the countdown notice, "" without candidate
+    char when[24];  // "Sun 8 Nov 03:00", "" without candidate
+};
+// False without a candidate release (then v.out.state is FWSCHED_NO_CANDIDATE and the texts are empty).
+bool fwNetSchedGet(FwSchedView &v);
+// Once a second from the AU tick: logs the due line once per candidate.
+void fwNetSchedTick(void);
+// `--autest [status|jump <+Nd|+Nh|+Nm|0>|release YYYY-MM-DD HH:MM|off]`: INSTRUMENT builds only, RAM only.
+void fwNetAutest(const char *args);
+#endif
 
 // ---------------------------------------------------------------------------
 // policy / timer

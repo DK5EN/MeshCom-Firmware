@@ -74,5 +74,6 @@ void addNodeData(uint8_t msg_buffer[300], uint16_t size, int16_t rssi, int8_t sn
 void addUdpOutBuffer(uint8_t *buffer, uint16_t len); // function adds outgoing udp messages in the udp_out_ringbuffer
 void sendKEEP();
 void storTick();   // SNF-GW W3: STOR announce, no-op unless --stor on and gateway
+void udpHoldBenchCommand(const char *args);   // --udphold (INSTRUMENT builds only; src/udp_hold_bench.cpp)
 
 #endif

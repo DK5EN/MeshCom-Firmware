@@ -26,8 +26,8 @@ flash and test (W5). Nothing here is released; the release stays on hold until t
 | W1   | H     | WEB-TX-01                           | `src/web_functions/web_txbuf.{h,cpp}`, its native test                                       | done   |
 | W2   | D     | BLE registers over UDP              | `src/command_functions.cpp`, `src/extudp_functions.*`, new header, docs                      | done   |
 | W2   | E     | Live pin status                     | `src/web_functions/web_functions.cpp`, `web_setup.cpp`, new header, `tools/webgui_*`         | done   |
-| W3   | F     | Auto update schedule and clock jump | `src/fw_update.h`, `src/esp32/fw_update_net.cpp`, settings, console, web, docs               | open   |
-| W4   | G     | Server buffer                       | `src/udp_functions.cpp`, drain files, `src/byte_fifo.*`, gateway service files               | open   |
+| W3   | F     | Auto update schedule and clock jump | `src/fw_update.h`, `src/esp32/fw_update_net.cpp`, settings, console, web, docs               | done   |
+| W4   | G     | Server buffer                       | `src/udp_functions.cpp`, drain files, `src/byte_fifo.*`, gateway service files               | done   |
 | W5   | me    | Flash and bench, all items below    | hardware, serialized                                                                         | open   |
 
 Orchestrator-owned hotspots: `platformio.ini`, `tools/regression.sh`, `docs/test-suite-map.md`, the INI baseline,
@@ -55,3 +55,9 @@ Orchestrator-owned hotspots: `platformio.ini`, `tools/regression.sh`, `docs/test
   host tested only). Advisor: stack blocker fixed (`work_webpage` frame down 2536 B on RAK, 2160 B on T-Beam), input pin
   button, `all` run after EXTUDP off; re-pass: `--extudpip` refresh removed as unsafe on RAK, now `EXT-PEER-01`. New rows
   `EXT-PEER-01`, `WEB-PIN-01`. Gate: Unity 99 envs 3506 cases, pytest 1490, 6 builds. RAK flash 82.0 %.
+- W3 and W4 (2026-11-06): auto update schedule and notice (`src/fw_schedule.h`, `--autoupdate delay|day|time`, Setup fields,
+  `--autest` clock jump, install stays off) and the server outage hold ring (`src/udp_hold.h`, `--udphold`, text only, 20 min,
+  1 KB classic, 6 KB S3 and RAK). Advisor: schedule read a clock nothing sets (fixed, node date fields); RM1, MCP, SET, CET,
+  telemetry, ack, ping and SOTA frames refused from the hold; text held without an IP is replayed, never released. Overruled:
+  a single lost `BEAT` may replay the few held frames (about 1 per 4 h, measured), because a longer gap would lose text.
+  Gate: Unity 101 envs 3584 cases, pytest 1490, 6 builds. RAK flash 82.3 %. Bench open (W5).

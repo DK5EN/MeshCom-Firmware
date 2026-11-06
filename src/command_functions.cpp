@@ -1032,6 +1032,105 @@ void nodePasswdApply(const char *pw)
     save_settings();
 }
 
+#if defined(ESP32)
+// Install schedule (src/fw_schedule.h): the three settings and the plan. Shown only; nothing installs by itself.
+static __attribute__((noinline)) void auSchedPrint(void)
+{
+    static const char *const dayName[] = {"off", "mon", "tue", "wed", "thu", "fri", "sat", "sun"};
+    const int day = (meshcom_settings.node_auday >= 0 && meshcom_settings.node_auday <= 7) ? meshcom_settings.node_auday : 0;
+    const int tm = (meshcom_settings.node_autime >= 0 && meshcom_settings.node_autime <= 1439) ? meshcom_settings.node_autime : FWSCHED_TIME_DEFAULT;
+    const int dl = (meshcom_settings.node_audelay >= 0 && meshcom_settings.node_audelay <= FWSCHED_DELAY_MAX) ? meshcom_settings.node_audelay : FWSCHED_DELAY_DEFAULT;
+    // one Serial.print of a stack buffer: Print::printf mallocs above 64 B, which starves NimBLE on the classic ESP32
+    char ln[220];
+    snprintf(ln, sizeof(ln), "[AU];sched;delay;%d;day;%s;time;%02d:%02d\n", dl, dayName[day], tm / 60, tm % 60);
+    Serial.print(ln);
+    FwSchedView v;
+    if(fwNetSchedGet(v))
+    {
+        static const char *const stn[] = {"none", "clock", "waiting", "due"};
+        snprintf(ln, sizeof(ln), "[AU];sched;state;%s;install;%s;left;%dd%dh;tag;%s\n", stn[v.out.state], v.when, (int)v.out.daysLeft, (int)v.out.hoursLeft, v.tag);
+        Serial.print(ln);
+        snprintf(ln, sizeof(ln), "[AU];sched;notice;%s\n", v.text);
+        Serial.print(ln);
+    }
+    else
+        Serial.printf("[AU];sched;state;none\n");
+}
+// verb alone or verb + blanks + value; *val points at the value ("" when absent)
+static bool auSchedVerb(const char *arg, const char *verb, const char **val)
+{
+    const size_t n = strlen(verb);
+    if(strncasecmp(arg, verb, n) != 0 || (arg[n] != '\0' && arg[n] != ' '))
+        return false;
+    const char *p = arg + n;
+    while(*p == ' ')
+        p++;
+    *val = p;
+    return true;
+}
+// "--autoupdate delay|day|time <v>" and "--autoupdate status": the install schedule (src/fw_schedule.h). Persisted;
+// nothing installs by itself (D14). True when the argument was one of these (answered, valid or not).
+// noinline: its locals stay out of the (already large) commandAction frame.
+static __attribute__((noinline)) bool auSchedCommand(const char *arg)
+{
+    const char *av = nullptr;
+    int sv = 0;
+    if(auSchedVerb(arg, "delay", &av))
+    {
+        if(*av == '\0')
+        {
+            Serial.printf("[ERR];autoupdate;delay needs a value 0-7 (days after the release)\n");
+            return true;
+        }
+        if(!fwSchedParseDelay(av, &sv))
+        {
+            Serial.printf("[ERR];autoupdate;delay must be 0-7 (days after the release)\n");
+            return true;
+        }
+        meshcom_settings.node_audelay = sv;
+    }
+    else if(auSchedVerb(arg, "day", &av))
+    {
+        if(*av == '\0')
+        {
+            Serial.printf("[ERR];autoupdate;day needs a value: off, mon, tue, wed, thu, fri, sat or sun\n");
+            return true;
+        }
+        if(!fwSchedParseDay(av, &sv))
+        {
+            Serial.printf("[ERR];autoupdate;day must be off, mon, tue, wed, thu, fri, sat or sun\n");
+            return true;
+        }
+        meshcom_settings.node_auday = sv;
+    }
+    else if(auSchedVerb(arg, "time", &av))
+    {
+        if(*av == '\0')
+        {
+            Serial.printf("[ERR];autoupdate;time needs a value HH:MM (00:00-23:59)\n");
+            return true;
+        }
+        if(!fwSchedParseTime(av, &sv))
+        {
+            Serial.printf("[ERR];autoupdate;time must be HH:MM (00:00-23:59)\n");
+            return true;
+        }
+        meshcom_settings.node_autime = sv;
+    }
+    else if(strcasecmp(arg, "status") == 0)
+    {
+        Serial.printf("[AU];mode;%s\n", meshcom_settings.node_autoupd == 2 ? "auto" : "notify");
+        auSchedPrint();
+        return true;
+    }
+    else
+        return false;
+    save_settings();
+    auSchedPrint();
+    return true;
+}
+#endif
+
 void commandAction(char *msg_text, int iphone, bool rxFromPhone)
 {
     bRxFromPhone = rxFromPhone;
@@ -1829,7 +1928,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--ota-update            reboot into safeboot OTA\n");
             #endif
             #if defined(ESP32)
-            printdeb("--autoupdate notify      firmware update mode (ESP32)\n--updchan " AU_UPDCHAN_HELP "\n");
+            printdeb("--autoupdate notify      firmware update mode (ESP32)\n--autoupdate status      mode and planned install\n--autoupdate delay 0-7   planned install: days after the release (default 3)\n--autoupdate day off|mon..sun  planned install on a weekday (replaces the delay)\n--autoupdate time HH:MM  planned install time (default 03:00); shown only, nothing installs by itself\n--updchan " AU_UPDCHAN_HELP "\n");
             printdeb("--update check/install/status/apply  firmware update now (ESP32)\n");
             #endif
             printdeb("--conffin               send config-finished to app\n");
@@ -2007,6 +2106,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--redrawlog on/off/refr/obj, --uistat, --tab list/<n>, --drawer on/off, --playtone start/msg/<file>, --tft on/off/state, --screencrc\n--spitrace on/off, --touch tap <x> <y> [ms] / down <x> <y> / up\n");
             #endif
             printdeb("--ntpsync  request an immediate NTP refresh now\n--battprobe [n]  raw battery divider ADC capture, n cycles 1-10 (~7.5 s each)\n\n");
+            printdeb("--udphold [status|outage on|off]  server outage hold ring, outage = behave as if the server were dead\n");
             #if MC_HAS_U8G2
             printdeb("--oledtext [-10] [-t<s>] <text>  show UTF-8 test text on the OLED (fold + fonts as messages; -10 = 10x20; held 60 s or -t<s>), no TX\n");
             #endif
@@ -5603,6 +5703,10 @@ void commandAction(char *umsg_text, bool ble)
     {
         snprintf(_owner_c, sizeof(_owner_c), "%s", msg_text+13);
 
+        // install schedule: delay / day / time / status (auSchedCommand above commandAction)
+        if(auSchedCommand(_owner_c))
+            return;
+
         if(casecmp(_owner_c, (char*)"off") == 0)
         {
             // D1: off no longer exists; notify is the lowest mode. Nothing is changed or saved.
@@ -5654,6 +5758,7 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"autoupdate") == 0)
     {
         Serial.printf("[AU];mode;%s\n", meshcom_settings.node_autoupd == 2 ? "auto" : "notify");
+        auSchedPrint();
 
         return;
     }
@@ -6438,6 +6543,23 @@ void commandAction(char *umsg_text, bool ble)
     // Order matters: commandCheck() is a prefix match, so "heap " (tagged form)
     // must be tested before the bare "heap".
     else
+    #if defined(ESP32)
+    // --autest [status|jump <+Nd|+Nh|+Nm|0>|release YYYY-MM-DD HH:MM|off]: install schedule bench hook (fw_update_net.cpp).
+    // RAM only, cleared by a reboot. Moves the clock of the schedule evaluation only and injects a candidate release;
+    // no install, no download, no reboot. "autest " before the bare "autest" (prefix match).
+    if(commandCheck(msg_text+2, (char*)"autest ") == 0)
+    {
+        fwNetAutest(msg_text + 9);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"autest") == 0)
+    {
+        fwNetAutest("");
+        return;
+    }
+    else
+    #endif
     // --heaplog <s>: [INSTR-HEAP] every s seconds (0 = off). Before "heap" on purpose.
     if(commandCheck(msg_text+2, (char*)"heaplog ") == 0)
     {
@@ -6555,6 +6677,13 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"oledstat") == 0)
     {
         oledStat();
+        return;
+    }
+    else
+    // --udphold [status | outage on|off]: server outage hold ring (bench, RAM only)
+    if(commandCheck(msg_text+2, (char*)"udphold") == 0)
+    {
+        udpHoldBenchCommand(msg_text+2+7);
         return;
     }
     #if MC_HAS_U8G2

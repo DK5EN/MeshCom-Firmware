@@ -22,6 +22,7 @@ Status: implemented (wave W4, `src/prod_lock.h` and its call sites); this docume
 - Hosttests: `src/instrument.h:36-38` erzwingt `INSTRUMENT_ENABLED 0` auf Native/Host. Deshalb nehmen alle Funktionen in `src/prod_lock.h` `instrument` als Parameter; der Hosttest (`test/test_prod_lock`, `pio test -e native_prod_lock`) prüft beide Werte, und nur die Firmware setzt `INSTRUMENT_ENABLED != 0` ein.
 - `MC_DIAG` (Default 1) bleibt unabhängig. Es schaltet nur, ob die `--spec*`-Kommandos kompiliert werden (`src/command_functions.cpp:5457-5552`); gesperrt werden sie zusätzlich in Produktion.
 - Regeln für **alle** Builds (auch INSTRUMENT): `--autoupdate auto` wird nie gesetzt (Wert 2 des Schemas), ein gespeichertes `node_autoupd` 2 wird beim Laden 1 (nicht auf nRF52, dort gibt es kein AU); Telemetrie-, Positions- und Ping-Werte bleiben in den Bereichen ihrer Setter.
+- Bewusst nicht gesperrt: der Installationsplan `--autoupdate delay|day|time` (`node_audelay`, `node_auday`, `node_autime`) verschiebt nur eine angezeigte Zeit; `AU_AUTO_INSTALL` bleibt 0, nichts installiert sich selbst. `--autest` (Uhrensprung und simuliertes Release für den Plan) gibt es nur in INSTRUMENT-Builds, nur im RAM.
 
 ## Matrix 1: Einstellung, Kommando, Speicherort, Wert
 
@@ -190,6 +191,7 @@ Gate: `tools/regression.sh --stage 1,2` für den Host-Teil; Bench-Teil mit `tool
 - Host tests: `src/instrument.h:36-38` forces `INSTRUMENT_ENABLED 0` on native/host. Every function in `src/prod_lock.h` therefore takes `instrument` as a parameter; the host test (`test/test_prod_lock`, `pio test -e native_prod_lock`) exercises both values and only the firmware passes `INSTRUMENT_ENABLED != 0`.
 - `MC_DIAG` (default 1) stays independent. It only decides whether the `--spec*` commands are compiled (`src/command_functions.cpp:5457-5552`); in production they are additionally locked.
 - Rules that hold in **all** builds (INSTRUMENT too): `--autoupdate auto` is never set (value 2 of the schema), a stored `node_autoupd` 2 becomes 1 on load (not on nRF52, which has no AU); telemetry, position and ping values stay inside the ranges of their setters.
+- Not locked, by design: the install schedule `--autoupdate delay|day|time` (`node_audelay`, `node_auday`, `node_autime`) only moves a displayed time; `AU_AUTO_INSTALL` stays 0 and nothing installs by itself. `--autest` (clock jump and simulated release for the schedule) exists only in INSTRUMENT builds and is RAM only.
 
 ## Matrix 1: setting, command, storage, value
 

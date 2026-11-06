@@ -821,11 +821,13 @@ inline bool webGuardHasUpdCommand(const char *text)
     return false;
 }
 
-// The /setparam names that set the update mode or channel (aumode, autoupdate, updchan): they do what the
-// X-MC-gated console commands --autoupdate / --updchan do (name already lower-cased, exact match).
+// The /setparam names that set the update mode, channel or install schedule (aumode, autoupdate, updchan, audelay,
+// auday, autime): they do what the X-MC-gated console commands --autoupdate / --updchan do (name already
+// lower-cased, exact match).
 inline bool webGuardIsUpdParam(const char *name)
 {
-    return name != NULL && (strcmp(name, "aumode") == 0 || strcmp(name, "autoupdate") == 0 || strcmp(name, "updchan") == 0);
+    return name != NULL && (strcmp(name, "aumode") == 0 || strcmp(name, "autoupdate") == 0 || strcmp(name, "updchan") == 0 ||
+                             strcmp(name, "audelay") == 0 || strcmp(name, "auday") == 0 || strcmp(name, "autime") == 0);
 }
 
 // The decision setparam() makes (name already lower-cased, value percent-decoded). X-MC is needed for

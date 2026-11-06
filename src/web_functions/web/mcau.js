@@ -44,7 +44,9 @@ if((L=='A'||L=='C'||L=='E')&&(auLoc||(s.err&&!auLowHeap(s.err))))e=auLoc||auErrT
 var r=auEl('au_row');if(s.phone&&(L=='A'||L=='C')&&!e&&r&&r.getAttribute('data-blepause')=='1')h='(i) A connected phone may block the update on this board';
 // BLE guard (section 7): the phone link is dropped for the job; the row says so until the guard is released
 if(s.guard&&L!='S'&&L!='E'){m='Bluetooth paused for the update';e='';h='';dis=1;act='none';if(L!='B'&&L!='D'&&L!='d')lab='Checking now ...';}
-auDraw(g,m,e,h,lab,act,dis,red);}
+auDraw(g,m,e,h,lab,act,dis,red);
+// install schedule: the countdown notice of the node (text built in fw_schedule.h); never while a job runs, the update cannot start or the release has no image
+var sc=auEl('au_sched');if(sc)sc.textContent=(s.sched&&!s.guard&&(L=='A'||L=='C'||L=='E')&&!(s.newer&&!s.inst))?s.sched:'';}
 function auSched(){clearTimeout(auT.poll);auT.poll=0;if(!auShown||!auS||auF)return;var L=auState(auS,0),ms=0;
 if(auS.st=='busy'||auS.guard)ms=1000;else if(L=='G')ms=10000;
 if(ms)auT.poll=setTimeout(auFetch,ms);}

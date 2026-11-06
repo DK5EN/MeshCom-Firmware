@@ -3090,6 +3090,7 @@ static void auTick(void)
 #if INSTRUMENT_ENABLED
     auInstrCycleTick();
 #endif
+    fwNetSchedTick();   // install schedule: logs "[AU];sched;due;..." once when the plan is due; starts nothing
 
     // AU-12: boot demotion, once per boot at the first tick (settings are loaded long before). A node
     // that was in auto mode with a Safeboot too old to apply updates drops to notify and says so. Only

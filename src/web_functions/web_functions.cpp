@@ -3256,6 +3256,23 @@ void sub_page_setup()
         web_client.printf("\t<option value=\"auto\" disabled %s>auto (coming soon)</option>\n", (au_mode == 2) ? "selected" : "");
         web_client.println("</select>");
         web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">auto: coming soon -- for now the node notifies only. Install new firmware from the Info page.</p>");
+        { // install schedule: shown on the Info page, nothing installs by itself (src/fw_schedule.h)
+            static const char *const dayVal[] = {"off", "mon", "tue", "wed", "thu", "fri", "sat", "sun"};
+            static const char *const dayTxt[] = {"none (use the delay)", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
+            const int s_day = (meshcom_settings.node_auday >= 0 && meshcom_settings.node_auday <= 7) ? meshcom_settings.node_auday : 0;
+            const int s_delay = (meshcom_settings.node_audelay >= 0 && meshcom_settings.node_audelay <= FWSCHED_DELAY_MAX) ? meshcom_settings.node_audelay : FWSCHED_DELAY_DEFAULT;
+            const int s_tm = (meshcom_settings.node_autime >= 0 && meshcom_settings.node_autime <= 1439) ? meshcom_settings.node_autime : FWSCHED_TIME_DEFAULT;
+            char s_tms[8];
+            snprintf(s_tms, sizeof(s_tms), "%02d:%02d", s_tm / 60, s_tm % 60);
+            _create_setup_textinput_element("audelay", "Planned install: days after release (0-7)", String(s_delay), "3", "audelay", 1, false, false);
+            web_client.println("<label for=\"auday\">Planned install: weekday :</label>");
+            web_client.println("<select id=\"auday\" name=\"auday\" onchange=\"setvalue('auday',this.value,true);\">");
+            for (int i = 0; i < 8; i++)
+                web_client.printf("\t<option value=\"%s\" %s>%s</option>\n", dayVal[i], i == s_day ? "selected" : "", dayTxt[i]);
+            web_client.println("</select>");
+            _create_setup_textinput_element("autime", "Planned install: time (HH:MM)", String(s_tms), "03:00", "autime", 5, false, false);
+            web_client.println("<p class=\"font-small\" style=\"grid-column:1/-1\">The plan is shown on the Info page. A weekday replaces the delay. Automatic install is not active in this firmware: the node does not install by itself, use Download or Install on the Info page.</p>");
+        }
         if (!au_sb_ok && !fwNetBootloaderQio())
         {
             // AU-16: a DIO bootloader cannot start the Safeboot; the web flasher renews both
@@ -3934,7 +3951,7 @@ void sub_page_info()
         web_client.printf("<tr id=\"au_tr\"><td>Auto update</td><td id=\"au_row\" data-blepause=\"%d\">mode %s, channel %s<br>env %s, running %s",
             AU_BLE_PAUSE, meshcom_settings.node_autoupd == 2 ? "auto (notify only)" : "notify", auChan,
             MC_ENV_NAME[0] ? MC_ENV_NAME : "(unknown)", MC_BUILD_TAG[0] ? MC_BUILD_TAG : "local");
-        web_client.print("<div id=\"au_msg\"></div><div id=\"au_err\"></div><div id=\"au_hint\"></div><button type=\"button\" id=\"au_btn\" disabled>Check now</button></td></tr>\n");
+        web_client.print("<div id=\"au_msg\"></div><div id=\"au_sched\"></div><div id=\"au_err\"></div><div id=\"au_hint\"></div><button type=\"button\" id=\"au_btn\" disabled>Check now</button></td></tr>\n");
     }
 #endif
     // WEB-SW: grouped switch overview, one <tr> per group, labels matching
@@ -4655,8 +4672,13 @@ static void sub_au_status()
     in.etaS = auEtaS(au.stagedIlen);
     fwNetHeapNow(&in.ifree, &in.iblk);
 
-    char body[640];
+    char body[832];
     size_t n = auStatusJson(in, body, sizeof(body));
+    { // install schedule: the countdown notice rides outside auStatusJson (its golden strings stay as they are)
+        FwSchedView sv;
+        fwNetSchedGet(sv);
+        n = auAppendSched(body, sizeof(body), n, sv.text);
+    }
     // "up": seconds since boot, appended outside auStatusJson. The page compares it across the install restart
     // when the build tag cannot be compared (an image built without MC_BUILD_TAG reports run "local").
     n = fwJsonAppendUp(body, sizeof(body), n, (uint32_t)(esp_timer_get_time() / 1000000));
@@ -4765,6 +4787,7 @@ void setparam(String web_header)
     // "--<cmd> %s" line that commandAction() splits on "--"), and aumode/autoupdate/updchan change the update
     // mode or channel: the upd* gate of call_function() would be a bypass otherwise. Same X-MC proof,
     // independent of MC_WEB_GUARD.
+    // The install schedule settings (audelay, auday, autime) run --autoupdate sub-commands: webGuardIsUpdParam covers them.
     if (!webGuardSetparamAllowed(param_name.c_str(), param_value.c_str(), full_header.c_str(), full_header.length()))
     {
         if (bDEBUG)

@@ -137,7 +137,7 @@ function mkNode(status) {
 }
 
 const ROW = '<table><tr id="au_tr"><td>Auto update</td><td id="au_row" data-blepause="BLE">mode notify, channel dev<br>env x, running v4.40a.10.17' +
-  '<div id="au_msg"></div><div id="au_err"></div><div id="au_hint"></div><button type="button" id="au_btn" disabled>Check now</button></td></tr></table>';
+  '<div id="au_msg"></div><div id="au_sched"></div><div id="au_err"></div><div id="au_hint"></div><button type="button" id="au_btn" disabled>Check now</button></td></tr></table>';
 
 async function mkPage(node, opts) {
   opts = opts || {};
@@ -188,7 +188,7 @@ async function mkPage(node, opts) {
   check('JS has no confirm() and no innerHTML (tag text goes through textContent)', !/confirm\(/.test(JS) && !/innerHTML/.test(JS));
   const assetsH = fs.readFileSync(path.join(ROOT, 'src', 'web_functions', 'web_assets.h'), 'utf8');
   check('the mcau.js blob and its <script> tag sit inside #if defined(ESP32)', /#if defined\(ESP32\)\n\/\/ mcau\.js[^\n]*\n#define WEB_MC_AU_JS_TAG[\s\S]*?\n#endif/.test(assetsH) && /#if defined\(ESP32\)\n\s+web_client\.println\("<script src=\\"\/mcau\.js\?v=" WEB_MC_AU_JS_TAG/.test(cpp) && /data-blepause/.test(cpp));
-  check('the row ids the JS needs exist in the C++ row', ['au_tr', 'au_row', 'au_msg', 'au_err', 'au_hint', 'au_btn'].every((i) => cpp.indexOf('id=\\"' + i + '\\"') >= 0));
+  check('the row ids the JS needs exist in the C++ row', ['au_tr', 'au_row', 'au_msg', 'au_sched', 'au_err', 'au_hint', 'au_btn'].every((i) => cpp.indexOf('id=\\"' + i + '\\"') >= 0));
   check('banner and .au-banner CSS are gone', !/au-banner|au_banner/.test(cpp));
   check('loadPage hooks auPageLeave/auPageInit through RAK-empty macros', /#define AU_LP_LEAVE ""/.test(cpp) && /" AU_LP_LEAVE "/.test(cpp) && /AU_LP_INIT/.test(cpp));
   check('GET /austatus route sets web_cors_ok = false and is ESP32 only', /#if defined\(ESP32\)\n\s+else if \(web_header\.startsWith\("GET \/austatus"\)\)\n\s+\{[^\n]*\n\s+web_cors_ok = false;/.test(cpp));
@@ -657,6 +657,63 @@ async function mkPage(node, opts) {
     await Q.T.advance(6000);
     check('F3: polling goes on at fallback 0', n2.calls.length > c0);
     Q.w.auPageLeave();
+  }
+
+  // ---- install schedule: countdown notice (fw_schedule.h text rides in /austatus as "sched") ---------------------------------
+  {
+    const NOTICE = 'Planned install: Sun 8 Nov 03:00 (in 3 days). Automatic install is not active in this firmware; use Download or Install on the Info page.';
+    const withSched = (k, s) => JSON.stringify(Object.assign(JSON.parse(J(k)), { sched: s }));
+    const sc = (P) => P.el('au_sched').textContent;
+    // the exact sentence of test/test_au_schedule (test_notice_text_exact) is in the C++ test source
+    const schedTest = fs.existsSync(path.join(ROOT, 'test', 'test_au_schedule', 'test_main.cpp')) ? fs.readFileSync(path.join(ROOT, 'test', 'test_au_schedule', 'test_main.cpp'), 'utf8') : '';
+    // adjacent C++ string literals are joined first, so a line break inside the other test's literal does not matter
+    const schedFlat = schedTest.replace(/"\s*\n\s*"/g, '');
+    check('notice sentence is the one pinned by test_au_schedule', schedFlat.indexOf(NOTICE) >= 0);
+    const A = await mkPage(mkNode(withSched('A', NOTICE)));
+    await A.init();
+    check('notice shown in state A (idle, a plan exists, e.g. a simulated release); the button stays "Check now"', sc(A) === NOTICE && A.view().btn === 'Check now' && !A.view().dis, sc(A) + ' / ' + JSON.stringify(A.view()));
+    check('notice never claims an automatic install while install is off', !/will install|installing automatically|starts automatically/i.test(sc(A)) && /not active/.test(sc(A)));
+    A.w.auPageLeave();
+    const C = await mkPage(mkNode(withSched('C', NOTICE)));
+    await C.init();
+    check('notice shown in state C (newer release, installable)', sc(C) === NOTICE && C.view().btn === 'Download', sc(C));
+    C.w.auPageLeave();
+    const E = await mkPage(mkNode(withSched('E', NOTICE)));
+    await E.init();
+    check('notice shown in state E (staged)', sc(E) === NOTICE && E.view().btn === 'Install now', sc(E));
+    E.w.auPageLeave();
+    const none = await mkPage(mkNode(withSched('C', '')));
+    await none.init();
+    check('empty sched clears the line', sc(none) === '');
+    none.w.auPageLeave();
+    const old = await mkPage(mkNode(J('C')));
+    await old.init();
+    check('an answer without "sched" (older firmware) leaves the line empty', sc(old) === '');
+    old.w.auPageLeave();
+    for (const [k, why] of [['S', 'Safeboot too old'], ['B', 'checking'], ['D', 'downloading'], ['G', 'phone blocks']]) {
+      const P = await mkPage(mkNode(withSched(k, NOTICE)));
+      await P.init();
+      check('no notice in state ' + k + ' (' + why + ')', sc(P) === '', sc(P));
+      P.w.auPageLeave();
+    }
+    const NI = await mkPage(mkNode(withSched('C', NOTICE).replace('"inst":1', '"inst":0')));
+    await NI.init();
+    check('no notice when the release has no image for this board (Install is not possible)', sc(NI) === '', sc(NI));
+    NI.w.auPageLeave();
+    const tx = await mkPage(mkNode(withSched('A', '<img src=x onerror=alert(1)>')));
+    await tx.init();
+    check('the notice is inserted as text', tx.d.querySelectorAll('#au_row img').length === 0 && /<img src=x/.test(sc(tx)));
+    tx.w.auPageLeave();
+    // C++ side: the JSON key and the Setup fields exist, same validation server side, X-MC for the setter names
+    check('/austatus appends "sched" outside auStatusJson (goldens unchanged)', /auAppendSched\(body, sizeof\(body\), n, sv\.text\)/.test(cpp) && !/w\.key\("sched"\)[\s\S]{0,40}in\./.test(fs.readFileSync(path.join(ROOT, 'src', 'web_functions', 'au_ui_state.h'), 'utf8').split('auAppendSched')[0]));
+    check('Setup has the delay field, the weekday select and the time field next to aumode', ['"audelay"', 'id=\\"auday\\"', '"autime"'].every((pat) => cpp.indexOf(pat) > cpp.indexOf('id=\\"aumode\\"') && cpp.indexOf(pat) > 0) && /setvalue\('auday',this\.value,true\)/.test(cpp));
+    check('Setup says that automatic install is not active and names Download or Install', /Automatic install is not active in this firmware: the node does not install by itself, use Download or Install on the Info page/.test(cpp));
+    const guardH = fs.readFileSync(path.join(ROOT, 'src', 'web_functions', 'web_guard.h'), 'utf8');
+    const updParam = (guardH.match(/inline bool webGuardIsUpdParam[\s\S]*?\n\}/) || [''])[0];
+    check('the three setter names need X-MC through webGuardIsUpdParam (one guard, no side path in setparam())', ['audelay', 'auday', 'autime'].every((n) => updParam.indexOf('strcmp(name, "' + n + '") == 0') >= 0) && !/auSchedParam/.test(cpp) && /!webGuardSetparamAllowed\(param_name\.c_str\(\), param_value\.c_str\(\), full_header\.c_str\(\), full_header\.length\(\)\)\)/.test(cpp));
+    const setup = fs.readFileSync(path.join(ROOT, 'src', 'web_functions', 'web_setup.cpp'), 'utf8');
+    check('setter handlers run the console rungs (one validation) and read the stored state back', ['delay', 'day', 'time'].every((w) => setup.indexOf('"--autoupdate ' + w + ' %s"') >= 0) && /fwSchedParseDelay[\s\S]{0,120}node_audelay/.test(setup) && /fwSchedParseDay[\s\S]{0,120}node_auday/.test(setup) && /fwSchedParseTime[\s\S]{0,120}node_autime/.test(setup));
+    check('getter handlers exist for the three names', ['audelay', 'auday', 'autime'].every((n) => (setup.match(new RegExp('paramName\\.equals\\("' + n + '"\\)', 'g')) || []).length === 2));
   }
 
   // ---- error table mirror (spec 4.3) --------------------------------------------------------------------------------
