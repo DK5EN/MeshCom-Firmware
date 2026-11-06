@@ -69,3 +69,5 @@ flash and test (W5). Nothing here is released; the release stays on hold until t
   free 37-45 ms, free to TX below 1.2 ms, irq to read max 18 ms, worst loop gap 295 ms. Script reboots: `--bleshort`/`--blelong`,
   `--setboostedgain`, `--sethamnet`/`--setinet` are documented; T-Deck `--disptest` (`TD-34`); Heltec near index 55 did not
   reproduce. `RAK-PIN-01` found and fixed. Gate: Unity 101 envs 3587 cases, pytest 1490, 7 builds.
+- W5 RAK script (2026-11-06): 382 commands, 368 answered, no hang, 4 soft resets (`RESETREAS=0x4`), `--button gpio 1` refused.
+  All four nodes restored and verified against the vault.

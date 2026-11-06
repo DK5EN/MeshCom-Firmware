@@ -19,6 +19,10 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
+- **Bench fixes and features 2026-11-06, not released:** `docs/campaign-bench-fixes-20261106.md` (W1-W5, `408657be` to
+  `e7a6fbeb`). Bench images on all four nodes are INSTRUMENT builds of `e7a6fbeb`; nodes restored from the vault. DK5EN-90 is
+  on `.66`. Still needs CI images: soak, Safeboot `/ota` page, manipulated `.autoupdate`, BLE, RAK secrets with a real phone.
+
 - **`v4.40a.11.01` released 2026-11-01** (Latest, tag on `47f339ad`): RM1 `upd chan prod|dev`, ping target lock, own
   beacons at prio 2, RX-silence logging (nRF52 and ESP32), `--gateway lab`, E290 OTP without periodic full refresh.
   **Built by CI** (run 41333106863, green). Gate stage 1,2 PASS (85 envs, 3262/3262, golden 48, pytest 1473). Assets:
