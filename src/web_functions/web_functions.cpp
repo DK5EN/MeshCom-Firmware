@@ -36,6 +36,9 @@
 #include <prod_lock.h>      // prodLockNormalise(): an imported file may hold values the setters now refuse
 #include <blocked_calls.h> // BLK-01: info row + setup card
 #include <instrument.h>     // INSTRUMENT_ENABLED
+#if INSTRUMENT_ENABLED && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS))
+#include <t-deck/tdeck_debug.h> // sub_screen_rgb565()
+#endif
 #include "web_server_gate.h" // WEB-STOP-01: stopWebserver() acts on a running server only
 #include "watchdog_feed.h"  // meshcom_wdt_feed(): neighbour matrix rows run in the WDT-guarded loop task
 #include "board_led.h"         // LED-08: ledFitted() for the setup controls and info rows
@@ -902,6 +905,35 @@ static bool deliver_web_asset(const String &req)
     return true;
 }
 
+#if INSTRUMENT_ENABLED && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS))
+// First request: switch the shadow on and force a redraw, 503 until the frame is there. Afterwards
+// every flush is already in the copy, so a later request is current.
+static void sub_screen_rgb565(void)
+{
+    const uint8_t *buf = tdeck_dbg_shadow_buf();
+    if (buf == NULL)
+    {
+        tdeck_dbg_shadow_on();
+        web_client.println("HTTP/1.1 503 Service Unavailable");
+        web_client.println("Retry-After: 1");
+        web_client.println("Content-Length: 0");
+        web_client.println("Connection: close");
+        web_client.println();
+        return;
+    }
+    const size_t len = tdeck_dbg_shadow_bytes();
+    web_client.println("HTTP/1.1 200 OK");
+    web_client.println("Content-type:application/octet-stream");
+    web_client.println("X-Screen-Format: rgb565be");
+    web_client.print("Content-Length: ");
+    web_client.println((unsigned)len);
+    web_client.println("Cache-Control: no-store");
+    web_client.println("Connection: close");
+    web_client.println();
+    web_client.write(buf, len);
+}
+#endif
+
 /**
  * ###########################################################################################################################
  * Handle Web requests and call the matching sub function
@@ -1195,6 +1227,12 @@ void work_webpage(void)
                             // ### !!function will generate a HTML header itself
                             getparam(web_header);
                         }
+#if INSTRUMENT_ENABLED && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS))
+                        else if (web_header.startsWith("GET /screen.rgb565"))
+                        { // bench screenshot, tools/bench/tdeck_screenshot.py
+                            sub_screen_rgb565();
+                        }
+#endif
                         else if (web_header.indexOf("/config.json") >= 0)
                         { // CS-03: download the configuration as a file
                             // ### !!function will generate a HTML header itself

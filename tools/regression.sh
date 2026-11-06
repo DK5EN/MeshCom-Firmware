@@ -230,7 +230,7 @@ stage2() {
         node tools/webgui_queue_test.js
     NODE_PATH="$jsdom/node_modules" run_step "node webgui_login_test.js" stage2-webgui-login \
         node tools/webgui_login_test.js
-    for f in tools/nbrlog.py tools/soakstatus.py tools/webflash.py tools/resource_watch.py tools/wire_doc_html.py; do
+    for f in tools/bench/tdeck_screenshot.py tools/nbrlog.py tools/soakstatus.py tools/webflash.py tools/resource_watch.py tools/wire_doc_html.py; do
         run_step "self-test $(basename "$f")" "stage2-selftest-$(basename "$f" .py)" \
             uv run --quiet "$f" --self-test
     done

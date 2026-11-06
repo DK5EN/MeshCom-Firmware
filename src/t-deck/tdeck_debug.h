@@ -13,6 +13,8 @@
 #include <lvgl.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <instrument.h> // INSTRUMENT_ENABLED
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,6 +35,14 @@ void tdeck_dbg_blink(int n);
 void tdeck_dbg_framedump_arm(bool on);
 bool tdeck_dbg_framedump_armed(void);
 void tdeck_dbg_invalidate(void);
+#if INSTRUMENT_ENABLED
+/* Screen shadow for GET /screen.rgb565, see screen_shadow.h. _on() switches the copy on and forces a
+ * full redraw; false = no memory. _buf() is NULL until the copy is on. */
+bool tdeck_dbg_shadow_on(void);
+void tdeck_dbg_shadow_copy(int x1, int y1, int w, int h, const uint8_t *src);
+const uint8_t *tdeck_dbg_shadow_buf(void);
+size_t tdeck_dbg_shadow_bytes(void);
+#endif
 bool tdeck_dbg_flushfix_enabled(void);
 
 /* One-shot UI/heap/counter snapshot, see brief for the exact field list. */

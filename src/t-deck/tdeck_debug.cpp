@@ -11,6 +11,7 @@
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 
 #include "tdeck_debug.h"
+#include "screen_shadow.h"
 #include "lv_obj_functions.h"
 #include "lv_obj_functions_extern.h"
 #include "tdeck_sdmap.h"
@@ -487,6 +488,39 @@ extern "C" void tdeck_dbg_tft(int mode)
                   tft_is_sleeping ? 1 : 0, (unsigned)current_brightness_level,
                   (unsigned long)(millis() - tdeck_tft_timer));
 }
+
+#if INSTRUMENT_ENABLED
+static uint8_t *s_shadow = NULL;
+
+extern "C" bool tdeck_dbg_shadow_on(void)
+{
+    if(s_shadow == NULL) {
+        s_shadow = (uint8_t *)ps_calloc(SCREEN_TOTAL_PIXELS, 2);
+        if(s_shadow == NULL) {
+            Serial.println("[SHOT];err;nomem");
+            return false;
+        }
+        Serial.println("[SHOT];on");
+    }
+    tdeck_dbg_invalidate();
+    return true;
+}
+
+extern "C" void tdeck_dbg_shadow_copy(int x1, int y1, int w, int h, const uint8_t *src)
+{
+    screenShadowBlit(s_shadow, SCREEN_W, SCREEN_BANDS * SCREEN_BAND_H, x1, y1, w, h, src);
+}
+
+extern "C" const uint8_t *tdeck_dbg_shadow_buf(void)
+{
+    return s_shadow;
+}
+
+extern "C" size_t tdeck_dbg_shadow_bytes(void)
+{
+    return (size_t)SCREEN_TOTAL_PIXELS * 2;
+}
+#endif
 
 extern "C" void tdeck_dbg_screencrc(void)
 {

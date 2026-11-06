@@ -600,6 +600,9 @@ static void disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *c
         tft.pushColors( ( uint16_t * )&color_p->full, w * h, false );
         tft.endWrite();
         INSTR_FLUSH(_instr_flush_t0);       // TEMPORARY
+#if INSTRUMENT_ENABLED
+        tdeck_dbg_shadow_copy(area->x1, area->y1, (int)w, (int)h, (const uint8_t *)&color_p->full);
+#endif
         // TM-07: post-transfer bus-register snapshot + SD/LoRa user counts
         // since the previous flush, see tdeck_debug.h for the line format.
         if(tdeck_dbg_spitrace_enabled()) {
