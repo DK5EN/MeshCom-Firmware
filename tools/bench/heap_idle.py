@@ -310,7 +310,9 @@ def main(argv: list[str] | None = None) -> int:
             port = args.port or resolve_usb_serial(args.usb_serial)
             channel, lines = "usb", serial_lines(port, deadline, args.idle_s, args.boot_timeout_s)
         HARNESS_DIR.mkdir(parents=True, exist_ok=True)
-        log_path = HARNESS_DIR / f"heap_idle_{time.strftime('%Y%m%d_%H%M%S')}.log"
+        # the host keeps parallel runs on different nodes from sharing one log
+        who = args.host or "usb"
+        log_path = HARNESS_DIR / f"heap_idle_{who}_{time.strftime('%Y%m%d_%H%M%S')}.log"
         report = run_capture(lines, log_path)
         figures = report.figures()
     except (HeapError, OSError) as exc:

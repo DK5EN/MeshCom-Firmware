@@ -1,6 +1,6 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261101`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261106`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
@@ -8,6 +8,34 @@ Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `releas
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
 
 ---
+
+## Release v4.40a.11.06 (Freitag, 2026-11-06)
+
+Gebaut und veroeffentlicht von GitHub CI (`MeshCom CI`, Tag `v4.40a.11.06`, `MC_BUILD_TAG` und `MC_AU_DEV_CHANNEL=1` gesetzt), 68 Assets, Struktur wie `v4.40a.11.01`.
+`FLASH_VERSION` 20261106, `FLASH_STRUCT_VERSION` 20260724 unveraendert -- die Einstellungen bleiben erhalten. Safeboot bleibt Faehigkeit v3, das Image ist neu gebaut (nur ueber den Web-Flasher).
+
+Inhalt: Landeszeichen auf allen Displays (CHARS-01), UV und Wind (WX-01), Ladezustand (BAT-04), T#-Telemetrie (TLM-03), Web-Passwort im Setup (WEB-PWD-01), Pins-Seite und `mcpout`-Ablehnung (WEB-PIN-01),
+LED-Modi (WEB-LED-01), Install-Plan als Hinweis, T-Beam-Heap-Gate (AU-23), Knoten-Uhr in den Stempeln (AU-22), EXTUDP-Peer-Wechsel (EXT-PEER-01) und Register-Abfrage, Hold-Ring bei Server-Ausfall,
+RAK-Pin-Schutz (RAK-PIN-01), T-Deck-Icons (TD-30, TD-33), Web-Guard an und `X-MC` fuer `otaupdate` und `reboot`. Kampagne: `docs/campaign-release-gate-20261106.md`.
+
+Betreiber-Entscheidung 2026-11-06: T-Beam Idle-Heap 64016 B statt 68688 B (`v4.40a.11.01`) akzeptiert, 4,7 KB unter dem alten Stand und ueber der Toleranz von 3 KB; neue Basis in `tools/heap_baseline.json`. Kein Leck, in den letzten 40 min flach innerhalb 112 B.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Bench und Soak liefen auf dem CI-Build von `44075ef3`. Das Release fuegt die Setup-Korrektur WEB-GRID-01 und den `FLASH_VERSION`-Stempel hinzu; die Release-Images bekommen einen Smoke-Test auf den vier Knoten.
+- Web-GUI in Chrome auf RAK, T-Beam, T-Deck Plus: alle Seiten, keine Konsolenfehler. Check now am T-Beam ohne Ablehnung.
+- Manipulierte `.autoupdate` am T-Beam: 6 von 6 abgelehnt, saubere Datei stellt her. Safeboot-Seite in Chrome am T-Deck Plus.
+- EXTUDP-Peer-Wechsel auf allen vier, auch waehrend WLAN-Ausfall am T-Deck Plus. Langsamer Client am T-Beam ohne Reboot. RM-Rundlauf DK5EN-1 zu DK5EN-92, 4 von 4. Ethernet am RAK ohne Reset.
+- Telefon (Betreiber): DM mit ACK an T-Beam und RAK, Reconnect ohne Pairing, "Pause Bluetooth and check" am T-Beam, BLE kommt von selbst zurueck.
+- Soak 1 h: kein Reboot auf allen vier Knoten.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- Neustart des Update-Jobs bei gespaltenem Heap mit gehaltenem Telefon (AU-23).
+- BLE-Settings-Characteristic: existiert nicht auf der Luft (BLE-SET-01), die Maskierung laeuft nur im Host-Test.
+- MCP23017-Pins auf echter Hardware, Web-Passwort setzen und loeschen auf einem Knoten, Hold-Ring bei echtem Server-Ausfall.
+- UV, Wind und Ladezustand fuer dieses Release nicht wiederholt. E290, Wireless Paper, E213, T-Echo und T114 nicht auf der Bench.
+- Der Soak hatte um 20:15 eine Web-Abfrage; rund 1 KB des Abfalls koennte daher kommen, Ursache nicht bewiesen. Das Rohlog des Soaks ist gemischt, die Werte je Knoten sind sauber.
 
 ## Release v4.40a.11.01 (Sonntag, 2026-11-01)
 

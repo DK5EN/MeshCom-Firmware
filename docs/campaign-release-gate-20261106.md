@@ -51,6 +51,10 @@ and the heap decision come docs and host gate, the `v*` tag when the operator as
 Later releases: collect fixes with host tests and local builds, one CI build, one bench sitting on that image, soak last and overnight. A late change touching runtime behaviour goes back to the
 CI build; a pure text or layout change gets the smoke test.
 
+## Release run
+
+Operator accepted the T-Beam heap on 2026-11-06 (64016 B, new baseline) and gave the go to ship `v4.40a.11.06`. Order: docs and gate, push, tag, CI, asset check, web flasher, smoke test on the four nodes.
+
 ## W2 file ownership
 
 | Agent | Item                    | Exclusive files                                                                                                                  |

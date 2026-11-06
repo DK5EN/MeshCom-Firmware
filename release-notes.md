@@ -3,21 +3,18 @@
 
 ## What this release is
 
-**`v4.40a.11.01` lets remote management switch a node's Auto Update channel, locks the ping target to callsigns, sends a node's own position, weather and HEY reports with the priority of an own group message, and adds receive-silence logging for field diagnosis.** Your configuration survives the update. Nobody has to act unless a stored ping target is not a callsign (below).
+**`v4.40a.11.06` brings national characters on every display, UV and wind sensors, the battery charge state, a web password you can manage on the page, a live Pins page, a message hold during server outages, and fixes that stop a T-Beam refusing updates and a RAK being bricked by a pin setting.** Your configuration survives the update. Only scripts that reboot a node over HTTP must act (below).
 
 ### Action needed
 
 > [!WARNING]
-> **A stored ping target that is not a callsign is cleared at boot.** A group (`2025`), a special target (`*`, `TEST`), the node's own call or a malformed value (`255.`) becomes empty, so the node stops pinging.
+> **Scripts that call `/callfunction/?otaupdate` or `?reboot` must send the header `X-MC: 1`** (web guard).
 >
-> - Set a real callsign again with `--pingcall <call>`; the console now says why a value is refused.
-> - Nodes with a valid ping target or none are not affected.
+> - Without the header the node answers 403 and does nothing. The web GUI and `tools/webflash.py` already send it.
+> - The web guard is now on by default, and cross-origin headers are gone, so pages on other sites can no longer drive a node.
 
 > [!WARNING]
-> **Scripts that log in to the web GUI with `/?nodepassword=<password>` stop working** on a node with a web password, if you skipped `v4.40a.10.30`.
->
-> - The node answers that request with 403 `{"ok":false,"err":"plaintext"}`.
-> - Use the three-step login (nonce, HMAC, session cookie); a `curl`/`openssl` example is in [`Web-API_documentation.txt`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.11.01/src/web_functions/Web-API_documentation.txt), section "Login".
+> **Coming from before `v4.40a.11.01`:** a stored ping target that is not a callsign is cleared at boot. Coming from before `v4.40a.10.30`: `/?nodepassword=<password>` logins answer 403, use the three-step login in [`Web-API_documentation.txt`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.11.06/src/web_functions/Web-API_documentation.txt), section "Login".
 
 > [!WARNING]
 > **T-Beam 1W and T-Deck Pro:** run the [web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/) once if you skipped it with `v4.40a.10.20` (1W) or `v4.40a.10.21` (Pro). Details: "Known gaps" below.
@@ -26,17 +23,84 @@
 
 ### Key facts
 
-- **Base:** the official `v4.40a.10.28` (2026-10-28) plus our merged [#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243), [#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244) and [#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245) (upstream `dev` 147812e0, 2026-10-31). All fork firmware of earlier releases is upstream.
-- **Fork-only firmware in this release:** the six changes below and the `dev` Auto Update channel. Three of them (ping target lock, own beacons at priority 2, receive-silence logging) are submitted upstream as [#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247), still open. The release is **not** byte-identical to any official release.
-- **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings from `4.40a`/`4.35v` are kept. Ten locked protocol settings are still reset to their fixed value at boot (since `v4.40a.10.19`). A new keyed setting `node_gwlab` exists only after `--gateway lab`.
+- **Base:** the official `v4.40a.10.28` (2026-10-28) plus upstream `dev` up to our merged [#1251](https://github.com/icssw-org/MeshCom-Firmware/pull/1251) (4f60051c, 2026-11-02). National characters, the charge state and UV and wind sensors are upstream through #1249, #1250 and #1251.
+- **Fork-only firmware:** everything else below and the `dev` Auto Update channel. The release is **not** byte-identical to any official release.
+- **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings from `4.40a`/`4.35v` are kept. New settings start at their defaults.
 - **How to tell builds apart:** the version on the air still reads `4.40a`.
-  - `--info` prints `...AU env=<board> tag=v4.40a.11.01` and `FLASH_VERSION 20261101`.
-  - `--id` prints `MCBOARD:v1:<hwid>:<hwid>:<board>:v4.40a.11.01`.
-- **Safeboot v3** ships unchanged since `v4.40a.10.21`; it reaches a node only through the web flasher.
+  - `--info` prints `...AU env=<board> tag=v4.40a.11.06` and `FLASH_VERSION 20261106`.
+  - `--id` prints `MCBOARD:v1:<hwid>:<hwid>:<board>:v4.40a.11.06`.
+- **Safeboot** stays at capability v3 with a refreshed image (smaller page, stale stage dropped on a web upload). It reaches a node only through the web flasher.
 - **Auto Update channels:** `prod` reads the latest icssw-org release, `dev` (`--updchan dev`) the **Latest** release of this fork, which is this one. The mode is always `notify`: nothing installs by itself.
+- **T-Beam idle memory is lower:** 64.0 KB against 68.7 KB on `v4.40a.11.01`, accepted by the operator. It holds flat, so this is a lower level and not a leak. Details: "Known gaps".
 - **Assets (68):** 28 ESP32 application `.bin` plus 28 `.autoupdate` files, the three nRF52 boards as `.uf2` and DFU `.zip`, and six support files.
 
-## New in `v4.40a.11.01`
+## New in `v4.40a.11.06`
+
+**Displays and characters**
+
+- **National characters on every display** (CHARS-01, upstream #1249, idea by sp2ong in #1221).
+  - E290, Wireless Paper and E213 fonts carry Polish and German letters; E290 also French, Spanish and Portuguese. T-Deck has Latin fonts.
+  - A display that lacks a letter folds it (`ä` to `ae`, `ł` to `l`, `€` to `EUR`, emoji to `?`); nothing printable is dropped any more.
+  - T-Deck input now caps the message in bytes, so a long UTF-8 text is no longer cut in the middle of a letter (TD-25). Latin-2 on the OLED fonts stays folded by decision (CHARS-02).
+- **Boot screens and the web logo show MeshCom 4.4** (BOOT-01).
+
+**Sensors, battery and telemetry**
+
+- **UV and wind sensors on ESP32** (WX-01, upstream #1251): optional LTR390 and reed anemometer, as telemetry values `uvindex`, `wind` and `gust`, off by default.
+- **Battery charge state on PMU boards** (BAT-04, upstream #1250): charging, full, discharging or absent, plus current where the PMU measures it (AXP192 only). Over BLE in a new `IS2` register.
+- **Own `T#` telemetry goes on air again** without the soft-serial app (TLM-03).
+  - Cause: since upstream `v4.34x.05.16` the periodic timer asked for the soft-serial app only.
+
+**Web GUI**
+
+- **Web password on the page** (WEB-PWD-01): set, change and clear it on Setup. A forgotten password still needs `--webpwd none` on the console.
+- **Live Pins page:** board LED, charge LED and MCP23017 pins, refreshed every 5 s while open. An input pin or bad port now answers 422 instead of a false success (WEB-PIN-01).
+- **Board LED off, flash or steady,** kept across reboots (WEB-LED-01).
+- **Auto Update install plan** on Setup and Info: delay, weekday, time. It is a notice only; automatic install stays off.
+- **Smaller and tidier:** CSS and JS are served compressed, dark mode and accessibility fixes (WEB-DARK-01, WEB-DARK-02, WEB-A11Y-01), Firmware Update card aligned (WEB-GRID-01), unique field ids (WEB-DUP-01).
+
+**Auto Update**
+
+- **T-Beam no longer refuses Check now and Download after web use** (AU-23).
+  - Cause: closed web sockets held memory for two minutes, and the job's own stack could split the big memory block.
+  - Now: on a refusal the job clears those sockets, reads the gate again and, on a split heap, restarts once.
+- **The update image is checked more strictly before handover,** with a battery floor on apply and a staging gate.
+- **Check time stamps use the node clock** (AU-22). The update button reads Download, not Install.
+
+**Network and gateway**
+
+- **EXTUDP peer changes take effect at once** on console and web (EXT-PEER-01). Accepted: a RAK hostname peer no longer serves inbound traffic.
+- **EXTUDP can answer register queries** (`{"type":"reg","q":"SN"}`): read-only, secrets filtered, only to the configured peer, one per second.
+- **Messages are held during a server outage:** up to 20 minutes, text only, 1 KB on classic ESP32, 6 KB on S3 and RAK, replayed with the same id (`--udphold`).
+- **Gateway stability:** UDP drain, server name resolved again, EXTUDP name lookup no longer blocks.
+- **Net console:** handshake deadline and rate-limited accept errors.
+
+**RAK4631 and nRF52**
+
+- **A pin setting can no longer brick a RAK** (RAK-PIN-01).
+  - Cause: `--button gpio 1` took the 32 kHz crystal pin, the node hung in its first delay, and a reflash kept it.
+  - Now: crystal and reset pins are refused at the console and repaired at load.
+- **Ethernet is a build flag per board,** off on T114 and T-Echo, where `--gateway on` is refused.
+- **Secrets are masked in the BLE settings path** (QA-NET-02). See "Known gaps": that path does not exist on the air (BLE-SET-01).
+
+**T-Deck**
+
+- **BLE and WiFi header icons toggle the radio,** stay across reboots and follow the switch (TD-30, TD-33). The Path column wraps long paths, Setup field padding fixed (TD-31).
+- **T-Deck Pro:** a destination of 1 to 9 characters is a DM, an invalid one is refused and never sent as a broadcast (TD-26). Also TD-27 to TD-29 and TD-32.
+
+**Stability and mesh**
+
+- **Mesh:** the echo scan runs only after decoding, `{SET}` saves are rate limited, special calls are handled as source (QA-RX-03).
+- **Stability:** BLE callbacks no longer log on the host task, less `String` churn on hot paths, safe argument copies in commands, cleared RX copy tail (BL-02).
+- **Smaller builds:** no exceptions, debug level 0, unused T-Deck widgets and fonts dropped, table-driven web settings, shared code for hashing and clock sync.
+- **Also:** BMP390 guard fixed, battery and queue details (BAT-05, TXP-02), time zone and sensor fixes (TZ-02, SENS-03), CAD timing log (CSMA-04), OLED and T-Deck bench screenshots.
+
+## Earlier fork releases
+
+Everything below is already in `v4.40a.11.01` and older, and therefore in this release too. Open a section for details.
+
+<details>
+<summary><strong><code>v4.40a.11.01</code></strong> — remote Auto Update channel switch, ping target lock, own beacons at priority 2, receive-silence logging</summary>
 
 - **Remote management can switch the Auto Update channel** (fork, flag builds only, RM-UPDCHAN, RM1 `upd chan prod|dev`).
   - Use: an authenticated `RM1` DM `upd chan dev` or `upd chan prod` sets the channel; answers are `ok chan <x>`, `err aubusy` (a check or download runs, or a remote `upd go` is armed) and `err unsupported`.
@@ -62,9 +126,7 @@
 - **Vision Master E290 OTP image: no periodic full refresh by default** (fork, `vision-master-e290-otp`).
   - Testing on panels marked `FPC-7519revb` showed no ghosting with partial refresh alone, so the full refresh every 10 updates is off (`E290_FULL_EVERY=0`). `-D E290_FULL_EVERY=N` brings it back.
 
-## Earlier fork releases
-
-Everything below is already in `v4.40a.10.30` and older, and therefore in this release too. Open a section for details.
+</details>
 
 <details>
 <summary><strong><code>v4.40a.10.30</code></strong> — web login without plain-text password, Extern-UDP echo in web chat, gateway names itself in HEY upload, E290 OTP image</summary>
@@ -358,6 +420,25 @@ With default settings, compared with the official `v4.40a.10.28`:
 
 ### Verification for this release
 
+- **Host suite:** 3602 test cases in 101 native environments, all green, plus the golden selftest, nRF52 board links and the host tool suites (pytest 1500, web GUI, web flasher).
+- **Build:** CI builds all environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download.
+- **Test image:** the bench and soak below ran on the CI build of `44075ef3`. The release adds a one-line Setup layout fix and the `FLASH_VERSION` stamp; the release images get a smoke test on the four nodes.
+- **Soak, 1 hour (2026-11-06):** T-Beam, Heltec V3, T-Deck Plus, RAK4631: no reboot. T-Beam flat within 112 B over the last 40 minutes at 64016 B, new baseline; the gate allows 3072 B.
+- **Benched on those images (2026-11-06):**
+  - Web GUI: every page on RAK4631, T-Beam and T-Deck Plus in Chrome, no console errors. Layout fix seen on a T-Deck Plus.
+  - Update safety: six manipulated `.autoupdate` uploads refused on a T-Beam, each with its reason, clean upload recovered the node; Safeboot page in Chrome on a T-Deck Plus.
+  - EXTUDP peer change on all four boards, also during a WiFi drop on a T-Deck Plus.
+  - Slow client on a T-Beam at 2.5 s reply delay: no reboot.
+  - Remote management round trip Heltec V3 to T-Beam, 4 of 4 replies verified, relayed by a gateway over the server.
+  - Ethernet on a RAK4631: 20 inbound EXTUDP datagrams at 0.5 s and 1.2 s, no reset.
+  - Phone (operator): DM and ACK on T-Beam and RAK4631, reconnect without pairing; with a phone held the T-Beam offers "Pause Bluetooth and check", the check ends well and BLE returns.
+- **Benched on earlier images the same day:** reserved RAK pin refused, hold ring with one simulated outage, 60 of 60 T-Beam pages complete, OLED screenshots, 0 % RX loss on a T-Beam under web load.
+
+<details>
+<summary>Bench results of earlier releases (unchanged code since)</summary>
+
+**`v4.40a.11.01`:**
+
 - **Host suite:** 3262 test cases in 85 native environments, all green, plus the golden selftest (48 commands), nRF52 board links and the host tool suites (pytest 1473, web GUI, web flasher). New: suites for the ping target, the receive-silence tracker, the remote channel switch and the lab gateway.
 - **Build:** CI builds all 33 environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download (checked on the published assets).
 - **Idle heap on T-Beam v1.2 (`DK5EN-92`):** 68688 B against the 69332 B baseline (-644 B, the gate allows 3072 B), measured 2026-11-01 as the 600 s STAT heap with Bluetooth up on a local build of this commit.
@@ -366,9 +447,6 @@ With default settings, compared with the official `v4.40a.10.28`:
   - Ping target: refusals of group, special, own-call and malformed targets at the console setter on `DK5EN-1`.
   - Receive-silence logging: nRF52 on RAK4631 `DK5EN-90`; ESP32 on Heltec V3 `DK5EN-1` for 18 minutes at 2 dBm (six snapshots, six end lines, 178 timed RX restarts all in receive mode, no reset). On the bench a silence is a quiet channel, not a deaf chip.
 - **Host-tested only:** own beacons at priority 2 (queue order, expiry), boot-time clean-up of a stored ping target, the lab gateway, the E290 refresh default (built only, no E290 on our bench).
-
-<details>
-<summary>Bench results of earlier releases (unchanged code since)</summary>
 
 - **`v4.40a.10.30` (2026-10-30):**
   - Web login on Heltec V3 (`DK5EN-1`, USB): 19 of 19 HTTP checks including the login block, plus Chrome (Enter, focus, wrong-password message, logout). On the gateway `DK5EN-98` (over the air): 17 of 17 plus Chrome.
@@ -449,6 +527,22 @@ With default settings, compared with the official `v4.40a.10.28`:
 - **Use a long random web password:** a sniffed login challenge can be attacked offline.
 - **Any device on the LAN can lock the login for a minute** with five wrong guesses; open sessions stay valid.
 - **A login page cached by the browser from older firmware** sends the old plain-text login and gets an error; reload the page.
+
+**New in this release**
+
+- **Less memory on classic ESP32:** T-Beam idle heap 64.0 KB against 68.7 KB on `v4.40a.11.01` (measured 2026-11-06).
+  - About 2.5 KB are new static buffers (hold ring, web settings table, register query); the rest is not itemised. Measured with about 1 KB of the drop possibly caused by the first web request after boot.
+  - Check now passed 20 of 20 on a T-Beam. Accepted by the operator.
+- **BLE settings characteristic does not exist on the air** (BLE-SET-01): the RAK shows service `0xF0A0` empty. No secret can leak this way, and the phone app uses Nordic UART. Likely cause, from the source: its 2001 bytes exceed the 510 byte limit. The masking in this release therefore runs only in host tests.
+- **Web password:** no prompt for the current one, so an open session can change or clear it. It crosses the network in plain text.
+- **Auto Update restart on a split heap with a phone held:** the phone path works, but this run may not have hit a split heap (AU-23).
+- **Message hold:** one simulated outage on the bench, no real server failure. A single lost `BEAT` may replay the few held frames (about 1 per 4 h, measured), by decision.
+- **MCP23017 pins on the Pins page:** host tests only, no expander on our bench.
+- **UV and wind sensors, charge state over BLE:** see the upstream PRs; not repeated on the bench for this release.
+- **Display fixes on E290, Wireless Paper, E213, T-Echo and T114:** no such board on our bench unless listed under "Verification".
+- **Safeboot page and upload tests** ran with the Safeboot already on those nodes; the refreshed image was not confirmed on them.
+- **T-Deck `--disptest`** in INSTRUMENT builds can reboot (TD-34), not in release images.
+- **RM1 pins:** `setout` reaches MCP23017 bits only. ESP32 hardware pins are planned for a later release (GPIO-01).
 
 **Not benched (host tests or builds only)**
 

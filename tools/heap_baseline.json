@@ -1,8 +1,8 @@
 {
   "ttgo_tbeam": {
     "channel": "net2323",
-    "date": "2026-10-18",
-    "firmware_version": "40a/20261018",
-    "idle_free": 69332
+    "date": "2026-11-06",
+    "firmware_version": "40a/20261101",
+    "idle_free": 64016
   }
 }
