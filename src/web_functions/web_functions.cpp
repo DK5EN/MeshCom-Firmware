@@ -10,6 +10,7 @@
 
 #include <configuration.h>
 #include <debugconf.h>
+#include "pin_status_json.h" // GET /pinstatus: pure JSON formatter (test/test_pin_status)
 #include "web_functions.h"
 #include "web_oled_shot.h"
 #include "web_txbuf.h"     // WEB-TX-01: webTxBeginChunked in send_http_header
@@ -113,6 +114,11 @@ void web_client_html(CommonWebClient web_client);
 // die anderen sub_page_*()-Deklarationen -- das ist ein Punkt fuer den
 // naechsten, der web_functions.h anfassen darf.
 void sub_page_neighbours();
+
+// Pins page + GET /pinstatus: local declarations, as above (web_functions.h is outside this change)
+void sub_page_pins();
+// noinline: an inlined copy puts the JSON buffer in work_webpage's frame, i.e. on every web request
+static void __attribute__((noinline)) sub_pin_status();
 
 
 String web_header;
@@ -1180,6 +1186,10 @@ void work_webpage(void)
                         { // WEB-PWD-01: set / clear the web login password, the password is in the BODY
                             sub_web_passwd(web_content_length);
                         }
+                        else if (web_header.startsWith("GET /pinstatus"))
+                        { // Pins page: cached state of the board LED, charge LED and MCP23017 pins, read-only, GET only
+                            sub_pin_status();
+                        }
                         else if (web_header.startsWith("GET /rmnodes"))
                         { // RM GUI: the three saved nodes (slot, used, call), never a key
                             sub_rm_nodes_get();
@@ -1312,6 +1322,11 @@ void work_webpage(void)
                         { // user requested the path page
                             send_http_header(200, RESPONSE_TYPE_TEXT);
                             sub_page_mcp23017();
+                        }
+                        else if (web_header.indexOf("/?page=pins") >= 0)
+                        { // user requested the pins page
+                            send_http_header(200, RESPONSE_TYPE_TEXT);
+                            sub_page_pins();
                         }
                         else if (web_header.indexOf("/?page=info") >= 0)
                         { // user requested the info page
@@ -1449,7 +1464,7 @@ void deliver_scaffold(bool bget_password)
     // WEB-AUTH-01: login(), logout(), mcLoginFocus() -- challenge-response, must stay after the X-MC wrapper (mc.js above)
     webLoginScaffoldJs();
     // this function is used to load content depending on the navigation button pressed
-    web_client.println("function loadPage(page,sender,useSpinner) {" AU_LP_LEAVE "if(typeof rmPageLeave=='function')rmPageLeave();cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;if(typeof mcLoginFocus=='function')mcLoginFocus();mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='remote'&&cpage=='remote')rmPageInit();" AU_LP_INIT "if(page=='setup'&&typeof raSt=='function')raSt();}else if(this.readyState==4&&useSpinner)document.getElementById('content_layer').innerHTML='Node did not answer completely. Please reload.';};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
+    web_client.println("function loadPage(page,sender,useSpinner) {" AU_LP_LEAVE "if(typeof rmPageLeave=='function')rmPageLeave();if(typeof pinsLeave=='function')pinsLeave();cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;if(typeof mcLoginFocus=='function')mcLoginFocus();mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='remote'&&cpage=='remote')rmPageInit();if(page=='pins'&&cpage=='pins'&&typeof pinsInit=='function')pinsInit();" AU_LP_INIT "if(page=='setup'&&typeof raSt=='function')raSt();}else if(this.readyState==4&&useSpinner)document.getElementById('content_layer').innerHTML='Node did not answer completely. Please reload.';};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
     web_client.println("</script>\n");
 #if defined(ESP32)
     web_client.println("<script src=\"/mcau.js?v=" WEB_MC_AU_JS_TAG "\"></script>"); // AU web GUI: Info page Auto update row
@@ -1493,6 +1508,12 @@ void deliver_scaffold(bool bget_password)
     web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('spectrum',this,true)\"><svg viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><g><path d=\"M13,11v4M9,7v8m8-6v6\" style=\"fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:2;\"></path><path d=\"M3,19H21M5,3V21\" style=\"fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:2;\"></path></g></svg></Button>\n");
     if(bMCP23017) {
         web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('mcp23017',this,true)\"><svg width=\"48\" height=\"48\" version=\"1.1\" viewBox=\"0 0 12.7 12.7\" xmlns=\"http://www.w3.org/2000/svg\"><g fill=\"none\" stroke=\"currentColor\" stroke-linejoin=\"round\"><rect x=\".78644\" y=\".78644\" width=\"11.127\" height=\"5.4354\" stroke-width=\"1.0\"/><g stroke-linecap=\"round\" stroke-width=\"1.0\"><path d=\"m0.79071 8.2113h11.119\"/><path d=\"m0.79679 9.7926h11.119\"/><path d=\"m0.79679 11.38h11.119\"/></g></g></svg></Button>\n");
+    }
+
+    { // Pins page: any switchable pin (board LED, charge LED, MCP23017); the page and /pinstatus show what exists
+        const LedFitted pinHw = ledFittedNow();
+        if (pinHw.board || pinHw.charge || bMCP23017)
+            web_client.println("<Button class=\"nav_button\" title=\"Pins\" aria-label=\"Pins\" onclick=\"loadPage('pins',this,true)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"><circle cx=\"7\" cy=\"7\" r=\"2.5\"></circle><circle cx=\"17\" cy=\"7\" r=\"2.5\" fill=\"currentColor\"></circle><circle cx=\"7\" cy=\"17\" r=\"2.5\" fill=\"currentColor\"></circle><circle cx=\"17\" cy=\"17\" r=\"2.5\"></circle></g></svg></Button>\n");
     }
 
     // Setup Button (Image as base64 and split t0 several print() so RAK can handle it)
@@ -4266,6 +4287,92 @@ void sub_page_mcp23017()
     snprintf(caption, 10,  "%s", "clear all");
     uic_button(&web_client, onclick, caption);
     web_client.println("</td></tr></table></div>");
+}
+
+/**
+ * ###########################################################################################################################
+ * Pins page: only the frame. The rows are made by pinsInit()/pnRender() in web/mc.js from GET /pinstatus (scripts of
+ * sub-pages never run). PINS-HTML-BEGIN is read by tools/webgui_pins_test.js.
+ * Switches: board LED through setparam boardled, MCP pins through mcpout/mcpio/mcpname, the same handlers as the
+ * MCP23017 page (kept as it is: server-rendered, no polling). Everything is hidden until the first answer says what exists.
+ */
+void sub_page_pins()
+{
+    _create_meshcom_subheader("Pins");
+    // PINS-HTML-BEGIN
+    web_client.println("<div id=\"content_inner\">");
+    web_client.println("<div id=\"pn_led\" hidden><label id=\"pn_led_lbl\">Board LED</label>");
+    web_client.println("<div class=\"mcledgrp\" role=\"group\" aria-labelledby=\"pn_led_lbl\">");
+    web_client.println("<button type=\"button\" class=\"mctab mcledbtn\" id=\"pn_led_off\" aria-pressed=\"false\" onclick=\"pinsLed('off')\">off</button>");
+    web_client.println("<button type=\"button\" class=\"mctab mcledbtn\" id=\"pn_led_flash\" aria-pressed=\"false\" onclick=\"pinsLed('flash')\">flash</button>");
+    web_client.println("<button type=\"button\" class=\"mctab mcledbtn\" id=\"pn_led_steady\" aria-pressed=\"false\" onclick=\"pinsLed('steady')\">steady</button>");
+    web_client.println("</div><p class=\"font-small\" id=\"pn_led_st\"></p></div>");
+    web_client.println("<div id=\"pn_chg\" hidden><label id=\"pn_chg_lbl\">Charge LED</label>");
+    web_client.println("<div class=\"mcledgrp\" role=\"group\" aria-labelledby=\"pn_chg_lbl\">");
+    web_client.println("<button type=\"button\" class=\"mctab mcledbtn\" id=\"pn_chg_off\" aria-pressed=\"false\" onclick=\"pinsChg('off')\">off</button>");
+    web_client.println("<button type=\"button\" class=\"mctab mcledbtn\" id=\"pn_chg_auto\" aria-pressed=\"false\" onclick=\"pinsChg('auto')\">auto</button>");
+    web_client.println("</div><p class=\"font-small\">auto = follows charging, off = dark. Now: <span id=\"pn_chg_st\"></span></p></div>");
+    web_client.println("<p id=\"pn_none\" hidden>No switchable pins on this node.</p>");
+    web_client.println("<table class=\"table mw-600\" id=\"pn_mcp\" hidden><caption class=\"font-small\">MCP23017 pins</caption>");
+    web_client.println("<thead><tr class=\"font-bold\"><th scope=\"col\">Pin</th><th scope=\"col\">Name</th><th scope=\"col\">In/Out</th><th scope=\"col\">Level</th></tr></thead>");
+    web_client.println("<tbody id=\"pn_body\"></tbody></table>");
+    web_client.println("<p class=\"font-small pn-note\" id=\"pn_note\" role=\"status\"></p>");
+    web_client.println("<p class=\"font-small pn-note\" id=\"pn_msg\" role=\"status\"></p>");
+    web_client.println("<p class=\"font-small\">Refreshed every 5 s while this page is open. Output levels are what the node was told to set; input levels are sampled by the node every 5 s.</p>");
+    web_client.println("</div>");
+    // PINS-HTML-END
+}
+
+/**
+ * ###########################################################################################################################
+ * GET /pinstatus -- cached state of the switched pins as one JSON document (src/pin_status_json.h documents the shape).
+ * Read-only and GET only; behind the WEB-AUTH gate like the pages. No I2C access here: the MCP levels are the settings
+ * fields as loopMCP23017() (scheduler, every 5 s, and right after --setout / --setio) last left them.
+ */
+static void __attribute__((noinline)) sub_pin_status()
+{
+    PinStatusIn in;
+    memset(&in, 0, sizeof(in));
+
+    const LedFitted ledHw = ledFittedNow();
+    in.ledFitted = ledHw.board;
+#if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)
+    if (ledHw.board)
+    {
+        in.ledMode = bUSER_BOARD_LED ? (boardLedModeGet() == BOARD_LED_MODE_STEADY ? PIN_LED_STEADY : PIN_LED_FLASH) : PIN_LED_OFF;
+        in.ledBusy = !boardLedPinUsable();
+    }
+#endif
+#if defined(REMOTE_LED_PIN)
+    in.ledRm = bRemoteLedFlash ? PIN_RM_FLASH : (bRemoteLed ? PIN_RM_ON : PIN_RM_NONE);
+#endif
+
+    in.chgMode = "off";
+#if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
+    in.chgFitted = ledHw.charge;
+    in.chgMode = bCHARGE_LED ? "auto" : "off";
+    in.chgEff = chargeLedModeName(chargeLedEffective());
+    in.chgRm = chargeLedOverrideActive();
+#endif
+
+    in.mcpPresent = bMCP23017;
+    in.mcpIo = (uint16_t)meshcom_settings.node_mcp17io;
+    in.mcpOut = (uint16_t)meshcom_settings.node_mcp17out;
+    in.mcpIn = (uint16_t)meshcom_settings.node_mcp17in;
+    in.names = meshcom_settings.node_mcp17t;   // not copied; pinJsonEscape reads at most PIN_NAME_MAX - 1 bytes
+
+#if defined(NRF52_SERIES)
+    static char body[PIN_STATUS_JSON_MAX];   // the 8 KB loop stack is tight; the web server runs in this one task only
+#else
+    char body[PIN_STATUS_JSON_MAX];
+#endif
+    const size_t n = pinStatusJson(in, body, sizeof(body));
+    web_cors_ok = false; // node-local read, as /austatus
+    send_http_header(n ? 200 : 500, RESPONSE_TYPE_JSON);
+    if (n)
+        web_client.println(body);
+    else
+        web_client.println("{\"ok\":false}");
 }
 
 /**

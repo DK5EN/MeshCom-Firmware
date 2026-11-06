@@ -17,6 +17,16 @@ void flushExternQueue();
 void sendExternHeartbeat();
 void resetExternUDP();
 
+// EXTUDP register query (src/ext_reg.h, docs/ext_udp_telemetry.md): getExtern()
+// hands {"type":"reg","q":...} to extRegQuery(); extRegTick() (called from
+// getExternUDP()) runs it. While a query runs, sendBleJsonRegister() gives the
+// frame to extRegSinkFrame() instead of the BLE ring.
+void extRegQuery(const char *q);
+void extRegTick();
+void extRegReset();   // drops a queued query / running "all" run (resetExternUDP() calls it)
+bool extRegSinkActive();
+void extRegSinkFrame(const uint8_t *json, uint16_t len);
+
 String getJSON(unsigned char incoming, int len, char *iname);
 
 

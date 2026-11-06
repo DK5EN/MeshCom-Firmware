@@ -45,11 +45,15 @@ select:focus,input:focus,textarea:focus {border:solid 1px var(--mcred);backgroun
 #content_inner > table thead {background-color:var(--navbg);color:var(--navfg);border-radius:10px;}
 #content_inner > table tr:nth-child(even) {background-color:var(--mceven);}
 #content_inner > table td {vertical-align:top;padding:0.5em 0.5em 0.5em 0.5em;border-bottom:solid 1px var(--mcline);}
+#content_inner > table th {text-align:left;vertical-align:top;padding:0.5em;border-bottom:solid 1px var(--mcline);}
+#content_inner .pn-note {min-height:1.2em;}
 /* content definitions -> anchors */
 #content_inner a {color:var(--mcred);}
 /* content definitions -> buttons */
 #content_inner button {background-color:var(--mclightred);border:solid 1px var(--mcgray);padding:3px 10px;text-align:center;cursor:pointer;display:inline-flex;align-items:center;border-radius:5px;}
 #content_inner button:hover {background-color:var(--mcmidred);}
+/* the display:inline-flex above (and on .mctab) overrides the UA [hidden] rule: without this a hidden button stays visible */
+#content_inner button[hidden] {display:none;}
 .btncheckmark {width:20px;height:20px;margin:auto;background:center no-repeat url("data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgNDggNDgiIHZlcnNpb249IjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgZW5hYmxlLWJhY2tncm91bmQ9Im5ldyAwIDAgNDggNDgiIGZpbGw9IiMwMDAwMDAiPjxnIHN0cm9rZS13aWR0aD0iMCI+PC9nPjxnIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PC9nPjxnPjxwb2x5Z29uIGZpbGw9IiM0M0EwNDciIHBvaW50cz0iNDAuNiwxMi4xIDE3LDM1LjcgNy40LDI2LjEgNC42LDI5IDE3LDQxLjMgNDMuNCwxNC45Ij48L3BvbHlnb24+PC9nPjwvc3ZnPg==");}
 .btnrefresh {width:20px;height:20px;margin:auto;background:center no-repeat url("data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgc3Ryb2tlLXdpZHRoPSIwIj48L2c+PGcgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48L2c+PGc+PHBhdGggZD0iTTIxIDNWOE0yMSA4SDE2TTIxIDhMMTggNS4yOTE2OEMxNi40MDc3IDMuODY2NTYgMTQuMzA1MSAzIDEyIDNDNy4wMjk0NCAzIDMgNy4wMjk0NCAzIDEyQzMgMTYuOTcwNiA3LjAyOTQ0IDIxIDEyIDIxQzE2LjI4MzIgMjEgMTkuODY3NSAxOC4wMDggMjAuNzc3IDE0IiBzdHJva2U9IiM0M0EwNDciIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48L3BhdGg+IDwvZz48L3N2Zz4=");}
 /* content definitions -> message-page */

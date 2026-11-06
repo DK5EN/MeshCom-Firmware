@@ -4,6 +4,8 @@
 #include <atomic>
 
 #include <extudp_functions.h>
+#include "command_functions.h"   // commandAction(): register query
+#include "ext_reg.h"
 #include <loop_functions.h>
 #include <debugconf.h>
 #include "instrument.h"
@@ -491,6 +493,17 @@ void getExtern(unsigned char incoming[], int len)
     return;
   }
 
+  // Register query {"type":"reg","q":"SN"}: only queued here, run from
+  // extRegTick() after getExtern() has returned (this frame carries the
+  // JsonDocument; commandAction() is deep). Not part of the host test.
+#ifndef NATIVE_BUILD
+  if(msg_type != nullptr && strcmp(msg_type, "reg") == 0)
+  {
+    extRegQuery(inputJson["q"] | (const char *)nullptr);
+    return;
+  }
+#endif
+
 // FIX — Null-Checks einfügen:
   const char* dst = inputJson["dst"];
   const char* msg = inputJson["msg"];
@@ -559,6 +572,8 @@ void getExternUDP()
 
   if(!hasExternIPaddress)
     return;
+
+  extRegTick();
 
 #ifdef MC_TEST_HOOKS
   // N-20-Soak-Instrumentierung (compile-gated, Produktionsbuilds unberuehrt):
@@ -1073,6 +1088,174 @@ static void sendExternJson(const uint8_t *json, uint16_t jlen)
 }
 #endif // EXT_NO_SOCKET
 
+// ---------------------------------------------------------------------------
+// EXTUDP register query (src/ext_reg.h). Read-only, answered only to the
+// configured node_extern peer (extSendDatagram() -> apip:EXTERN_PORT, never
+// the sender's address), nothing goes over LoRa. The frames are made by the
+// existing BLE builders: extRegTick() runs the console command that builds a
+// register, sendBleJsonRegister() hands each frame to extRegSinkFrame()
+// instead of the BLE ring, which keeps the one whose TYP was asked for,
+// removes secret members (extRegFilter(), denylist by key name) and sends
+// it. A phone never sees these frames, and BLE does not have to be on.
+// ---------------------------------------------------------------------------
+#if !defined(EXT_NO_SOCKET)
+static_assert(BLE_JSON_PAYLOAD_MAX <= EXT_REG_PAYLOAD_MAX, "ext_reg.h reply buffer is sized for BLE_JSON_PAYLOAD_MAX");
+
+static ExtRegLimiter regLimiter = {0, false};
+static char regPendingQ[EXT_REG_NAME_MAX + 2];   // +1 char over the limit so extRegLookup() sees "too long"
+static ExtRegRun regRun_st = {false, -1, 0};     // queued query / "all" run (ext_reg.h); cleared by extRegReset()
+static bool regSinkOn = false;
+static char regWant[EXT_REG_NAME_MAX + 1];
+static bool regEmitted = false;
+// static, not stack: nRF52 loop task has 4 KB (N-22), T-Beam RAM is tight
+static char regReply[EXT_REG_REPLY_MAX];
+
+static bool regPeerReady()
+{
+  #ifdef ESP32
+    if(bWIFIAP)
+      return false;
+  #endif
+  return bEXTUDP && hasExternIPaddress && (int)strlen(meshcom_settings.node_extern) > 7;
+}
+
+static void regLog(const char *what)
+{
+  #if defined(INSTRUMENT)
+    Serial.printf("[EXT] reg: %s\n", what);
+  #else
+    if(bLORADEBUG)
+      Serial.printf("[EXT] reg: %s\n", what);
+  #endif
+}
+
+void extRegQuery(const char *q)
+{
+  if(!regPeerReady())
+    return;
+
+  if(!extRegAllow(regLimiter, (uint32_t)millis()))
+  {
+    regLog("dropped, rate limit 1/s");
+    return;
+  }
+
+  if(extRegRunBusy(regRun_st))
+  {
+    regLog("dropped, previous query still running");
+    return;
+  }
+
+  snprintf(regPendingQ, sizeof(regPendingQ), "%s", q ? q : "");
+  regRun_st.pending = true;
+}
+
+bool extRegSinkActive()
+{
+  return regSinkOn;
+}
+
+void extRegSinkFrame(const uint8_t *json, uint16_t len)
+{
+  if(!regSinkOn)
+    return;
+
+  char typ[EXT_REG_NAME_MAX + 2];
+  if(!extRegFrameTyp((const char *)json, len, typ, sizeof(typ)) || strcmp(typ, regWant) != 0)
+    return;
+
+  // 0 = not filterable: send nothing rather than the unfiltered text
+  size_t n = extRegFilter((const char *)json, len, regReply, sizeof(regReply), true);
+  if(n == 0)
+  {
+    regLog("frame not filterable, dropped");
+    return;
+  }
+
+  regEmitted = true;
+  if(bLORADEBUG)
+    Serial.printf("[EXT] Reg-Out: %s Len: %u\n", regReply, (unsigned)n);
+  extSendDatagram((const uint8_t *)regReply, n, false);
+}
+
+// Builds register idx through the BLE builder; true if its frame was sent.
+static bool regRun(int idx)
+{
+  char cmd[16];
+
+  snprintf(regWant, sizeof(regWant), "%s", EXT_REG_TABLE[idx].name);
+  snprintf(cmd, sizeof(cmd), "%s", EXT_REG_TABLE[idx].cmd);
+  regEmitted = false;
+  regSinkOn = true;
+  commandAction(cmd, 1, true);   // ble=true builds the frame, rxFromPhone=true keeps the serial print out
+  regSinkOn = false;
+  return regEmitted;
+}
+
+static void regSendJson(size_t n)
+{
+  if(n > 0)
+  {
+    if(bLORADEBUG)
+      Serial.printf("[EXT] Reg-Out: %s Len: %u\n", regReply, (unsigned)n);
+    extSendDatagram((const uint8_t *)regReply, n, false);
+  }
+}
+
+// Forgets a queued query and a running "all" run. resetExternUDP() calls it (--extudp off, a new
+// --extudpip, a failed write): the tick below only runs while EXTUDP is on, so without this a run
+// paused by "off" would go on towards the next peer.
+void extRegReset()
+{
+  extRegRunReset(regRun_st);
+}
+
+// Main loop, via getExternUDP(): one register per call, "all" every 100 ms.
+void extRegTick()
+{
+  if(!regPeerReady())
+  {
+    extRegRunReset(regRun_st);
+    return;
+  }
+
+  if(regRun_st.pending)
+  {
+    regRun_st.pending = false;
+
+    int idx = extRegLookup(regPendingQ);
+
+    if(idx == EXT_REG_UNKNOWN)
+      regSendJson(extRegErrorJson(regReply, sizeof(regReply), "unknown"));
+    else if(idx == EXT_REG_ALL)
+      extRegRunStartAll(regRun_st, (uint32_t)millis());
+    else if(!regRun(idx))
+      regSendJson(extRegErrorJson(regReply, sizeof(regReply), "unavailable"));
+
+    return;
+  }
+
+  int idx = 0;
+  switch(extRegAllStep(regRun_st, (uint32_t)millis(), &idx))
+  {
+    case EXT_REG_STEP_RUN:
+      (void)regRun(idx);   // a register this build/state does not have is skipped
+      break;
+    case EXT_REG_STEP_DONE:
+      regSendJson(extRegDoneJson(regReply, sizeof(regReply)));
+      break;
+    default:
+      break;
+  }
+}
+#else
+void extRegQuery(const char *q) { (void)q; }
+void extRegTick() {}
+void extRegReset() {}
+bool extRegSinkActive() { return false; }
+void extRegSinkFrame(const uint8_t *json, uint16_t len) { (void)json; (void)len; }
+#endif // EXT_NO_SOCKET
+
 void flushExternQueue()
 {
     for(int i = 0; i < MAX_EXTERN_QUEUE; i++)
@@ -1161,6 +1344,9 @@ void sendExternNotice(const char *text, const char *dst)
 #if !defined(EXT_NO_SOCKET)
 void resetExternUDP()
 {
+  // before the bWIFIAP return: "--extudp off" ends up here, and so must a pending register query
+  extRegReset();
+
   #ifdef ESP32
     if(bWIFIAP)
       return;

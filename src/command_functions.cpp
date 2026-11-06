@@ -203,7 +203,15 @@ static void sendBleJsonRegister(JsonDocument &doc)
     msg_buffer[0] = 0x44;
     uint16_t len = bleJsonFrameFailSoft(doc, msg_buffer, sizeof(msg_buffer), BLE_JSON_PAYLOAD_MAX);
     if (len > 1)
-        addBLEComToOutBuffer(msg_buffer, len);
+    {
+        // EXTUDP register query: the frame goes to the EXTUDP reply (through the
+        // secret filter), not to the BLE ring -- a connected phone must not see
+        // frames it did not ask for. Phone frames below are unchanged.
+        if (extRegSinkActive())
+            extRegSinkFrame(msg_buffer + 1, len - 1);
+        else
+            addBLEComToOutBuffer(msg_buffer, len);
+    }
 }
 
 // Both the case-insensitive compare and the matching rule now live in

@@ -188,3 +188,66 @@ widened `sendExtern()` type switch, and what is and is not covered yet:
 
 Every outbound type above is sent unauthenticated to whatever IP `meshcom_settings.node_extern`
 resolves to — same "no sender/receiver validation" caveat as §3 for the inbound side.
+
+---
+
+## 8. Register query (client → node, answer node → client)
+
+Read-only access to the BLE config registers (the JSON frames the phone app gets on connect), over
+the same EXTUDP socket. Implementation: `src/ext_reg.h` (parse, secret filter, framing, limiter,
+host-tested in `test/test_ext_reg`), glue in `src/extudp_functions.cpp`.
+
+Request, one datagram to `<node-IP>:1799`:
+
+```json
+{ "type": "reg", "q": "SN" }
+```
+
+`q` is one register name, matched exactly and case-insensitively: `TM`, `W`, `IO`, `I`, `IS1`,
+`IS2`, `G`, `SE`, `S1`, `SW`, `S2`, `SN`, `SN1`, `AN`, `SA`, `CONFFIN`, or `all`.
+
+Answer: the register frame as the phone gets it, secret members removed, `"type":"reg"` as the first
+member (one datagram per register, at most 257 bytes):
+
+```json
+{
+  "type": "reg",
+  "TYP": "SN1",
+  "VIA": true,
+  "VIACALL": "OE1KFR-12",
+  "ASYM": false,
+  "TZ": "CET-1CEST,M3.5.0,M10.5.0/3",
+  "MHOP": 5,
+  "MTU": 1500,
+  "VOLT": false,
+  "NCON": false
+}
+```
+
+(on the wire the answer is compact, without spaces). The members are those of the BLE frame; their
+meaning is the BLE register documentation. `all` answers with every register this build has, one
+datagram each, 100 ms apart, and ends with `{"type":"reg","q":"all","done":true}`.
+
+| Answer                               | Meaning                                                                                 |
+| ------------------------------------ | --------------------------------------------------------------------------------------- |
+| `{"type":"reg","err":"unknown"}`     | `q` missing or not in the list                                                          |
+| `{"type":"reg","err":"unavailable"}` | no such register in this build or state (e.g. `AN` on RAK4631, `IS2` without a charger) |
+| nothing                              | not accepted: see the rules below                                                       |
+
+Rules:
+
+- Only when EXTUDP is on (`--extudp on`) and the peer IP is resolved. Otherwise no answer.
+- The answer goes only to the configured `node_extern` IP, port `1799`, never to the sender's
+  address (no reflection). Nothing is sent over LoRa, no phone needs to be connected, and a
+  connected phone does not see these frames.
+- The input has no authentication, so at most one query per second is accepted. Queries inside that
+  second, and queries while an `all` run is still going (about 2 s), are dropped silently. With
+  `INSTRUMENT` builds or `--loradebug` the node logs `[EXT] reg: dropped ...`.
+- Secrets never leave: a member is removed when its key, case-insensitive, is `BPIN` or `WSPWD` or
+  contains `PWD`, `PASS`, `PW`, `KEY`, `SECRET` or `TOKEN`. This is by name, so it holds for fields
+  added later; a new field with a harmless-looking name must be reviewed. The phone frames are not
+  changed: the app still gets `BPIN` and `WSPWD`.
+- Values are not filtered: free text such as `ATXT`, `NAME`, `PARM` and the WiFi `SSID` is sent as
+  stored.
+
+The reply goes to the peer resolved when EXTUDP started. After `--extudpip`, switch EXTUDP off and on, or replies keep going to the old address.

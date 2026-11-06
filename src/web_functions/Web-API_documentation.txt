@@ -260,3 +260,24 @@ GET /rmstatus
 	sent		the whole book of commands this node SENT (up to 12), newest first, streamed one entry at a
 			time (also fields st = queued|waiting|noanswer|ok|err|unverified and msg = one sentence): rep = some reply arrived, ver = its tag matched
 			(verified); rep=1 with ver=0 is an UNVERIFIED reply, reply holds its raw (truncated) text
+
+
+GET /pinstatus
+
+	No parameters, GET only, read-only; behind the login like the pages. Answer (JSON, one line, user text escaped):
+
+	{"led":{"fitted":1,"mode":"flash","busy":0,"rm":"","state":"flash"},
+	 "chg":{"fitted":0,"mode":"off","eff":"off","rm":0},
+	 "mcp":{"present":1,"pins":[{"id":"A0","n":"Relay","d":"out","l":1},{"id":"A1","n":"","d":"in","l":0}, ... 16 entries A0..A7, B0..B7]}}
+
+	led		board LED: fitted, stored mode (off|flash|steady, as --board led), busy = OneWire owns the pad (T-Beam
+			GPIO4) so the mode cannot run, rm = an RM1 "led" hold on the pad ("", on, flash), state = what the pad
+			does now (busy -> off, else the hold, else the stored mode)
+	chg		charge LED (AXP PMU boards): fitted, console mode (auto|off), effective mode (auto|on|off, RM1 "chgled"
+			override included), rm = override active
+	mcp		present = an MCP23017 answered at boot; pins is empty when it is not. d = in|out, l = level 0|1,
+			n = pin name (<= 15 bytes; valid UTF-8 as it is, other bytes read as Latin-1)
+
+	Cached state only, no I2C access in the request: an output level is the commanded one (the chip is written from it),
+	an input level is the last sample of the 5 s refresh. The Pins page polls it every 5 s while it is shown and
+	switches through /setparam/ (boardled=off|flash|steady, mcpout<P>=on|off, mcpio<P>=in|out, mcpname<P>=text).

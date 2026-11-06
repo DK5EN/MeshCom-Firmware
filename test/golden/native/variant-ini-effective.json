@@ -3272,6 +3272,25 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_ext_reg": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1"
+  ],
+  "build_src_filter": [
+   "-<*>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
+  ],
+  "platform": "native",
+  "test_filter": [
+   "test_ext_reg"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_extern": {
   "build_flags": [
    "-std=gnu++17",
@@ -4028,6 +4047,25 @@
    "test_decodeaprspos",
    "test_checkvia",
    "test_pos_tag_nan"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_pin_status": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1"
+  ],
+  "build_src_filter": [
+   "-<*>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
+  ],
+  "platform": "native",
+  "test_filter": [
+   "test_pin_status"
   ],
   "test_framework": "unity"
  },

@@ -67,19 +67,19 @@ the following JSON payload — all fields optional, only the ones present are
 applied:
 
 ```json
-{"type":"tele","temp":23.3,"hum":60,"press":1018.5}
+{ "type": "tele", "temp": 23.3, "hum": 60, "press": 1018.5 }
 ```
 
-| Field    | Content                                |
-|----------|------------------------------------------|
-| `type`   | always `"tele"`                           |
-| `temp`   | temperature in °C                         |
-| `hum`    | relative humidity in %                    |
-| `press`  | air pressure (QFE) in hPa                 |
-| `temp2`  | 2nd temperature sensor (optional)         |
-| `qnh`    | sea-level air pressure (optional)         |
-| `gasres` | gas resistance (optional)                 |
-| `co2`    | CO2 reading (optional)                    |
+| Field    | Content                           |
+| -------- | --------------------------------- |
+| `type`   | always `"tele"`                   |
+| `temp`   | temperature in °C                 |
+| `hum`    | relative humidity in %            |
+| `press`  | air pressure (QFE) in hPa         |
+| `temp2`  | 2nd temperature sensor (optional) |
+| `qnh`    | sea-level air pressure (optional) |
+| `gasres` | gas resistance (optional)         |
+| `co2`    | CO2 reading (optional)            |
 
 There is currently no field for rainfall or similar — only these 7 fixed
 fields, because only these have a matching APRS comment field (see protocol
@@ -150,6 +150,39 @@ for the exact cause:
 4. The values stay set permanently (not just once) and flow into every
    subsequent beacon until overwritten or the node restarts.
 5. Only works as long as the node has **no** real sensor hardware installed.
+
+---
+
+## 6. Reading the node configuration (register query)
+
+Besides sending values, a client can read the node settings. Send one datagram to `<node-IP>:1799`:
+
+```json
+{ "type": "reg", "q": "SN" }
+```
+
+`q` is a register name (`TM`, `W`, `IO`, `I`, `IS1`, `IS2`, `G`, `SE`, `S1`, `SW`, `S2`, `SN`,
+`SN1`, `AN`, `SA`, `CONFFIN`) or `all`. The node answers to the IP set with `--extudpip`, not to
+the sender, with the register as JSON, for example:
+
+```json
+{
+  "type": "reg",
+  "TYP": "SN1",
+  "VIA": true,
+  "VIACALL": "OE1KFR-12",
+  "ASYM": false
+}
+```
+
+- `all` sends every register, one datagram each, and ends with `{"type":"reg","q":"all","done":true}`.
+- An unknown name gives `{"type":"reg","err":"unknown"}`, a register this build does not have gives
+  `{"type":"reg","err":"unavailable"}`.
+- At most one query per second is accepted; more is dropped without an answer.
+- PINs and passwords (`BPIN`, `WSPWD`, anything with `PWD`/`PASS`/`KEY`/`SECRET`/`TOKEN` in the
+  name) are never included.
+
+Details: `docs/ext_udp_telemetry.md` section 8.
 
 ---
 

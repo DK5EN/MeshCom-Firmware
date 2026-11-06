@@ -24,8 +24,8 @@ flash and test (W5). Nothing here is released; the release stays on hold until t
 | W1   | B     | WEB-LED-02, WEB-DUP-01              | `src/web_functions/web_functions.cpp`, `webUIComponents.cpp`, `web/mc.css`, `tools/webgui_*` | done   |
 | W1   | C     | OLED screenshot, test text command  | `src/loop_functions.cpp`, `src/command_functions.cpp`, new OLED files, `tools/bench/`        | done   |
 | W1   | H     | WEB-TX-01                           | `src/web_functions/web_txbuf.{h,cpp}`, its native test                                       | done   |
-| W2   | D     | BLE registers over UDP              | `src/command_functions.cpp`, `src/extudp_functions.*`, new header, docs                      | open   |
-| W2   | E     | Live pin status                     | `src/web_functions/web_functions.cpp`, `web_setup.cpp`, new header, `tools/webgui_*`         | open   |
+| W2   | D     | BLE registers over UDP              | `src/command_functions.cpp`, `src/extudp_functions.*`, new header, docs                      | done   |
+| W2   | E     | Live pin status                     | `src/web_functions/web_functions.cpp`, `web_setup.cpp`, new header, `tools/webgui_*`         | done   |
 | W3   | F     | Auto update schedule and clock jump | `src/fw_update.h`, `src/esp32/fw_update_net.cpp`, settings, console, web, docs               | open   |
 | W4   | G     | Server buffer                       | `src/udp_functions.cpp`, drain files, `src/byte_fifo.*`, gateway service files               | open   |
 | W5   | me    | Flash and bench, all items below    | hardware, serialized                                                                         | open   |
@@ -50,3 +50,8 @@ Orchestrator-owned hotspots: `platformio.ini`, `tools/regression.sh`, `docs/test
   `tools/bench/oled_screenshot.py`), WEB-TX-01. Advisor: 2 must-fix plus 1 measure, re-pass 1 must-fix, all fixed. New
   guard: `configuration_global.h` includes `sdkconfig.h`, because reaching it before `<Arduino.h>` selected the classic
   branch on S3. Gate: Unity 97 envs 3467 cases, pytest 1490, 6 builds. T-Deck `t_deck` not built. Bench open (W5).
+- W2 (2026-11-06): BLE registers over EXTUDP (`{"type":"reg","q":"SN"}`, `src/ext_reg.h`, secrets filtered, replies only to
+  the configured peer, 1 query per second) and the Pins page (`/pinstatus`, 5 s poll, LED and charge LED switches, MCP pins
+  host tested only). Advisor: stack blocker fixed (`work_webpage` frame down 2536 B on RAK, 2160 B on T-Beam), input pin
+  button, `all` run after EXTUDP off; re-pass: `--extudpip` refresh removed as unsafe on RAK, now `EXT-PEER-01`. New rows
+  `EXT-PEER-01`, `WEB-PIN-01`. Gate: Unity 99 envs 3506 cases, pytest 1490, 6 builds. RAK flash 82.0 %.

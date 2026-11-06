@@ -229,3 +229,88 @@ var btn=document.getElementById('mcqtogglebtn');
 d.hidden=!mcQueueOpen;
 if(btn)btn.textContent=mcQueueOpen?'hide':'show';
 }
+// Pins page (sub_page_pins()): live view and switches of the board LED, the charge LED and the MCP23017 pins.
+// Sub-pages are injected with innerHTML, so the logic lives here; loadPage() calls pinsInit() when the page is in and
+// pinsLeave() before the next page. GET /pinstatus every 5 s only while the page is shown; the answer is the node's
+// cached state (see src/pin_status_json.h), an input level can be ~5 s old. A failed poll keeps the last table; HTTP 401 (session over) stops the polling and says so.
+// Switches use /setparam/ (boardled, chargeled, mcpout<P>, mcpio<P>, mcpname<P>): fetch() carries X-MC through the wrapper above.
+// Names are user text: only ever put into value/textContent, never into HTML.
+// PINS-JS-BEGIN
+var pnT=0,pnG=0,pnOn=false,pnBusy=false,pnRows={};
+var pnLoginNote='Session expired: reload this page and log in again.';
+function pnBytes(s){var n=0;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);if(c<128)n++;else if(c<2048)n+=2;else if(c>=55296&&c<56320){n+=4;i++;}else n+=3;}return n;}
+function pnCut(s){while(s.length&&pnBytes(s)>15){var k=s.length-1;if(k>0&&s.charCodeAt(k)>=56320&&s.charCodeAt(k)<57344&&s.charCodeAt(k-1)>=55296&&s.charCodeAt(k-1)<56320)k--;s=s.slice(0,k);}return s;}
+function pnEl(i){return document.getElementById(i);}
+function pnTxt(i,t){var e=pnEl(i);if(e)e.textContent=t;}
+function pnArm(){clearTimeout(pnT);pnT=0;if(pnOn)pnT=setTimeout(pnPoll,5000);}
+function pnPoll(){
+if(!pnOn)return;
+pnT=0;
+if(pnBusy||document.visibilityState==='hidden'){pnArm();return;}
+var g=pnG;pnBusy=true;
+fetch('/pinstatus').then(function(r){if(r.status==401)return null;if(!r.ok)throw 0;return r.json();}).then(function(j){
+if(g!=pnG)return;pnBusy=false;
+if(!j){pnTxt('pn_note',pnLoginNote);return;}
+pnRender(j);pnTxt('pn_note','');pnArm();
+}).catch(function(){
+if(g!=pnG)return;pnBusy=false;pnTxt('pn_note','Stale: the node did not answer, showing the last values.');pnArm();
+});
+}
+function pinsInit(){pinsLeave();pnOn=true;pnG++;pnPoll();}
+function pinsLeave(){pnOn=false;pnG++;clearTimeout(pnT);pnT=0;pnBusy=false;pnRows={};}
+function pnSet(param,val){
+fetch('/setparam/?'+param+'='+encodeURIComponent(val)).then(function(r){if(r.status==401)return null;return r.json();}).then(function(j){
+if(!j){pnTxt('pn_msg',pnLoginNote);return;}
+pnTxt('pn_msg',j.returncode===0?'':(j.returncode==2?'The node does not know this setting.':'The node refused the change.'));
+if(pnOn){clearTimeout(pnT);pnT=0;pnPoll();}
+}).catch(function(){pnTxt('pn_msg','The request failed.');});
+}
+function pinsLed(m){pnSet('boardled',m);}
+function pinsChg(m){pnSet('chargeled',m=='auto'?'on':'off');}
+function pnBtn(txt,fn,cls){var b=document.createElement('button');b.type='button';b.className=cls||'mctab';b.textContent=txt;b.onclick=fn;return b;}
+// maxLength counts characters; the store takes 15 bytes, so pnCut() caps by UTF-8 bytes
+function pnRow(id){
+var r=pnRows[id];if(r)return r;
+var tr=document.createElement('tr'),th=document.createElement('th'),tn=document.createElement('td'),td=document.createElement('td'),tl=document.createElement('td');
+th.scope='row';th.textContent=id;
+var inp=document.createElement('input');inp.type='text';inp.maxLength=15;inp.setAttribute('aria-label','Name of pin '+id);
+inp.oninput=function(){var v=pnCut(inp.value);if(v!=inp.value)inp.value=v;inp.setAttribute('data-dirty','1');};
+var sb=pnBtn('set',function(){inp.removeAttribute('data-dirty');pnSet('mcpname'+id,pnCut(inp.value));});
+sb.setAttribute('aria-label','Set the name of pin '+id);
+tn.appendChild(inp);tn.appendChild(sb);
+var db=pnBtn('',function(){pnSet('mcpio'+id,db.getAttribute('data-d')=='out'?'in':'out');},'mctab mcledbtn');
+td.appendChild(db);
+var lb=pnBtn('',function(){pnSet('mcpout'+id,lb.getAttribute('aria-pressed')=='true'?'off':'on');},'mctab mcledbtn');
+var lt=document.createElement('span');
+tl.appendChild(lb);tl.appendChild(lt);
+tr.appendChild(th);tr.appendChild(tn);tr.appendChild(td);tr.appendChild(tl);
+pnEl('pn_body').appendChild(tr);
+r=pnRows[id]={inp:inp,db:db,lb:lb,lt:lt};return r;
+}
+function pnRender(j){
+var l=j.led||{},c=j.chg||{},m=j.mcp||{},ms=['off','flash','steady'];
+var e=pnEl('pn_led');if(e)e.hidden=!l.fitted;
+if(l.fitted){
+for(var i=0;i<3;i++){var b=pnEl('pn_led_'+ms[i]);if(b){var on=l.mode==ms[i];b.setAttribute('aria-pressed',on?'true':'false');b.classList.toggle('mctab-on',on);b.disabled=!!l.busy;}}
+pnTxt('pn_led_st','Now: '+l.state+(l.busy?' (pin busy: OneWire owns the pad)':'')+(l.rm?' (held by a remote command: '+l.rm+')':''));
+}
+e=pnEl('pn_chg');if(e)e.hidden=!c.fitted;
+if(c.fitted){
+var cm=['off','auto'];
+for(var q=0;q<2;q++){var cb=pnEl('pn_chg_'+cm[q]);if(cb){var con=c.mode==cm[q];cb.setAttribute('aria-pressed',con?'true':'false');cb.classList.toggle('mctab-on',con);}}
+}
+if(c.fitted)pnTxt('pn_chg_st',c.eff+(c.rm?' (remote override, console setting: '+c.mode+')':' (console setting)'));
+e=pnEl('pn_mcp');if(e)e.hidden=!m.present;
+e=pnEl('pn_none');if(e)e.hidden=!!(l.fitted||c.fitted||m.present);
+if(!m.present)return;
+var ps=m.pins||[];
+for(var k=0;k<ps.length;k++){
+var p=ps[k],r=pnRow(p.id),o=p.d=='out';
+if(!r.inp.getAttribute('data-dirty')&&document.activeElement!==r.inp)r.inp.value=p.n;
+r.db.textContent=p.d;r.db.setAttribute('data-d',p.d);r.db.setAttribute('aria-label','Pin '+p.id+' is an '+(o?'output':'input')+', switch direction');
+r.lb.hidden=!o;r.lt.hidden=o;
+if(o){var hi=p.l==1;r.lb.textContent=hi?'HIGH':'LOW';r.lb.setAttribute('aria-pressed',hi?'true':'false');r.lb.classList.toggle('mctab-on',hi);r.lb.setAttribute('aria-label','Pin '+p.id+' output is '+(hi?'high':'low')+', switch');}
+else r.lt.textContent=p.l==1?'HIGH':'LOW';
+}
+}
+// PINS-JS-END
