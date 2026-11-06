@@ -922,6 +922,135 @@ static void test_storetime_drop_counts_as_cap_when_never_attempted(void)
     TEST_ASSERT_EQUAL_UINT32(1, msgstoreCounters()->dropped_cap);
 }
 
+// ------------------------------------------- echo copy after delivery began
+
+// A copy of an already-delivering message (our own delivery heard and
+// uploaded by another gateway, coming back) must not restart the hold clock
+// or skip the cooldown.
+static void test_copy_during_cooldown_changes_nothing(void)
+{
+    int slot = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+    TEST_ASSERT_TRUE(msgstoreDeliverNow(slot));
+
+    for(int i = 0; i < 9; i++)
+    {
+        msgstoreLoop();
+        g_now += MSGSTORE_STEP_MS + MSGSTORE_BLOCK_GAP_MS;
+    }
+
+    const struct MsgStoreEntry *e = msgstoreEntry(slot);
+    TEST_ASSERT_EQUAL_UINT8(MSGSTORE_COOLDOWN, e->state);
+    uint32_t next_ms   = e->next_ms;
+    uint32_t stored_ms = e->stored_ms;
+    uint8_t  attempt   = e->attempt;
+    uint32_t refreshed = msgstoreCounters()->refreshed;
+
+    g_now += 5000;
+    TEST_ASSERT_EQUAL(slot, msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5));
+
+    e = msgstoreEntry(slot);
+    TEST_ASSERT_EQUAL_UINT8(MSGSTORE_COOLDOWN, e->state);
+    TEST_ASSERT_EQUAL_UINT32(next_ms, e->next_ms);
+    TEST_ASSERT_EQUAL_UINT32(stored_ms, e->stored_ms);
+    TEST_ASSERT_EQUAL_UINT8(attempt, e->attempt);
+    TEST_ASSERT_EQUAL_UINT32(refreshed, msgstoreCounters()->refreshed);
+}
+
+static void test_copy_during_ladder_changes_nothing(void)
+{
+    int slot = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+    TEST_ASSERT_TRUE(msgstoreDeliverNow(slot));
+    msgstoreLoop();   // first step sent -> LADDER, attempt 1
+
+    const struct MsgStoreEntry *e = msgstoreEntry(slot);
+    TEST_ASSERT_EQUAL_UINT8(MSGSTORE_LADDER, e->state);
+    uint32_t next_ms   = e->next_ms;
+    uint32_t stored_ms = e->stored_ms;
+    uint32_t refreshed = msgstoreCounters()->refreshed;
+
+    g_now += 3000;
+    TEST_ASSERT_EQUAL(slot, msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5));
+
+    e = msgstoreEntry(slot);
+    TEST_ASSERT_EQUAL_UINT8(MSGSTORE_LADDER, e->state);
+    TEST_ASSERT_EQUAL_UINT32(next_ms, e->next_ms);
+    TEST_ASSERT_EQUAL_UINT32(stored_ms, e->stored_ms);
+    TEST_ASSERT_EQUAL_UINT32(refreshed, msgstoreCounters()->refreshed);
+}
+
+static void test_echo_copies_cannot_keep_slot_alive_past_storetime(void)
+{
+    msgstoreConfigure(MSGSTORE_OWN, MSGSTORE_SLOTS_DEFAULT, 3);   // 3 h hold: spans two cooldowns
+
+    int slot = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);   // stored_ms = 1000
+    uint32_t stored_ms = msgstoreEntry(slot)->stored_ms;
+    uint32_t hold_end  = stored_ms + 3UL * 3600000UL;
+    bool     freed     = false;
+
+    while(g_now <= hold_end + 20000UL)
+    {
+        msgstorePresence("DK5EN-9");
+        msgstoreLoop();
+        if(msgstoreEntry(slot) == NULL)
+        {
+            freed = true;
+            break;
+        }
+        // the echo of whatever was just sent comes back (only once a delivery
+        // exists; before that a copy is a sender re-flood and refreshes)
+        if(msgstoreEntry(slot)->attempt > 0)
+            msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+        g_now += 10000;
+    }
+
+    TEST_ASSERT_TRUE(freed);
+    TEST_ASSERT_TRUE(g_now >= hold_end);
+    TEST_ASSERT_TRUE(g_now <= hold_end + 20000UL);
+    TEST_ASSERT_EQUAL_UINT32(1, msgstoreCounters()->dropped_storetime);
+    // first ladder, then exactly one frame per 1 h cooldown: echoes add none
+    TEST_ASSERT_EQUAL_UINT32(9 + 2, msgstoreCounters()->delivered);
+}
+
+// The guard covers only the same payload: an NNN wrap onto another message
+// after delivery began still replaces the slot and starts a fresh cycle.
+static void test_replace_different_payload_after_delivery_began(void)
+{
+    int slot = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+    TEST_ASSERT_TRUE(msgstoreDeliverNow(slot));
+    msgstoreLoop();
+    TEST_ASSERT_EQUAL_UINT8(1, msgstoreEntry(slot)->attempt);
+
+    g_now += 3000;
+    TEST_ASSERT_EQUAL(slot, msgstoreStore("OE1ABC", "DK5EN-9", 5, "servus", 6));
+
+    const struct MsgStoreEntry *e = msgstoreEntry(slot);
+    TEST_ASSERT_EQUAL_UINT8(MSGSTORE_HELD, e->state);
+    TEST_ASSERT_EQUAL_UINT8(0, e->attempt);
+    TEST_ASSERT_EQUAL_STRING("servus", e->payload);
+    TEST_ASSERT_EQUAL_UINT32(g_now, e->stored_ms);
+}
+
+// Peer cancel puts a started slot back to HELD: a copy must not push its clock
+// out, and the next presence must still arm it.
+static void test_copy_after_peer_cancel_keeps_clock_and_rearms(void)
+{
+    int slot = msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5);
+    TEST_ASSERT_TRUE(msgstoreDeliverNow(slot));
+    msgstoreLoop();
+    msgstoreOnPeerDelivery("OE1ABC", 5);
+
+    const struct MsgStoreEntry *e = msgstoreEntry(slot);
+    TEST_ASSERT_EQUAL_UINT8(MSGSTORE_HELD, e->state);
+    uint32_t stored_ms = e->stored_ms;
+
+    g_now += 70000;   // past the 60 s presence guard, counted from the first sighting
+    TEST_ASSERT_EQUAL(slot, msgstoreStore("OE1ABC", "DK5EN-9", 5, "hallo", 5));
+    TEST_ASSERT_EQUAL_UINT32(stored_ms, msgstoreEntry(slot)->stored_ms);
+
+    msgstorePresence("DK5EN-9");
+    TEST_ASSERT_EQUAL_UINT8(MSGSTORE_ARMED, msgstoreEntry(slot)->state);
+}
+
 // --------------------------------------------------------------- operator
 
 static void test_deliver_now_from_cooldown(void)
@@ -1708,6 +1837,12 @@ int main(int, char **)
 
     RUN_TEST(test_storetime_drop_after_a_completed_attempt);
     RUN_TEST(test_storetime_drop_counts_as_cap_when_never_attempted);
+
+    RUN_TEST(test_copy_during_cooldown_changes_nothing);
+    RUN_TEST(test_copy_during_ladder_changes_nothing);
+    RUN_TEST(test_echo_copies_cannot_keep_slot_alive_past_storetime);
+    RUN_TEST(test_replace_different_payload_after_delivery_began);
+    RUN_TEST(test_copy_after_peer_cancel_keeps_clock_and_rearms);
 
     RUN_TEST(test_deliver_now_from_cooldown);
     RUN_TEST(test_deliver_false_retries_without_advancing);
