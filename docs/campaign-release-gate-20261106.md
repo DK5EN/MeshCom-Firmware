@@ -43,6 +43,14 @@ W6: 1 h soak running on the CI images of `44075ef3`, without a browser or phone 
 11.01 (68.7 KB idle on DK5EN-92) and take the baseline decision: W0 measured -4.6 KB against the 3 KB tolerance. After W6: release decision. The CI images do not
 hold the W5 grid fix (`WEB-GRID-01`, a Setup layout string, no heap effect expected); the release build does.
 
+## Plan to the final state (operator agreed 2026-11-06)
+
+The firmware is frozen at `86fb4a7a`. Soak image `44075ef3` differs from it by one layout line (`WEB-GRID-01`), so the bench results carry over. No further `ci-proof-*` build: after the soak
+and the heap decision come docs and host gate, the `v*` tag when the operator asks for it (CI about 55 min), asset check and web flasher, then a smoke test of about 15 min on the four nodes.
+
+Later releases: collect fixes with host tests and local builds, one CI build, one bench sitting on that image, soak last and overnight. A late change touching runtime behaviour goes back to the
+CI build; a pure text or layout change gets the smoke test.
+
 ## W2 file ownership
 
 | Agent | Item                    | Exclusive files                                                                                                                  |
