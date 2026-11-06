@@ -15,6 +15,7 @@
 
 #include <Arduino.h>
 #include <string.h>
+#include <debugconf.h>   // Serial is mirrored to the 2323 console through this
 #include "udp_hold.h"
 
 void udpHoldBenchCommand(const char *args)

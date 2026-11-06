@@ -18,20 +18,19 @@ flash and test (W5). Nothing here is released; the release stays on hold until t
 
 ## Waves and file ownership
 
-| Wave | Agent | Items                               | Exclusive files                                                                              | Status |
-| ---- | ----- | ----------------------------------- | -------------------------------------------------------------------------------------------- | ------ |
-| W1   | A     | TD-33, T-Deck Path column           | `src/t-deck/lv_obj_functions.cpp`, `src/t-deck/event_functions.cpp`                          | done   |
-| W1   | B     | WEB-LED-02, WEB-DUP-01              | `src/web_functions/web_functions.cpp`, `webUIComponents.cpp`, `web/mc.css`, `tools/webgui_*` | done   |
-| W1   | C     | OLED screenshot, test text command  | `src/loop_functions.cpp`, `src/command_functions.cpp`, new OLED files, `tools/bench/`        | done   |
-| W1   | H     | WEB-TX-01                           | `src/web_functions/web_txbuf.{h,cpp}`, its native test                                       | done   |
-| W2   | D     | BLE registers over UDP              | `src/command_functions.cpp`, `src/extudp_functions.*`, new header, docs                      | done   |
-| W2   | E     | Live pin status                     | `src/web_functions/web_functions.cpp`, `web_setup.cpp`, new header, `tools/webgui_*`         | done   |
-| W3   | F     | Auto update schedule and clock jump | `src/fw_update.h`, `src/esp32/fw_update_net.cpp`, settings, console, web, docs               | done   |
-| W4   | G     | Server buffer                       | `src/udp_functions.cpp`, drain files, `src/byte_fifo.*`, gateway service files               | done   |
-| W5   | me    | Flash and bench, all items below    | hardware, serialized                                                                         | open   |
-
-Orchestrator-owned hotspots: `platformio.ini`, `tools/regression.sh`, `docs/test-suite-map.md`, the INI baseline,
-`docs/BACKLOG.md`, `docs/RESUME.md`, this file.
+| Wave                                                                                                              | Agent | Items                               | Exclusive files                                                                              | Status |
+| ----------------------------------------------------------------------------------------------------------------- | ----- | ----------------------------------- | -------------------------------------------------------------------------------------------- | ------ |
+| W1                                                                                                                | A     | TD-33, T-Deck Path column           | `src/t-deck/lv_obj_functions.cpp`, `src/t-deck/event_functions.cpp`                          | done   |
+| W1                                                                                                                | B     | WEB-LED-02, WEB-DUP-01              | `src/web_functions/web_functions.cpp`, `webUIComponents.cpp`, `web/mc.css`, `tools/webgui_*` | done   |
+| W1                                                                                                                | C     | OLED screenshot, test text command  | `src/loop_functions.cpp`, `src/command_functions.cpp`, new OLED files, `tools/bench/`        | done   |
+| W1                                                                                                                | H     | WEB-TX-01                           | `src/web_functions/web_txbuf.{h,cpp}`, its native test                                       | done   |
+| W2                                                                                                                | D     | BLE registers over UDP              | `src/command_functions.cpp`, `src/extudp_functions.*`, new header, docs                      | done   |
+| W2                                                                                                                | E     | Live pin status                     | `src/web_functions/web_functions.cpp`, `web_setup.cpp`, new header, `tools/webgui_*`         | done   |
+| W3                                                                                                                | F     | Auto update schedule and clock jump | `src/fw_update.h`, `src/esp32/fw_update_net.cpp`, settings, console, web, docs               | done   |
+| W4                                                                                                                | G     | Server buffer                       | `src/udp_functions.cpp`, drain files, `src/byte_fifo.*`, gateway service files               | done   |
+| W5                                                                                                                | me    | Flash and bench, all items below    | hardware, serialized                                                                         | done   |
+| Orchestrator-owned hotspots: `platformio.ini`, `tools/regression.sh`, `docs/test-suite-map.md`, the INI baseline, |
+| `docs/BACKLOG.md`, `docs/RESUME.md`, this file.                                                                   |
 
 ## W5 bench list
 
@@ -61,3 +60,12 @@ Orchestrator-owned hotspots: `platformio.ini`, `tools/regression.sh`, `docs/test
   telemetry, ack, ping and SOTA frames refused from the hold; text held without an IP is replayed, never released. Overruled:
   a single lost `BEAT` may replay the few held frames (about 1 per 4 h, measured), because a longer gap would lose text.
   Gate: Unity 101 envs 3584 cases, pytest 1490, 6 builds. RAK flash 82.3 %. Bench open (W5).
+- W5 (2026-11-06, bench, images of this commit): OLED screenshot on Heltec and T-Beam, umlaut dots correct in both fonts
+  (`CHARS-02` for Latin-2). `--autest` reaches due and logs `blocked;auto_install_off`. EXTUDP query: 15 registers, no secret,
+  rate limit holds. Hold ring: frame held in a simulated outage, replayed once with the same id. `WEB-TX-01`: 60 of 60 T-Beam
+  pages complete, longest 0.7 s, no abort; the old failure did not reappear, so the cause stays unconfirmed. TD-33 and the Path
+  column confirmed on screen except WiFi off (needs a person, WiFi is the only bench link). Debug flags on and off on all 4, no
+  panic. RX timing: 0 % loss at the T-Beam, quiet and under web load (`rx_stall_*_20261106-1133*.json`, `-1136*.json`); CAD to
+  free 37-45 ms, free to TX below 1.2 ms, irq to read max 18 ms, worst loop gap 295 ms. Script reboots: `--bleshort`/`--blelong`,
+  `--setboostedgain`, `--sethamnet`/`--setinet` are documented; T-Deck `--disptest` (`TD-34`); Heltec near index 55 did not
+  reproduce. `RAK-PIN-01` found and fixed. Gate: Unity 101 envs 3587 cases, pytest 1490, 7 builds.

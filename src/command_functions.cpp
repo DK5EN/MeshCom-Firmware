@@ -2409,6 +2409,17 @@ void commandAction(char *umsg_text, bool ble)
             return;
         }
 
+        #if defined(NRF52_SERIES)
+        if(meshcom_settings.node_button_pin != 0 && mcPinReservedNrf52840(meshcom_settings.node_button_pin))
+        {
+            printlndeb("BUTTON GPIO refused: reserved on nRF52 (32 kHz crystal or reset)");
+
+            meshcom_settings.node_button_pin = ibt;
+
+            return;
+        }
+        #endif
+
         save_settings();
 
         if(ble)
@@ -2439,6 +2450,17 @@ void commandAction(char *umsg_text, bool ble)
 
             return;
         }
+
+        #if defined(NRF52_SERIES)
+        if(mcPinReservedNrf52840(meshcom_settings.node_analog_pin))
+        {
+            printfdeb("ANALOG GPIO refused: reserved on nRF52 (32 kHz crystal or reset)");
+
+            meshcom_settings.node_analog_pin = iap;
+
+            return;
+        }
+        #endif
 
         save_settings();
 

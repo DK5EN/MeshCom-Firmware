@@ -291,7 +291,7 @@ flashes whatever is attached.
 | test_setlog_lines            | Unit          |    29 | native                                                       |
 | test_settings_members        | Contract      |     5 | native_settings_members_esp32, native_settings_members_nrf52 |
 | test_settings_roundtrip      | Contract      |     9 | native_settings_roundtrip                                    |
-| test_settings_sanitize       | Regression    |    22 | native                                                       |
+| test_settings_sanitize       | Regression    |    25 | native                                                       |
 | test_settings_store          | Unit          |    24 | native_settings_store                                        |
 | test_stor_announce           | Unit          |    22 | native_stor_announce                                         |
 | test_sto_notice              | Unit          |    26 | native                                                       |

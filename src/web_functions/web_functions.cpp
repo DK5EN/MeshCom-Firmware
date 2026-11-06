@@ -3266,7 +3266,7 @@ void sub_page_setup()
             snprintf(s_tms, sizeof(s_tms), "%02d:%02d", s_tm / 60, s_tm % 60);
             _create_setup_textinput_element("audelay", "Planned install: days after release (0-7)", String(s_delay), "3", "audelay", 1, false, false);
             web_client.println("<label for=\"auday\">Planned install: weekday :</label>");
-            web_client.println("<select id=\"auday\" name=\"auday\" onchange=\"setvalue('auday',this.value,true);\">");
+            web_client.println("<select id=\"auday\" name=\"auday\" style=\"grid-column:2/-1\" onchange=\"setvalue('auday',this.value,true);\">");
             for (int i = 0; i < 8; i++)
                 web_client.printf("\t<option value=\"%s\" %s>%s</option>\n", dayVal[i], i == s_day ? "selected" : "", dayTxt[i]);
             web_client.println("</select>");

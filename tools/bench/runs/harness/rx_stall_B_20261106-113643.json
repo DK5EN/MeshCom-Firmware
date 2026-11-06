@@ -1,0 +1,35 @@
+{
+  "arm": "B",
+  "frames_sent": 22,
+  "seen_dut": 22,
+  "seen_ref": 21,
+  "lost_dut_seen_ref": 0,
+  "seen_dut_not_ref": 1,
+  "lost_both": 0,
+  "dut_loss_pct": 0.0,
+  "ref_loss_pct": 4.5,
+  "onrx_dut": {
+    "n": 77,
+    "irq_to_read_us_p50": 3789.0,
+    "irq_to_read_us_max": 18380.0
+  },
+  "instr_loop_dut": {
+    "udp": {
+      "count": 1,
+      "max_ms": 295,
+      "total_ms": 295
+    }
+  },
+  "nodes": {
+    "dut": "DK5EN-92",
+    "sender": "DK5EN-1",
+    "ref": "DK5EN-14"
+  },
+  "interval_ms": 3000,
+  "web_load": {
+    "requests_ok": 364,
+    "requests_err": 0,
+    "max_latency_s": 0.47
+  },
+  "stamp": "20261106-113643"
+}

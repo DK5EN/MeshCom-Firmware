@@ -399,6 +399,54 @@ static void test_au_schedule_corrupt_values_go_to_defaults(void)
     TEST_ASSERT_EQUAL_INT(1439, mg);
 }
 
+// A RAK with --button gpio 1 stored hung in the first delay() of setup after every
+// reboot: P0.01 is the 32 kHz crystal. Console and web were dead, a reflash kept it.
+static std::string read_src(const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    TEST_ASSERT_NOT_NULL_MESSAGE(f, path);
+    static char buf[64 * 1024];
+    size_t r;
+    std::string src;
+    while ((r = fread(buf, 1, sizeof(buf), f)) > 0)
+        src.append(buf, r);
+    fclose(f);
+    return src;
+}
+
+static void test_nrf52_reserved_pins(void)
+{
+    TEST_ASSERT_TRUE(mcPinReservedNrf52840(0));
+    TEST_ASSERT_TRUE(mcPinReservedNrf52840(1));
+    TEST_ASSERT_TRUE(mcPinReservedNrf52840(18));
+    TEST_ASSERT_FALSE(mcPinReservedNrf52840(2));
+    TEST_ASSERT_FALSE(mcPinReservedNrf52840(9));
+    TEST_ASSERT_FALSE(mcPinReservedNrf52840(99));
+}
+
+static void test_nrf52_load_path_repairs_reserved_pins(void)
+{
+    const std::string src = read_src("src/nrf52/nrf52_flash.cpp");
+    const size_t at = src.find("void sanitize_loaded_settings(void)");
+    TEST_ASSERT_TRUE(at != std::string::npos);
+    const std::string body = src.substr(at, 4000);
+    TEST_ASSERT_TRUE_MESSAGE(body.find("mcPinReservedNrf52840(meshcom_settings.node_button_pin)") != std::string::npos, "button pin");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("mcPinReservedNrf52840(meshcom_settings.node_analog_pin)") != std::string::npos, "analog pin");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("mcPinReservedNrf52840(meshcom_settings.node_owgpio)") != std::string::npos, "onewire pin");
+}
+
+static void test_console_refuses_reserved_pins(void)
+{
+    const std::string src = read_src("src/command_functions.cpp");
+    for (const char *rung : {"\"button gpio \"", "\"analog gpio \""})
+    {
+        const size_t at = src.find(rung);
+        TEST_ASSERT_TRUE_MESSAGE(at != std::string::npos, rung);
+        const std::string body = src.substr(at, 700);
+        TEST_ASSERT_TRUE_MESSAGE(body.find("mcPinReservedNrf52840") != std::string::npos, rung);
+    }
+}
+
 static void test_au_schedule_esp32_load_path_calls_the_repair(void)
 {
     FILE *f = fopen("src/esp32/esp32_flash.cpp", "rb");
@@ -442,5 +490,8 @@ int main(int, char **)
     RUN_TEST(test_ping_target_ohne_terminator);
     RUN_TEST(test_au_schedule_corrupt_values_go_to_defaults);
     RUN_TEST(test_au_schedule_esp32_load_path_calls_the_repair);
+    RUN_TEST(test_nrf52_reserved_pins);
+    RUN_TEST(test_nrf52_load_path_repairs_reserved_pins);
+    RUN_TEST(test_console_refuses_reserved_pins);
     return UNITY_END();
 }
