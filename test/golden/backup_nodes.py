@@ -140,6 +140,14 @@ def verify_masked(root: Path = MASKED_DIR) -> List[str]:
     return problems
 
 
+def restore_request(ip: str, body: bytes) -> urllib.request.Request:
+    """POST /config for the node; the web guard refuses it without X-MC."""
+    return urllib.request.Request(
+        f"http://{ip}/config", data=body, method="POST",
+        headers={"Content-Type": "application/json", "X-MC": "1"},
+    )
+
+
 def restore(name: str, ip: str, vault: Path, timeout: float = 30.0) -> str:
     """POST the unmasked backup back to the node; it reboots on success.
 
@@ -156,13 +164,13 @@ def restore(name: str, ip: str, vault: Path, timeout: float = 30.0) -> str:
     """
     src = vault / f"{name}-settings-base.json"
     body = src.read_bytes()
-    req = urllib.request.Request(
-        f"http://{ip}/config", data=body, method="POST",
-        headers={"Content-Type": "application/json"},
-    )
+    req = restore_request(ip, body)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as fh:
             return fh.read().decode("utf-8", errors="replace").strip()
+    except urllib.error.HTTPError as exc:
+        # An HTTP status means the node answered and did not reboot: a refusal, not success.
+        return f"(refused: HTTP {exc.code})"
     except (TimeoutError, urllib.error.URLError, ConnectionError) as exc:
         # The node reboots as part of the import, so it often never finishes
         # the HTTP response. That is success, not failure -- but say so only
@@ -199,6 +207,10 @@ def verify_restore(name: str, ip: str, vault: Path, wait: float = 25.0) -> List[
 
 
 def _self_test() -> int:
+    req = restore_request("192.0.2.1", b"{}")
+    if req.get_header("X-mc") != "1":
+        print("FAIL restore request has no X-MC header (web guard answers 403)", file=sys.stderr)
+        return 1
     failures = 0
     sample = {
         "meshcom_config": {
