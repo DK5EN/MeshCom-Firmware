@@ -55,6 +55,8 @@ CI build; a pure text or layout change gets the smoke test.
 
 Operator accepted the T-Beam heap on 2026-11-06 (64016 B, new baseline) and gave the go to ship `v4.40a.11.06`. Order: docs and gate, push, tag, CI, asset check, web flasher, smoke test on the four nodes.
 
+The first tag run on `69a79d9b` (CI 42286861404) was cancelled before anything was published, and the tag was removed. Store node fix `SNF-ECHO-01` came in on top; the operator asked for the release on that tree. It changes runtime behaviour on mailbox nodes, so it gets the CI build of the tag, its Heltec V3 before/after bench and the smoke test, but no new soak.
+
 ## W2 file ownership
 
 | Agent | Item                    | Exclusive files                                                                                                                  |

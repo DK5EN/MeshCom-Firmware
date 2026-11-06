@@ -90,6 +90,10 @@
 
 **Stability and mesh**
 
+- **A mailbox node no longer keeps re-sending a direct message for hours** (SNF-ECHO-01, ESP32-S3 and nRF52 nodes with a mailbox switched on, upstream PR [#1257](https://github.com/icssw-org/MeshCom-Firmware/pull/1257)).
+  - Cause: the node's own delivery came back through another gateway and looked like a new message. That restarted the hold time and skipped the pause, so the message never expired.
+  - Now: a copy that arrives after delivery began changes nothing, the delivery's id enters the duplicate check, and a frame whose path holds the node's own call is not stored.
+  - Unchanged: the limits themselves. A message nobody acknowledges still goes out up to 9 times, then at most once per hour until the 24-hour hold ends.
 - **Mesh:** the echo scan runs only after decoding, `{SET}` saves are rate limited, special calls are handled as source (QA-RX-03).
 - **Stability:** BLE callbacks no longer log on the host task, less `String` churn on hot paths, safe argument copies in commands, cleared RX copy tail (BL-02).
 - **Smaller builds:** no exceptions, debug level 0, unused T-Deck widgets and fonts dropped, table-driven web settings, shared code for hashing and clock sync.
@@ -395,6 +399,7 @@ With default settings, compared with the official `v4.40a.10.28`:
 - **Nothing else new on LoRa by default.** The receive-silence logging reads the radio chip only under `--loradebug`; the channel switch and `--gateway lab` are remote-management and console features.
 - **Since `v4.40a.10.30`:** gateways upload HEY reports with their own call (server side, not LoRa), and a relay skips a frame whose path is already too long for its own call (more than 119 characters, log `pathfull`).
 - **Auto Update `dev` channel:** fork builds can follow this fork's releases (`--updchan dev`, now also by remote management); official builds know `prod` only.
+- **Mailbox nodes send less** (mailbox switched on, off by default): the node's own returning delivery no longer restarts its delivery. Frame format and length are unchanged.
 
 <details>
 <summary>Shared with the official <code>v4.40a.10.28</code>: fork behaviour merged upstream in #1238 (compared with <code>v4.40a.spserver</code>)</summary>
@@ -420,9 +425,10 @@ With default settings, compared with the official `v4.40a.10.28`:
 
 ### Verification for this release
 
-- **Host suite:** 3602 test cases in 101 native environments, all green, plus the golden selftest, nRF52 board links and the host tool suites (pytest 1500, web GUI, web flasher).
+- **Host suite:** 3607 test cases in 101 native environments, all green, plus the golden selftest, nRF52 board links and the host tool suites (pytest 1503, web GUI, web flasher).
 - **Build:** CI builds all environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download.
-- **Test image:** the bench and soak below ran on the CI build of `44075ef3`. The release adds a one-line Setup layout fix and the `FLASH_VERSION` stamp; the release images get a smoke test on the four nodes.
+- **Test image:** the bench and soak below ran on the CI build of `44075ef3`. The release adds a one-line Setup layout fix, the mailbox fix (SNF-ECHO-01) and the `FLASH_VERSION` stamp; the release images get a smoke test on the four nodes. The soak did not cover the mailbox fix.
+- **Mailbox fix, benched on a Heltec V3 (2026-11-06), before and after, on local builds:** returning copies injected through the real receive path at 2 dBm. Before, a copy counted as a refresh and put the slot back to held. After, the refresh count stays put and the delivery continues.
 - **Soak, 1 hour (2026-11-06):** T-Beam, Heltec V3, T-Deck Plus, RAK4631: no reboot. T-Beam flat within 112 B over the last 40 minutes at 64016 B, new baseline; the gate allows 3072 B.
 - **Benched on those images (2026-11-06):**
   - Web GUI: every page on RAK4631, T-Beam and T-Deck Plus in Chrome, no console errors. Layout fix seen on a T-Deck Plus.
@@ -538,6 +544,9 @@ With default settings, compared with the official `v4.40a.10.28`:
 - **Auto Update restart on a split heap with a phone held:** the phone path works, but this run may not have hit a split heap (AU-23).
 - **Message hold:** one simulated outage on the bench, no real server failure. A single lost `BEAT` may replay the few held frames (about 1 per 4 h, measured), by decision.
 - **MCP23017 pins on the Pins page:** host tests only, no expander on our bench.
+- **Mailbox echo fix (SNF-ECHO-01):** benched on one Heltec V3 with injected copies, not with a real second gateway and the server, and not on nRF52 (built only). The counters of the node from the field report were not read, so the link to that report rests on timing and code.
+  - **Still open:** two mailbox nodes serving the same call can re-open a slot after it expires, about one run per hold time and node. A node that keeps hearing the recipient without an ack can therefore start over.
+  - **Accepted:** after the first pause a message gets one frame per pause instead of nine. This differs from the concept but keeps airtime down (about 30 instead of up to 216 frames in 24 hours).
 - **UV and wind sensors, charge state over BLE:** see the upstream PRs; not repeated on the bench for this release.
 - **Display fixes on E290, Wireless Paper, E213, T-Echo and T114:** no such board on our bench unless listed under "Verification".
 - **Safeboot page and upload tests** ran with the Safeboot already on those nodes; the refreshed image was not confirmed on them.
