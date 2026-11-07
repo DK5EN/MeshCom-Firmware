@@ -327,14 +327,14 @@ async function settle() { for (let i = 0; i < 6; i++) await flush(); }
     const ws = fs.readFileSync(process.env.SETUP_SRC || path.join(__dirname, '..', 'src', 'web_functions', 'web_setup.cpp'), 'utf8');
     const fn = (name) => { const a = wf.indexOf('\n' + name); const b = wf.indexOf('\n}\n', a); return a < 0 ? '' : wf.slice(a, b); };
     const setup = fn('void sub_page_setup()'), info = fn('void sub_page_info()');
-    check('LED-08 setup page has a Board LED control id boardled (three-way, WEB-LED-01), only when the board LED is fitted', /if \(ledHw\.board\)\s*_create_setup_led_mode_element\("boardled", "Board LED"[^;]*boardLedModeGet\(\)\)/.test(setup));
+    check('Setup page no longer carries the Board LED control (it lives on the Pins page, operator 2026-11-07)', !/_create_setup_led_mode_element\("boardled"/.test(setup) && /id=\\"pn_led\\"/.test(wf));
     check('LED-08 setup page has a Charge LED switch id chargeled, only when fitted', /if \(ledHw\.charge\)\s*_create_setup_switch_element\("chargeled", "Charge LED"/.test(setup));
     check('LED-08 info page: both status rows exist with "not fitted"', /"Board LED: %s<br>"[^;]*"not fitted"/.test(info) && /"Charge LED: %s<br>"[^;]*"not fitted"/.test(info));
     const bat = info.slice(info.indexOf('global_batt == 0.0'), info.indexOf('#if defined(ESP32)'));
     check('LED-08 charge LED status is no longer inside the battery branch', !/Charge/.test(bat) && /USB \(no battery\)/.test(bat), bat.length);
     const lf = fs.readFileSync(path.join(__dirname, '..', 'src', 'loop_functions.cpp'), 'utf8');
     check('LED-08 fitted decision is the shared ledFittedNow() = ledFitted() of board_led.h, charge LED from chargeLedFitted()', /#include "board_led\.h"/.test(wf) && /ledFittedNow\(\)/.test(wf) && !/static LedFitted/.test(wf) && /return ledFitted\(boardPin, neo, true, chargeLedFitted\(\)\)/.test(lf));
-    check('LED-08 boardled GUI element is gated by the same #if defined(BOARD_LED) || NeoPixel guard as the setparam handler', (() => { const G = '#if defined\\(BOARD_LED\\) \\|\\| \\(defined\\(LED_PIN\\) && defined\\(LED_PIXEL\\) && LED_PIXEL > 0\\)'; return new RegExp(G + '[^\\n]*\\n\\s*if \\(ledHw\\.board\\)\\s*_create_setup_led_mode_element\\("boardled"').test(setup) && new RegExp(G + '\\s*\\n\\s*if\\(setupData->paramName\\.equals\\("boardled"\\)\\) \\{   // LED-08').test(ws); })());
+    check('LED-08 setparam boardled handler keeps the #if defined(BOARD_LED) || NeoPixel guard (the Pins page posts it)', new RegExp('#if defined\\(BOARD_LED\\) \\|\\| \\(defined\\(LED_PIN\\) && defined\\(LED_PIXEL\\) && LED_PIXEL > 0\\)\\s*\\n\\s*if\\(setupData->paramName\\.equals\\("boardled"\\)\\) \\{   // LED-08').test(ws));
     check('LED-08 setparam boardled issues --board led off|on|steady through commandAction (WEB-LED-01)', /paramName\.equals\("boardled"\)[\s\S]{0,700}"--board led %s"[\s\S]{0,200}commandAction\(message_text/.test(ws) && /equals\("steady"\)/.test(ws) && /equals\("flash"\) \|\| setupData->paramValue\.equals\("on"\)/.test(ws));
     { // WEB-LED-01: render the three-way helper from its printf format and check the stored mode shows as pressed
       const m = /_create_setup_led_mode_element\(const char id\[\][^;{]*\)\n\{([\s\S]*?)\n\}\n/.exec(wf);

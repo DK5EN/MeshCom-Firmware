@@ -3315,12 +3315,9 @@ void sub_page_setup()
     _create_setup_switch_element("volt", "Voltage", "show batt. voltage, not percent", bDisplayVolt);           // create Switch-Element inclucing Label and Description
     _create_setup_switch_element("mesh", "Mesh", "enable mesh/forwarding of received LoRa messages", bMESH);    // create Switch-Element inclucing Label and Description
     _create_setup_switch_element("via", "Via", "enable via", bVIA);    // create Switch-Element inclucing Label and Description
-    { // LED-08: only on a node that has the LED (the info page says "not fitted" otherwise); same console rows as --board led / --charge led
+    { // LED-08: only on a node that has the LED (the info page says "not fitted" otherwise); same console row as --charge led.
+      // The Board LED control lives on the Pins page only (operator 2026-11-07); its /setparam boardled handler stays.
         const LedFitted ledHw = ledFittedNow();
-#if defined(BOARD_LED) || (defined(LED_PIN) && defined(LED_PIXEL) && LED_PIXEL > 0)   // same guard as the webSetup_setParam handler and the --board led console row
-        if (ledHw.board)
-            _create_setup_led_mode_element("boardled", "Board LED", "off, heartbeat flash every 2 s, or steady on", boardLedModeGet());   // WEB-LED-01
-#endif
         if (ledHw.charge)
             _create_setup_switch_element("chargeled", "Charge LED", "on = follows charging, off = dark", bCHARGE_LED);
     }

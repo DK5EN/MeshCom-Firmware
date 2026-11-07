@@ -983,12 +983,13 @@ static void test_real_led_guards_are_wired()
     TEST_ASSERT_TRUE_MESSAGE(loop.find("LedFitted ledFittedNow(void)") != std::string::npos && loop.find("chargeLedFitted()") != std::string::npos, "ledFittedNow() in loop_functions.cpp missing");
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("static LedFitted") == std::string::npos && web.find("static LedFitted") == std::string::npos, "private LedFitted helper copy is back");
 
-    // --info marks a busy pad; the web GUI switch uses the same BOARD_LED guard as the handler
+    // --info marks a busy pad. The Setup page no longer carries the board LED control (it lives on the Pins page,
+    // operator 2026-11-07); the /setparam boardled handler keeps the BOARD_LED guard.
     // WEB-LED-01: the "on" state is now shown as flash or steady
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("flash (pin busy)") != std::string::npos, "--info BOARD LED: flash (pin busy) missing");
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("steady (pin busy)") != std::string::npos, "--info BOARD LED: steady (pin busy) missing");
     std::string sw = led_span(web, "const LedFitted ledHw = ledFittedNow();", "chargeled", 600);
-    TEST_ASSERT_TRUE_MESSAGE(led_order(sw, "#if defined(BOARD_LED)", "\"boardled\""), "web GUI boardled element must be gated by #if defined(BOARD_LED)");
+    TEST_ASSERT_TRUE_MESSAGE(sw.find("\"boardled\"") == std::string::npos, "the Setup page carries the boardled control again (Pins page only)");
 }
 
 // Production lock (docs/production-locked-settings.md): every toggle row the nbr*/shortpath
