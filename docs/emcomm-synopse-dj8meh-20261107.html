@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EMCOMM-Synopse</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --text: #17212e;
+  --muted: #4a5868;
+  --line: #ccd5df;
+  --accent: #173f73;
+  --band: #e6ebf2;
+  --green: #17723a;
+  --green-text: #ffffff;
+  --yellow: #ffd60a;
+  --yellow-text: #17212e;
+  --red: #b3123a;
+  --red-text: #ffffff;
+  --call: #e8eefa;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1621;
+    --surface: #182230;
+    --text: #e9eef5;
+    --muted: #aebccb;
+    --line: #36475b;
+    --accent: #8ab8f5;
+    --band: #223044;
+    --call: #1d2d45;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+main { max-width: 1180px; margin: 0 auto; padding: 32px 24px 48px; }
+.eyebrow, .meta, .note, .foot, .class-hint { font-size: 14px; color: var(--muted); }
+.eyebrow { margin: 0 0 8px; }
+h1 { font-size: 28px; line-height: 1.25; margin: 0 0 12px; }
+h2 { font-size: 20px; line-height: 1.3; margin: 32px 0 12px; }
+.meta { list-style: none; margin: 0 0 20px; padding: 0; }
+.bluf { background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--accent); padding: 16px 20px; border-radius: 4px; }
+.bluf p { margin: 0; }
+.bluf .reco { margin-top: 8px; }
+.callout { background: var(--call); border: 1px solid var(--line); padding: 14px 20px; border-radius: 4px; margin-top: 14px; }
+.callout p { margin: 0; }
+ul.facts { margin: 0; padding-left: 20px; }
+ul.facts li { margin-bottom: 6px; }
+.table-note { margin: 0 0 12px; }
+table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); }
+th, td { padding: 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+thead th { background: var(--accent); color: var(--surface); position: sticky; top: 0; }
+col.c-idea { width: 29%; }
+col.c-eval { width: 42%; }
+col.c-class { width: 16%; }
+col.c-amp { width: 13%; }
+tbody.group th { background: var(--band); font-size: 16px; }
+td p { margin: 0 0 6px; }
+td p:last-child { margin-bottom: 0; }
+.idea-title { display: block; font-weight: 700; margin-bottom: 4px; }
+.class-name { display: block; font-weight: 700; }
+.class-hint { display: block; margin-top: 4px; }
+.amp { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
+.amp::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: currentColor; }
+.amp.g { background: var(--green); color: var(--green-text); }
+.amp.y { background: var(--yellow); color: var(--yellow-text); }
+.amp.r { background: var(--red); color: var(--red-text); }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 12px 20px; margin-top: 12px; }
+summary { cursor: pointer; font-weight: 700; }
+details ul { margin: 12px 0 4px; padding-left: 20px; }
+details li { margin-bottom: 6px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+.foot { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 12px; }
+@media (max-width: 760px) {
+  main { padding: 20px 16px 32px; }
+  table, tbody, tr, td { display: block; width: 100%; }
+  thead, colgroup { display: none; }
+  tbody.group tr, tbody.group th { display: block; width: 100%; }
+  tr { border-bottom: 3px solid var(--line); }
+  td { border-bottom: 0; padding: 8px 12px; }
+  td[data-label]::before { content: attr(data-label); display: block; font-size: 14px; color: var(--muted); }
+}
+@media print {
+  thead th { position: static; }
+  tr { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<main>
+<p class="eyebrow">Synopse · EMCOMM (Notfunk) · Vorschläge von Helmut, DJ8MEH</p>
+<h1>Fünf Vorschläge übernehmen wir, fünf klären wir noch, drei gehen nicht</h1>
+<ul class="meta">
+  <li>Stand: 07.11.2026, geprüft gegen den Code auf <code>fork-dev</code></li>
+  <li>Grundlage: Helmuts Papier vom 06.11.2026 und seine zwei Begleitmails</li>
+  <li>Status: Entwurf, noch nicht mit OE1KBC und OE1KFR abgestimmt</li>
+</ul>
+
+<div class="bluf">
+  <p><strong>Helmuts wichtigster Punkt ändert unseren Plan: Die meisten werden im Ernstfall nicht signieren. EMCOMM muss deshalb auch ohne Signatur nützen.</strong></p>
+  <p class="reco">Empfehlung: zuerst sichtbare und nummerierte EMCOMM-Nachrichten bauen, Signaturen erst bei echtem Bedarf.</p>
+</div>
+<div class="callout">
+  <p><strong>Offene Entscheidung:</strong> Darf eine EMCOMM-Nachricht ohne Signatur begrenzt Vorrang bekommen? Wir empfehlen Ja. Das kehrt die bisherige Regel im Konzept um und gehört deshalb in das Gespräch mit OE1KBC und OE1KFR.</p>
+</div>
+
+<h2>Kernfakten</h2>
+<ul class="facts">
+  <li><strong>Grün:</strong> Kennzeichnung, Anzeige trotz Prüffehler, laufende Nummer, schlanke Authentisierung und Vertrauen statt gemeinsamem Geheimnis.</li>
+  <li><strong>Gelb:</strong> Rechtsfrage, Max Hop, Vorrang, Warnung bei Gerätewechsel und Schutz vor wiederholten Nachrichten.</li>
+  <li><strong>Rot:</strong> MSG-ID als Zähler, Hash über MAC oder Rufzeichen und Identitätsnachweis über den Pfad.</li>
+  <li><strong>Heutiger Stand:</strong> In der Firmware gibt es noch keinen EMCOMM-Code. Alles hier ist Planung.</li>
+</ul>
+
+<h2>Synopse</h2>
+<p class="note table-note">Sortiert nach Ampel, innerhalb der Ampel von Low Hanging Fruit über hohen Nutzen bis zu viel Aufwand bei wenig Nutzen. Aufwand und Nutzen sind unsere Einschätzung, keine Messung.</p>
+
+<table>
+  <colgroup><col class="c-idea"><col class="c-eval"><col class="c-class"><col class="c-amp"></colgroup>
+  <thead>
+    <tr><th scope="col">Helmuts Idee</th><th scope="col">Unsere Einschätzung</th><th scope="col">Einordnung</th><th scope="col">Ampel</th></tr>
+  </thead>
+
+  <tbody class="group"><tr><th colspan="4" scope="colgroup">Grün: übernehmen wir</th></tr></tbody>
+  <tbody>
+    <tr>
+      <td data-label="Helmuts Idee"><span class="idea-title">Fette Kennzeichnung</span>Clients zeigen deutlich, dass jemand per EMCOMM unterwegs ist, ähnlich wie bei VarAC.</td>
+      <td data-label="Unsere Einschätzung"><p>Billig und wirksam, weil Missbrauch für alle sichtbar wird.</p><p>Das ist soziale Kontrolle, kein technischer Schutz. Die Web GUI kann früh folgen, die Apps brauchen zuerst echte Statusmeldungen (IDEE-11).</p></td>
+      <td data-label="Einordnung"><span class="class-name">Low Hanging Fruit</span><span class="class-hint">Aufwand gering, Nutzen hoch</span></td>
+      <td data-label="Ampel"><span class="amp g">Grün</span></td>
+    </tr>
+    <tr>
+      <td data-label="Helmuts Idee"><span class="idea-title">Anzeige trotz Prüffehler</span>Eine EMCOMM-Nachricht mit fehlerhafter Signatur wird trotzdem angezeigt, mit deutlichem Hinweis.</td>
+      <td data-label="Unsere Einschätzung"><p>Richtig: Im Notfall darf keine Nachricht verschwinden. Das Konzept sieht es für unsignierte Nachrichten schon vor.</p><p>Wir ergänzen drei Zustände: gültig, Schlüssel unbekannt und ungültig. Ungültig bekommt die stärkste Warnung.</p></td>
+      <td data-label="Einordnung"><span class="class-name">Low Hanging Fruit</span><span class="class-hint">Eine Regel, kein eigenes Feature. Wirkt erst mit Signaturen.</span></td>
+      <td data-label="Ampel"><span class="amp g">Grün</span></td>
+    </tr>
+    <tr>
+      <td data-label="Helmuts Idee"><span class="idea-title">Laufende Nachrichtennummer</span>Ein Summenzähler je Knoten wird mitgesendet und in Web GUI und Client angezeigt.</td>
+      <td data-label="Unsere Einschätzung"><p>Übernehmen wir, mit einem eigenen Zähler nur für EMCOMM. Vier Zeichen kosten bei SF11 rechnerisch etwa 36 ms.</p><p>Die Nummer dient als Bezug im Betrieb ("Bezug Nr. 17"). Der Empfänger erkennt damit keinen Verlust, denn eine Lücke kann auch eine Nachricht an andere sein.</p></td>
+      <td data-label="Einordnung"><span class="class-name">Hoher Nutzen</span><span class="class-hint">Aufwand mittel: Zähler, Speicherung, Anzeige</span></td>
+      <td data-label="Ampel"><span class="amp g">Grün</span></td>
+    </tr>
+    <tr>
+      <td data-label="Helmuts Idee"><span class="idea-title">Wenig Aufwand für die Authentisierung</span>Aus seiner K-Schutz-Zeit (Katastrophenschutz): Die meisten werden sie nicht nutzen. Auch im Handfunk ist der Absender nur eine Behauptung.</td>
+      <td data-label="Unsere Einschätzung"><p>Der wichtigste Hinweis im Papier. Wenn nur Signiertes Vorrang bekommt und kaum jemand signiert, bleibt der Vorrang im Ernstfall meist aus.</p><p>Darum teilen wir die Arbeit: erst Kennzeichnung und Nummer, dann Signaturen als Option bei echtem Bedarf.</p></td>
+      <td data-label="Einordnung"><span class="class-name">Hoher Nutzen</span><span class="class-hint">Spart Aufwand, weil es die Reihenfolge ändert</span></td>
+      <td data-label="Ampel"><span class="amp g">Grün</span></td>
+    </tr>
+    <tr>
+      <td data-label="Helmuts Idee"><span class="idea-title">Vertrauen bestätigen statt gemeinsamem Geheimnis</span>Das Vertrauen in XY wird einfach bestätigt und kann wieder entzogen werden.</td>
+      <td data-label="Unsere Einschätzung"><p>Die Richtung stimmt und deckt sich mit der Roadmap: OMs bestätigen, welcher Schlüssel zu welchem Rufzeichen gehört. Das Entziehen ergänzen wir.</p><p>Ein HMAC, wie er ihn nennt, bräuchte ein gemeinsames Geheimnis. Sein Wunsch geht deshalb nur mit öffentlichen Schlüsseln (Ed25519), rechnerisch etwa 0,8 s pro Frame.</p></td>
+      <td data-label="Einordnung"><span class="class-name">Viel Aufwand, wenig Nutzen</span><span class="class-hint">Solange kaum jemand signiert. Richtung jetzt festlegen, später bauen.</span></td>
+      <td data-label="Ampel"><span class="amp g">Grün</span></td>
+    </tr>
+  </tbody>
+
+  <tbody class="group"><tr><th colspan="4" scope="colgroup">Gelb: muss weiter ausdifferenziert werden</th></tr></tbody>
+  <tbody>
+    <tr>
+      <td data-label="Helmuts Idee"><span class="idea-title">Keine rechtlichen Probleme</span>Authentisierung sei unbedenklich, weil wir nicht verschlüsseln.</td>
+      <td data-label="Unsere Einschätzung"><p>Für Deutschland passt das zum Wortlaut: § 16 AFuV verbietet Kodieren oder Verschlüsseln zur Verschleierung des Inhalts. Eine Aussage zu Signaturen haben wir nicht gefunden.</p><p>Für Österreich fehlt uns der amtliche Text. Nötig ist eine kurze Anfrage bei DARC oder Bundesnetzagentur und beim ÖVSV.</p></td>
+      <td data-label="Einordnung"><span class="class-name">Low Hanging Fruit</span><span class="class-hint">Zwei Anfragen, kein Code. Nötig vor jeder Signatur.</span></td>
+      <td data-label="Ampel"><span class="amp y">Gelb</span></td>
+    </tr>
+    <tr>
+      <td data-label="Helmuts Idee"><span class="idea-title">Max Hop bei der MH-Fernabfrage weglassen</span>Bei der Remote-Abfrage von MH könne die Abfrage von Max Hop entfallen.</td>
+      <td data-label="Unsere Einschätzung"><p>Rückfrage nötig: Der Lesen-Knopf der Heard-Liste fragt Max Hop gar nicht ab. Das tut nur die gemeinsame Karte mit TX-Queue und Mailbox.</p><p>Meint er diese Karte, sparen wir je Abruf einen Befehl samt Antwort. Max Hop braucht dann einen eigenen Knopf. Die Hop-Zahl einer Route in der MH-Antwort bleibt.</p></td>
+      <td data-label="Einordnung"><span class="class-name">Low Hanging Fruit</span><span class="class-hint">Kleine Änderung in der Web GUI</span></td>
+      <td data-label="Ampel"><span class="amp y">Gelb</span></td>
+    </tr>
+    <tr>
+      <td data-label="Helmuts Idee"><span class="idea-title">Überholspur verhindern</span>Wie verhindert man, dass OMs den EMCOMM-Modus nur wegen der Priorität nutzen?</td>
+      <td data-label="Unsere Einschätzung"><p>Das Problem ist echt und bleibt offen. Unser Vorschlag: begrenzter Vorrang mit Obergrenze je Absender, der nur die Warteschlange ändert.</p><p>Falsche Rufzeichen umgehen die Grenze. Fluten oder Stören verhindert aber auch eine Signatur nicht. Das ist die offene Entscheidung von oben.</p></td>
+      <td data-label="Einordnung"><span class="class-name">Hoher Nutzen</span><span class="class-hint">Aufwand mittel. Der Kern des EMCOMM-Modus.</span></td>
+      <td data-label="Ampel"><span class="amp y">Gelb</span></td>
+    </tr>
+    <tr>
+      <td data-label="Helmuts Idee"><span class="idea-title">Warnung bei Geräte- oder Rufzeichenwechsel</span>Ändert sich Gerät oder Rufzeichen, erscheint ein Warnhinweis.</td>
+      <td data-label="Unsere Einschätzung"><p>Sinnvoll, sobald es Signaturen gibt: Ein neuer Schlüssel für ein bekanntes Rufzeichen löst die Warnung aus.</p><p>Zu klären: Gehört ein Schlüssel zum Gerät, zum Rufzeichen oder zur SSID? Davon hängt ab, ob ein Ersatzgerät im Einsatz einen Fehlalarm auslöst.</p></td>
+      <td data-label="Einordnung"><span class="class-name">Viel Aufwand, wenig Nutzen</span><span class="class-hint">Solange Signaturen selten sind. Selbst danach ein kleiner Zusatz.</span></td>
+      <td data-label="Ampel"><span class="amp y">Gelb</span></td>
+    </tr>
+    <tr>
+      <td data-label="Helmuts Idee"><span class="idea-title">Zähler gegen wiederholte Nachrichten</span>Er sieht das Zählerproblem wie bei RM und fragt, ob der Nachrichtenzähler hilft.</td>
+      <td data-label="Unsere Einschätzung"><p>Grundsätzlich ja: Ist der Zähler signiert, kann der Empfänger alte Nachrichten erkennen. Dafür muss er je Absender den letzten Stand speichern.</p><p>Offen ist, wie weit das gegen Verlust und Neustarts tolerant sein muss. Wiederholungen eher kennzeichnen als verwerfen, passend zur Regel "immer anzeigen".</p></td>
+      <td data-label="Einordnung"><span class="class-name">Viel Aufwand, wenig Nutzen</span><span class="class-hint">Nur in der Signaturstufe relevant</span></td>
+      <td data-label="Ampel"><span class="amp y">Gelb</span></td>
+    </tr>
+  </tbody>
+
+  <tbody class="group"><tr><th colspan="4" scope="colgroup">Rot: übernehmen wir nicht</th></tr></tbody>
+  <tbody>
+    <tr>
+      <td data-label="Helmuts Idee"><span class="idea-title">MSG-ID als Zähler nutzen</span>Die MSG-ID wird ohnehin übertragen und könnte als Nachrichtennummer dienen.</td>
+      <td data-label="Unsere Einschätzung"><p>Geht nicht. Der Zähler in der MSG-ID teilt sich alle Frames mit Positionen und anderem Verkehr, läuft bei 999 über und springt nach einem Neustart.</p><p>Als Referenz ließe sie sich ohne Sendezeit anzeigen, eine fortlaufende EMCOMM-Nummer ersetzt sie aber nicht.</p></td>
+      <td data-label="Einordnung"><span class="class-name">Viel Aufwand, wenig Nutzen</span><span class="class-hint">Aufwand klein, Nutzen als Nummer gering</span></td>
+      <td data-label="Ampel"><span class="amp r">Rot</span></td>
+    </tr>
+    <tr>
+      <td data-label="Helmuts Idee"><span class="idea-title">Hash über MAC oder Rufzeichen</span>Ein Authentisierungshash über eine MAC-Adresse des Knotens oder nur über das Rufzeichen.</td>
+      <td data-label="Unsere Einschätzung"><p>Bringt keinen Schutz. Beide Werte sind öffentlich, 22 Bit der MAC-Ableitung stehen sogar in jeder MSG-ID. Jeder kann diesen Hash selbst berechnen.</p><p>Er ändert sich auch nicht mit dem Text und lässt sich deshalb einfach kopieren. Echter Nachweis braucht ein Geheimnis, das nur der Absender hat.</p></td>
+      <td data-label="Einordnung"><span class="class-name">Viel Aufwand, wenig Nutzen</span><span class="class-hint">Aufwand klein, Nutzen null, dazu falsche Sicherheit</span></td>
+      <td data-label="Ampel"><span class="amp r">Rot</span></td>
+    </tr>
+    <tr>
+      <td data-label="Helmuts Idee"><span class="idea-title">Identität über Nachbarn und Pfad</span>Das Rufzeichen wird nicht nur behauptet, sondern wie bei MH über Nachbarn und Pfad bestätigt.</td>
+      <td data-label="Unsere Einschätzung"><p>Als Nachweis untauglich. Rufzeichen und Pfad sind unsigniert und lassen sich beide fälschen. MH zeigt nur, dass jemand mit diesem Rufzeichen gehört wurde.</p><p>Im Katastrophenfall ändern sich zudem die Wege, ein Abgleich würde oft falschen Alarm geben. Höchstens später ein Plausibilitätshinweis.</p></td>
+      <td data-label="Einordnung"><span class="class-name">Viel Aufwand, wenig Nutzen</span><span class="class-hint">Aufwand mittel bis hoch, kein Sicherheitsgewinn</span></td>
+      <td data-label="Ampel"><span class="amp r">Rot</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Was nicht geprüft ist</h2>
+<ul class="facts">
+  <li><strong>Sendezeiten:</strong> Die Werte sind berechnet, nicht gemessen. Die 36 ms sind aus den 786 ms für 88 Zeichen bei SF11 abgeleitet.</li>
+  <li><strong>Vorrang über Relays:</strong> Dass Relays ohne hinterlegten Schlüssel keinen Vorrang geben können, ist unsere Ableitung aus dem Konzept, kein Testergebnis.</li>
+  <li><strong>Nutzungsverhalten:</strong> Dass die meisten nicht signieren, ist Helmuts Erfahrung. Daten dazu haben wir nicht.</li>
+  <li><strong>Rechtslage:</strong> Das ist keine Rechtsauskunft. Die deutsche Regel kennen wir nur aus Auszügen der Suche, die österreichische gar nicht im amtlichen Wortlaut.</li>
+  <li><strong>Max Hop:</strong> Was Helmut genau meint, ist noch nicht rückgefragt.</li>
+</ul>
+
+<details>
+  <summary>Technische Belege für Entwickler</summary>
+  <ul>
+    <li><strong>MSG-ID:</strong> <code>(_GW_ID &lt;&lt; 10) | (node_msgid &amp; 0x3FF)</code>, Überlauf bei 999, Beschreibung in <code>docs/architecture/11-wire-format.md</code>, Aufbau in <code>src/loop_functions.cpp:4085</code>.</li>
+    <li><strong>Sprung nach Neustart:</strong> Der Zähler rückt beim Laden um einen ganzen Block vor (<code>src/msgid_counter.h</code>).</li>
+    <li><strong>Auch Positionen zählen mit:</strong> Feldbefund 30.08.2026, jeder Positionsrahmen mit frischer MSG-ID (<code>src/beacon_rate.h</code>).</li>
+    <li><strong>Max Hop:</strong> Die Karte liest <code>txq</code>, <code>mbox</code> und <code>maxhop</code> gemeinsam (<code>src/web_functions/web/mcrm.js:198-199</code> und <code>:219</code>). Die Antwort lautet <code>t=4 p=2</code> (<code>src/rm_format.h:827</code>).</li>
+    <li><strong>Eigener Knopf für Max Hop:</strong> Jeder RM-Befehl braucht einen Knopf oder ein Feld auf der Seite (<code>docs/rm-gui/extended-commands-concept.md</code>, Punkt 10).</li>
+    <li><strong>Signaturgröße:</strong> Ed25519 als Base64 sind 88 Zeichen, rechnerisch etwa +786 ms bei SF11. Ein Frame hat höchstens 255 Byte (<code>docs/mesh-evolution-concept-20261021.md</code>, Abschnitte 2.3 und 4.9).</li>
+    <li><strong>Bisherige Regel:</strong> Unsignierte EMCOMM-Frames werden angezeigt und normal weitergeleitet, aber nicht bevorzugt (ebenda, Abschnitt 4.8).</li>
+  </ul>
+</details>
+
+<div class="foot">
+  <p>Quellen: <a href="https://www.gesetze-im-internet.de/afuv_2005/__16.html">§ 16 AFuV</a> · <a href="https://gesetzefinden.at/bundesrecht/verordnungen/afv">Amateurfunkverordnung Österreich</a> · <code>docs/ROADMAP.md</code> (IDEE-11, IDEE-12) · <code>docs/mesh-evolution-concept-20261021.md</code></p>
+</div>
+</main>
+</body>
+</html>
