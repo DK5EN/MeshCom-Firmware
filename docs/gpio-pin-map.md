@@ -241,7 +241,7 @@ A pin is listed only if it is **not** used by any class above for that board, is
 
 ### Heltec WiFi LoRa 32 V3 (heltec_wifi_lora_32_V3)
 
-**Free: 2, 4, 5, 6, 7.**
+**Free: 2, 4, 5, 6.** GPIO 7 was dropped after review (2026-11-07): `init_batt()` in `src/batt_function_old.cpp` (the `#else` branch, `ADC_CHANNEL_6` on ADC1) configures it as an analog input at boot and again on `--batt factor`, which would undo a user output.
 
 | Class                 | Pins                                                                 | Note                                                                                                                                                |
 | --------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -310,7 +310,7 @@ inline bool pinCanAssign(const BoardPins *b, int pin, uint64_t claimed) { PinCla
 ```
 
 - **New board:** no `kBoards` entry, so `boardFor()` returns NULL and `classify()` returns `PIN_FORBIDDEN` for every pin.
-- **Host test:** loop over `kBoards`; assert `used & freeOk == 0`, every `freeOk` bit passes `chipAllows()`, the T-Deck and T-Deck Plus entries have `freeOk == 0`, the T-Beam entries equal `{13, 25}`, Heltec V3 equals `{2, 4, 5, 6, 7}`, and an unknown env yields no free pin. The nRF52 chip rule is `mcPinReservedNrf52840()` called inside `classify()` for `CHIP_NRF52840`, with `freeOk == 0` (Part B off).
+- **Host test:** loop over `kBoards`; assert `used & freeOk == 0`, every `freeOk` bit passes `chipAllows()`, the T-Deck and T-Deck Plus entries have `freeOk == 0`, the T-Beam entries equal `{13, 25}`, Heltec V3 equals `{2, 4, 5, 6}`, and an unknown env yields no free pin. The nRF52 chip rule is `mcPinReservedNrf52840()` called inside `classify()` for `CHIP_NRF52840`, with `freeOk == 0` (Part B off).
 
 ## 8. Findings outside this task (reported, not fixed)
 
@@ -325,7 +325,7 @@ inline bool pinCanAssign(const BoardPins *b, int pin, uint64_t claimed) { PinCla
 
 ## 9. Claims left unverified
 
-- Header exposure of every free candidate (T-Beam 13, 25; Heltec V3 2, 4-7): data sheet, not checked here.
+- Header exposure of every free candidate (T-Beam 13, 25; Heltec V3 2, 4, 5, 6): data sheet, not checked here.
 - Classic strapping set, WROVER PSRAM pins 16/17, ADC2 limits, GPIO 20/37/38 bonding, T-Beam PMU IRQ 35 and GPS PPS 37: data sheet, not checked here.
 - S3 strapping set, 47/48 voltage domain, Heltec V3 pins 15/16/33/34/38-40, Supreme peripherals: data sheet, not checked here.
 - Framework packages 3.20014 (platform 6.6.0, T-Deck family) and the 6.5.0 platform packages: not opened.
