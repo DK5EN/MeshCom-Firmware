@@ -11,6 +11,7 @@
 #include <configuration.h>
 #include <debugconf.h>
 #include "pin_status_json.h" // GET /pinstatus: pure JSON formatter (test/test_pin_status)
+#include "pin_assign_json.h" // GET /pinassign: pure JSON formatter (test/test_pin_status)
 #include "web_functions.h"
 #include "web_oled_shot.h"
 #include "web_txbuf.h"     // WEB-TX-01: webTxBeginChunked in send_http_header
@@ -45,6 +46,7 @@
 #include "web_server_gate.h" // WEB-STOP-01: stopWebserver() acts on a running server only
 #include "watchdog_feed.h"  // meshcom_wdt_feed(): neighbour matrix rows run in the WDT-guarded loop task
 #include "board_led.h"         // LED-08: ledFitted() for the setup controls and info rows
+#include "pin_board.h"         // GPIO-01: pin policy with the board context (GET /pinassign)
 #include "charge_led_mode.h"   // LED-02: chargeLedModeName() for the info row
 #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
 #include "esp32/esp32_pmu.h"    // LED-02: effective charge-LED mode (RM override)
@@ -119,6 +121,43 @@ void sub_page_neighbours();
 void sub_page_pins();
 // noinline: an inlined copy puts the JSON buffer in work_webpage's frame, i.e. on every web request
 static void __attribute__((noinline)) sub_pin_status();
+static void __attribute__((noinline)) sub_pin_assign();
+
+// GPIO-01 W2: may the Pins page change this assignment on this build? The same guards as the wsParams rows of
+// web_setup.cpp (writable rows only). Used by GET /pinassign and by the nav button, so the page is reachable
+// whenever it has something to offer.
+static bool pinAssignAvail(PinFunc f)
+{
+    switch (f)
+    {
+    case PIN_FN_ONEWIRE:
+#if defined(OneWire_GPIO)
+        return true;
+#else
+        return false;
+#endif
+    case PIN_FN_BUTTON:
+#if !defined(BOARD_T_DECK_PRO)
+        return true;
+#else
+        return false;
+#endif
+    case PIN_FN_ANALOG:
+#if defined(ANALOG_PIN)
+        return true;
+#else
+        return false;
+#endif
+    case PIN_FN_WIND:
+#if defined(ENABLE_WIND) && defined(ESP32)
+        return true;
+#else
+        return false;
+#endif
+    default:
+        return false;
+    }
+}
 
 
 String web_header;
@@ -1190,6 +1229,10 @@ void work_webpage(void)
                         { // Pins page: cached state of the board LED, charge LED and MCP23017 pins, read-only, GET only
                             sub_pin_status();
                         }
+                        else if (web_header.startsWith("GET /pinassign"))
+                        { // Pins page: the four pin assignments (1-Wire, button, analog, anemometer), read-only, GET only
+                            sub_pin_assign();
+                        }
                         else if (web_header.startsWith("GET /rmnodes"))
                         { // RM GUI: the three saved nodes (slot, used, call), never a key
                             sub_rm_nodes_get();
@@ -1510,9 +1553,12 @@ void deliver_scaffold(bool bget_password)
         web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('mcp23017',this,true)\"><svg width=\"48\" height=\"48\" version=\"1.1\" viewBox=\"0 0 12.7 12.7\" xmlns=\"http://www.w3.org/2000/svg\"><g fill=\"none\" stroke=\"currentColor\" stroke-linejoin=\"round\"><rect x=\".78644\" y=\".78644\" width=\"11.127\" height=\"5.4354\" stroke-width=\"1.0\"/><g stroke-linecap=\"round\" stroke-width=\"1.0\"><path d=\"m0.79071 8.2113h11.119\"/><path d=\"m0.79679 9.7926h11.119\"/><path d=\"m0.79679 11.38h11.119\"/></g></g></svg></Button>\n");
     }
 
-    { // Pins page: any switchable pin (board LED, charge LED, MCP23017); the page and /pinstatus show what exists
+    { // Pins page: any switchable pin (board LED, charge LED, MCP23017) or a pin assignment; the page, /pinstatus and /pinassign show what exists
         const LedFitted pinHw = ledFittedNow();
-        if (pinHw.board || pinHw.charge || bMCP23017)
+        bool pinAsg = false;
+        for (int i = 0; i < (int)PIN_FN_COUNT; i++)
+            pinAsg = pinAsg || pinAssignAvail((PinFunc)i);
+        if (pinHw.board || pinHw.charge || bMCP23017 || pinAsg)
             web_client.println("<Button class=\"nav_button\" title=\"Pins\" aria-label=\"Pins\" onclick=\"loadPage('pins',this,true)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"><circle cx=\"7\" cy=\"7\" r=\"2.5\"></circle><circle cx=\"17\" cy=\"7\" r=\"2.5\" fill=\"currentColor\"></circle><circle cx=\"7\" cy=\"17\" r=\"2.5\" fill=\"currentColor\"></circle><circle cx=\"17\" cy=\"17\" r=\"2.5\"></circle></g></svg></Button>\n");
     }
 
@@ -4330,7 +4376,11 @@ void sub_page_pins()
     web_client.println("<button type=\"button\" class=\"mctab mcledbtn\" id=\"pn_chg_off\" aria-pressed=\"false\" onclick=\"pinsChg('off')\">off</button>");
     web_client.println("<button type=\"button\" class=\"mctab mcledbtn\" id=\"pn_chg_auto\" aria-pressed=\"false\" onclick=\"pinsChg('auto')\">auto</button>");
     web_client.println("</div><p class=\"font-small\">auto = follows charging, off = dark. Now: <span id=\"pn_chg_st\"></span></p></div>");
-    web_client.println("<p id=\"pn_none\" hidden>No switchable pins on this node.</p>");
+    web_client.println("<table class=\"table mw-600\" id=\"pn_asg\" hidden><caption class=\"font-small\">Pin assignments</caption>");
+    web_client.println("<thead><tr class=\"font-bold\"><th scope=\"col\">Function</th><th scope=\"col\">Pin</th><th scope=\"col\">Default</th><th scope=\"col\">In use</th><th scope=\"col\">Note</th></tr></thead>");
+    web_client.println("<tbody id=\"pn_asg_body\"></tbody></table>");
+    web_client.println("<p class=\"font-small\" id=\"pn_asg_hint\" hidden>A pin the board uses itself is refused.</p>");
+    web_client.println("<p id=\"pn_none\" hidden>No switchable outputs on this node.</p>");
     web_client.println("<table class=\"table mw-600\" id=\"pn_mcp\" hidden><caption class=\"font-small\">MCP23017 pins</caption>");
     web_client.println("<thead><tr class=\"font-bold\"><th scope=\"col\">Pin</th><th scope=\"col\">Name</th><th scope=\"col\">In/Out</th><th scope=\"col\">Level</th></tr></thead>");
     web_client.println("<tbody id=\"pn_body\"></tbody></table>");
@@ -4339,6 +4389,54 @@ void sub_page_pins()
     web_client.println("<p class=\"font-small\">Refreshed every 5 s while this page is open. Output levels are what the node was told to set; input levels are sampled by the node every 5 s.</p>");
     web_client.println("</div>");
     // PINS-HTML-END
+}
+
+/**
+ * ###########################################################################################################################
+ * GET /pinassign -- the four user pin assignments with board default, pin in use and the pins the policy accepts
+ * (src/pin_assign_json.h documents the shape). Read-only and GET only; behind the WEB-AUTH gate like the pages.
+ * Writes go through /setparam/ (onewiregpio, buttongpio, angpio, windpin) -> console setters -> pinCanAssign().
+ */
+static void __attribute__((noinline)) sub_pin_assign()
+{
+    PinAssignIn in;
+    memset(&in, 0, sizeof(in));
+    in.chip = pinBoardChip();
+
+    for (int i = 0; i < (int)PIN_FN_COUNT; i++)
+    {
+        const PinFunc f = (PinFunc)i;
+        PinAssignFn &o = in.fn[i];
+        o.def = pinBoardDefault(f);
+        o.eff = pinBoardInUse(f);   // the button: the pin read at boot (a new setting needs a restart)
+        o.ok = pinAssignMask(pinBoardContext(f), f, o.def, pinBoardSetterRefused(f));
+    }
+    for (int i = 0; i < (int)PIN_FN_COUNT; i++)
+        in.fn[i].avail = pinAssignAvail((PinFunc)i);
+    in.fn[PIN_FN_ONEWIRE].pin = meshcom_settings.node_owgpio;
+    in.fn[PIN_FN_ONEWIRE].on = bONEWIRE;
+    in.fn[PIN_FN_BUTTON].pin = meshcom_settings.node_button_pin;
+    in.fn[PIN_FN_BUTTON].on = bButtonCheck;
+    in.fn[PIN_FN_BUTTON].restart = true;     // GPIO-01 W0: the button pin is read at boot
+    in.fn[PIN_FN_ANALOG].pin = meshcom_settings.node_analog_pin >= 99 ? 0 : meshcom_settings.node_analog_pin;   // 99 = unset
+    in.fn[PIN_FN_ANALOG].on = bAnalogCheck;
+#if defined(ESP32)
+    in.fn[PIN_FN_WIND].pin = meshcom_settings.node_wind_pin;
+    in.fn[PIN_FN_WIND].on = bWINDON;
+#endif
+
+#if defined(NRF52_SERIES)
+    static char body[PIN_ASSIGN_JSON_MAX];   // the 8 KB loop stack is tight; the web server runs in this one task only
+#else
+    char body[PIN_ASSIGN_JSON_MAX];
+#endif
+    const size_t n = pinAssignJson(in, body, sizeof(body));
+    web_cors_ok = false; // node-local read, as /pinstatus
+    send_http_header(n ? 200 : 500, RESPONSE_TYPE_JSON);
+    if (n)
+        web_client.println(body);
+    else
+        web_client.println("{\"ok\":false}");
 }
 
 /**

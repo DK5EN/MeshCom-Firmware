@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "../../src/pin_status_json.h"
+#include "../../src/pin_assign_json.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -368,6 +369,184 @@ static void test_buffer_limit(void)
     }
 }
 
+// ---- GET /pinassign (src/pin_assign_json.h) ----
+static char g_ab[PIN_ASSIGN_JSON_MAX];
+
+static PinAssignIn assignBase(void)
+{
+    PinAssignIn in;
+    memset(&in, 0, sizeof(in));
+    in.chip = PIN_CHIP_ESP32;
+    for (int i = 0; i < PIN_FN_COUNT; i++)
+        in.fn[i].ok = 1;
+    return in;
+}
+
+static void test_assign_shape_and_order(void)
+{
+    PinAssignIn in = assignBase();
+    in.fn[PIN_FN_ONEWIRE].avail = true;
+    in.fn[PIN_FN_ONEWIRE].def = 4;
+    in.fn[PIN_FN_ONEWIRE].eff = 4;
+    in.fn[PIN_FN_BUTTON].avail = true;
+    in.fn[PIN_FN_BUTTON].restart = true;
+    in.fn[PIN_FN_BUTTON].on = true;
+    const size_t n = pinAssignJson(in, g_ab, sizeof(g_ab));
+    TEST_ASSERT_TRUE(n > 0);
+    TEST_ASSERT_EQUAL_UINT32(strlen(g_ab), n);
+    TEST_ASSERT_TRUE(validJson(g_ab));
+    TEST_ASSERT_EQUAL_STRING(
+        "{\"chip\":\"esp32\",\"fn\":["
+        "{\"id\":\"ow\",\"param\":\"onewiregpio\",\"avail\":1,\"pin\":0,\"def\":4,\"eff\":4,\"on\":0,\"restart\":0,\"ok\":\"0x0000000000000001\"},"
+        "{\"id\":\"btn\",\"param\":\"buttongpio\",\"avail\":1,\"pin\":0,\"def\":0,\"eff\":0,\"on\":1,\"restart\":1,\"ok\":\"0x0000000000000001\"},"
+        "{\"id\":\"an\",\"param\":\"angpio\",\"avail\":0,\"pin\":0,\"def\":0,\"eff\":0,\"on\":0,\"restart\":0,\"ok\":\"0x0000000000000001\"},"
+        "{\"id\":\"wind\",\"param\":\"windpin\",\"avail\":0,\"pin\":0,\"def\":0,\"eff\":0,\"on\":0,\"restart\":0,\"ok\":\"0x0000000000000001\"}]}",
+        g_ab);
+}
+
+static void test_assign_chip_names(void)
+{
+    PinAssignIn in = assignBase();
+    const PinChip c[] = {PIN_CHIP_ESP32, PIN_CHIP_ESP32S3, PIN_CHIP_NRF52840, PIN_CHIP_NONE};
+    const char *nm[] = {"\"chip\":\"esp32\"", "\"chip\":\"esp32s3\"", "\"chip\":\"nrf52840\"", "\"chip\":\"none\""};
+    for (int i = 0; i < 4; i++)
+    {
+        in.chip = c[i];
+        TEST_ASSERT_TRUE(pinAssignJson(in, g_ab, sizeof(g_ab)) > 0);
+        TEST_ASSERT_NOT_NULL(strstr(g_ab, nm[i]));
+        TEST_ASSERT_TRUE(validJson(g_ab));
+    }
+}
+
+static void test_assign_clamps_numbers(void)
+{
+    PinAssignIn in = assignBase();
+    in.fn[0].pin = -5;
+    in.fn[0].def = 99999;
+    in.fn[0].eff = 255;
+    TEST_ASSERT_TRUE(pinAssignJson(in, g_ab, sizeof(g_ab)) > 0);
+    TEST_ASSERT_NOT_NULL(strstr(g_ab, "\"pin\":0,\"def\":255,\"eff\":255"));
+}
+
+static void test_assign_mask_full_width(void)
+{
+    PinAssignIn in = assignBase();
+    in.fn[0].ok = 0x8000000000000010ULL;
+    in.fn[1].ok = 0xFFFFFFFFFFFFFFFFULL;
+    TEST_ASSERT_TRUE(pinAssignJson(in, g_ab, sizeof(g_ab)) > 0);
+    TEST_ASSERT_NOT_NULL(strstr(g_ab, "\"ok\":\"0x8000000000000010\""));
+    TEST_ASSERT_NOT_NULL(strstr(g_ab, "\"ok\":\"0xffffffffffffffff\""));
+}
+
+static void test_assign_mask_from_policy(void)
+{
+    PinContext c;
+    c.chip = PIN_CHIP_ESP32;
+    c.reserved = (1ULL << 18) | (1ULL << 23);   // radio
+    c.soft = 1ULL << 21;                        // I2C
+    c.claimed = 1ULL << 13;
+    const uint64_t ow = pinAssignMask(c, PIN_FN_ONEWIRE, 4);
+    const uint64_t an = pinAssignMask(c, PIN_FN_ANALOG, 36);
+    TEST_ASSERT_TRUE(ow & 1ULL);                  // 0 = default / off
+    TEST_ASSERT_TRUE(ow & (1ULL << 4));           // the board default
+    TEST_ASSERT_TRUE(ow & (1ULL << 25));          // unreviewed: allowed
+    TEST_ASSERT_FALSE(ow & (1ULL << 18));         // reserved
+    TEST_ASSERT_FALSE(ow & (1ULL << 21));         // soft
+    TEST_ASSERT_FALSE(ow & (1ULL << 13));         // claimed
+    TEST_ASSERT_FALSE(ow & (1ULL << 1));          // console
+    TEST_ASSERT_FALSE(ow & (1ULL << 6));          // flash
+    TEST_ASSERT_FALSE(ow & (1ULL << 24));         // hole
+    TEST_ASSERT_FALSE(ow & (1ULL << 40));         // past the chip (max 39)
+    TEST_ASSERT_FALSE(ow & (1ULL << 36));         // input-only: no output for 1-Wire
+    TEST_ASSERT_TRUE(an & (1ULL << 36));          // input-only is fine for analog
+    for (int n = 1; n < 64; n++)                  // every bit agrees with pinCanAssign()
+        TEST_ASSERT_EQUAL(pinCanAssign(c, PIN_FN_ONEWIRE, n, 4) ? 1 : 0, (int)((ow >> n) & 1));
+    PinContext none;                              // no chip: only 0
+    TEST_ASSERT_EQUAL_UINT64(1ULL, pinAssignMask(none, PIN_FN_WIND, 0));
+}
+
+// The board default is exempt from every class (pinCanAssign): a default that sits on a reserved / soft / claimed pin is
+// still assignable, and only that pin gets the exemption.
+static void test_assign_mask_default_exemption(void)
+{
+    PinContext c;
+    c.chip = PIN_CHIP_ESP32;
+    c.reserved = (1ULL << 18) | (1ULL << 23);
+    c.soft = 1ULL << 21;
+    c.claimed = 1ULL << 13;
+    const uint64_t other = pinAssignMask(c, PIN_FN_ONEWIRE, 4);   // default on a free pin
+    TEST_ASSERT_FALSE(other & (1ULL << 18));
+    TEST_ASSERT_FALSE(other & (1ULL << 21));
+    TEST_ASSERT_FALSE(other & (1ULL << 13));
+    const int dflt[] = {18, 21, 13, 1, 6};                        // HARD, SOFT, claimed, console, flash
+    for (int i = 0; i < 5; i++)
+    {
+        const uint64_t m = pinAssignMask(c, PIN_FN_ONEWIRE, dflt[i]);
+        TEST_ASSERT_TRUE_MESSAGE(m & (1ULL << dflt[i]), "default on a refused pin is assignable");
+        TEST_ASSERT_EQUAL_UINT64(other & ~(1ULL << dflt[i]) & ~(1ULL << 4), m & ~(1ULL << dflt[i]) & ~(1ULL << 4));   // nothing else changes
+    }
+    TEST_ASSERT_FALSE(pinAssignMask(c, PIN_FN_ONEWIRE, 4) & (1ULL << 18));
+}
+
+// The mask follows the console setter: analog takes no 0, 1-Wire on BOARD_RAK4630 no 0-2 (pinBoardSetterRefused()).
+static void test_assign_mask_setter_refusals(void)
+{
+    PinContext c;
+    c.chip = PIN_CHIP_NRF52840;
+    c.reserved = c.soft = c.claimed = 0;
+    TEST_ASSERT_TRUE(pinAssignMask(c, PIN_FN_ANALOG, 5) & 1ULL);              // nothing refused: bit 0 stays
+    const uint64_t an = pinAssignMask(c, PIN_FN_ANALOG, 5, 1ULL);
+    TEST_ASSERT_FALSE(an & 1ULL);
+    TEST_ASSERT_TRUE(an & (1ULL << 5));
+    TEST_ASSERT_TRUE(an & (1ULL << 3));
+    const uint64_t ow = pinAssignMask(c, PIN_FN_ONEWIRE, 17, 7ULL);
+    TEST_ASSERT_EQUAL_UINT64(0ULL, ow & 7ULL);
+    TEST_ASSERT_TRUE(ow & (1ULL << 17));                                      // the default
+    TEST_ASSERT_TRUE(ow & (1ULL << 3));
+    TEST_ASSERT_EQUAL_UINT64(pinAssignMask(c, PIN_FN_ONEWIRE, 17) & ~7ULL, ow);   // only those bits differ
+}
+
+static void test_assign_worst_case_fits_max(void)
+{
+    PinAssignIn in = assignBase();
+    const PinChip chips[] = {PIN_CHIP_NRF52840, PIN_CHIP_ESP32S3, PIN_CHIP_ESP32, PIN_CHIP_NONE};
+    size_t worst = 0;
+    for (int ci = 0; ci < 4; ci++)
+    {
+        in.chip = chips[ci];
+        for (int i = 0; i < PIN_FN_COUNT; i++)
+        {
+            in.fn[i].avail = in.fn[i].on = in.fn[i].restart = true;
+            in.fn[i].pin = in.fn[i].def = in.fn[i].eff = 255;   // clamp ceiling: three digits
+            in.fn[i].ok = 0xFFFFFFFFFFFFFFFFULL;
+        }
+        const size_t n = pinAssignJson(in, g_ab, sizeof(g_ab));
+        TEST_ASSERT_TRUE(n > 0);
+        TEST_ASSERT_TRUE(validJson(g_ab));
+        if (n > worst) worst = n;
+    }
+    // pinned: the true worst case (nrf52840, everything at its widest); the buffer stays close and under the 1 KB stack rule
+    TEST_ASSERT_EQUAL_UINT32(495, worst);
+    TEST_ASSERT_TRUE(PIN_ASSIGN_JSON_MAX >= worst + 1);
+    TEST_ASSERT_TRUE(PIN_ASSIGN_JSON_MAX <= worst + 64);
+    TEST_ASSERT_TRUE(PIN_ASSIGN_JSON_MAX <= 1024);
+    char exact[PIN_ASSIGN_JSON_MAX];
+    in.chip = PIN_CHIP_NRF52840;
+    TEST_ASSERT_EQUAL_UINT32(worst, pinAssignJson(in, exact, worst + 1));
+    TEST_ASSERT_EQUAL_UINT32(0, pinAssignJson(in, exact, worst));
+    TEST_ASSERT_EQUAL('\0', exact[0]);
+}
+
+static void test_assign_buffer_limit(void)
+{
+    PinAssignIn in = assignBase();
+    char tiny[8];
+    TEST_ASSERT_EQUAL_UINT32(0, pinAssignJson(in, tiny, sizeof(tiny)));
+    TEST_ASSERT_EQUAL('\0', tiny[0]);
+    TEST_ASSERT_EQUAL_UINT32(0, pinAssignJson(in, NULL, 100));
+    TEST_ASSERT_EQUAL_UINT32(0, pinAssignJson(in, g_ab, 0));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -384,5 +563,14 @@ int main(int, char **)
     RUN_TEST(test_worst_case_fits_max);
     RUN_TEST(test_names_are_not_copied);
     RUN_TEST(test_buffer_limit);
+    RUN_TEST(test_assign_shape_and_order);
+    RUN_TEST(test_assign_chip_names);
+    RUN_TEST(test_assign_clamps_numbers);
+    RUN_TEST(test_assign_mask_full_width);
+    RUN_TEST(test_assign_mask_from_policy);
+    RUN_TEST(test_assign_mask_default_exemption);
+    RUN_TEST(test_assign_mask_setter_refusals);
+    RUN_TEST(test_assign_worst_case_fits_max);
+    RUN_TEST(test_assign_buffer_limit);
     return UNITY_END();
 }

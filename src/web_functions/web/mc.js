@@ -236,7 +236,7 @@ if(btn)btn.textContent=mcQueueOpen?'hide':'show';
 // Switches use /setparam/ (boardled, chargeled, mcpout<P>, mcpio<P>, mcpname<P>): fetch() carries X-MC through the wrapper above.
 // Names are user text: only ever put into value/textContent, never into HTML.
 // PINS-JS-BEGIN
-var pnT=0,pnG=0,pnOn=false,pnBusy=false,pnRows={};
+var pnT=0,pnG=0,pnOn=false,pnBusy=false,pnRows={},pnAsg={},pnAsgOk={},pnAsgAny=false,pnAsgKnown=false,pnHw=false;
 var pnLoginNote='Session expired: reload this page and log in again.';
 function pnBytes(s){var n=0;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);if(c<128)n++;else if(c<2048)n+=2;else if(c>=55296&&c<56320){n+=4;i++;}else n+=3;}return n;}
 function pnCut(s){while(s.length&&pnBytes(s)>15){var k=s.length-1;if(k>0&&s.charCodeAt(k)>=56320&&s.charCodeAt(k)<57344&&s.charCodeAt(k-1)>=55296&&s.charCodeAt(k-1)<56320)k--;s=s.slice(0,k);}return s;}
@@ -249,21 +249,79 @@ pnT=0;
 if(pnBusy||document.visibilityState==='hidden'){pnArm();return;}
 var g=pnG;pnBusy=true;
 fetch('/pinstatus').then(function(r){if(r.status==401)return null;if(!r.ok)throw 0;return r.json();}).then(function(j){
-if(g!=pnG)return;pnBusy=false;
-if(!j){pnTxt('pn_note',pnLoginNote);return;}
-pnRender(j);pnTxt('pn_note','');pnArm();
+if(g!=pnG)return;
+if(!j){pnBusy=false;pnTxt('pn_note',pnLoginNote);return;}
+pnRender(j);pnTxt('pn_note','');pnAssign(g);
 }).catch(function(){
 if(g!=pnG)return;pnBusy=false;pnTxt('pn_note','Stale: the node did not answer, showing the last values.');pnArm();
 });
 }
 function pinsInit(){pinsLeave();pnOn=true;pnG++;pnPoll();}
-function pinsLeave(){pnOn=false;pnG++;clearTimeout(pnT);pnT=0;pnBusy=false;pnRows={};}
-function pnSet(param,val){
+function pinsLeave(){pnOn=false;pnG++;clearTimeout(pnT);pnT=0;pnBusy=false;pnRows={};pnAsg={};pnAsgOk={};pnAsgAny=false;pnAsgKnown=false;pnHw=false;}
+function pnSet(param,val,refuse){
 fetch('/setparam/?'+param+'='+encodeURIComponent(val)).then(function(r){if(r.status==401)return null;return r.json();}).then(function(j){
 if(!j){pnTxt('pn_msg',pnLoginNote);return;}
 pnTxt('pn_msg',j.returncode===0?'':(j.returncode==2?'The node does not know this setting.':'The node refused the change.'));
+if(refuse)refuse(j.returncode===0?'Saved.':(j.returncode==2?'The node does not know this setting.':'Refused by pin policy.'));
 if(pnOn){clearTimeout(pnT);pnT=0;pnPoll();}
-}).catch(function(){pnTxt('pn_msg','The request failed.');});
+}).catch(function(){pnTxt('pn_msg','The request failed.');if(refuse)refuse('The request failed.');});
+}
+// "No switchable outputs" only when there is neither an LED / MCP pin nor an assignment row; undecided until /pinassign answered once.
+function pnNone(){var e=pnEl('pn_none');if(e)e.hidden=!pnAsgKnown||pnHw||pnAsgAny;}
+// Pin assignments (GET /pinassign, src/pin_assign_json.h): 1-Wire, button, analog, anemometer. Writes use the same setparam names as the Setup page.
+var pnAsgName={ow:'1-Wire',btn:'Button',an:'Analog',wind:'Anemometer'};
+// the "ok" mask is 0x + 16 hex digits (64 bits do not fit a JS number): bit n is digit 17-floor(n/4), bit n%4
+// the button also takes 99 = "no button" (not a bit of the mask): the setter accepts it always
+function pnPinOk(ok,n,id){if(id=='btn'&&n==99)return true;if(typeof ok!='string'||ok.length!=18)return true;if(n<0||n>63)return false;var d=parseInt(ok.charAt(17-(n>>2)),16);return !isNaN(d)&&((d>>(n&3))&1)==1;}
+function pnAsgRow(f){
+var r=pnAsg[f.id];if(r)return r;
+var tr=document.createElement('tr'),th=document.createElement('th'),tp=document.createElement('td'),td=document.createElement('td'),te=document.createElement('td'),tn=document.createElement('td');
+th.scope='row';th.textContent=pnAsgName[f.id]||f.id;
+var inp=document.createElement('input');inp.type='text';inp.inputMode='numeric';inp.maxLength=3;inp.size=4;inp.setAttribute('aria-label','Pin of '+(pnAsgName[f.id]||f.id));
+inp.oninput=function(){inp.setAttribute('data-dirty','1');};
+var note=document.createElement('span'),hint=document.createElement('span'),msg=document.createElement('span');
+hint.id='pn_asg_h_'+f.id;hint.className='font-small';inp.setAttribute('aria-describedby',hint.id);
+msg.setAttribute('role','status');
+var sb=pnBtn('set',function(){
+inp.removeAttribute('data-dirty');msg.textContent='';
+var t=inp.value.trim();
+if(!/^[0-9]{1,3}$/.test(t)){msg.textContent='Enter a pin number.';return;}
+var v=parseInt(t,10);
+if(!pnPinOk(pnAsgOk[f.id],v,f.id)){msg.textContent='Refused by pin policy.';return;}
+pnSet(f.param,v,function(m){msg.textContent=m;});
+});
+sb.setAttribute('aria-label','Set the pin of '+(pnAsgName[f.id]||f.id));
+tp.appendChild(inp);tp.appendChild(sb);tn.appendChild(note);tn.appendChild(document.createTextNode(' '));tn.appendChild(hint);tn.appendChild(document.createTextNode(' '));tn.appendChild(msg);
+tr.appendChild(th);tr.appendChild(tp);tr.appendChild(td);tr.appendChild(te);tr.appendChild(tn);
+pnEl('pn_asg_body').appendChild(tr);
+r=pnAsg[f.id]={inp:inp,sb:sb,def:td,eff:te,note:note,hint:hint};return r;
+}
+function pnAsgRender(j){
+var fs=j.fn||[];
+pnAsgAny=false;for(var q=0;q<fs.length;q++)if(fs[q].avail)pnAsgAny=true;
+pnAsgKnown=true;pnNone();
+var e=pnEl('pn_asg');if(e)e.hidden=!fs.length;
+e=pnEl('pn_asg_hint');if(e)e.hidden=!fs.length;
+for(var i=0;i<fs.length;i++){
+var f=fs[i],r=pnAsgRow(f);pnAsgOk[f.id]=f.ok;
+if(!f.avail){r.inp.value='';r.inp.disabled=true;r.sb.hidden=true;r.def.textContent='';r.eff.textContent='';r.note.textContent='not on this board';r.hint.textContent='';continue;}
+r.inp.disabled=false;r.sb.hidden=false;
+if(!r.inp.getAttribute('data-dirty')&&document.activeElement!==r.inp)r.inp.value=f.pin;
+r.def.textContent=f.def?f.def:'none';
+r.eff.textContent=f.eff?f.eff:'none';
+r.note.textContent=(f.on?'on':'off')+', '+(f.restart?'a change applies after a restart':'a change applies at once');
+// 0 only where the setter takes it; 99 only for the button
+var h=[];if(pnPinOk(f.ok,0,f.id))h.push(f.id=='wind'?'0 = off':'0 = board default');if(f.id=='btn')h.push('99 = no button');
+r.hint.textContent=h.length?'('+h.join(', ')+')':'';
+}
+}
+// Chained after the /pinstatus answer: one connection at a time (W5100S sockets). pnBusy stays set until it is done.
+function pnAssign(g){
+fetch('/pinassign').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){
+if(g!=pnG)return;pnBusy=false;pnAsgRender(j);pnArm();
+}).catch(function(){
+if(g!=pnG)return;pnBusy=false;pnAsgKnown=true;pnNone();pnArm();
+});
 }
 function pinsLed(m){pnSet('boardled',m);}
 function pinsChg(m){pnSet('chargeled',m=='auto'?'on':'off');}
@@ -301,7 +359,7 @@ for(var q=0;q<2;q++){var cb=pnEl('pn_chg_'+cm[q]);if(cb){var con=c.mode==cm[q];c
 }
 if(c.fitted)pnTxt('pn_chg_st',c.eff+(c.rm?' (remote override, console setting: '+c.mode+')':' (console setting)'));
 e=pnEl('pn_mcp');if(e)e.hidden=!m.present;
-e=pnEl('pn_none');if(e)e.hidden=!!(l.fitted||c.fitted||m.present);
+pnHw=!!(l.fitted||c.fitted||m.present);pnNone();
 if(!m.present)return;
 var ps=m.pins||[];
 for(var k=0;k<ps.length;k++){

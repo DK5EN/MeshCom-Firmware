@@ -70,6 +70,17 @@ let fail = null;        // null | 'net' | 500 | 401 for /pinstatus
 let setReply = { returncode: 0 };
 let setStatus = 200;
 let pinStatus;
+let assignFail = null;   // null | 'net' for /pinassign
+function maskOf(bits, zero = true) { let m = zero ? 1n : 0n; for (const b of bits) m |= 1n << BigInt(b); return '0x' + m.toString(16).padStart(16, '0'); }
+function freshAssign() {
+  const all = []; for (let i = 1; i < 40; i++) if (i !== 18 && i !== 21) all.push(i);
+  return { chip: 'esp32', fn: [
+    { id: 'ow', param: 'onewiregpio', avail: 1, pin: 0, def: 4, eff: 4, on: 1, restart: 0, ok: maskOf(all) },
+    { id: 'btn', param: 'buttongpio', avail: 1, pin: 38, def: 38, eff: 38, on: 0, restart: 1, ok: maskOf(all) },
+    { id: 'an', param: 'angpio', avail: 1, pin: 0, def: 36, eff: 36, on: 0, restart: 0, ok: maskOf(all, false) },   // the setter takes no 0
+    { id: 'wind', param: 'windpin', avail: 0, pin: 0, def: 0, eff: 0, on: 0, restart: 0, ok: maskOf([]) } ] };
+}
+let pinAssign = freshAssign();
 function freshStatus() {
   const pins = [];
   for (let i = 0; i < 16; i++) pins.push({ id: (i < 8 ? 'A' : 'B') + (i & 7), n: '', d: 'in', l: 0 });
@@ -93,6 +104,10 @@ w.Headers = Headers;
 w.fetch = (url, opt) => {
   const h = new Headers((opt && opt.headers) || {});
   calls.push({ url, xmc: h.get('X-MC') });
+  if (url === '/pinassign') {
+    if (assignFail === 'net') return Promise.reject(new TypeError('Failed to fetch'));
+    return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(JSON.parse(JSON.stringify(pinAssign))) });
+  }
   if (url === '/pinstatus') {
     if (fail === 'net') return Promise.reject(new TypeError('Failed to fetch'));
     if (fail === 401) return Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({ ok: false }) });
@@ -126,6 +141,8 @@ const flush = () => new Promise((r) => setImmediate(r));
 async function settle() { for (let i = 0; i < 8; i++) await flush(); }
 const polls = () => calls.filter((c) => c.url === '/pinstatus').length;
 const rows = () => w.document.querySelectorAll('#pn_body tr');
+const arows = () => w.document.querySelectorAll('#pn_asg_body tr');
+const assigns = () => calls.filter((c) => c.url === '/pinassign').length;
 
 (async () => {
   // ---- frame ----
@@ -136,8 +153,8 @@ const rows = () => w.document.querySelectorAll('#pn_body tr');
   // jsdom does not compute the cascade: the rule that lets [hidden] win over `#content_inner button` / `.mctab` (display:inline-flex) must exist
   check('css: #content_inner button[hidden] is display:none (beats the inline-flex rules)', /#content_inner\s+button\[hidden\]\s*\{[^}]*display\s*:\s*none/.test(css));
   check('frame: status regions are role=status', (html.match(/role="status"/g) || []).length === 2);
-  check('frame: table has column headers with scope', (html.match(/<th scope="col">/g) || []).length === 4);
-  check('frame: everything hidden until the first answer', ['pn_led', 'pn_chg', 'pn_none', 'pn_mcp'].every((i) => new RegExp('id="' + i + '"[^>]*hidden').test(html)));
+  check('frame: table has column headers with scope', (html.match(/<th scope="col">/g) || []).length === 9);
+  check('frame: everything hidden until the first answer', ['pn_led', 'pn_chg', 'pn_none', 'pn_mcp', 'pn_asg'].every((i) => new RegExp('id="' + i + '"[^>]*hidden').test(html)));
 
   // ---- polling starts on page load ----
   w.loadPage('pins', $('navpins'), true);
@@ -154,6 +171,18 @@ const rows = () => w.document.querySelectorAll('#pn_body tr');
   check('input pin: level is text, level button hidden', rows()[1].querySelectorAll('td')[2].querySelector('span').textContent === 'HIGH' && rows()[1].querySelectorAll('button')[2].hidden);
   check('every request carries X-MC (wrapper of mc.js)', calls.length > 0 && calls.every((c) => c.xmc === '1'), JSON.stringify(calls.filter((c) => c.xmc !== '1')));
 
+  // ---- pin assignments ----
+  check('assign: table has caption "Pin assignments"', />Pin assignments<\/caption>/.test(html));
+  check('assign: one /pinassign request per poll', assigns() === 1, assigns());
+  check('assign: chained, one connection at a time (every /pinassign follows a /pinstatus)', calls.filter((c) => c.url === '/pinstatus' || c.url === '/pinassign').every((c, i) => c.url === (i % 2 ? '/pinassign' : '/pinstatus')));
+  check('assign: section shown with the four rows', !$('pn_asg').hidden && arows().length === 4, arows().length);
+  const lab = [...arows()].map((r) => r.querySelector('th').textContent);
+  check('assign: rows 1-Wire, Button, Analog, Anemometer', lab.join('|') === '1-Wire|Button|Analog|Anemometer', lab.join('|'));
+  check('assign: pin input, board default and pin in use shown', arows()[0].querySelector('input').value === '0' && arows()[0].querySelectorAll('td')[1].textContent === '4' && arows()[0].querySelectorAll('td')[2].textContent === '4' && arows()[1].querySelector('input').value === '38');
+  check('assign: restart need per field (button restarts, 1-Wire applies at once)', /after a restart/.test(arows()[1].querySelectorAll('td')[3].textContent) && /at once/.test(arows()[0].querySelectorAll('td')[3].textContent) && /at once/.test(arows()[2].querySelectorAll('td')[3].textContent), arows()[1].querySelectorAll('td')[3].textContent);
+  check('assign: function not on this board says so, read-only', /not on this board/.test(arows()[3].querySelectorAll('td')[3].textContent) && arows()[3].querySelector('input').disabled && arows()[3].querySelector('button').hidden);
+  check('assign: available function is editable', !arows()[0].querySelector('input').disabled && !arows()[0].querySelector('button').hidden);
+  check('assign: inputs and buttons are labelled', arows()[0].querySelector('input').getAttribute('aria-label') === 'Pin of 1-Wire' && arows()[2].querySelector('button').getAttribute('aria-label') === 'Set the pin of Analog');
   // ---- the timer polls again; the table is updated in place ----
   const r0 = rows()[0];
   pinStatus.mcp.pins[0].l = 0; pinStatus.mcp.pins[3].d = 'out';
@@ -165,7 +194,9 @@ const rows = () => w.document.querySelectorAll('#pn_body tr');
 
   // ---- a failed poll keeps the table and says so ----
   fail = 'net';
+  const aBefore = assigns();
   runTimers(5000); await settle();
+  check('failed poll: no /pinassign request after a failed /pinstatus', assigns() === aBefore, assigns() + ' vs ' + aBefore);
   check('failed poll: table kept', rows().length === 16 && rows()[0].querySelector('input').value === 'Relay');
   check('failed poll: stale note shown', /Stale/.test($('pn_note').textContent), $('pn_note').textContent);
   check('failed poll: polling goes on', polls() === 3 && timers.length === 1, polls() + '/' + timers.length);
@@ -175,6 +206,58 @@ const rows = () => w.document.querySelectorAll('#pn_body tr');
   fail = null;
   runTimers(5000); await settle();
   check('recovery clears the stale note', $('pn_note').textContent === '', $('pn_note').textContent);
+
+  // ---- pin assignments: writes, refusals, polling ----
+  let an = calls.length;
+  arows()[0].querySelector('input').value = '13'; arows()[0].querySelector('input').dispatchEvent(new w.Event('input'));
+  arows()[0].querySelector('button').click(); await settle();
+  check('assign: set sends setparam onewiregpio=13 with X-MC', calls[an] && calls[an].url === '/setparam/?onewiregpio=13' && calls[an].xmc === '1', JSON.stringify(calls[an]));
+  check('assign: accepted write says "Saved." (the callback ran) and no refusal', /Saved\./.test(arows()[0].querySelectorAll('td')[3].textContent) && arows()[0].querySelectorAll('td')[3].textContent.indexOf('Refused') < 0, arows()[0].querySelectorAll('td')[3].textContent);
+  an = calls.length;
+  arows()[2].querySelector('input').value = '18'; arows()[2].querySelector('button').click(); await settle();
+  check('assign: pin cleared in the ok mask is refused locally, no request', !calls.slice(an).some((x) => x.url.indexOf('/setparam/') === 0) && /Refused by pin policy/.test(arows()[2].querySelectorAll('td')[3].textContent), arows()[2].querySelectorAll('td')[3].textContent);
+  an = calls.length;
+  arows()[2].querySelector('input').value = 'abc'; arows()[2].querySelector('button').click(); await settle();
+  check('assign: not a number: no request', !calls.slice(an).some((x) => x.url.indexOf('/setparam/') === 0));
+  an = calls.length;
+  arows()[2].querySelector('input').value = '17'; setStatus = 422; setReply = { returncode: 1, returnValue: '0' };
+  arows()[2].querySelector('button').click(); await settle();
+  check('assign: node answers returncode 1 (422): "Refused by pin policy" at that field', calls[an].url === '/setparam/?angpio=17' && /Refused by pin policy/.test(arows()[2].querySelectorAll('td')[3].textContent) && arows()[0].querySelectorAll('td')[3].textContent.indexOf('Refused') < 0, arows()[2].querySelectorAll('td')[3].textContent);
+  setStatus = 200; setReply = { returncode: 0 };
+  an = calls.length;
+  arows()[2].querySelector('input').value = '34'; arows()[2].querySelector('button').click(); await settle();
+  check('assign: next success replaces the field refusal by "Saved."', /Saved\./.test(arows()[2].querySelectorAll('td')[3].textContent) && arows()[2].querySelectorAll('td')[3].textContent.indexOf('Refused') < 0, arows()[2].querySelectorAll('td')[3].textContent);
+  // button: 99 = no button is accepted (the setter takes it; it is not a bit of the mask); 99 elsewhere is not
+  an = calls.length;
+  arows()[1].querySelector('input').value = '99'; arows()[1].querySelector('button').click(); await settle();
+  check('assign: button 99 (= no button) is sent', calls.slice(an).some((x) => x.url === '/setparam/?buttongpio=99') && /Saved\./.test(arows()[1].querySelectorAll('td')[3].textContent), arows()[1].querySelectorAll('td')[3].textContent);
+  an = calls.length;
+  arows()[0].querySelector('input').value = '99'; arows()[0].querySelector('button').click(); await settle();
+  check('assign: 1-Wire 99 is refused locally, no request', !calls.slice(an).some((x) => x.url.indexOf('/setparam/') === 0) && /Refused by pin policy/.test(arows()[0].querySelectorAll('td')[3].textContent), arows()[0].querySelectorAll('td')[3].textContent);
+  an = calls.length;
+  arows()[2].querySelector('input').value = '0'; arows()[2].querySelector('button').click(); await settle();
+  check('assign: analog 0 is refused locally (the setter takes no 0), no request', !calls.slice(an).some((x) => x.url.indexOf('/setparam/') === 0) && /Refused by pin policy/.test(arows()[2].querySelectorAll('td')[3].textContent), arows()[2].querySelectorAll('td')[3].textContent);
+  an = calls.length;
+  arows()[0].querySelector('input').value = '0'; arows()[0].querySelector('button').click(); await settle();
+  check('assign: 1-Wire 0 (= board default) is sent', calls.slice(an).some((x) => x.url === '/setparam/?onewiregpio=0'));
+  const hint = (i) => arows()[i].querySelectorAll('td')[3].textContent;
+  check('assign: hints per field (0 = board default only where taken, 99 = no button for the button)', /0 = board default/.test(hint(0)) && /99 = no button/.test(hint(1)) && /0 = board default/.test(hint(1)) && !/0 = board default/.test(hint(2)) && !/99/.test(hint(0)), [0, 1, 2].map(hint).join(' | '));
+  check('assign: the section hint no longer claims 0 for every field', !/Pin 0 = board default/.test($('pn_asg_hint').textContent), $('pn_asg_hint').textContent);
+  pinAssign.fn[1].pin = 4; pinAssign.fn[1].eff = 4; pinAssign.fn[0].avail = 0;
+  runTimers(5000); await settle();
+  check('assign: poll refreshes values in place (4 rows kept)', arows().length === 4 && arows()[1].querySelector('input').value === '4' && arows()[1].querySelectorAll('td')[2].textContent === '4');
+  check('assign: avail turning 0 locks the row', arows()[0].querySelector('input').disabled);
+  pinAssign = freshAssign();
+  assignFail = 'net';
+  runTimers(5000); await settle();
+  check('assign: a failed /pinassign keeps the rows and polling goes on', arows().length === 4 && timers.length === 1);
+  assignFail = null;
+  runTimers(5000); await settle();
+  check('assign: recovery re-reads', !arows()[0].querySelector('input').disabled);
+  arows()[0].querySelector('input').value = '9'; arows()[0].querySelector('input').dispatchEvent(new w.Event('input'));
+  runTimers(5000); await settle();
+  check('assign: a pin being typed survives a poll', arows()[0].querySelector('input').value === '9');
+  arows()[0].querySelector('input').removeAttribute('data-dirty');
 
   // ---- switching ----
   let n = calls.length;
@@ -294,12 +377,13 @@ const rows = () => w.document.querySelectorAll('#pn_body tr');
   check('Set sends at most 15 bytes', calls[n].url === '/setparam/?mcpnameA5=' + encodeURIComponent('ÄÄÄÄÄÄÄ'), calls[n].url);
 
   // ---- polling stops on leave ----
-  const before = polls();
+  const before = polls(), beforeA = assigns();
   w.loadPage('info', $('navinfo'), true);
   await settle();
   check('leave: no timer left', timers.length === 0, timers.length);
   runTimers(30000); await settle();
   check('leave: no /pinstatus after the page is gone', polls() === before, polls() + ' vs ' + before);
+  check('leave: no /pinassign after the page is gone', assigns() === beforeA, assigns() + ' vs ' + beforeA);
   // a late answer that was in flight at leave time must not revive polling either
   w.loadPage('pins', $('navpins'), true); await settle();
   w.loadPage('info', $('navinfo'), true); await settle();
@@ -315,7 +399,20 @@ const rows = () => w.document.querySelectorAll('#pn_body tr');
   check('no MCP: no "none" notice while the LED exists', $('pn_none').hidden);
   pinStatus.led.fitted = 0;
   runTimers(5000); await settle();
-  check('nothing fitted: LED row hidden, notice shown', $('pn_led').hidden && !$('pn_none').hidden);
+  check('no LED/MCP but assignment rows: the notice stays hidden (it would contradict the table)', $('pn_led').hidden && $('pn_none').hidden && !$('pn_asg').hidden && arows().length === 4, 'none.hidden=' + $('pn_none').hidden);
+  pinAssign.fn.forEach((f) => { f.avail = 0; });
+  runTimers(5000); await settle();
+  check('nothing fitted and no assignment available: notice shown', !$('pn_none').hidden && /switchable outputs/.test($('pn_none').textContent), $('pn_none').textContent);
+  pinAssign = freshAssign();
+  runTimers(5000); await settle();
+  check('an assignment becomes available: notice hidden again', $('pn_none').hidden);
+  pinAssign.fn.forEach((f) => { f.avail = 0; });
+  runTimers(5000); await settle();
+  assignFail = 'net'; pinAssign = freshAssign();
+  w.loadPage('info', $('navinfo'), true); await settle();
+  w.loadPage('pins', $('navpins'), true); await settle();
+  check('/pinassign fails on a node with nothing fitted: notice shown (decided without it)', !$('pn_none').hidden && $('pn_asg').hidden);
+  assignFail = null; pinAssign = freshAssign();
   w.loadPage('info', $('navinfo'), true); await settle();
 
   // ---- session expired: HTTP 401 on /pinstatus stops the polling and says why ----

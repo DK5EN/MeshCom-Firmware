@@ -283,3 +283,31 @@ GET /pinstatus
 	switches through /setparam/ (boardled=off|flash|steady, mcpout<P>=on|off, mcpio<P>=in|out, mcpname<P>=text).
 	mcpout<P> on a pin that is configured as input (or an invalid port) answers returncode 1 and changes nothing; the Pins page shows
 	"The node refused the change." and re-reads the state.
+
+
+GET /pinassign
+
+	No parameters, GET only, read-only; behind the login like the pages. Answer (JSON, one line):
+
+	{"chip":"esp32","fn":[
+	 {"id":"ow","param":"onewiregpio","avail":1,"pin":0,"def":4,"eff":4,"on":1,"restart":0,"ok":"0x00000000ffffffff"},
+	 {"id":"btn","param":"buttongpio", ...}, {"id":"an","param":"angpio", ...}, {"id":"wind","param":"windpin", ...}]}
+
+	chip		esp32 | esp32s3 | nrf52840 | none
+	fn		always four entries in this order: 1-Wire (ow), button (btn), analog (an), anemometer (wind)
+	param		the /setparam/ name that writes the assignment (the Setup page uses the same)
+	avail		0 = this build cannot change it (function not compiled in, or read-only on the board)
+	pin		stored setting, 0 = board default (button: 99 = no button; analog: 99 = unset reads as 0)
+	def		board default, 0 = none (the anemometer has none)
+	eff		pin in use, 0 = none: the stored pin, or the default when the stored one is 0. The button reports the pin read
+			at boot (a newly stored value counts after a restart), 0 when it is 99 = no button
+	on		the function is switched on
+	restart		1 = a change takes effect after a restart (button); 0 = applies at once (1-Wire, analog, anemometer)
+	ok		64-bit mask as hex text: bit n set = the setter accepts pin n for this function now (pin policy, minus the pins
+			the console setter refuses on its own). Bit 0 (= default/off) is set unless the setter refuses 0: not for the
+			analog pin (takes 1..98), nor for 1-Wire on BOARD_RAK4630 (also refuses 1 and 2; that macro is set on every
+			nRF52 build). The button's 99 = "no button" is not a bit: the setter always accepts it. The node's own answer
+			to the setparam stays authoritative.
+
+	Numbers are clamped to 0..255. The Pins page polls it with /pinstatus every 5 s while it is shown, refuses a pin whose bit is clear
+	without asking the node, and shows "Refused by pin policy." when the node answers returncode 1 (HTTP 422).

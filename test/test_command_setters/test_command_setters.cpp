@@ -2047,15 +2047,15 @@ void test_bat04_info_charge_line_pin(void)
     TEST_ASSERT_TRUE_MESSAGE(blk.find("Charge: ") != std::string::npos, "no \"Charge: \" line");
 }
 
-// body of pinBoardReservedHard() / pinBoardReservedSoft() in src/pin_board.h (the reserved-pin macro lists; they
-// used to be the body of wxWindPinOk())
-static std::string pin_board_fn_body(const std::string &hdr, const char *fn)
+// the reserved-pin macro lists kHard[] / kSoft[] in src/pin_board.cpp (the one TU that owns them since GPIO-01 W2;
+// they used to be the body of wxWindPinOk(), then inline functions in src/pin_board.h)
+static std::string pin_board_list(const std::string &src, const char *arr)
 {
-    const size_t a = hdr.find(std::string("inline uint64_t ") + fn + "()\n{");
+    const size_t a = src.find(std::string("constexpr int ") + arr + "[] = {");
     if(a == std::string::npos) return "";
-    const size_t b = hdr.find("\n}\n", a);
+    const size_t b = src.find("\n};", a);
     if(b == std::string::npos) return "";
-    return hdr.substr(a, b - a);
+    return src.substr(a, b - a);
 }
 
 // Worst-case JSON size of one BLE register document, computed from the source block (no ArduinoJson in this
@@ -2117,12 +2117,21 @@ static void test_windpin_windcal_rungs_validate_and_store()
     const size_t wk = cmd.find("bool wxWindPinOk(int pin)\n{");
     TEST_ASSERT_TRUE_MESSAGE(wk != std::string::npos, "no wxWindPinOk() body");
     TEST_ASSERT_TRUE_MESSAGE(cmd.substr(wk, 300).find("pinCanAssign(pinBoardContext(PIN_FN_WIND), PIN_FN_WIND") != std::string::npos, "wxWindPinOk is not the policy");
-    const std::string hdr = read_repo_file("src/pin_board.h");
-    const std::string hard = pin_board_fn_body(hdr, "pinBoardReservedHard");
-    const std::string soft = pin_board_fn_body(hdr, "pinBoardReservedSoft");
-    TEST_ASSERT_TRUE_MESSAGE(!hard.empty(), "no pinBoardReservedHard() body");
-    TEST_ASSERT_TRUE_MESSAGE(!soft.empty(), "no pinBoardReservedSoft() body");
+    const std::string hdr = read_repo_file("src/pin_board.cpp");
+    const std::string hard = pin_board_list(hdr, "kHard");
+    const std::string soft = pin_board_list(hdr, "kSoft");
+    TEST_ASSERT_TRUE_MESSAGE(!hard.empty(), "no kHard[] list in src/pin_board.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(!soft.empty(), "no kSoft[] list in src/pin_board.cpp");
     const std::string body = hard + soft;
+    // GPIO-01 W2: the lists live in one TU (no per-TU inline copies, ODR) and the T-Echo pin header is included for
+    // the T-Echo only; on the RAK4631 its RADIO_* / I2C pins (17, 19-27) are WisBlock IO pins. The T114 radio sits on
+    // the same pins but has no macros (hard-wired in lora_t114_init()), so kHard carries an explicit T114 block.
+    TEST_ASSERT_TRUE_MESSAGE(read_repo_file("src/pin_board.h").find("WX_RES(") == std::string::npos, "pin_board.h holds macro lists again");
+    TEST_ASSERT_TRUE_MESSAGE(hdr.find("#if defined(BOARD_T_ECHO)\n#include \"nrf52/t_echo_utilities.h\"") != std::string::npos, "t_echo_utilities.h not guarded by BOARD_T_ECHO");
+    TEST_ASSERT_TRUE_MESSAGE(hard.find("#if defined(BOARD_HELTEC_T114)") != std::string::npos && hard.find(", 17, 19, 20, 22, 23, 24, 25") != std::string::npos, "T114 radio pins not reserved HARD");
+    const std::string t114 = read_repo_file("src/nrf52/api_functions.cpp");
+    for(const char *w : {"PIN_LORA_RESET = 25;", "PIN_LORA_NSS = 24;", "PIN_LORA_SCLK = 19;", "PIN_LORA_MISO = 23;", "PIN_LORA_DIO_1 = 20;", "PIN_LORA_BUSY = 17;", "PIN_LORA_MOSI = 22;"})
+        TEST_ASSERT_TRUE_MESSAGE(t114.find(w) != std::string::npos, (std::string("T114 radio wiring changed, re-check kHard: ") + w).c_str());
     TEST_ASSERT_TRUE_MESSAGE(hdr.find("c.soft = pinBoardReservedSoft();") != std::string::npos, "context does not carry the soft mask");
     TEST_ASSERT_TRUE_MESSAGE(hdr.find("c.reserved = pinBoardReservedHard();") != std::string::npos, "context does not carry the hard mask");
     for(const char *m : {"LORA_CS", "LORA_NSS", "LORA_RST", "LORA_RESET", "LORA_DIO0", "LORA_DIO1", "LORA_DIO2",
