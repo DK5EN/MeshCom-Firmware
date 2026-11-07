@@ -544,6 +544,9 @@ With default settings, compared with the official `v4.40a.10.28`:
 - **Auto Update restart on a split heap with a phone held:** the phone path works, but this run may not have hit a split heap (AU-23).
 - **Message hold:** one simulated outage on the bench, no real server failure. A single lost `BEAT` may replay the few held frames (about 1 per 4 h, measured), by decision.
 - **MCP23017 pins on the Pins page:** host tests only, no expander on our bench.
+- **T-Beam Auto Update download can still fail (AU-24, open):** seen on DK5EN-92 on 2026-11-07 on the last image before this release, cause not established.
+  - **What happens:** Download is refused with "Not enough free memory", or in one case of two the node restarts by watchdog during the first Download after a reboot.
+  - **What to do:** reboot the node and try again; the web flasher and `tools/webflash.py` do not use this path.
 - **Mailbox echo fix (SNF-ECHO-01):** benched on one Heltec V3 with injected copies, not with a real second gateway and the server, and not on nRF52 (built only). The counters of the node from the field report were not read, so the link to that report rests on timing and code.
   - **Still open:** two mailbox nodes serving the same call can re-open a slot after it expires, about one run per hold time and node. A node that keeps hearing the recipient without an ack can therefore start over.
   - **Accepted:** after the first pause a message gets one frame per pause instead of nine. This differs from the concept but keeps airtime down (about 30 instead of up to 216 frames in 24 hours).

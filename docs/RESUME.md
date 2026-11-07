@@ -1,6 +1,6 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-11-02, branch `fork-dev`, last release **`v4.40a.11.01`** (Latest, tag on `47f339ad`, 68 assets, built by CI).
+**Stand:** 2026-11-07, branch `fork-dev`, last release **`v4.40a.11.06`** (Latest, tag on `3ecf429e`, 68 assets, built by CI).
 Base is upstream `dev` 4f60051c (merged into fork-dev 2026-11-02 as `560e65ab`, tree unchanged): our
 [#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243), [#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244),
 [#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245), [#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247)
@@ -19,9 +19,13 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 ## Open now
 
+- **`v4.40a.11.06` shipped 2026-11-07, fleet updated:** DK5EN-1, -14, -92 by Auto Update in Chrome, DK5EN-90 by USB DFU with the CI zip (Chrome's serial chooser could not be driven), DK5EN-98 last through its Safeboot page in Chrome, still on channel `prod`. Web flasher verified (31 boards, 0 mismatches). T-Beam idle heap on the release image passes (+136 B against 64016 B).
+
+- **T-Beam Auto Update download, open (`AU-24`):** see `docs/BACKLOG.md`. Read this before the next release.
+
 - **Store node echo fix 2026-11-06 (`SNF-ECHO-01`), upstream PR [#1257](https://github.com/icssw-org/MeshCom-Firmware/pull/1257) open:** branch `pr/snf-echo`, worktree `../MeshCom-PR-next`; fix on `fork-dev` as `f4b212a0`, `a9071cc7`, `d9b07f8c`, tests `42941ab2`. These commits sit on top of the untagged release commit `69a79d9b`, so a `v4.40a.11.06` tagged there does not contain them: operator decides. Field check still open: `refr=` on the affected store node. DK5EN-1 now runs a local `fork-dev` build of `42941ab2` (23:28:19), no longer the CI image of `44075ef3`. After the merge: `/sync-upstream`, then remove the worktree and branch.
 
-- **Release gate 2026-11-06, in progress:** `docs/campaign-release-gate-20261106.md` holds the wave plan, decisions and state. T-Beam heap (`AU-23`) fixed in W1; `AU-22`, `EXT-PEER-01`, `WEB-PIN-01` and the `TD-34` icon fixed in W2; `RX-TX-02` settled in W3, no firmware loss; `fork-dev` pushed and CI images of `44075ef3` on all four bench nodes in W4; W5 bench pass done, `WEB-GRID-01` fixed, `BLE-SET-01` filed. Next: W6 soak, then the release decision.
+- **Release gate 2026-11-06, closed with `v4.40a.11.06`:** `docs/campaign-release-gate-20261106.md` holds the wave plan, decisions and state. T-Beam heap (`AU-23`) fixed in W1; `AU-22`, `EXT-PEER-01`, `WEB-PIN-01` and the `TD-34` icon fixed in W2; `RX-TX-02` settled in W3, no firmware loss; `fork-dev` pushed and CI images of `44075ef3` on all four bench nodes in W4; W5 bench pass done, `WEB-GRID-01` fixed, `BLE-SET-01` filed. Next: W6 soak, then the release decision.
 
 - **Bench fixes and features 2026-11-06, not released:** `docs/campaign-bench-fixes-20261106.md` (W1-W5, `408657be` to
   `e7a6fbeb`). Bench images on all four nodes are INSTRUMENT builds of `e7a6fbeb`; nodes restored from the vault. DK5EN-90 is

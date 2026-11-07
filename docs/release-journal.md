@@ -32,8 +32,13 @@ Betreiber-Entscheidung 2026-11-06: T-Beam Idle-Heap 64016 B statt 68688 B (`v4.4
 - Telefon (Betreiber): DM mit ACK an T-Beam und RAK, Reconnect ohne Pairing, "Pause Bluetooth and check" am T-Beam, BLE kommt von selbst zurueck.
 - Soak 1 h: kein Reboot auf allen vier Knoten.
 
+- Release-Check 2026-11-07: Run 42306803386 gruen, 68 Assets, 28 `.autoupdate` byte-genau zurueckgepackt, Tag-String im Image, T-Deck-Befehlsscan wie erwartet. Web-Flasher: 31 Boards, 0 Abweichungen.
+- Flotte aktualisiert: DK5EN-1, -14, -92 per Auto Update in Chrome (Check, Download, Install), DK5EN-90 per USB-DFU mit dem CI-Zip, DK5EN-98 zuletzt ueber die Safeboot-Seite in Chrome mit dem CI-Image, Kanal bleibt `prod`. Alle laufen auf dem Release-Image, ohne Neustart seither (DK5EN-1, -14, -92, -98 rund 14 bis 32 min beim Check).
+- T-Beam Idle-Heap auf dem Release-Image: Delta +136 B gegen 64016 B, Toleranz 3072 B, bestanden.
+
 ### Was ausdruecklich NICHT geprueft wurde
 
+- AU-24, offen: am T-Beam auf dem Stand vor dem Release zwei Download-Ablehnungen `lowheap_tls` und ein `TASK_WDT` beim ersten Download nach Neustart. Ursache nicht geklaert, auf dem Release-Image nicht wiederholt (`docs/BACKLOG.md`).
 - SNF-ECHO-01: kein Soak, kein echtes zweites Gateway mit Server, nRF52 nur gebaut, `refr=` des Knotens aus der Feldmeldung nicht ausgelesen.
 - Neustart des Update-Jobs bei gespaltenem Heap mit gehaltenem Telefon (AU-23).
 - BLE-Settings-Characteristic: existiert nicht auf der Luft (BLE-SET-01), die Maskierung laeuft nur im Host-Test.
