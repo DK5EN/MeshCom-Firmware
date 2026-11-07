@@ -68,7 +68,7 @@
         <li><strong>Postfach-Knoten sendet nicht mehr endlos:</strong> gilt für ESP32-S3 und nRF52 mit eingeschaltetem Postfach (Store and Forward).
           <ul>
             <li>Ursache: die eigene Zustellung kam über ein anderes Gateway zurück und sah wie eine neue Nachricht aus. Haltezeit und Pause begannen neu.</li>
-            <li>Jetzt: eine Kopie nach Beginn der Zustellung ändert nichts mehr (upstream-PR #1257 offen). Geprüft auf einem Heltec V3 mit eingespeisten Kopien, nicht mit einem echten zweiten Gateway.</li>
+            <li>Jetzt: eine Kopie nach Beginn der Zustellung ändert nichts mehr (seit 06.11.2026 in upstream <code>dev</code>, #1257). Geprüft auf einem Heltec V3 mit eingespeisten Kopien, nicht mit einem echten zweiten Gateway.</li>
           </ul>
         </li>
         <li><strong>Schutz vor Fehlbedienung:</strong> eine Pin-Einstellung kann einen RAK nicht mehr lahmlegen; das Web-Guard ist standardmäßig an.</li>
