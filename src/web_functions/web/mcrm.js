@@ -1,5 +1,5 @@
 var rmShown=false,rmT={tick:0,arm:0,poll:0},rmSel={call:'',slot:-1},rmKnown=Object.create(null),rmSaved=[],rmHeard=[],rmLock=0,rmSrvLock=0,rmSrvMsg='',rmBusy=false,rmArmId='',rmQq=[],rmQp='',rmAuth=false,rmOut=false,rmStat=null,rmWasLocked=false,rmRows=Object.create(null);
-var rmCmds={status:'Status',sendpos:'Send position',sendtrack:'Send track',reboot:'Restart',sync:'Re-sync counter',radio:'Radio',sens:'Sensors',name:'Name',atxt:'APRS text',pos:'Position',txq:'TX queue',mbox:'Mailbox',maxhop:'Max hop',mh:'Heard list',net:'Network',upd:'Update',blockcall:'Blocked calls'};
+var rmCmds={status:'Status',sendpos:'Send position',sendtrack:'Send track',reboot:'Restart',sync:'Re-sync counter',radio:'Radio',sens:'Sensors',name:'Name',atxt:'APRS text',pos:'Position',txq:'TX queue',mbox:'Mailbox',maxhop:'Max hop',mh:'Heard list',net:'Network',upd:'Update',blockcall:'Blocked calls',pins:'Pin assignments',gpio:'Free GPIO'};
 var rmUpdT0=0,rmUpdGone=Object.create(null),rmReally='Really? tap again',rmNoAns='The node did not answer the request. Check the connection and try again.',rmNote={t:'',c:''},rmSw=Object.create(null);
 function rmCf(l,w){return 'Tap again within 4 seconds to confirm: '+l+' on '+w+'.'+(l.indexOf('Update channel ')==0?' The last check result is cleared and a new check is needed.':'');}
 var rmTog={gps:0,track:1,display:2,mesh:3,gateway:4,led:5},rmTogName={gps:'GPS',track:'Track',display:'Display',led:'Light',mesh:'Mesh',gateway:'Gateway'},rmChgModes=['auto','on','off'];function rmSwLbl(n){return n=='ledflash'?'Light flash':rmTogName[n];}
@@ -21,7 +21,8 @@ function rmLocked(){return rmBusy||rmAuth||rmLockLeft()>0;}
 function rmSlotOf(c){for(var i=0;i<rmSaved.length;i++)if(rmSaved[i]&&rmSaved[i].used&&rmSaved[i].call==c)return i;return -1;}
 var rmTL=Object.create(null);function rmRowLocked(d){return rmBusy||rmAuth||rmLock>rmNow()||rmTL[d]>rmNow();}
 function rmTxp(v){var m=/^(-?\d+)\/(-?\d+)\/(-?\d+)$/.exec(String(v));return m?m[1]+' dBm ('+m[2]+'..'+m[3]+')':String(v)+' dBm';}
-function rmChL(f){var p=f.split(' ');return p[0]=='upd'&&p[1]=='chan'?'Update channel '+(p[2]=='dev'?'DEV':'MAIN'):'';}
+var rmPF={ow:'1-Wire',btn:'Button',an:'Analog',wind:'Wind'};
+function rmChL(f){var p=f.split(' ');return p[0]=='upd'&&p[1]=='chan'?'Update channel '+(p[2]=='dev'?'DEV':'MAIN'):p[0]=='pins'&&rmPF[p[1]]?'Set '+rmPF[p[1]]+' to '+(p[2]=='0'?(p[1]=='wind'?'off':'board default'):'GPIO '+p[2]):p[0]=='gpio'&&p.length==3?'GPIO '+p[1]+' '+(p[2]=='in'?'input':p[2]):'';}
 function rmLabel(f){var p=f.split(' '),n=p[0];if(rmChL(f))return rmChL(f);if(rmCmds[n])return rmCmds[n];if(rmTogName[n])return rmTogName[n]+' '+p[1];if(n=='txpower')return 'TX power '+p[1]+' dBm';if(n=='setout')return 'Pin '+p[1]+' '+p[2];if(n=='chgled')return 'Charge LED'+f.slice(6);return f;}
 function rmParseStatus(r){if(typeof r!='string'||r.indexOf('ok v=')!==0)return null;var o={ver:'',up:'',bat:'',sw:[-1,-1,-1,-1,-1,-1],led:false},t=r.split(' '),U='GTDMWL',i,j,k,m,s,ok;
 for(i=1;i<t.length;i++){k=t[i];
@@ -50,6 +51,7 @@ if(n=='sync')return 'Connected. The counters are in step.';
 if(n=='led'&&c[1]=='flash')return 'Done. The light is now flashing.';
 if(n=='chgled'){m=/^ok chgled=(auto|on|off)( rm)?$/.exec(e.reply);return c[1]?'Done. Charge LED is now '+c[1]+'.':m?'Charge LED is '+m[1]+(m[2]?' (set by remote management)':'')+'.':e.msg||'Done.';}
 if(rmTogName[n])return 'Done. '+rmTogName[n]+' is now '+c[1]+'.';
+if(n=='pins'||n=='gpio')return c[1]?'Done. '+rmChL(e.cmd)+'.':n=='pins'?'Pin assignments read.':'GPIO state read.';
 if(n=='txpower')return 'Done. TX power is now '+c[1]+' dBm.';
 if(n=='setout')return 'Done. Pin '+c[1]+' is now '+c[2]+'.';
 return rmOkNew(e,c,n)||e.msg||'Done.';}
@@ -107,7 +109,7 @@ for(i=0;i<a.length;i++){e=a[i];k=e.dst+'#'+e.ctr+'#'+e.cmd;if(seen[k])continue;i
 if(!tr){tr=rmRows[k]=document.createElement('tr');for(n=0;n<4;n++)tr.appendChild(document.createElement('td'));}
 c=tr.children;n=e.cmd.split(' ');v=e.st=='queued'||e.st=='waiting'?'sent':e.st=='noanswer'?'no answer':e.ver&&(e.st=='ok'||e.st=='err')?'verified':'unverified';
 x=e.st=='ok'&&v=='verified'?rmOkText(e):(e.msg||'');
-q=/^err range (-?\d+)\.\.(-?\d+)$/.exec(e.reply||'');if(q&&e.st=='err')x='Refused: '+e.dst+' accepts '+q[1]+'..'+q[2]+' dBm.';tr.title=e.msg||'';if(e.st=='err'&&/^upd chan /.test(e.cmd||'')&&e.reply=='err blocked')x='This node has no channel switch.';
+q=/^err range (-?\d+)\.\.(-?\d+)$/.exec(e.reply||'');if(q&&e.st=='err')x='Refused: '+e.dst+' accepts '+q[1]+'..'+q[2]+' dBm.';tr.title=e.msg||'';if(e.st=='err'&&/^(pins|gpio)\b/.test(e.cmd)){q={master:rmGOff,refused:'The node refused this pin.',unsupported:'This node does not support that.'}[(e.reply||'').substring(4)];if(q)x=q;}if(e.st=='err'&&/^upd chan /.test(e.cmd||'')&&e.reply=='err blocked')x='This node has no channel switch.';
 c[0].textContent=rmAgo(e.ago)+' ago';c[1].textContent=e.dst+' '+rmLabel(e.cmd);c[2].textContent=v;c[2].className=v=='verified'?(e.st=='ok'?'rmok':'rmbad'):v=='sent'?'':'rmbad';c[3].textContent='';z=document.createElement('div');z.textContent=v=='sent'?'':x;c[3].appendChild(z);
 if(b.children[u]!==tr)b.insertBefore(tr,b.children[u]||null);u++;}
 for(k in rmRows)if(!seen[k]){if(rmRows[k].parentNode)rmRows[k].parentNode.removeChild(rmRows[k]);delete rmRows[k];}}
@@ -120,6 +122,8 @@ w:[['lat','Latitude (+/-)','lat',11],['lon','Longitude (+/-)','lon',11],['alt','
 {c:'mbox',card:'queues',l:'Mailbox',k:1,u:'This node has no mailbox.',f:[['m','Mode',''],['u','Slots used',''],['b','Bytes',''],['a','Actions this hour','']],t:['st','Stored','dl','Delivered','ak','Acknowledged','dr','Dropped','bl','Blocked','nt','Notified']},
 {c:'maxhop',card:'queues',l:'Max hop',k:1,f:[['t','Text messages',''],['p','Position beacons','']]},
 {c:'net',card:'radio',l:'Network',k:1,x:1,v:rmNetView,u:'This node has no network settings.'},{c:'upd',card:'radio',l:'Software update',k:1,x:1,a:1,v:rmUpdView,u:'This node cannot update itself.'},
+{c:'pins',card:'pins',l:'Pin assignments',a:1,v:rmPinsView,n:'Pin 0 means board default (wind: off). Button pin: set on the node (serial console or web Pins page).'},
+{c:'gpio',card:'pins',l:'Free GPIO',a:1,v:rmGpioView,u:'This node has no GPIO control.'},
 {c:'blockcall',card:'radio',l:'Blocked calls',f:[],n:'The whole list is replaced. Over remote management it can hold '+rmLen.args+' characters (3 or 4 calls); type none to clear it.',w:[['v','Blocked calls','blockcall',rmLen.args,'b']]}];
 function rmClrIn(c){var k;for(k in rmIn)if(k.indexOf('rm_f_'+c+'_')==0)delete rmIn[k];}
 function rmChk(k,v){var m;if(v==='')return '';
@@ -214,9 +218,9 @@ for(i=0;i<Math.min(b,60);i++)x.appendChild(rmNew('div',i<f?'mcq-cell':'mcq-cell-
 x=p.appendChild(rmNew('div','font-small',(m?o.q:'-')+' queued, state ','rm_v_txq_q'));s=x.appendChild(rmNew('span',['rmok','','rmbad'][v],v<0?o.bp||'-':['quiet','slow down','hold'][v],'rm_v_txq_bp'));if(v==1)s.style.color='var(--mcsw2)';
 x=p.appendChild(rmNew('div','mcq-util-row'));x.appendChild(rmNew('span','mcq-util-label','use '+(isNaN(o.u)?'-':o.u+' %'),'rm_v_txq_u'));
 x.appendChild(rmNew('div','mcq-util-track')).appendChild(rmNew('div')).style.cssText='height:100%;width:'+(parseInt(o.u,10)||0)+'%;background:#3B7DD8';}
-function rmRenderCards(){var c=rmSel.call,dis=!rmValidCall(c)||rmLocked(),B={},K=['radio','ident','pos','queues','mh'],d,i,j,p,h,v,o,x,y,z,e,f,fa=document.activeElement,fid='';if(!rmEl('rm_card_mh'))return;
+function rmRenderCards(){var c=rmSel.call,dis=!rmValidCall(c)||rmLocked(),B={},K=['radio','ident','pos','queues','mh','pins'],d,i,j,p,h,v,o,x,y,z,e,f,fa=document.activeElement,fid='';if(!rmEl('rm_card_mh'))return;
 if(fa&&fa.tagName=='INPUT'&&/^rm_f_/.test(fa.id)){rmIn[fa.id]=fa.value;fid=fa.id;}
-for(i=0;i<5;i++){B[K[i]]=rmEl('rm_card_'+K[i]).lastElementChild;B[K[i]].textContent='';}
+for(i=0;i<K.length;i++){B[K[i]]=rmEl('rm_card_'+K[i]).lastElementChild;B[K[i]].textContent='';}
 for(j=0;j<2;j++){rmCardHd(B[['ident','queues'][j]],c,[['name','atxt'],['txq','mbox','maxhop']][j],dis||rmMh.on);if(!j)B.ident.appendChild(rmNew('p','font-small','Stored exactly as typed.'));}
 for(i=0;i<rmDefs.length;i++){d=rmDefs[i];p=rmNew('div','','','rm_def_'+d.c);B[d.card].appendChild(p);h=d.card=='ident'?0:rmNew('div',d.card=='queues'?'rmrow rmsplit':'rmrow rmh');if(h){p.appendChild(h);h.appendChild(rmNew('b','',d.p?'':d.l));}
 v=rmLast(c,d.c,d.x);o=v?(d.p?rmPosKv(d.p,v.reply):d.k?rmKv(v.reply,1):rmKv(v.reply)):null;
@@ -228,6 +232,25 @@ for(j=0;j<d.f.length;j++){f=d.f[j];e=o[f[0]];z=(e===undefined||e=='-')?'not pres
 rmWBuild(p,d,o);if(d.n)p.appendChild(rmNew('div','font-small',d.n));
 if(d.u&&rmUns(c,d.c,v))p.appendChild(rmNew('div','',d.u));}
 y=B.pos.appendChild(rmNew('div','grid rmf'));z=rmKn();rmSwRow(y,'gps',z.sw[0],dis,'enable GPS');rmSwRow(y,'track',z.sw[1],dis,'enable display of SmartBeaconing');rmMhCard(B.mh,dis);if(fid&&rmEl(fid))rmEl(fid).focus();}
+var rmGOff='GPIO control is off on the node (serial console: --gpiocontrol on).';
+function rmGBit(m,n){var h=typeof m=='string'?m.charAt(m.length-1-(n>>2)):'';return h!==''&&(parseInt(h,16)>>(n&3)&1)==1;}
+function rmCtl(p,c,sel,dis){var r=p.appendChild(rmNew('div','rmrow')),a=rmNew('select','','','rm_f_'+c+'_a'),n=rmNew('input','','','rm_f_'+c+'_n'),b,h=rmNew('div','font-small rmbad','','rm_f_'+c+'_hint'),i,o,l,u=function(){var v=n.value,bad=v!==''&&(!(/^(0|[1-9]\d?)$/.test(v)&&+v<=48)||(c=='pins'&&a.value=='an'&&v=='0')),g=c=='pins'?a.value+' '+v:v+' '+a.value;
+b.disabled=!!dis||v===''||bad;b.setAttribute('data-args',g);if(c=='pins'){b.setAttribute('data-cf','pins '+g);b.textContent=rmArmId=='pins '+g?'Confirm: set '+rmPF[a.value]+' to '+(+v?'GPIO '+v:(a.value=='wind'?'off':'board default'))+'?':'Set';}h.textContent=bad?(c=='pins'&&a.value=='an'&&v=='0'?'Analog needs a GPIO from 1 to 48 (0 is not accepted).':'GPIO must be a whole number from 0 to 48.'):'';};
+l=r.appendChild(rmNew('label','',c=='pins'?'Function':'Action'));l.htmlFor=a.id;r.appendChild(a);
+for(i=0;i<sel.length;i++){o=a.appendChild(rmNew('option','',sel[i][1]));o.value=sel[i][0];}
+l=r.appendChild(rmNew('label','','GPIO'));l.htmlFor=n.id;r.appendChild(n);n.type='text';n.maxLength=2;n.size=3;n.autocomplete='off';
+a.disabled=n.disabled=!!dis;a.value=rmIn[a.id]||sel[0][0];n.value=rmIn[n.id]||'';
+b=rmBtn(r,c=='pins'?'Set':'Send','',true,{'data-cmd':c,'data-args':''});b.id='rm_f_'+c+'_go';p.appendChild(h);
+a.addEventListener('change',function(){rmIn[a.id]=a.value;u();});n.addEventListener('input',function(){rmIn[n.id]=n.value;u();});u();}
+function rmPinsView(p,o){var k,r=[],dis=!rmValidCall(rmSel.call)||rmLocked();
+if(o.ow!==undefined)for(k in rmPF)r.push([rmPF[k],o[k]===undefined?'-':o[k]=='0'?'none':'GPIO '+o[k],'rm_v_pins_'+k]);
+rmKvRows(p,r);rmCtl(p,'pins',[['ow','1-Wire'],['an','Analog'],['wind','Wind']],dis);}
+function rmGpioView(p,o,v){var c=rmSel.call,a=rmStat?rmStat.sent:[],i,e,r=[],n,off=o.m=='0',dis=!rmValidCall(c)||rmLocked();
+if(!off)for(i=0;i<a.length;i++){e=a[i];if(e.dst==c&&/^gpio /.test(e.cmd)&&e.st=='err'&&e.reply=='err master'&&(!v||e.ago<v.ago))off=true;}
+if(o.m!==undefined)r.push(['GPIO control',o.m=='1'?'on':'off','rm_v_gpio_m']);
+if(o.o!==undefined){for(n=0;n<=48;n++)if(rmGBit(o.o,n)||rmGBit(o.i,n))r.push(['GPIO '+n,(rmGBit(o.o,n)?'out':'in')+', '+(rmGBit(o.l,n)?'high':'low'),'rm_v_gpio_'+n]);if(r.length<2)r.push(['Held pins','none','rm_v_gpio_none']);}
+rmKvRows(p,r);if(off)p.appendChild(rmNew('div','font-small rmbad',rmGOff,'rm_gpio_off'));
+rmCtl(p,'gpio',[['on','on'],['off','off'],['in','input']],dis||off);}
 function rmCell(tr,t){var d=document.createElement('td');d.textContent=String(t);tr.appendChild(d);}
 function rmRenderLog(){var j=rmStat,b,i,r,tr;if(!j)return;
 b=rmEl('rm_log');b.textContent='';for(i=0;i<j.log.length;i++){r=j.log[i];tr=document.createElement('tr');rmCell(tr,rmAgo(r.ago));rmCell(tr,r.src);rmCell(tr,r.ctr);rmCell(tr,r.cmd);rmCell(tr,r.res);b.appendChild(tr);}

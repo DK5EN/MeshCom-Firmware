@@ -552,7 +552,7 @@ static void test_rmstrictsecurity_rung_schema_row_and_default_match_the_assumpti
 
     // never over RM: the RM allowlist (a positive list) must not name it
     // RM_ALLOWLIST[] in remote_cmd.cpp is generated from the X(name, KIND, SHAPE) list of rm_commands.h
-    // (DRY-07), so that list is what gets scanned: all 25 pinned names present, the console-only ones absent.
+    // (DRY-07), so that list is what gets scanned: all 28 pinned names present, the console-only ones absent.
     const std::string rc = read_repo_file("src/remote_cmd.cpp");
     TEST_ASSERT_TRUE_MESSAGE(rc.find("const RmAllowRow RM_ALLOWLIST[]") != std::string::npos, "RM_ALLOWLIST not found");
     TEST_ASSERT_TRUE_MESSAGE(rc.find("RM_COMMAND_LIST(RM_ALLOW_ROW)") != std::string::npos,
@@ -560,15 +560,16 @@ static void test_rmstrictsecurity_rung_schema_row_and_default_match_the_assumpti
     const std::string names = rm_command_list_names();
     static const char *const pinned[] = {"reboot", "status", "sendpos", "sendtrack", "sync", "gps", "track",
                                          "display", "led", "gateway", "mesh", "txpower", "setout", "radio", "sens",
-                                         "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh", "chgled", "net", "upd", "blockcall"};
-    TEST_ASSERT_EQUAL_UINT_MESSAGE(26, sizeof(pinned) / sizeof(pinned[0]), "pinned list is not 26 names");
+                                         "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh", "chgled", "net", "upd", "blockcall",
+                                         "pins", "gpio"};
+    TEST_ASSERT_EQUAL_UINT_MESSAGE(28, sizeof(pinned) / sizeof(pinned[0]), "pinned list is not 28 names");
     for (const char *nm : pinned)
         TEST_ASSERT_TRUE_MESSAGE(names.find(std::string(",") + nm + ",") != std::string::npos, nm);
     size_t count = 0;
     for (char ch : names)
         count += (ch == ',') ? 1 : 0;
-    TEST_ASSERT_EQUAL_UINT_MESSAGE(26 + 1, count, "rm_commands.h does not list exactly 26 commands");
-    for (const char *bad : {"rmstrictsecurity", "remotemgmt", "passwd"})
+    TEST_ASSERT_EQUAL_UINT_MESSAGE(28 + 1, count, "rm_commands.h does not list exactly 28 commands");
+    for (const char *bad : {"rmstrictsecurity", "remotemgmt", "passwd", "gpiocontrol"})
         TEST_ASSERT_TRUE_MESSAGE(names.find(std::string(",") + bad + ",") == std::string::npos, bad);
 
     // the web switch is routed through the console command and reads node_rmstrict back
@@ -1727,6 +1728,44 @@ static bool atInInstrumentRegion(const std::string &src, size_t at)
     return false;
 }
 
+// GPIO-01 W5: the RM1 executors "pins" / "gpio" are compiled by no native env, so pin the safety shape by text.
+static void test_rm_pins_gpio_executor_pins()
+{
+    const std::string src = read_repo_file("src/rm_exec_write.cpp");
+
+    // gpio <n> on|off|in: straight into the state machine, never the master switch, never a console line
+    const std::string g = slice_body(src, "int writeGpio(const RmCmd &c, char *res, size_t n)", "no writeGpio");
+    TEST_ASSERT_TRUE_MESSAGE(g.find("gpioCtlCommand(") != std::string::npos, "writeGpio does not call gpioCtlCommand()");
+    TEST_ASSERT_TRUE_MESSAGE(g.find("gpioCtlSetMaster") == std::string::npos, "writeGpio touches the master switch (gpioCtlSetMaster)");
+    TEST_ASSERT_TRUE_MESSAGE(g.find("commandAction") == std::string::npos, "writeGpio builds a console line (commandAction)");
+
+    // pins <ow|btn|an|wind> <n>
+    const std::string w = slice_body(src, "int writePins(const RmCmd &c, char *res, size_t n)", "no writePins");
+    const size_t sn = pin_find(w, "snprintf(cmd", 0, "writePins does not build the console line with snprintf");
+    const size_t sn_end = pin_find(w, ");", sn, "the snprintf call has no end");
+    const std::string sargs = w.substr(sn, sn_end - sn);
+    TEST_ASSERT_TRUE_MESSAGE(sargs.find("\"%s %d\"") != std::string::npos, "the console line is not built with \"%s %d\"");
+    TEST_ASSERT_TRUE_MESSAGE(sargs.find("c.args") == std::string::npos, "c.args reaches the console line (only the parsed number may)");
+    TEST_ASSERT_TRUE_MESSAGE(sargs.find("%s %s") == std::string::npos, "the console line has a second %s");
+    const size_t act = pin_find(w, "commandAction(", sn, "writePins does not call commandAction");
+
+    // btn is read-only over RM: blocked before any setter
+    const size_t blk = pin_find(w, "err blocked", 0, "writePins has no err blocked branch for btn");
+    TEST_ASSERT_TRUE_MESSAGE(blk < act, "the err blocked branch must come before commandAction");
+    TEST_ASSERT_TRUE_MESSAGE(w.substr(blk > 80 ? blk - 80 : 0, blk > 80 ? 80 : blk).find("PIN_FN_BUTTON") != std::string::npos,
+                             "the err blocked branch is not the PIN_FN_BUTTON branch");
+
+    // boards without the function answer err unsupported before the setter
+    const char *guards[] = {"#if !defined(ANALOG_PIN)", "#if !defined(OneWire_GPIO)", "#if !(defined(ESP32) && defined(ENABLE_WIND))"}; // the negation is the point
+    for (const char *gd : guards)
+    {
+        const size_t gp = pin_find(w, gd, 0, "writePins lacks a build guard");
+        const size_t un = pin_find(w, "err unsupported", gp, "a build guard has no err unsupported");
+        TEST_ASSERT_TRUE_MESSAGE(un - gp < 100, gd);
+        TEST_ASSERT_TRUE_MESSAGE(un < act, "err unsupported must come before commandAction");
+    }
+}
+
 static void test_bleguard_cycle_and_shed_fail_are_instrument_only(void)
 {
     const std::string cmd = read_repo_file("src/command_functions.cpp");
@@ -2428,6 +2467,7 @@ int main(int, char **)
     RUN_TEST(test_web_setvia_compares_canonical_form);
     RUN_TEST(test_au_web_gate_and_status_wiring_pins);
     RUN_TEST(test_rm_upd_chan_glue_pins);
+    RUN_TEST(test_rm_pins_gpio_executor_pins);
     RUN_TEST(test_bleguard_cycle_and_shed_fail_are_instrument_only);
     RUN_TEST(test_bleguard_wiring_pins);
     RUN_TEST(test_bleguard_is_classic_esp32_only);

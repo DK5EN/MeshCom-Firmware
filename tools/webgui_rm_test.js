@@ -2003,6 +2003,119 @@ function leaks(P, canary) {
     P.w.rmPageLeave();
   }
 
+  // ---- GPIO-01 W5: pin assignments and free GPIO on the Remote page (Advanced card, rm_card_pins) -----------
+  {
+    const mk = async (sent) => {
+      const srv = mkServer();
+      srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+      const tg = [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0 }];
+      srv.status = srv.mkStatus({ targets: tg, sent: sent || [] });
+      const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1'); await P.setPoll({ targets: tg, sent: sent || [] });
+      return P;
+    };
+    const R = (cmd, rep, o) => ent('DK5EN-1', cmd, rep, Object.assign({ ctr: 7, ago: 5, st: rep.indexOf('ok') === 0 ? 'ok' : 'err' }, o || {}));
+    const val = (P, id, v) => { const e = P.el(id); e.value = v; e.dispatchEvent(new P.w.Event(e.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); };
+    const body = (P, i) => decodeURIComponent((P.sends()[i] || { body: '' }).body);
+    let P = await mk();
+    const card = () => P.el('rm_card_pins');
+    check('W5 pins and gpio are in the Advanced card, each with a Read (data-cmd)', P.el('rm_adv').contains(card()) && !!card().querySelector('[data-cmd="pins"][data-args=""]') && !!card().querySelector('[data-cmd="gpio"][data-args=""]'));
+    await P.tap(card().querySelector('#rm_def_pins [data-cmd="pins"]'));
+    check('W5 pins Read sends "pins"', P.sends().length === 1 && /cmd=pins&args=(&|$)/.test(P.sends()[0].body), JSON.stringify(P.sends()));
+    P.w.rmPageLeave();
+
+    P = await mk([R('pins', 'ok ow=4 btn=0 an=36 wind=0')]);
+    check('W5 reply "ok ow=4 btn=0 an=36 wind=0" renders 1-Wire GPIO 4, Button none, Analog GPIO 36, Wind none', P.text('rm_v_pins_ow') === 'GPIO 4' && P.text('rm_v_pins_btn') === 'none' && P.text('rm_v_pins_an') === 'GPIO 36' && P.text('rm_v_pins_wind') === 'none', ['ow', 'btn', 'an', 'wind'].map((k) => P.el('rm_v_pins_' + k) && P.text('rm_v_pins_' + k)).join());
+    check('W5 note: pin 0 means board default (wind: off); the button pin is set on the node; labels bound to select and input', /Pin 0 means board default \(wind: off\)/.test(P.text('rm_def_pins')) && /Button pin: set on the node \(serial console or web Pins page\)/.test(P.text('rm_def_pins')) && P.d.querySelector('label[for="rm_f_pins_a"]') && P.d.querySelector('label[for="rm_f_pins_n"]'));
+    check('W5 btn is not offered in the set select (ow, an, wind only); the read result still shows Button', Array.from(P.el('rm_f_pins_a').options).map((o) => o.value).join() === 'ow,an,wind' && P.text('rm_v_pins_btn') === 'none', Array.from(P.el('rm_f_pins_a').options).map((o) => o.value).join());
+    const set = () => P.el('rm_f_pins_go');
+    check('W5 Set is disabled while the pin field is empty', set().disabled === true);
+    val(P, 'rm_f_pins_n', '49');
+    check('W5 pin 49 (out of range): Set disabled, hint shown, click sends nothing', set().disabled === true && /0 to 48/.test(P.text('rm_f_pins_hint')), P.text('rm_f_pins_hint'));
+    await P.tap(set());
+    check('W5 pin 49 sends nothing', P.sends().length === 0);
+    val(P, 'rm_f_pins_n', '07');
+    check('W5 "07" (leading zero): Set disabled, click sends nothing', set().disabled === true, set().disabled);
+    await P.tap(set()); await P.tap(set());
+    check('W5 "07" sends nothing', P.sends().length === 0);
+    val(P, 'rm_f_pins_n', '00');
+    await P.tap(set());
+    check('W5 "00" sends nothing', set().disabled === true && P.sends().length === 0);
+    val(P, 'rm_f_pins_a', 'an'); val(P, 'rm_f_pins_n', '0');
+    check('W5 analog pin 0: Set disabled, hint says analog needs 1 to 48', set().disabled === true && /Analog needs a GPIO from 1 to 48/.test(P.text('rm_f_pins_hint')), P.text('rm_f_pins_hint'));
+    await P.tap(set()); await P.tap(set());
+    check('W5 "an 0" sends nothing', P.sends().length === 0);
+    val(P, 'rm_f_pins_a', 'ow'); val(P, 'rm_f_pins_n', '');
+    val(P, 'rm_f_pins_n', 'x1');
+    check('W5 non-numeric pin disables Set', set().disabled === true);
+    val(P, 'rm_f_pins_n', '13');
+    check('W5 valid pin enables Set', set().disabled === false && set().textContent === 'Set');
+    await P.tap(set());
+    check('W5 first click on Set only arms: sends nothing, button reads "Confirm: set 1-Wire to GPIO 13?"', P.sends().length === 0 && set().textContent === 'Confirm: set 1-Wire to GPIO 13?', set().textContent + '/' + P.sends().length);
+    check('W5 the pin and function typed survive the re-render', P.el('rm_f_pins_n').value === '13' && P.el('rm_f_pins_a').value === 'ow');
+    await P.T.advance(5000);
+    check('W5 an unconfirmed arm disarms by itself', set().textContent === 'Set' && P.sends().length === 0, set().textContent);
+    await P.tap(set()); val(P, 'rm_f_pins_n', '14');
+    check('W5 editing the pin disarms (label back to Set)', set().textContent === 'Set');
+    await P.tap(set());
+    check('W5 after the edit the next click arms again, still nothing sent', P.sends().length === 0 && set().textContent === 'Confirm: set 1-Wire to GPIO 14?');
+    val(P, 'rm_f_pins_n', '13');
+    await P.tap(set()); await P.tap(set());
+    check('W5 two clicks send exactly "pins ow 13"', P.sends().length === 1 && /cmd=pins&args=ow 13/.test(body(P, 0)), JSON.stringify(P.sends().map((x) => x.body)));
+    check('W5 ok text of the set', P.w.rmOkText({ cmd: 'pins ow 13', reply: 'ok ow=13 btn=0 an=36 wind=0', msg: 'x' }) === 'Done. Set 1-Wire to GPIO 13.' && P.w.rmLabel('pins ow 13') === 'Set 1-Wire to GPIO 13' && P.w.rmLabel('pins') === 'Pin assignments');
+    P.w.rmPageLeave();
+
+    P = await mk([R('pins', 'ok ow=4 btn=0 an=36 wind=0')]);
+    val(P, 'rm_f_pins_a', 'wind'); val(P, 'rm_f_pins_n', '0');
+    await P.tap(set());
+    check('W5 pin 0 arms with "off" wording and function wind', set().textContent === 'Confirm: set Wind to off?', set().textContent);
+    await P.tap(set());
+    check('W5 sends "pins wind 0"', P.sends().length === 1 && /cmd=pins&args=wind 0/.test(body(P, 0)), JSON.stringify(P.sends().map((x) => x.body)));
+    P.w.rmPageLeave();
+
+    P = await mk([R('pins', 'ok ow=4 btn=0 an=36 wind=0')]);
+    val(P, 'rm_f_pins_n', '0');
+    await P.tap(set());
+    check('W5 pin 0 on 1-Wire arms with "board default" wording', set().textContent === 'Confirm: set 1-Wire to board default?', set().textContent);
+    check('W5 labels: rmLabel pins ow 0 = board default, pins wind 0 = off', P.w.rmLabel('pins ow 0') === 'Set 1-Wire to board default' && P.w.rmLabel('pins wind 0') === 'Set Wind to off', P.w.rmLabel('pins ow 0') + '|' + P.w.rmLabel('pins wind 0'));
+    P.w.rmPageLeave();
+
+    P = await mk([R('pins ow 99', 'err refused', { ctr: 9 })]);
+    check('W5 err refused on pins shown in the Messages table', /refused this pin/.test(P.text('rm_msgs')), P.text('rm_msgs'));
+    P.w.rmPageLeave();
+
+    // free GPIO
+    P = await mk();
+    await P.tap(card().querySelector('[data-cmd="gpio"][data-args=""]'));
+    check('W5 gpio Read sends "gpio"', P.sends().length === 1 && /cmd=gpio&args=(&|$)/.test(P.sends()[0].body), JSON.stringify(P.sends()));
+    P.w.rmPageLeave();
+
+    P = await mk([R('gpio', 'ok m=1 o=0000000002000 i=0000000000000 l=0000000002000')]);
+    check('W5 gpio reply lists only pin 13: out, high; master on', P.text('rm_v_gpio_13') === 'out, high' && P.text('rm_v_gpio_m') === 'on' && !P.el('rm_v_gpio_12') && !P.el('rm_v_gpio_14') && !P.el('rm_v_gpio_none'), card().textContent);
+    const go = () => P.el('rm_f_gpio_go');
+    check('W5 switch is enabled with master on, no off note', !P.el('rm_gpio_off') && P.el('rm_f_gpio_a').disabled === false && P.d.querySelector('label[for="rm_f_gpio_n"]') && P.d.querySelector('label[for="rm_f_gpio_a"]'));
+    val(P, 'rm_f_gpio_n', '49');
+    check('W5 gpio pin 49 disables Send and shows the hint', go().disabled === true && /0 to 48/.test(P.text('rm_f_gpio_hint')));
+    await P.tap(go());
+    check('W5 gpio pin 49 sends nothing', P.sends().length === 0);
+    val(P, 'rm_f_gpio_n', '13'); val(P, 'rm_f_gpio_a', 'off');
+    await P.tap(go());
+    check('W5 gpio Send sends "gpio 13 off" in one click', P.sends().length === 1 && /cmd=gpio&args=13 off/.test(body(P, 0)), JSON.stringify(P.sends().map((x) => x.body)));
+    check('W5 gpio ok texts', P.w.rmOkText({ cmd: 'gpio 13 in', reply: 'ok m=1 o=0 i=0 l=0', msg: 'x' }) === 'Done. GPIO 13 input.' && P.w.rmOkText({ cmd: 'gpio', reply: 'ok m=1 o=0 i=0 l=0', msg: 'x' }) === 'GPIO state read.');
+    P.w.rmPageLeave();
+
+    P = await mk([R('gpio', 'ok m=0 o=0000000000000 i=0000000000004 l=0000000000000')]);
+    check('W5 m=0: switch disabled with the console note, master off, pin 2 listed as in/low', P.el('rm_f_gpio_go').disabled === true && P.el('rm_f_gpio_n').disabled === true && P.el('rm_f_gpio_a').disabled === true && P.text('rm_gpio_off') === 'GPIO control is off on the node (serial console: --gpiocontrol on).' && P.text('rm_v_gpio_m') === 'off' && P.text('rm_v_gpio_2') === 'in, low', card().textContent);
+    P.w.rmPageLeave();
+
+    P = await mk([R('gpio', 'ok m=1 o=0 i=0 l=0', { ctr: 3, ago: 30 }), R('gpio 13 on', 'err master', { ctr: 4, ago: 5 })]);
+    check('W5 err master newer than the last read disables the switch and the Messages row says so', !!P.el('rm_gpio_off') && P.el('rm_f_gpio_go').disabled === true && /GPIO control is off on the node/.test(P.text('rm_msgs')) && P.text('rm_v_gpio_none') === 'none', P.text('rm_msgs'));
+    P.w.rmPageLeave();
+
+    P = await mk([R('gpio 13 on', 'err refused', { ctr: 4 }), R('gpio 4 on', 'err unsupported', { ctr: 5, ago: 9 })]);
+    check('W5 err refused and err unsupported on gpio shown in the Messages table', /refused this pin/.test(P.text('rm_msgs')) && /does not support that/.test(P.text('rm_msgs')), P.text('rm_msgs'));
+    P.w.rmPageLeave();
+  }
+
   console.log(failures ? '\n' + failures + ' FAILED' : '\nall passed');
   process.exit(failures ? 1 : 0);
 })().catch((e) => { console.log('FAIL harness error: ' + (e && e.stack || e)); process.exit(2); });

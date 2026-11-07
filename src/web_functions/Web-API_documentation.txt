@@ -212,6 +212,11 @@ POST /rmsend
 	cmd		reboot | status | sendpos | sendtrack | gps | track | display | gateway | mesh | txpower | setout | sync
 	args		on|off for gps/track/display/gateway/mesh, <n> dBm for txpower (<= board maximum),
 			"<a0..b7> <on|off>" for setout, empty otherwise (sync counter: cmd=sync)
+	pins, gpio	(GPIO-01) pins: empty = read, "<ow|an|wind> <0..48>" = assign (0 = board default, wind: off; an refuses 0); btn is
+			read-only over RM (a restart applies it, a held pin can trigger the long-press deep sleep): "btn <n>" = err blocked;
+			reply "ok ow=<n> btn=<n> an=<n> wind=<n>"; err refused | unsupported | blocked. gpio: empty = read, "<0..48> <on|off|in>" = switch a free GPIO
+			(only with gpio control on at the node); reply "ok m=<0|1> o=<13 hex> i=<13 hex> l=<13 hex>" (bit n =
+			GPIO n: held outputs, held inputs, level); err master | refused | unsupported
 
 	Answer (JSON):	{"ok":true,"ctr":1760000123}		sent, ctr = the counter used (0 for sync)
 			{"ok":false,"err":"<reason>"}		HTTP 422; reason: size | short | form | passwd | cmd | dst |

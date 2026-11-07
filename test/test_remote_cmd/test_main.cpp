@@ -150,7 +150,7 @@ static void test_vectors_commands_reproduced(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "commands", objs, 64);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(42, n, "command vector count drifted from tools/remote_cmd.py generate_vectors()");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(48, n, "command vector count drifted from tools/remote_cmd.py generate_vectors()");
 
     for (size_t i = 0; i < n; i++)
     {
@@ -243,7 +243,7 @@ static void test_vectors_replies_reproduced(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "replies", objs, 64);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(35, n, "reply vector count drifted from tools/remote_cmd.py generate_vectors()");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(39, n, "reply vector count drifted from tools/remote_cmd.py generate_vectors()");
 
     for (size_t i = 0; i < n; i++)
     {
@@ -1221,7 +1221,7 @@ static void test_build_command_reproduces_every_vector(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "commands", objs, 64);
-    TEST_ASSERT_EQUAL_INT(42, n);
+    TEST_ASSERT_EQUAL_INT(48, n);
 
     for (size_t i = 0; i < n; i++)
     {
@@ -1327,10 +1327,11 @@ static void test_allowlist_is_the_pinned_command_list(void)
 {
     static const char *const kPinned[] = {
         "reboot", "status", "sendpos", "sendtrack", "sync", "gps", "track", "display", "led", "gateway", "mesh",
-        "txpower", "setout", "chgled", "radio", "sens", "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh", "net", "upd", "blockcall"};
+        "txpower", "setout", "chgled", "radio", "sens", "txq", "mbox", "maxhop", "name", "atxt", "pos", "mh", "net", "upd", "blockcall",
+        "pins", "gpio"};
     const size_t n = sizeof(kPinned) / sizeof(kPinned[0]);
-    TEST_ASSERT_EQUAL_UINT(26, n);
-    TEST_ASSERT_EQUAL_UINT(26, RM_COMMAND_COUNT);
+    TEST_ASSERT_EQUAL_UINT(28, n);
+    TEST_ASSERT_EQUAL_UINT(28, RM_COMMAND_COUNT);
 
     // the list itself, name by name and in order, with a sample argument that fits the shape in column 3
     size_t i = 0;
@@ -1346,6 +1347,8 @@ static void test_allowlist_is_the_pinned_command_list(void)
                            : !strcmp(#shape, "SETOUT")  ? "a0 on"                                                \
                            : !strcmp(#shape, "MH")      ? "5"                                                    \
                            : !strcmp(#shape, "CALLS")   ? "DL1ABC,DK5EN-1"                                       \
+                           : !strcmp(#shape, "PINS")    ? "ow 12"                                                \
+                           : !strcmp(#shape, "GPIO")    ? "13 on"                                                \
                                                         : "";                                                    \
         TEST_ASSERT_TRUE_MESSAGE(rmCommandAllowed(#nm, good, 0, 22), #nm);                                          \
         /* a stray argument never passes a no-argument shape, and a missing one never passes on/off */         \
@@ -1359,10 +1362,10 @@ static void test_allowlist_is_the_pinned_command_list(void)
 #undef CHECK_ROW
     TEST_ASSERT_EQUAL_UINT(n, i);
 
-    // by kind: 5 actions, 6 toggles, 3 parametrised, 7 reads, 5 read/write
+    // by kind: 5 actions, 6 toggles, 3 parametrised, 7 reads + 7 read/write (rmKindIsRead counts both: 14), 7 read/write
     TEST_ASSERT_EQUAL_UINT(6, rmCountWhere(rmKindIsToggle));
-    TEST_ASSERT_EQUAL_UINT(12, rmCountWhere(rmKindIsRead));
-    TEST_ASSERT_EQUAL_UINT(5, rmCountWhere(rmKindIsWrite));
+    TEST_ASSERT_EQUAL_UINT(14, rmCountWhere(rmKindIsRead));
+    TEST_ASSERT_EQUAL_UINT(7, rmCountWhere(rmKindIsWrite));
     TEST_ASSERT_EQUAL_INT(RM_CK_TOGGLE, rmCommandKind("led"));
     TEST_ASSERT_EQUAL_INT(RM_CK_RW, rmCommandKind("pos"));
     TEST_ASSERT_EQUAL_INT(RM_CK_READ, rmCommandKind("mh"));
@@ -1370,7 +1373,7 @@ static void test_allowlist_is_the_pinned_command_list(void)
 
     // and the console-only switches are not on it
     const char *const kBlocked[] = {"rmstrictsecurity", "remotemgmt", "passwd", "setpasswd", "wifi", "rm", "stat",
-                                    "namex", "rebootx", ""};
+                                    "namex", "rebootx", "", "gpiocontrol", "gpioctl", "gpio_control"};
     for (const char *b : kBlocked)
         TEST_ASSERT_FALSE_MESSAGE(rmCommandAllowed(b, "", 0, 22), b);
 }
@@ -1403,7 +1406,7 @@ static void test_verify_reply_vectors_and_tampering(void)
 
     static std::string objs[64];
     const size_t n = objectsOf(json, "replies", objs, 64);
-    TEST_ASSERT_EQUAL_INT(35, n);
+    TEST_ASSERT_EQUAL_INT(39, n);
 
     for (size_t i = 0; i < n; i++)
     {
@@ -1647,6 +1650,21 @@ static void test_ext_allowlist_accepts_and_rejects(void)
         {"upd", "go v4/41", false}, {"upd", "check now", false}, {"upd", "Check", false}, {"upd", " check", false},
         {"upd", "chan", false}, {"upd", "chan ", false}, {"upd", "chan DEV", false}, {"upd", "chan main", false},
         {"upd", "chan dev x", false},
+        // GPIO-01 W5: pins <ow|btn|an|wind> <0..48>, gpio <0..48> <on|off|in>; exact, single space, nothing trailing
+        {"pins", "", true}, {"pins", "ow 0", true}, {"pins", "ow 12", true}, {"pins", "ow 48", true},
+        {"pins", "btn 9", true}, {"pins", "an 36", true}, {"pins", "wind 48", true},
+        {"pins", "ow 49", false}, {"pins", "ow 99", false}, {"pins", "ow 100", false}, {"pins", "ow 07", false},
+        {"pins", "ow 00", false}, {"pins", "ow -1", false}, {"pins", "ow", false}, {"pins", "ow ", false},
+        {"pins", "ow 12 ", false}, {"pins", " ow 12", false}, {"pins", "ow  12", false}, {"pins", "ow 1x", false},
+        {"pins", "OW 12", false}, {"pins", "led 12", false}, {"pins", "12", false}, {"pins", "owx 12", false},
+        {"pins", "ow 12 13", false},
+        {"gpio", "", true}, {"gpio", "0 in", true}, {"gpio", "13 on", true}, {"gpio", "13 off", true},
+        {"gpio", "48 in", true}, {"gpio", "9 on", true},
+        {"gpio", "49 on", false}, {"gpio", "99 on", false}, {"gpio", "100 on", false}, {"gpio", "07 on", false},
+        {"gpio", "13 on ", false}, {"gpio", " 13 on", false}, {"gpio", "13  on", false},
+        {"gpio", "13 release", false}, {"gpio", "13 ON", false}, {"gpio", "13", false}, {"gpio", "13 ", false},
+        {"gpio", "on", false}, {"gpio", "x on", false}, {"gpio", "-1 on", false}, {"gpio", "13 onoff", false},
+        {"gpio", "13 on 14", false},
         {"blockcall", "", true}, {"blockcall", "none", true}, {"blockcall", "DL1ABC", true},
         {"blockcall", "DL1ABC,DK5EN-1", true}, {"blockcall", "dl1abc,dk5en-1", true},
         {"blockcall", "123456789012345678901234567890123456789", true},   // 39

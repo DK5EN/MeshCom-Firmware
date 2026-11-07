@@ -505,6 +505,78 @@
       "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
       "tag": "58d43aaa7875ff7c",
       "dm_text": "RM1 105 upd chan prod 58d43aaa7875ff7c"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 110,
+      "cmd": "pins",
+      "args": "",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|110|pins",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "bec34795717bb956",
+      "dm_text": "RM1 110 pins bec34795717bb956"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 111,
+      "cmd": "pins",
+      "args": "ow 12",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|111|pins ow 12",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "fb16ea90355c4c26",
+      "dm_text": "RM1 111 pins ow 12 fb16ea90355c4c26"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 112,
+      "cmd": "pins",
+      "args": "wind 48",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|112|pins wind 48",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "a62f53e9f8ca62cb",
+      "dm_text": "RM1 112 pins wind 48 a62f53e9f8ca62cb"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 113,
+      "cmd": "gpio",
+      "args": "",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|113|gpio",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "010f68a364d00efb",
+      "dm_text": "RM1 113 gpio 010f68a364d00efb"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 114,
+      "cmd": "gpio",
+      "args": "13 on",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|114|gpio 13 on",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "89ab50361c0f3394",
+      "dm_text": "RM1 114 gpio 13 on 89ab50361c0f3394"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 115,
+      "cmd": "gpio",
+      "args": "0 in",
+      "canonical": "RM1|DK5EN-90|DK5EN-1|115|gpio 0 in",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "tag": "62dffdc3d43d1e37",
+      "dm_text": "RM1 115 gpio 0 in 62dffdc3d43d1e37"
     }
   ],
   "replies": [
@@ -907,6 +979,50 @@
       "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|107|ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/2/22 rs=1",
       "reply_tag": "fc3f06ff3be1922e",
       "reply_text": "RM1 107 ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/2/22 rs=1 fc3f06ff3be1922e"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 110,
+      "result": "ok ow=99 btn=99 an=99 wind=99",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|110|ok ow=99 btn=99 an=99 wind=99",
+      "reply_tag": "f5a018c86a1c2c70",
+      "reply_text": "RM1 110 ok ow=99 btn=99 an=99 wind=99 f5a018c86a1c2c70"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 111,
+      "result": "ok m=1 o=0000000002000 i=0000000000001 l=0000000002001",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|111|ok m=1 o=0000000002000 i=0000000000001 l=0000000002001",
+      "reply_tag": "d4ec6f2d51a1c9d3",
+      "reply_text": "RM1 111 ok m=1 o=0000000002000 i=0000000000001 l=0000000002001 d4ec6f2d51a1c9d3"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 112,
+      "result": "err master",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|112|err master",
+      "reply_tag": "02fc925460871a01",
+      "reply_text": "RM1 112 err master 02fc925460871a01"
+    },
+    {
+      "passwd": "secret",
+      "dst": "DK5EN-90",
+      "src": "DK5EN-1",
+      "ctr": 113,
+      "result": "err refused",
+      "key_hex": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "reply_canonical": "RM1R|DK5EN-90|DK5EN-1|113|err refused",
+      "reply_tag": "4c4fdc3d710ad541",
+      "reply_text": "RM1 113 err refused 4c4fdc3d710ad541"
     }
   ],
   "refusals": [

@@ -64,7 +64,7 @@ def test_refusal_text_receiver_model() -> None:
 
 
 def test_allowlist_command_count() -> None:
-    assert len(rc.ALLOWLIST) == 26
+    assert len(rc.ALLOWLIST) == 28
     assert rc.ALLOWLIST["led"] == ("on", "off", "flash")
     assert rc.ALLOWLIST["chgled"] == ("", "auto", "on", "off")  # "" = bare read form (LED-02)
 
@@ -308,3 +308,26 @@ def test_blockcall_builds(args: str) -> None:
 def test_blockcall_refused(args: str) -> None:
     with pytest.raises(rc.RmError):
         rc.build_command(DST, SRC, 5, "blockcall", args, PW)
+
+
+# GPIO-01 W5: pins <ow|btn|an|wind> <0..48>, gpio <0..48> <on|off|in>; same grammar as argsMatch in the firmware
+@pytest.mark.parametrize(
+    "cmd,args",
+    [("pins", ""), ("pins", "ow 0"), ("pins", "ow 48"), ("pins", "btn 9"), ("pins", "an 36"), ("pins", "wind 12"),
+     ("gpio", ""), ("gpio", "0 in"), ("gpio", "13 on"), ("gpio", "13 off"), ("gpio", "48 in")],
+)
+def test_gpio01_builds(cmd: str, args: str) -> None:
+    assert rc.build_command(DST, SRC, 5, cmd, args, PW).startswith("RM1 5 " + cmd)
+
+
+@pytest.mark.parametrize(
+    "cmd,args",
+    [("pins", "ow 49"), ("pins", "ow 100"), ("pins", "ow 07"), ("pins", "ow 00"), ("pins", "ow -1"), ("pins", "ow"), ("pins", "ow 12 "),
+     ("pins", "OW 12"), ("pins", "led 12"), ("pins", "12"), ("pins", "ow  12"),
+     ("gpio", "49 on"), ("gpio", "07 on"), ("gpio", "00 on"), ("gpio", "13 on "), ("gpio", "13 release"), ("gpio", "13 ON"),
+     ("gpio", "13"), ("gpio", "on"), ("gpio", "-1 on"), ("gpio", "13  on"), ("gpio", "gpiocontrol on"),
+     ("gpiocontrol", "on"), ("gpiocontrol", "")],
+)
+def test_gpio01_refused(cmd: str, args: str) -> None:
+    with pytest.raises(rc.RmError):
+        rc.build_command(DST, SRC, 5, cmd, args, PW)

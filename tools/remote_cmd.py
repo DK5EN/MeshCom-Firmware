@@ -88,6 +88,8 @@ ALLOWLIST: Dict[str, Any] = {
     "net": None,
     "upd": "upd",    # none (read) | "check" | "go <tag>", tag [A-Za-z0-9._-] 1..23 | "chan prod"|"chan dev" (dev-channel builds)
     "blockcall": "calls",  # none (read) | "none" | comma list [A-Za-z0-9,-] (BLK-01, full write)
+    "pins": "pins",  # none (read) | "<ow|btn|an|wind> <0..48>" (GPIO-01)
+    "gpio": "gpio",  # none (read) | "<0..48> <on|off|in>" (GPIO-01; never the master switch)
 }
 
 # Hard-blocked whatever the tag (6.4). Checked before the allowlist so the
@@ -159,6 +161,22 @@ def _check_ctr(ctr: int) -> None:
         raise RmError("ctr out of range 0..%d" % CTR_MAX)
 
 
+_PINS_RE = re.compile(r"(ow|btn|an|wind) (0|[1-9][0-9]?)")
+_GPIO_RE = re.compile(r"(0|[1-9][0-9]?) (on|off|in)")
+
+
+def _check_pin_args(cmd: str, shape: str, args: str) -> None:
+    """GPIO-01 shapes (mirrors RM_ARGS_PINS / RM_ARGS_GPIO in src/remote_cmd.cpp): value <= 48."""
+    if args == "":
+        return  # read form
+    m = (_PINS_RE if shape == "pins" else _GPIO_RE).fullmatch(args)
+    if m is None or int(args.split(" ")[1 if shape == "pins" else 0]) > 48:
+        raise RmError(
+            "pins needs nothing or '<ow|btn|an|wind> <0..48>'" if shape == "pins"
+            else "gpio needs nothing or '<0..48> <on|off|in>'"
+        )
+
+
 _CALLS_RE = re.compile(r"[A-Za-z0-9,-]+")
 _MIXED_CASE_SHAPES = ("name", "atxt", "pos", "mh", "upd", "calls")
 
@@ -226,6 +244,8 @@ def validate_command(cmd: str, args: str, ctr: int) -> None:
             raise RmError("setout needs '<a0..a7|b0..b7> <on|off>'")
     elif shape in _MIXED_CASE_SHAPES:
         _check_ext_args(cmd, shape, args)
+    elif shape in ("pins", "gpio"):
+        _check_pin_args(cmd, shape, args)
     elif args not in shape:
         raise RmError("%s needs one of %s" % (cmd, "|".join(a for a in shape if a)))
 
@@ -365,6 +385,13 @@ _VECTOR_CMDS = [
     ("secret", "DK5EN-90", "DK5EN-1", 103, "upd", "go v4.41a"),
     ("secret", "DK5EN-90", "DK5EN-1", 104, "upd", "chan dev"),
     ("secret", "DK5EN-90", "DK5EN-1", 105, "upd", "chan prod"),
+    # GPIO-01 W5: pin assignments and free GPIOs (read and write forms)
+    ("secret", "DK5EN-90", "DK5EN-1", 110, "pins", ""),
+    ("secret", "DK5EN-90", "DK5EN-1", 111, "pins", "ow 12"),
+    ("secret", "DK5EN-90", "DK5EN-1", 112, "pins", "wind 48"),
+    ("secret", "DK5EN-90", "DK5EN-1", 113, "gpio", ""),
+    ("secret", "DK5EN-90", "DK5EN-1", 114, "gpio", "13 on"),
+    ("secret", "DK5EN-90", "DK5EN-1", 115, "gpio", "0 in"),
 ]
 
 _VECTOR_REPLIES = [
@@ -407,6 +434,11 @@ _VECTOR_REPLIES = [
     ("secret", "DK5EN-90", "DK5EN-1", 105, "err stale -"),
     ("secret", "DK5EN-90", "DK5EN-1", 106, "err aubusy"),
     ("secret", "DK5EN-90", "DK5EN-1", 107, "ok v=4.40a up=417 bat=87 heap=115 s=GtdmW p=14/2/22 rs=1"),
+    # GPIO-01 W5: worst-case pins / gpio results and the gpio refusal tokens
+    ("secret", "DK5EN-90", "DK5EN-1", 110, "ok ow=99 btn=99 an=99 wind=99"),
+    ("secret", "DK5EN-90", "DK5EN-1", 111, "ok m=1 o=0000000002000 i=0000000000001 l=0000000002001"),
+    ("secret", "DK5EN-90", "DK5EN-1", 112, "err master"),
+    ("secret", "DK5EN-90", "DK5EN-1", 113, "err refused"),
 ]
 
 

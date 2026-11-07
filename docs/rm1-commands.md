@@ -96,6 +96,8 @@ ebenfalls mit `err blocked` abgelehnt, egal bei welchem Befehl.
 | `err hidden`                                                                                                | `pos` lesen: der Knoten hat keine Position (0/0) und gibt keine preis                                                                                 |
 | `err end`                                                                                                   | `mh <zeile>`: Zeilenindex hinter dem Ende der Liste                                                                                                   |
 | `err unknown`                                                                                               | `mh <rufzeichen>`: Rufzeichen weder direkt gehört noch als Route bekannt                                                                              |
+| `err refused`                                                                                               | `pins`/`gpio`: der Pin ist für diese Funktion nicht erlaubt (belegt, reserviert, nur Eingang)                                                         |
+| `err master`                                                                                                | `gpio` schreiben, solange der Hauptschalter `--gpiocontrol` aus ist (er lässt sich per RM nie schalten)                                               |
 | `err storage`                                                                                               | der Zähler konnte nicht dauerhaft gespeichert werden; nichts wurde ausgeführt                                                                         |
 | `err aubusy`, `err nowifi`, `err stale <tag>`, `err current`, `err noasset`, `err safeboot`, `err notready` | `upd`, siehe dort                                                                                                                                     |
 
@@ -115,6 +117,8 @@ Spalte "Gespeichert": ändert der Befehl dauerhaft gespeicherte Einstellungen (�
 | `chgled`                                        | Parameter         | nein (nächster Start stellt zurück) |
 | `radio`,`sens`,`txq`,`mbox`,`maxhop`,`net`,`mh` | Lesen             | nein                                |
 | `name`,`atxt`,`pos`,`blockcall`                 | Lesen / Schreiben | Schreiben: ja                       |
+| `pins`                                          | Lesen / Schreiben | Schreiben: ja                       |
+| `gpio`                                          | Lesen / Schreiben | nein (Pegel nie gespeichert)        |
 | `upd`                                           | Lesen / Aktion    | nein (Einstellungen), siehe unten   |
 
 In den Beispielen steht `<tag>` für den 16-stelligen Tag der Anfrage und `<rtag>` für den der Antwort. Echte
@@ -339,6 +343,35 @@ werden verworfen und nicht weitergeleitet; die Liste ist ab Werk leer).
   (nicht speicherbar), `err blocked` (Zeichen außerhalb von `A-Za-z0-9,-` oder länger als 39 Zeichen).
 - Beispiel: `RM1 72 blockcall DK5EN-7,DK5EN-12 <tag>` -> `RM1 72 ok b=DK5EN-7,DK5EN-12 <rtag>`.
 
+**`pins`** - Pin-Zuordnung der Funktionen 1-Wire (`ow`), Taste (`btn`), Analog (`an`) und Windmesser (`wind`).
+
+- `pins` (lesen): `ok ow=<n> btn=<n> an=<n> wind=<n>`, dezimal, je der wirksame Pin (`0` = kein Pin, die Platine hat keinen
+  Standardpin). Platinen ohne Windmesser (nRF52) melden `wind=0`; ohne Analog-Pin `an=0`, ohne 1-Wire-Pin `ow=0`. Längste Antwort 26 Zeichen.
+- `pins <ow|an|wind> <n>` (schreiben, `n` 0..48, ohne führende Null): setzt genau eine Zuordnung über denselben
+  Konsolen-Setter wie `--onewire gpio`, `--analog gpio`, `--windpin`; dessen Prüfung (Pin zulässig, nicht belegt)
+  gilt unverändert. `n` = 0 setzt die Platinen-Vorgabe (`wind`: aus); `an` lehnt 0 ab, `ow` auf dem RAK4630 lehnt 0 bis 2 ab (`err refused`). Antwort wie beim Lesen, mit dem
+  gespeicherten Wert. Gespeichert.
+- `btn` ist über RM nur lesbar: `pins btn <n>` wird mit `err blocked` beantwortet, ohne Setter. Ein neuer Tastenpin
+  wirkt erst nach einem Neustart, und ein von Fremdhardware auf Low gehaltener Pin kann den Langdruck-Pfad (Deep
+  Sleep auf Tracker-, Heltec- und WP_DISP-Platinen) auslösen und den Knoten über Funk nicht mehr erreichbar machen.
+  Den Tastenpin setzt man am Knoten (serielle Konsole oder Pins-Seite der Web-Oberfläche).
+- Fehler: `err refused` (der Setter hat den Pin abgelehnt, die Zuordnung bleibt), `err unsupported` (die Funktion fehlt in
+  dieser Firmware: `wind` ohne Windmesser, `an` ohne Analog-Pin, `ow` ohne 1-Wire-Pin), `err blocked` (Form falsch,
+  `n` > 48, führende Null, `btn` schreiben).
+- Beispiel: `RM1 80 pins ow 12 <tag>` -> `RM1 80 ok ow=12 btn=0 an=0 wind=0 <rtag>`.
+
+**`gpio`** - freie GPIOs (nur ESP32; der Hauptschalter `--gpiocontrol` muss an der Konsole oder Web-Oberfläche
+eingeschaltet sein, per RM lässt er sich nie schalten).
+
+- `gpio` (lesen): `ok m=<0|1> o=<13 hex> i=<13 hex> l=<13 hex>`, Kleinbuchstaben, auf 13 Stellen mit Nullen
+  aufgefüllt, Bit n = GPIO n. `m` Hauptschalter, `o` gehaltene Ausgänge, `i` gehaltene Eingänge, `l` Pegel der
+  gehaltenen Pins (Ausgang: gesetzter Pegel, Eingang: gemessen). Immer 51 Zeichen. nRF52: `err unsupported`.
+- `gpio <n> <on|off|in>` (schreiben, `n` 0..48): Ausgang hoch, Ausgang tief, Eingang. Antwort wie beim Lesen. Nicht
+  gespeichert, der Pegel überlebt keinen Neustart.
+- Fehler: `err master` (Hauptschalter aus), `err refused` (Pin nicht frei), `err unsupported` (nRF52), `err blocked`
+  (Form falsch, `n` > 48, `release` und andere Wörter).
+- Beispiel: `RM1 81 gpio 13 on <tag>` -> `RM1 81 ok m=1 o=0000000002000 i=0000000000000 l=0000000002000 <rtag>`.
+
 ---
 
 # English
@@ -425,6 +458,8 @@ as well, whatever the command.
 | `err hidden`                                                                                                | reading `pos`: the node has no position (0/0) and does not reveal one                                                            |
 | `err end`                                                                                                   | `mh <row>`: row index past the end of the list                                                                                   |
 | `err unknown`                                                                                               | `mh <call>`: callsign neither heard directly nor known as a route                                                                |
+| `err refused`                                                                                               | `pins`/`gpio`: the pin is not allowed for this function (in use, reserved, input-only)                                           |
+| `err master`                                                                                                | writing `gpio` while the master switch `--gpiocontrol` is off (RM can never switch it)                                           |
 | `err storage`                                                                                               | the counter could not be stored; nothing was executed                                                                            |
 | `err aubusy`, `err nowifi`, `err stale <tag>`, `err current`, `err noasset`, `err safeboot`, `err notready` | `upd`, see there                                                                                                                 |
 
@@ -444,6 +479,8 @@ as well, whatever the command.
 | `chgled`                                        | parameter     | no (next boot restores)  |
 | `radio`,`sens`,`txq`,`mbox`,`maxhop`,`net`,`mh` | read          | no                       |
 | `name`,`atxt`,`pos`,`blockcall`                 | read / write  | write: yes               |
+| `pins`                                          | read / write  | write: yes               |
+| `gpio`                                          | read / write  | no (levels never stored) |
 | `upd`                                           | read / action | no (settings), see below |
 
 In the examples `<tag>` stands for the 16-digit request tag and `<rtag>` for the reply tag. Real values with
@@ -651,3 +688,33 @@ list is empty by default).
 - Errors: `err text` (invalid call or more than 16 entries, the list stays unchanged), `err failed` (could not be
   stored), `err blocked` (a character outside `A-Za-z0-9,-`, or longer than 39 characters).
 - Example: `RM1 72 blockcall DK5EN-7,DK5EN-12 <tag>` -> `RM1 72 ok b=DK5EN-7,DK5EN-12 <rtag>`.
+
+**`pins`** - pin assignment of the functions 1-Wire (`ow`), button (`btn`), analog (`an`) and anemometer (`wind`).
+
+- `pins` (read): `ok ow=<n> btn=<n> an=<n> wind=<n>`, decimal, each the effective pin (`0` = no pin, the board has no
+  default pin). Boards without the anemometer (nRF52) report `wind=0`; without an analog pin `an=0`, without a 1-Wire
+  pin `ow=0`. Longest reply 26 characters.
+- `pins <ow|an|wind> <n>` (write, `n` 0..48, no leading zero): sets exactly one assignment through the same
+  console setter as `--onewire gpio`, `--analog gpio`, `--windpin`; its check (pin allowed, not in use) applies
+  unchanged. `n` = 0 selects the board default (`wind`: off); `an` refuses 0, `ow` on the RAK4630 refuses 0 to 2 (`err refused`). Reply as for read, with the stored
+  value. Stored.
+- `btn` is read-only over RM: `pins btn <n>` is answered `err blocked` without calling a setter. A new button pin
+  takes effect after a restart, and a pin held low by user hardware can trigger the long-press path (deep sleep on
+  Tracker, Heltec and WP_DISP boards) and strand the node off the air. Set the button pin on the node (serial
+  console or the Pins page of the web interface).
+- Errors: `err refused` (the setter refused the pin, the assignment stays), `err unsupported` (the function is not in
+  this firmware: `wind` without anemometer, `an` without analog pin, `ow` without 1-Wire pin), `err blocked` (wrong
+  shape, `n` > 48, leading zero, writing `btn`).
+- Example: `RM1 80 pins ow 12 <tag>` -> `RM1 80 ok ow=12 btn=0 an=0 wind=0 <rtag>`.
+
+**`gpio`** - free GPIOs (ESP32 only; the master switch `--gpiocontrol` must be turned on at the console or in the web
+interface, RM can never switch it).
+
+- `gpio` (read): `ok m=<0|1> o=<13 hex> i=<13 hex> l=<13 hex>`, lower case, zero-padded to 13 digits, bit n = GPIO n.
+  `m` master switch, `o` held outputs, `i` held inputs, `l` level of the held pins (output: driven level, input:
+  sampled). Always 51 characters. nRF52: `err unsupported`.
+- `gpio <n> <on|off|in>` (write, `n` 0..48): output high, output low, input. Reply as for read. Not stored, the level
+  does not survive a reboot.
+- Errors: `err master` (master switch off), `err refused` (pin not free), `err unsupported` (nRF52), `err blocked`
+  (wrong shape, `n` > 48, `release` and other words).
+- Example: `RM1 81 gpio 13 on <tag>` -> `RM1 81 ok m=1 o=0000000002000 i=0000000000000 l=0000000002000 <rtag>`.

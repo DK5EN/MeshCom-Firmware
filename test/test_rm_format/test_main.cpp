@@ -153,6 +153,37 @@ static void test_name_atxt(void)
     TEST_ASSERT_EQUAL_CHAR('\0', g_buf[0]);
 }
 
+// ---- pins / gpio (GPIO-01 W5) ----------------------------------------------------------------------------
+
+static void test_pins_gpio(void)
+{
+    expectStr("ow=36 btn=0 an=0 wind=0", rmFmtPins(g_buf, sizeof(g_buf), 36, 0, 0, 0));
+    expectStr("ow=1 btn=2 an=3 wind=48", rmFmtPins(g_buf, sizeof(g_buf), 1, 2, 3, 48));
+    // out of domain is clamped; worst case 26 chars
+    expectStr("ow=99 btn=99 an=99 wind=99", rmFmtPins(g_buf, sizeof(g_buf), 500, 100, 1000, 99));
+    TEST_ASSERT_EQUAL_UINT32(26, (uint32_t)strlen(g_buf));
+    expectStr("ow=0 btn=0 an=0 wind=0", rmFmtPins(g_buf, sizeof(g_buf), -5, -1, -99, -3));
+    TEST_ASSERT_EQUAL_UINT32(0, rmFmtPins(g_buf, 10, 1, 2, 3, 4)); // does not fit
+    TEST_ASSERT_EQUAL_CHAR('\0', g_buf[0]);
+
+    // zero padded to 13 hex digits, lowercase, bit n = GPIO n
+    expectStr("m=0 o=0000000000000 i=0000000000000 l=0000000000000", rmFmtGpio(g_buf, sizeof(g_buf), false, 0, 0, 0));
+    expectStr("m=1 o=0000000002000 i=0000000000001 l=0000000002001",
+              rmFmtGpio(g_buf, sizeof(g_buf), true, (uint64_t)1 << 13, 1, ((uint64_t)1 << 13) | 1));
+    // GPIO 48 is the top bit of the 13 digits
+    expectStr("m=1 o=1000000000000 i=0000000000000 l=1000000000000",
+              rmFmtGpio(g_buf, sizeof(g_buf), true, (uint64_t)1 << 48, 0, (uint64_t)1 << 48));
+    expectStr("m=1 o=1ffffffffffff i=1ffffffffffff l=1ffffffffffff",
+              rmFmtGpio(g_buf, sizeof(g_buf), true, 0x1FFFFFFFFFFFFULL, 0x1FFFFFFFFFFFFULL, 0x1FFFFFFFFFFFFULL));
+    // worst case: bits above the 13 digits are dropped, the result stays 51 chars
+    expectStr("m=1 o=fedcba9876543 i=fedcba9876543 l=fedcba9876543",
+              rmFmtGpio(g_buf, sizeof(g_buf), true, 0xFEDCBA9876543ULL | (0xFULL << 60), 0xFEDCBA9876543ULL, 0xFEDCBA9876543ULL));
+    TEST_ASSERT_EQUAL_UINT32(51, (uint32_t)strlen(g_buf));
+    TEST_ASSERT_TRUE(3 + strlen(g_buf) <= RM_MAX_RESULT);
+    TEST_ASSERT_EQUAL_UINT32(0, rmFmtGpio(g_buf, 51, false, 0, 0, 0)); // needs 52 with the NUL
+    TEST_ASSERT_EQUAL_CHAR('\0', g_buf[0]);
+}
+
 // ---- blockcall -----------------------------------------------------------------------------------------------
 
 static void test_block(void)
@@ -798,6 +829,7 @@ int main(int, char **)
     RUN_TEST(test_radio_rounding);
     RUN_TEST(test_name_atxt);
     RUN_TEST(test_block);
+    RUN_TEST(test_pins_gpio);
     RUN_TEST(test_pos);
     RUN_TEST(test_sens);
     RUN_TEST(test_mh_page_empty_and_one);

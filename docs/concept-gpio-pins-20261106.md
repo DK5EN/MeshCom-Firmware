@@ -98,13 +98,13 @@ Measured against the final release image, on a classic ESP32 because that is the
 
 Taken by the operator on 2026-11-06, as recommended.
 
-| #   | Question                                              | Decision                                                                   |
-| --- | ----------------------------------------------------- | -------------------------------------------------------------------------- |
-| 1   | Do output levels survive a reboot?                    | No. A saved level on the wrong pin can stop a boot, and RAM only avoids it |
-| 2   | Should RM1 switch free GPIOs at all?                  | Yes, only with the master switch on and RM1 enabled                        |
-| 3   | Should RM1 change pin assignments?                    | Yes, policy-checked, with a confirm step in the web RM page                |
-| 4   | Master switch default for free GPIOs?                 | Off. An update must not make any node's pins remotely switchable           |
-| 5   | Input pins: show a live level, or only the direction? | Show the level, sampled in the 5 s poll                                    |
+| #   | Question                                              | Decision                                                                                                    |
+| --- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 1   | Do output levels survive a reboot?                    | No. A saved level on the wrong pin can stop a boot, and RAM only avoids it                                  |
+| 2   | Should RM1 switch free GPIOs at all?                  | Yes, only with the master switch on and RM1 enabled                                                         |
+| 3   | Should RM1 change pin assignments?                    | Yes, policy-checked, with a confirm step in the web RM page; button excluded over RM, W5 advisor 2026-11-07 |
+| 4   | Master switch default for free GPIOs?                 | Off. An update must not make any node's pins remotely switchable                                            |
+| 5   | Input pins: show a live level, or only the direction? | Show the level, sampled in the 5 s poll                                                                     |
 
 ## Waves
 

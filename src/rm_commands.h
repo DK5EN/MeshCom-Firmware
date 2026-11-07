@@ -22,6 +22,8 @@
 //           "chan prod|dev" sets the update channel, accepted only in builds with MC_AU_DEV_CHANNEL)
 //           blockcall: BLK-01 call blocklist, "" reads, "none" or a comma list writes the WHOLE list. Over RM the
 //           args are capped at RM_MAX_ARGS (39) chars, so a list set remotely holds about 3-4 calls
+//           pins: GPIO-01 pin assignments, "" reads, "<ow|an|wind> <n>" sets one through the console setter; btn -> err blocked
+//           gpio: GPIO-01 free GPIOs (ESP32), "" reads, "<n> on|off|in" switches; needs --gpiocontrol on, never sets it
 // SHAPE  suffix of RM_ARGS_<SHAPE> in remote_cmd.cpp (the argument check of the allowlist)
 //
 // Adding a command: one line here. The build then fails until the allowlist shape exists and every
@@ -59,7 +61,9 @@
     X(mh, READ, MH)                                                                                              \
     X(net, READ, NONE)                                                                                           \
     X(upd, RW, UPD)                                                                                              \
-    X(blockcall, RW, CALLS)
+    X(blockcall, RW, CALLS)                                                                                      \
+    X(pins, RW, PINS)                                                                                            \
+    X(gpio, RW, GPIO)
 
 enum RmCommandKind
 {

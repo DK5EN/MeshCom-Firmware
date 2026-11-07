@@ -92,6 +92,7 @@ void sub_page_remote()
                        "<div>\n"
                        "<p class=\"font-small\">Switch an output pin of the node (only works if the pin is set as an output there).</p>");
     web_client.println("<div class=\"rmrow\"><select id=\"rm_pin\" aria-label=\"Output pin\"></select><label for=\"rm_pinsw\">Output</label><input type=\"checkbox\" role=\"switch\" class=\"rmsw\" id=\"rm_pinsw\" data-sw=\"pin\" disabled></div>\n"
+                       "<div id=\"rm_card_pins\"><div></div></div>\n"
                        "<p id=\"rm_cnt\" class=\"font-small\"></p>");
     web_client.println("<p class=\"font-small\">Commands run on this node</p>\n"
                        "<table class=\"rmtab font-small\"><thead><tr><th>ago</th><th>from</th><th>ctr</th><th>command</th><th>result</th></tr></thead><tbody id=\"rm_log\"></tbody></table>\n"
