@@ -10,7 +10,7 @@
 //
 // Prerequisites (not part of the repo):  npm i jsdom@24   (anywhere; set NODE_PATH to its node_modules)
 // Run:   NODE_PATH=<dir>/node_modules node tools/webgui_rm_test.js
-// Mutation check (the test must then FAIL):  RM_MUTATE=leak|nolock|timer|msgs|txp|refrange|locrange|qnoreject|qnopre|qnoclr|qmh|qnodrop|nochan node tools/webgui_rm_test.js
+// Mutation check (the test must then FAIL):  RM_MUTATE=leak|nolock|timer|msgs|txp|refrange|locrange|qnoreject|qnopre|qnoclr|qmh|qnodrop|qfixed|qanydst|qanyage|nochan node tools/webgui_rm_test.js
 const fs = require('fs');
 const path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
@@ -184,6 +184,9 @@ else if (MUT === 'qnopre') mutate("rmQp=rmSel.slot<0?'dst='+rmEnc(rmSel.call)+'&
 else if (MUT === 'qnoclr') mutate('if(!rmQp&&rmPre())rmQClr();else ', '');
 else if (MUT === 'qmh') mutate('if(rmLocked()||rmMh.on)return;if(pr)', 'if(rmLocked())return;if(pr)');
 else if (MUT === 'qnodrop') mutate("'send';rmQClr();", "'send';");
+else if (MUT === 'qfixed') mutate('if(!l&&rmQq.length&&rmQDone()){', 'if(!l&&rmQq.length){');
+else if (MUT === 'qanydst') mutate('if(e.dst==w.d&&e.cmd', 'if(e.cmd');
+else if (MUT === 'qanyage') mutate('&&e.ago*1000<=rmStat.t-w.t+5000&&', '&&');
 else if (MUT === 'force') mutate("if(fc)body+='&force=1';", '');
 else if (MUT === 'nochan') mutate("'upd','chan '+k,", "'upd','chn '+k,");
 else if (MUT) throw new Error('unknown RM_MUTATE ' + MUT);
@@ -575,7 +578,7 @@ function leaks(P, canary) {
     const QD = ['txq', 'mbox', 'maxhop'];
     const nonQ = Object.keys(where).filter((c) => !QD.includes(c) && c !== 'name' && c !== 'atxt');
     check('3.4 every non-queue, non-identity def (radio, sens, pos) starts with a .rmrow.rmh header: <b> label, font-small span, Read button', nonQ.every((c) => { const h = hdr(c); return h && h.classList.contains('rmrow') && h.classList.contains('rmh') && h.children[0].tagName === 'B' && h.children[1].tagName === 'SPAN' && h.children[1].classList.contains('font-small') && h.children[2].tagName === 'BUTTON' && h.children[2].textContent === 'Read' && h.children[2].getAttribute('data-cmd') === c && h.children[2].getAttribute('data-args') === ''; }), nonQ.map((c) => hdr(c) && hdr(c).className).join('|'));
-    check('3.4 queue defs have a title-only .rmrow.rmsplit header: just the <b> label, no span, no button', QD.every((c) => { const h = hdr(c); return h && h.classList.contains('rmsplit') && h.children.length === 1 && h.children[0].tagName === 'B'; }), QD.map((c) => hdr(c) && hdr(c).children.length).join());
+    check('3.4 queue defs have a .rmrow.rmsplit header: <b> label, last-read span, own Read button', QD.every((c) => { const h = hdr(c); return h && h.classList.contains('rmsplit') && h.children.length === 3 && h.children[0].tagName === 'B' && h.children[1].tagName === 'SPAN' && h.children[2].tagName === 'BUTTON'; }), QD.map((c) => hdr(c) && hdr(c).children.length).join());
     check('3.4 header labels (Position leaves its label cell empty like Identity and Queues) and the "last read N min ago" age', hdr('radio')?.children[0].textContent === 'Radio' && hdr('radio')?.children[1].textContent === 'last read 2 min ago' && hdr('sens')?.children[0].textContent === 'Sensors' && hdr('pos')?.children[0].textContent === '', hdr('radio')?.children[1].textContent);
     check('3.4 Position: the Source line moved into the header row, nothing else read-only', hdr('pos')?.children[1].id === 'rm_v_pos_src' && hdr('pos')?.children[1].textContent === 'Source: from GPS' && X('rm_def_pos') && !X('rm_def_pos').querySelector('.rmkv') && X('rm_def_pos').querySelectorAll('[id^="rm_v_"]').length === 1, hdr('pos')?.children[1].textContent);
     const kv = (c) => X('rm_def_' + c) && X('rm_def_' + c).querySelector('.rmkv');
@@ -987,20 +990,82 @@ function leaks(P, canary) {
     const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
     await P.setPoll({ sent: [], targets: tg });
     const qb = () => [...P.el('rm_card_queues').querySelectorAll('button')].filter((b) => !b.classList.contains('cardtoggle'));
-    check('RS-07 Queues card: exactly one Read button, in the first header row, no per-row Read', qb().length === 1 && qb()[0].textContent === 'Read' && qb()[0].getAttribute('data-act') === 'qread' && P.el('rm_card_queues').lastElementChild.firstElementChild.contains(qb()[0]) && !P.el('rm_card_queues').querySelector('[data-cmd]'), qb().map((b) => b.textContent).join());
+    check('RS-07 Queues card: one card Read in the first header row, plus one per-row Read each for txq, mbox, maxhop (data-act qread, no data-cmd)', qb().length === 4 && qb().every((b) => b.textContent === 'Read') && qb().slice(1).map((b) => b.getAttribute('data-q')).join() === 'txq,mbox,maxhop' && qb()[0].textContent === 'Read' && qb()[0].getAttribute('data-act') === 'qread' && P.el('rm_card_queues').lastElementChild.firstElementChild.contains(qb()[0]) && !P.el('rm_card_queues').querySelector('[data-cmd]'), qb().map((b) => b.textContent).join());
     const hd = P.el('rm_card_queues').lastElementChild.firstElementChild;
     check('RS-07 header: empty label cell | status "not read yet" | Read', hd.classList.contains('rmh') && hd.children.length === 3 && hd.children[1].textContent === 'not read yet' && hd.children[2] === qb()[0], hd.className + '|' + [...hd.children].map((e) => e.textContent).join('|'));
     const n0 = P.sends().length;
     await P.tap(qb()[0]);
     check('RS-07 Read sends txq first', P.sends().length === n0 + 1 && /cmd=txq&args=(&|$)/.test(P.sends()[n0].body), JSON.stringify(P.sends().slice(n0)));
-    await P.T.advance(12000);
-    await P.T.advance(12000);
-    check('RS-07 then mbox and maxhop, one per lock window, in order', P.sends().slice(n0).map((s) => /cmd=(\w+)/.exec(s.body)[1]).join() === 'txq,mbox,maxhop', JSON.stringify(P.sends().slice(n0).map((s) => s.body)));
+    await P.T.advance(61000);
+    await P.T.advance(61000);
+    check('RS-07 then mbox and maxhop, one per answer-or-60 s step, in order', P.sends().slice(n0).map((s) => /cmd=(\w+)/.exec(s.body)[1]).join() === 'txq,mbox,maxhop', JSON.stringify(P.sends().slice(n0).map((s) => s.body)));
     await P.T.advance(30000);
     check('RS-07 nothing more is sent afterwards', P.sends().length === n0 + 3, P.sends().length - n0);
     await P.setPoll({ sent: [ent('DK5EN-1', 'txq', 'ok q=1/20 bp=quiet tx=1 rt=0 dr=0 u=1', { ctr: 1, ago: 70, st: 'ok' })], targets: tg });
     check('RS-07 status shows the age of the newest read ("last read ...") in the fixed column', P.el('rm_card_queues').lastElementChild.firstElementChild.children[1].textContent === 'last read 70 s ago', P.el('rm_card_queues').lastElementChild.firstElementChild.children[1].textContent);
     P.w.rmPageLeave();
+  }
+  {
+    // RM-Q-01: per-row Read, and the card Read steps on the answer (or after 60 s), never on the fixed 10 s lock alone
+    const tg = [{ dst: 'DK5EN-1', pending: 0, retry: 0, locked: 0, canForce: 0 }];
+    const mk = async () => {
+      const srv = mkServer();
+      srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
+      srv.status = srv.mkStatus({ targets: tg });
+      const P = await mkPage(srv); await P.init(); P.w.rmPick('DK5EN-1');
+      await P.setPoll({ sent: [], targets: tg });
+      P.cmds = () => P.sends().map((x) => /cmd=(\w+)/.exec(x.body)[1]).join();
+      P.card = () => [...P.el('rm_card_queues').querySelectorAll('button')].find((b) => b.getAttribute('data-act') === 'qread');
+      return P;
+    };
+    {
+      const P = await mk();
+      const rowBtn = (c) => [...P.el('rm_def_' + c).querySelectorAll('button')].find((b) => b.getAttribute('data-act') === 'qread');
+      check('RM-Q-01 each row has its own Read', ['txq', 'mbox', 'maxhop'].every((c) => rowBtn(c) && rowBtn(c).getAttribute('data-q') === c));
+      await P.tap(rowBtn('mbox'));
+      await P.T.advance(65000);
+      check('RM-Q-01 per-row Read sends exactly one /rmsend with that cmd only', P.cmds() === 'mbox' && P.w.rmQq.length === 0, P.cmds());
+      P.w.rmPageLeave();
+    }
+    {
+      const P = await mk();
+      await P.tap(P.card());
+      P.srv.status = P.srv.mkStatus({ sent: [ent('DK5EN-1', 'txq', '', { st: 'waiting', ago: 1 })], targets: tg });
+      await P.T.advance(30000);
+      check('RM-Q-01 card Read: no second send while txq is still waiting (30 s, lock long over)', P.cmds() === 'txq', P.cmds());
+      P.srv.status = P.srv.mkStatus({ sent: [ent('DK5EN-1', 'txq', 'ok q=1/20 bp=quiet tx=1 rt=0 dr=0 u=1', { st: 'ok', ago: 1 })], targets: tg });
+      await P.T.advance(4000);
+      check('RM-Q-01 card Read: mbox follows within one tick after the status reports txq ok', P.cmds() === 'txq,mbox', P.cmds());
+      P.w.rmPageLeave();
+    }
+    {
+      const P = await mk();
+      await P.tap(P.card());
+      P.srv.status = P.srv.mkStatus({ sent: [ent('DK5EN-1', 'txq', '', { st: 'waiting', ago: 1 })], targets: tg });
+      await P.T.advance(55000);
+      const early = P.cmds();
+      await P.T.advance(8000);
+      check('RM-Q-01 card Read: with no answer the next send follows at 60 s, not before', early === 'txq' && P.cmds() === 'txq,mbox', early + ' | ' + P.cmds());
+      P.w.rmPageLeave();
+    }
+    {
+      // an OLDER answered txq of the same node (300 s ago) next to the new waiting one is not this step's answer (RM_MUTATE=qanyage)
+      const P = await mk();
+      await P.tap(P.card());
+      P.srv.status = P.srv.mkStatus({ sent: [ent('DK5EN-1', 'txq', '', { st: 'waiting', ago: 1 }), ent('DK5EN-1', 'txq', 'ok q=1/20 bp=quiet tx=1 rt=0 dr=0 u=1', { st: 'ok', ago: 300, ctr: 2 })], targets: tg });
+      await P.T.advance(30000);
+      check('RM-Q-01 card Read: an older ok txq of the node does not release mbox', P.cmds() === 'txq', P.cmds());
+      P.w.rmPageLeave();
+    }
+    {
+      // an answered txq of ANOTHER node is not this step's answer (RM_MUTATE=qanydst)
+      const P = await mk();
+      await P.tap(P.card());
+      P.srv.status = P.srv.mkStatus({ sent: [ent('DK5EN-1', 'txq', '', { st: 'waiting', ago: 1 }), ent('DK5EN-12', 'txq', 'ok q=1/20 bp=quiet tx=1 rt=0 dr=0 u=1', { st: 'ok', ago: 1, ctr: 2 })], targets: tg });
+      await P.T.advance(30000);
+      check('RM-Q-01 card Read: an ok txq of another node does not release mbox', P.cmds() === 'txq', P.cmds());
+      P.w.rmPageLeave();
+    }
   }
   {
     // RS-07 rework: the card-level Read chain on unsaved nodes, on errors, and when the page or node changes mid-chain
@@ -1020,8 +1085,8 @@ function leaks(P, canary) {
       const P = await mkChain(false);
       check('RS-07 unsaved node with a typed password: Read is enabled', P.qb().disabled === false);
       await P.tap(P.qb());
-      await P.T.advance(12000);
-      await P.T.advance(12000);
+      await P.T.advance(61000);
+      await P.T.advance(61000);
       await P.T.advance(30000);
       check('RS-07 unsaved node: the chain completes, txq,mbox,maxhop all sent', P.cmds() === 'txq,mbox,maxhop', P.cmds() + ' | ' + P.text('rm_msg'));
       check('RS-07 unsaved node: every chained send carries dst and the typed password in the body, never in a URL', P.sends().length === 3 && P.sends().every((x) => x.url === '/rmsend' && /^dst=DK5EN-1&pw=secretpw&cmd=/.test(x.body)), JSON.stringify(P.sends().map((x) => x.body)));
@@ -1036,8 +1101,8 @@ function leaks(P, canary) {
       await P.tap(P.qb());
       P.srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
       P.w.rmSel.slot = 0;
-      await P.T.advance(12000);
-      await P.T.advance(12000);
+      await P.T.advance(61000);
+      await P.T.advance(61000);
       await P.T.advance(30000);
       check('RS-07 remembered mid-chain: mbox and maxhop go by slot', P.cmds() === 'txq,mbox,maxhop' && P.sends().slice(1).every((x) => /^slot=0&/.test(x.body)), JSON.stringify(P.sends().map((x) => x.body)));
       check('RS-07 remembered mid-chain: the held prefix is released after the last step', P.w.rmQp === '', P.w.rmQp);
@@ -1050,7 +1115,7 @@ function leaks(P, canary) {
       const P = await mkChain(true);
       P.srv.sendHook = (f) => (f.get('cmd') === 'mbox' ? { ok: false, err: 'zzz', msg: 'Mailbox refused.' } : null);
       await P.tap(P.qb());
-      await P.T.advance(12000);
+      await P.T.advance(61000);
       await P.T.advance(60000);
       check('RS-07 an err reply mid-chain clears the queue: maxhop is never sent', P.cmds() === 'txq,mbox' && P.w.rmQq.length === 0, P.cmds());
       check('RS-07 the err reply is shown once', P.text('rm_msg') === 'Mailbox refused.', P.text('rm_msg'));
@@ -1060,7 +1125,7 @@ function leaks(P, canary) {
       const P = await mkChain(true);
       P.srv.rejectHook = (u, init) => u === '/rmsend' && /cmd=mbox/.test(String(init && init.body));
       await P.tap(P.qb());
-      await P.T.advance(12000);
+      await P.T.advance(61000);
       await P.T.advance(60000);
       check('RS-07 a network reject mid-chain clears the queue: maxhop is never sent', P.cmds() === 'txq,mbox' && P.w.rmQq.length === 0, P.cmds());
       check('RS-07 the "no answer" message stays (a later chain step does not wipe it)', /did not answer/.test(P.text('rm_msg')), P.text('rm_msg'));
@@ -1070,7 +1135,7 @@ function leaks(P, canary) {
       const P = await mkChain(false);
       await P.tap(P.qb());
       P.w.rmPick('OE1ABC-5');
-      await P.T.advance(12000);
+      await P.T.advance(61000);
       await P.T.advance(60000);
       check('RS-07 rmPick to another node mid-chain sends nothing more (the typed password never goes to the other node)', P.cmds() === 'txq' && P.w.rmQq.length === 0 && P.w.rmQp === '', P.cmds());
       P.w.rmPageLeave();
@@ -1089,7 +1154,7 @@ function leaks(P, canary) {
       const P = await mkChain(true);
       await P.tap(P.qb());
       P.w.rmForget(); await flush();
-      await P.T.advance(12000);
+      await P.T.advance(61000);
       await P.T.advance(30000);
       check('RS-07 node forgotten mid-chain (no key, no password): the chain is dropped silently, no error per command', P.cmds() === 'txq' && P.w.rmQq.length === 0 && !/Type the password/.test(P.text('rm_msg')), P.cmds() + ' | ' + P.text('rm_msg'));
       P.w.rmPageLeave();
@@ -1101,7 +1166,7 @@ function leaks(P, canary) {
       const n = P.sends().length;
       P.w.rmQRead(P.el('rm_card_queues').querySelector('[data-act="qread"]')); await flush();
       check('RS-07 rmQRead during a Heard list read sends nothing and queues nothing', P.sends().length === n && P.w.rmQq.length === 0, P.sends().length - n);
-      P.w.rmMhStop(); await P.T.advance(12000);
+      P.w.rmMhStop(); await P.T.advance(61000);
       check('RS-07 Read is enabled again after the Heard read stops', P.qb().disabled === false);
       P.w.rmPageLeave();
     }
