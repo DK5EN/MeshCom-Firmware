@@ -69,7 +69,7 @@
 
 **Network and gateway**
 
-- **EXTUDP peer changes take effect at once** on console and web (EXT-PEER-01). Accepted: a RAK hostname peer no longer serves inbound traffic.
+- **EXTUDP peer changes take effect at once** on console and web (EXT-PEER-01). Accepted: a RAK cannot resolve hostnames, so a hostname peer now leaves EXTUDP off in both directions, with one log line. Before, it still received but sent to the old address. Set `--extudpip` to a dotted IP.
 - **EXTUDP can answer register queries** (`{"type":"reg","q":"SN"}`): read-only, secrets filtered, only to the configured peer, one per second.
 - **Messages are held during a server outage:** up to 20 minutes, text only, 1 KB on classic ESP32, 6 KB on S3 and RAK, replayed with the same id (`--udphold`).
 - **Gateway stability:** UDP drain, server name resolved again, EXTUDP name lookup no longer blocks.
