@@ -119,6 +119,20 @@ Never rely on a subagent rediscovering these from project memory or a prior sess
   tokens cost ~5x its input and ~10x a Sonnet read; the agent reading the file itself is far
   cheaper. Do spend a sentence on conclusions that save the agent twenty exploratory calls ("the
   bug is in `handler.py:validate()`; the frontend sends camelCase").
+- **Give exact signatures for the APIs the brief depends on, and compile before testing.** List the
+  signatures the agent must call or implement, one line each, test helpers included; these are not
+  file bodies. Add what the call needs to resolve: in Rust the `use` line for a trait and any Cargo
+  feature; in C/C++ the header and any `#ifdef` guard around the declaration. A `scout` collects
+  existing ones (§3.1), and the plan fixes a sibling's unwritten API before dispatch. Name a
+  compile-only check of the agent's own crate or target to run before any test, covering test code
+  when the brief writes tests. Rust: `cargo check -p <crate>`, plus `--tests`, because plain
+  `cargo check` skips test code. PlatformIO: `pio test -e <native_env> --without-testing`, native
+  envs only (a bare `pio test` flashes attached boards); its `0 test cases` and `[PASSED]` only mean
+  it compiled. A one-target check does not replace the wave gate's build of every target. This
+  targets API-guessing errors, and most compile errors were in test code (72 of 105 with a known
+  target). Expected saving: under 1% of subagent turns. All compile fix
+  loops together cost 2.6% of subagent turns and 1.7% of their output tokens across about 400
+  subagent transcripts (measured 2026-11-07). Any saving on lookup calls was not measured.
 - **Locate before reading: `grep -n`, then a line range.** No unbounded `Read` or `cat` on a file
   over ~400 lines; read `sed -n 'a,bp'` / `Read` with `offset`+`limit` around the hit. Whole-file
   views over 3k tokens were 37% of the file-view context re-sent across 24h of sessions
@@ -132,7 +146,7 @@ Never rely on a subagent rediscovering these from project memory or a prior sess
   rest of the session and is re-read on every later turn.
 
 Model tier and effort are part of the dispatch decision. Use the named agents in
-`~/.claude/agents/` (prices per MTok in/out, as of 2026-10):
+`.claude/agents/` (prices per MTok in/out, as of 2026-10):
 
 | Work                                                         | Dispatch as                | Model and effort                                                     |
 | ------------------------------------------------------------ | -------------------------- | -------------------------------------------------------------------- |
@@ -252,16 +266,23 @@ The orchestrator's own context is the largest single cost: over two weeks ~78% o
 cache reads, at a median of 240k and a p90 of 550k tokens re-read on every turn. Every byte you
 pull in is paid again on each later turn.
 
+- **Send lookups to a `scout`: the main thread receives answers, not raw `sed` and `grep` output.**
+  "Where is X set", "who calls Y", "which files does Z touch" go out as a question and come back as
+  a conclusion with `file:line` references. Keep for yourself only the lines you are about to judge
+  or edit and checks whose target you already know, including the §5 spot-checks. Estimated saving:
+  about 8–10% (the owner's estimate, not measured).
 - Bulky reads go to a `scout` that returns a terse summary: logs, transcripts, full test output,
-  large files, `--info` dumps. Read a file yourself only for the lines you are about to judge.
-- The same locate-then-range rule from §2 applies to you: `grep -n` first, then the range.
+  large files, `--info` dumps.
+- The same locate-then-range rule from §2 applies to the reads you keep: `grep -n` first, then the
+  range.
 - Pipe gate and build output through `tail`, `grep -c` or a summary line before it reaches you.
 - **Batch independent calls into one message.** Every turn re-reads the whole context, so the
-  number of turns is the cost multiplier, not the number of calls. Greps, line-range reads,
-  `git` lookups and `ls` checks that don't depend on each other go out together in one message
-  — or as one Bash command chaining them. Over four weeks only 5% of orchestrator turns carried
-  more than one call, while 29% were pure read-only recon ($614 at ~200k context each,
-  2026-10-10). Before sending a single read, ask what else you will need next and send it too.
+  number of turns is the cost multiplier, not the number of calls. Scout dispatches and the reads
+  you keep (line ranges, known-target greps, `ls` checks) that don't depend on each other go out
+  together in one message — or as one Bash command chaining the reads. Over four weeks only 5% of
+  orchestrator turns carried more than one call, while 29% were pure read-only recon ($614 at
+  ~200k context each, 2026-10-10). Before sending a single read, ask what else you will need next
+  and send it too.
 - **One script for routine checks.** The recurring gate-adjacent checks (gate run, `git status`,
   `git diff --stat`, the `ls` of expected files) go out as one Bash command or one small script
   in the scratchpad, not as five turns.
@@ -353,6 +374,11 @@ compaction only if they are on disk.
 - Treat those documents as the resume point: a fresh context should be able to reconstruct the
   wave plan from them without re-reading the transcript. That is what makes compacting at each wave
   boundary (§3.1) safe — if the docs can't carry the next wave, fix the docs.
+- **Keep the current state short and archive finished waves.** The next wave, the open questions
+  and the resume steps live in their own short file, about one screen. When a wave closes, move its
+  details to an archive doc in the same update and leave one line: the outcome and a pointer. Look
+  things up in the archive through a `scout` (§3.1). One campaign plan grew to 97 KB and was read
+  53 times. Estimated saving: about 1–2% (the owner's estimate, not measured).
 
 ## Failure handling
 
@@ -372,4 +398,4 @@ compaction only if they are on disk.
 
 `fable-review` — a review campaign is these mechanics plus its finder fan-out and adversarial
 verification; the advisor gate itself is §4 step 6 and applies to every behavioral wave, campaign
-or not. The `scout` and `implementer` dispatch tiers are defined in `~/.claude/agents/`.
+or not. The `scout` and `implementer` dispatch tiers are defined in `.claude/agents/`.
