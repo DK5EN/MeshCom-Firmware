@@ -2278,6 +2278,50 @@ static void test_wx_settings_rows_and_defaults()
     TEST_ASSERT_TRUE(sc.find("\"node_gpioctl\", CFG_INT, node_gpioctl, 0.0, 1.0") != std::string::npos);
 }
 
+// GPIO-01 W3 advisor nits: --gpiocontrol takes exact tokens only (no "on foo"), and function-wins for the button
+// also releases the pin OneButton reads right now (pinBoardInUse), which differs from the stored one until a restart.
+static void test_gpio_exact_tokens_and_button_release()
+{
+    const std::string src = read_repo_file("src/command_functions.cpp");
+    const size_t gc = pin_find(src, "commandCheck(msg_text+2, (char*)\"gpiocontrol \") == 0", 0, "no --gpiocontrol branch");
+    const size_t gp = pin_find(src, "commandCheck(msg_text+2, (char*)\"gpio \") == 0", gc, "no --gpio branch");
+    const std::string ctl = src.substr(gc, gp - gc);
+    TEST_ASSERT_TRUE_MESSAGE(ctl.find("sscanf(ga, \"%3s %3s\", ctok, cextra)") != std::string::npos, "--gpiocontrol does not tokenize");
+    TEST_ASSERT_TRUE_MESSAGE(ctl.find("gn == 1 && strcasecmp(ctok, \"on\") == 0") != std::string::npos, "--gpiocontrol on is not exact");
+    TEST_ASSERT_TRUE_MESSAGE(ctl.find("gn == 1 && strcasecmp(ctok, \"off\") == 0") != std::string::npos, "--gpiocontrol off is not exact");
+    TEST_ASSERT_TRUE_MESSAGE(ctl.find("strncasecmp(ga, \"on\", 2)") == std::string::npos, "old prefix match for on still there");
+    const std::string fw = slice_body(src, "static void gpioFnWins(PinFunc f)", "no gpioFnWins");
+    TEST_ASSERT_TRUE_MESSAGE(fw.find("pinBoardInUse(f)") != std::string::npos, "gpioFnWins does not release the in-use pin");
+    TEST_ASSERT_TRUE_MESSAGE(fw.find("pinBoardEffective(f)") != std::string::npos, "gpioFnWins does not release the stored pin");
+}
+
+
+// GPIO-01 W4 rework: source pin for the /setparam gpio<N> rung in web_setup.cpp (ESP32-only code, no host harness).
+// The rung hands the value to gpioCtlCommand() as an enum, never through a console line, so a value cannot chain a
+// second command; it accepts exactly on/off/in/release and answers FAIL when refused.
+static void test_web_setup_gpio_rung_source_pins()
+{
+    const std::string web = read_repo_file("src/web_functions/web_setup.cpp");
+    const size_t from = pin_find(web, "GPIO<N> (GPIO-01 Part B)", 0, "no GPIO<N> rung marker");
+    const size_t to = pin_find(web, "###### MCPOUT", from, "no MCPOUT marker after the GPIO<N> rung");
+    const std::string rung = web.substr(from, to - from);
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("gpioCtlCommand(") != std::string::npos, "the rung does not call gpioCtlCommand(");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("snprintf") == std::string::npos, "the rung builds a string with snprintf");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("commandAction") == std::string::npos, "the rung reaches commandAction");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("v.equals(\"on\")") != std::string::npos, "the rung does not accept exactly on");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("v.equals(\"off\")") != std::string::npos, "the rung does not accept exactly off");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("v.equals(\"in\")") != std::string::npos, "the rung does not accept exactly in");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("v.equals(\"release\")") != std::string::npos, "the rung does not accept exactly release");
+    size_t equals = 0;
+    for (size_t at = rung.find("v.equals("); at != std::string::npos; at = rung.find("v.equals(", at + 1))
+        equals++;
+    TEST_ASSERT_EQUAL_MESSAGE(4, (int)equals, "the rung accepts a value other than on/off/in/release");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("startsWith") == std::string::npos && rung.find("indexOf") == std::string::npos,
+                             "the rung matches the value by prefix or substring");
+    const size_t bad = pin_find(rung, "if(!opOk", 0, "the rung does not test the refused value");
+    pin_find(rung, "WS_RETURNCODE_FAIL", bad, "the refused value does not set WS_RETURNCODE_FAIL");
+}
+
 
 // BAT-04 C5 (operator decision 2026-11-02): the charge state reaches the phone in its own register
 // "IS2" (CHG = state name, CHGMA = signed mA only when measurable), sent right after IS1 and only
@@ -2339,6 +2383,8 @@ int main(int, char **)
     RUN_TEST(test_pin_setters_ask_the_policy_and_restore);
     RUN_TEST(test_wx_ble_keys_live_in_s1_and_fit_the_budget);
     RUN_TEST(test_wx_settings_rows_and_defaults);
+    RUN_TEST(test_gpio_exact_tokens_and_button_release);
+    RUN_TEST(test_web_setup_gpio_rung_source_pins);
     RUN_TEST(test_a_non_numeric_argument_is_zero_not_leftover);
     RUN_TEST(test_leading_space_is_skipped);
     RUN_TEST(test_trailing_junk_still_yields_the_leading_number);

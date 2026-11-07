@@ -236,7 +236,7 @@ if(btn)btn.textContent=mcQueueOpen?'hide':'show';
 // Switches use /setparam/ (boardled, chargeled, mcpout<P>, mcpio<P>, mcpname<P>): fetch() carries X-MC through the wrapper above.
 // Names are user text: only ever put into value/textContent, never into HTML.
 // PINS-JS-BEGIN
-var pnT=0,pnG=0,pnOn=false,pnBusy=false,pnRows={},pnAsg={},pnAsgOk={},pnAsgAny=false,pnAsgKnown=false,pnHw=false;
+var pnT=0,pnG=0,pnOn=false,pnBusy=false,pnRows={},pnAsg={},pnAsgOk={},pnAsgAny=false,pnAsgKnown=false,pnHw=false,pnGp={},pnGpAny=false,pnGpKnown=false;
 var pnLoginNote='Session expired: reload this page and log in again.';
 function pnBytes(s){var n=0;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);if(c<128)n++;else if(c<2048)n+=2;else if(c>=55296&&c<56320){n+=4;i++;}else n+=3;}return n;}
 function pnCut(s){while(s.length&&pnBytes(s)>15){var k=s.length-1;if(k>0&&s.charCodeAt(k)>=56320&&s.charCodeAt(k)<57344&&s.charCodeAt(k-1)>=55296&&s.charCodeAt(k-1)<56320)k--;s=s.slice(0,k);}return s;}
@@ -257,7 +257,7 @@ if(g!=pnG)return;pnBusy=false;pnTxt('pn_note','Stale: the node did not answer, s
 });
 }
 function pinsInit(){pinsLeave();pnOn=true;pnG++;pnPoll();}
-function pinsLeave(){pnOn=false;pnG++;clearTimeout(pnT);pnT=0;pnBusy=false;pnRows={};pnAsg={};pnAsgOk={};pnAsgAny=false;pnAsgKnown=false;pnHw=false;}
+function pinsLeave(){pnOn=false;pnG++;clearTimeout(pnT);pnT=0;pnBusy=false;pnRows={};pnAsg={};pnAsgOk={};pnAsgAny=false;pnAsgKnown=false;pnHw=false;pnGp={};pnGpAny=false;pnGpKnown=false;}
 function pnSet(param,val,refuse){
 fetch('/setparam/?'+param+'='+encodeURIComponent(val)).then(function(r){if(r.status==401)return null;return r.json();}).then(function(j){
 if(!j){pnTxt('pn_msg',pnLoginNote);return;}
@@ -267,7 +267,7 @@ if(pnOn){clearTimeout(pnT);pnT=0;pnPoll();}
 }).catch(function(){pnTxt('pn_msg','The request failed.');if(refuse)refuse('The request failed.');});
 }
 // "No switchable outputs" only when there is neither an LED / MCP pin nor an assignment row; undecided until /pinassign answered once.
-function pnNone(){var e=pnEl('pn_none');if(e)e.hidden=!pnAsgKnown||pnHw||pnAsgAny;}
+function pnNone(){var e=pnEl('pn_none');if(e)e.hidden=!pnAsgKnown||!pnGpKnown||pnHw||pnAsgAny||pnGpAny;}
 // Pin assignments (GET /pinassign, src/pin_assign_json.h): 1-Wire, button, analog, anemometer. Writes use the same setparam names as the Setup page.
 var pnAsgName={ow:'1-Wire',btn:'Button',an:'Analog',wind:'Anemometer'};
 // the "ok" mask is 0x + 16 hex digits (64 bits do not fit a JS number): bit n is digit 17-floor(n/4), bit n%4
@@ -318,9 +318,53 @@ r.hint.textContent=h.length?'('+h.join(', ')+')':'';
 // Chained after the /pinstatus answer: one connection at a time (W5100S sockets). pnBusy stays set until it is done.
 function pnAssign(g){
 fetch('/pinassign').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){
-if(g!=pnG)return;pnBusy=false;pnAsgRender(j);pnArm();
+if(g!=pnG)return;pnAsgRender(j);pnGpio(g);
 }).catch(function(){
-if(g!=pnG)return;pnBusy=false;pnAsgKnown=true;pnNone();pnArm();
+if(g!=pnG)return;pnAsgKnown=true;pnNone();pnGpio(g);
+});
+}
+// Free GPIO (GET /gpiostatus, src/gpio_status_json.h): chained after /pinassign, the last link of the chain (pnBusy ends here).
+// A failed answer keeps the rows. The master switch is console-only: the page only reads it. Writes: /setparam/?gpio<N>=on|off|in|release.
+var pnGpOwn={ow:'1-Wire',btn:'Button',an:'Analog',wind:'Anemometer',led:'Board LED',fn:'a function'};
+var pnGpOps=['on','off','in','release'];
+function pnGpRow(pin){
+var r=pnGp[pin];if(r)return r;
+var tr=document.createElement('tr'),th=document.createElement('th'),to=document.createElement('td'),td=document.createElement('td'),tl=document.createElement('td'),ts=document.createElement('td');
+th.scope='row';th.textContent=pin;
+var msg=document.createElement('span'),bs={};
+msg.setAttribute('role','status');
+pnGpOps.forEach(function(op){
+var b=pnBtn(op,function(){msg.textContent='';pnSet('gpio'+pin,op,function(m){msg.textContent=m=='Saved.'?'':(m=='Refused by pin policy.'?'Refused: GPIO control is off or the pin is in use.':m);});},'mctab mcledbtn');
+b.setAttribute('aria-label','GPIO '+pin+' '+op);b.setAttribute('aria-pressed','false');bs[op]=b;ts.appendChild(b);
+});
+ts.appendChild(document.createTextNode(' '));ts.appendChild(msg);
+tr.appendChild(th);tr.appendChild(to);tr.appendChild(td);tr.appendChild(tl);tr.appendChild(ts);
+pnEl('pn_gpio_body').appendChild(tr);
+r=pnGp[pin]={tr:tr,own:to,dir:td,lvl:tl,bs:bs,msg:msg};return r;
+}
+function pnGpioRender(j){
+var ps=j.pins||[],seen={};
+pnGpAny=!!j.avail&&ps.length>0;pnGpKnown=true;pnNone();
+var e=pnEl('pn_gpio');if(e)e.hidden=!pnGpAny;
+e=pnEl('pn_gpio_off');if(e)e.hidden=!pnGpAny||!!j.master;
+for(var i=0;i<ps.length&&pnGpAny;i++){
+var p=ps[i],r=pnGpRow(p.pin);seen[p.pin]=1;
+r.own.textContent=p.own?(pnGpOwn[p.own]||p.own):'free';
+r.dir.textContent=p.dir;
+r.lvl.textContent=p.lvl==1?'HIGH':p.lvl==0?'LOW':'-';
+var sw=!!j.master&&!p.own;
+for(var k=0;k<pnGpOps.length;k++){
+var op=pnGpOps[k],b=r.bs[op],on=(op=='on'&&p.dir=='out'&&p.lvl==1)||(op=='off'&&p.dir=='out'&&p.lvl==0)||(op=='in'&&p.dir=='in');
+b.hidden=!sw;b.setAttribute('aria-pressed',on?'true':'false');b.classList.toggle('mctab-on',on);
+}
+}
+for(var q in pnGp)if(!seen[q]){var o=pnGp[q];if(o.tr.parentNode)o.tr.parentNode.removeChild(o.tr);delete pnGp[q];}
+}
+function pnGpio(g){
+fetch('/gpiostatus').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){
+if(g!=pnG)return;pnBusy=false;pnGpioRender(j);pnArm();
+}).catch(function(){
+if(g!=pnG)return;pnBusy=false;pnGpKnown=true;pnNone();pnArm();
 });
 }
 function pinsLed(m){pnSet('boardled',m);}

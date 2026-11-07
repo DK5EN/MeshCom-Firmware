@@ -71,6 +71,8 @@ let setReply = { returncode: 0 };
 let setStatus = 200;
 let pinStatus;
 let assignFail = null;   // null | 'net' for /pinassign
+let gpioFail = null;     // null | 'net' for /gpiostatus
+let gpioStatus = { avail: 0, master: 0, pins: [] };
 function maskOf(bits, zero = true) { let m = zero ? 1n : 0n; for (const b of bits) m |= 1n << BigInt(b); return '0x' + m.toString(16).padStart(16, '0'); }
 function freshAssign() {
   const all = []; for (let i = 1; i < 40; i++) if (i !== 18 && i !== 21) all.push(i);
@@ -108,6 +110,10 @@ w.fetch = (url, opt) => {
     if (assignFail === 'net') return Promise.reject(new TypeError('Failed to fetch'));
     return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(JSON.parse(JSON.stringify(pinAssign))) });
   }
+  if (url === '/gpiostatus') {
+    if (gpioFail === 'net') return Promise.reject(new TypeError('Failed to fetch'));
+    return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(JSON.parse(JSON.stringify(gpioStatus))) });
+  }
   if (url === '/pinstatus') {
     if (fail === 'net') return Promise.reject(new TypeError('Failed to fetch'));
     if (fail === 401) return Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({ ok: false }) });
@@ -143,6 +149,8 @@ const polls = () => calls.filter((c) => c.url === '/pinstatus').length;
 const rows = () => w.document.querySelectorAll('#pn_body tr');
 const arows = () => w.document.querySelectorAll('#pn_asg_body tr');
 const assigns = () => calls.filter((c) => c.url === '/pinassign').length;
+const gpios = () => calls.filter((c) => c.url === '/gpiostatus').length;
+const grows = () => w.document.querySelectorAll('#pn_gpio_body tr');
 
 (async () => {
   // ---- frame ----
@@ -153,8 +161,8 @@ const assigns = () => calls.filter((c) => c.url === '/pinassign').length;
   // jsdom does not compute the cascade: the rule that lets [hidden] win over `#content_inner button` / `.mctab` (display:inline-flex) must exist
   check('css: #content_inner button[hidden] is display:none (beats the inline-flex rules)', /#content_inner\s+button\[hidden\]\s*\{[^}]*display\s*:\s*none/.test(css));
   check('frame: status regions are role=status', (html.match(/role="status"/g) || []).length === 2);
-  check('frame: table has column headers with scope', (html.match(/<th scope="col">/g) || []).length === 9);
-  check('frame: everything hidden until the first answer', ['pn_led', 'pn_chg', 'pn_none', 'pn_mcp', 'pn_asg'].every((i) => new RegExp('id="' + i + '"[^>]*hidden').test(html)));
+  check('frame: table has column headers with scope', (html.match(/<th scope="col">/g) || []).length === 14);
+  check('frame: everything hidden until the first answer', ['pn_led', 'pn_chg', 'pn_none', 'pn_mcp', 'pn_asg', 'pn_gpio'].every((i) => new RegExp('id="' + i + '"[^>]*hidden').test(html)));
 
   // ---- polling starts on page load ----
   w.loadPage('pins', $('navpins'), true);
@@ -376,14 +384,62 @@ const assigns = () => calls.filter((c) => c.url === '/pinassign').length;
   rows()[5].querySelectorAll('button')[0].click(); await settle();
   check('Set sends at most 15 bytes', calls[n].url === '/setparam/?mcpnameA5=' + encodeURIComponent('ÄÄÄÄÄÄÄ'), calls[n].url);
 
+  // ---- free GPIO (GET /gpiostatus): chained after /pinassign, read-only master, writes through setparam gpio<N> ----
+  check('gpio: avail 0 -> section hidden, no rows', $('pn_gpio').hidden && grows().length === 0 && $('pn_gpio_off').hidden);
+  check('gpio: /gpiostatus chained after /pinassign (one connection at a time)', (() => { const seq = calls.filter((c) => /^\/(pinstatus|pinassign|gpiostatus)$/.test(c.url)); return seq.some((c) => c.url === '/gpiostatus') && seq.every((c, i) => c.url !== '/gpiostatus' || (i > 0 && seq[i - 1].url === '/pinassign')); })());
+  check('gpio: frame has the "Free GPIO" caption and the master-off note text', />Free GPIO<\/caption>/.test(html) && /GPIO control is off \(console: --gpiocontrol on\)\./.test(html));
+  gpioStatus = { avail: 1, master: 0, pins: [ { pin: 13, own: '', dir: '-', lvl: -1 }, { pin: 14, own: '', dir: '-', lvl: -1 }, { pin: 4, own: 'ow', dir: '-', lvl: -1 } ] };
+  let gn = gpios();
+  runTimers(5000); await settle();
+  check('gpio: one /gpiostatus per poll', gpios() === gn + 1, gpios() + ' vs ' + gn);
+  check('gpio: section shown with three rows', !$('pn_gpio').hidden && grows().length === 3, grows().length);
+  check('gpio: master off -> note shown, rows listed, no switch button visible', !$('pn_gpio_off').hidden && [...grows()].every((r) => [...r.querySelectorAll('button')].every((b) => b.hidden)));
+  check('gpio: owner shown as name, free pin as "free"', grows()[2].querySelectorAll('td')[0].textContent === '1-Wire' && grows()[0].querySelectorAll('td')[0].textContent === 'free', grows()[2].querySelectorAll('td')[0].textContent);
+  check('gpio: "No switchable outputs" stays hidden', $('pn_none').hidden);
+  gpioStatus.master = 1;
+  gpioStatus.pins[1] = { pin: 14, own: '', dir: 'out', lvl: 1 };
+  const g0 = grows()[0];
+  runTimers(5000); await settle();
+  check('gpio: master on -> note hidden', $('pn_gpio_off').hidden);
+  check('gpio: free rows show 4 buttons on/off/in/release, the owned row none', [...grows()[0].querySelectorAll('button')].map((b) => b.textContent + (b.hidden ? '!' : '')).join(',') === 'on,off,in,release' && [...grows()[2].querySelectorAll('button')].every((b) => b.hidden));
+  check('gpio: rows updated in place; direction and level shown; pressed state', grows()[0] === g0 && grows()[1].querySelectorAll('td')[1].textContent === 'out' && grows()[1].querySelectorAll('td')[2].textContent === 'HIGH' && grows()[1].querySelectorAll('button')[0].getAttribute('aria-pressed') === 'true' && grows()[0].querySelectorAll('td')[2].textContent === '-');
+  check('gpio: buttons are labelled', grows()[0].querySelectorAll('button')[0].getAttribute('aria-label') === 'GPIO 13 on');
+  gn = calls.length;
+  grows()[0].querySelectorAll('button')[0].click(); await settle();
+  check('gpio: switch sends /setparam/?gpio13=on with X-MC', calls[gn] && calls[gn].url === '/setparam/?gpio13=on' && calls[gn].xmc === '1', JSON.stringify(calls[gn]));
+  check('gpio: switch is followed by an immediate poll incl. /gpiostatus', calls.slice(gn + 1).some((x) => x.url === '/gpiostatus'));
+  gn = calls.length;
+  grows()[1].querySelectorAll('button')[3].click(); await settle();
+  check('gpio: release sends gpio14=release', calls[gn].url === '/setparam/?gpio14=release', calls[gn].url);
+  setStatus = 422; setReply = { returncode: 1 };
+  gn = calls.length;
+  grows()[0].querySelectorAll('button')[1].click(); await settle();
+  check('gpio: 422 shows the refusal at that row only', calls[gn].url === '/setparam/?gpio13=off' && /Refused/.test(grows()[0].querySelectorAll('td')[3].textContent) && grows()[1].querySelectorAll('td')[3].textContent.indexOf('Refused') < 0, grows()[0].querySelectorAll('td')[3].textContent);
+  setStatus = 200; setReply = { returncode: 0 };
+  grows()[0].querySelectorAll('button')[1].click(); await settle();
+  check('gpio: next success clears the row refusal', grows()[0].querySelectorAll('td')[3].textContent.indexOf('Refused') < 0, grows()[0].querySelectorAll('td')[3].textContent);
+  gpioFail = 'net';
+  gn = gpios();
+  runTimers(5000); await settle();
+  check('gpio: a failed /gpiostatus keeps the rows and polling goes on', gpios() === gn + 1 && grows().length === 3 && !$('pn_gpio').hidden && timers.length === 1, gpios() + '/' + grows().length + '/' + timers.length);
+  gpioFail = null;
+  gpioStatus.pins = [ { pin: 13, own: '', dir: 'in', lvl: 0 } ];
+  runTimers(5000); await settle();
+  check('gpio: a pin that is gone loses its row', grows().length === 1 && grows()[0].querySelectorAll('td')[1].textContent === 'in');
+  gpioStatus = { avail: 0, master: 0, pins: [] };
+  runTimers(5000); await settle();
+  check('gpio: avail 0 again hides the section', $('pn_gpio').hidden && grows().length === 0);
+  runTimers(5000); await settle();
+
   // ---- polling stops on leave ----
-  const before = polls(), beforeA = assigns();
+  const before = polls(), beforeA = assigns(), beforeG = gpios();
   w.loadPage('info', $('navinfo'), true);
   await settle();
   check('leave: no timer left', timers.length === 0, timers.length);
   runTimers(30000); await settle();
   check('leave: no /pinstatus after the page is gone', polls() === before, polls() + ' vs ' + before);
   check('leave: no /pinassign after the page is gone', assigns() === beforeA, assigns() + ' vs ' + beforeA);
+  check('leave: no /gpiostatus after the page is gone', gpios() === beforeG, gpios() + ' vs ' + beforeG);
   // a late answer that was in flight at leave time must not revive polling either
   w.loadPage('pins', $('navpins'), true); await settle();
   w.loadPage('info', $('navinfo'), true); await settle();

@@ -458,8 +458,11 @@ static void tg_post_setlog_off() { memset(LogCallsign, 0x00, sizeof(LogCallsign)
 static void gpioFnWins(PinFunc f)
 {
 #if defined(ESP32)
+    // the stored pin and the one in use now (the button pin is read at boot, they differ until a restart)
     const int p = pinBoardEffective(f);
     if(p > 0) gpioCtlReleasePin(p);
+    const int u = pinBoardInUse(f);
+    if(u > 0 && u != p) gpioCtlReleasePin(u);
 #else
     (void)f;
 #endif
@@ -2824,13 +2827,17 @@ void commandAction(char *umsg_text, bool ble)
     {
     #if defined(ESP32)
         const char *ga = msg_text+14;
-        if(strncasecmp(ga, "on", 2) == 0 && (ga[2] == 0 || ga[2] == ' ' || ga[2] == '\r' || ga[2] == '\n'))
+        // exact tokens like --gpio: "on" | "off", nothing after ("on foo", "onx" are refused)
+        char ctok[4] = {0};
+        char cextra[4] = {0};
+        const int gn = sscanf(ga, "%3s %3s", ctok, cextra);
+        if(gn == 1 && strcasecmp(ctok, "on") == 0)
         {
             meshcom_settings.node_gpioctl = 1;
             gpioCtlSetMaster(true);
         }
         else
-        if(strncasecmp(ga, "off", 3) == 0 && (ga[3] == 0 || ga[3] == ' ' || ga[3] == '\r' || ga[3] == '\n'))
+        if(gn == 1 && strcasecmp(ctok, "off") == 0)
         {
             meshcom_settings.node_gpioctl = 0;
             gpioCtlSetMaster(false);

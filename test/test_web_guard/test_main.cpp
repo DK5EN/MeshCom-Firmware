@@ -924,6 +924,82 @@ void test_setparam_update_names_need_xmc(void)
     TEST_ASSERT_TRUE(webGuardSetparamAllowed("audelayx", "3", without.c_str(), without.size()));
 }
 
+void test_setparam_gpio_needs_xmc(void)
+{
+    std::string with = req("GET /setparam/?gpio13=on HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
+    std::string without = req("GET /setparam/?gpio13=on HTTP/1.1", {"Host: 192.168.68.71"});
+    const char *names[] = {"gpio13", "gpio0", "gpio4"};
+    const char *values[] = {"on", "off", "in", "release"};
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++)
+        for (size_t v = 0; v < sizeof(values) / sizeof(values[0]); v++)
+        {
+            TEST_ASSERT_TRUE_MESSAGE(webGuardIsGpioParam(names[i]), names[i]);
+            TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed(names[i], values[v], without.c_str(), without.size()), names[i]);
+            TEST_ASSERT_TRUE_MESSAGE(webGuardSetparamAllowed(names[i], values[v], with.c_str(), with.size()), names[i]);
+            TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed(names[i], values[v], NULL, 0), names[i]);
+        }
+}
+
+void test_setparam_gpio_lookalikes_are_not_gpio_params(void)
+{
+    std::string without = req("GET /setparam/?gpioctl=on HTTP/1.1", {"Host: 192.168.68.71"});
+    const char *names[] = {"gpioctl", "gpio", "gpio1x", "gpiocontrol", "xgpio13", "gpio-1", "gpio 13", "GPIO13", "onewiregpio", ""};
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(webGuardIsGpioParam(names[i]), names[i]);
+        TEST_ASSERT_TRUE_MESSAGE(webGuardSetparamAllowed(names[i], "on", without.c_str(), without.size()), names[i]);
+    }
+    TEST_ASSERT_FALSE(webGuardIsGpioParam(NULL));
+}
+
+// GPIO-01 W4 rework: setparam values are pasted into "--<cmd> %s" and chained by commandAction(). The GPIO master
+// (--gpiocontrol) is console-only and refused in every value even with X-MC; --gpio needs X-MC like the upd tokens.
+void test_setparam_value_chained_gpiocontrol_always_refused(void)
+{
+    std::string with = req("GET /setparam/?setcall=X HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
+    std::string without = req("GET /setparam/?setcall=X HTTP/1.1", {"Host: 192.168.68.71"});
+    struct NV
+    {
+        const char *name;
+        const char *value;
+    } bad[] = {{"setcall", "DK5EN-1 --gpiocontrol on"}, {"onewiregpio", "13 --gpiocontrol on"},
+               {"setcall", "DK5EN-1 &&GpioControl on"}, {"onewiregpio", "13 &&GPIOCONTROL off"},
+               {"atxt", "x --gpiocontrol"}, {"setcall", "X -- gpiocontrol on"}, {"setcall", "X --gpio 13 on --gpiocontrol on"}};
+    for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed(bad[i].name, bad[i].value, without.c_str(), without.size()), bad[i].value);
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed(bad[i].name, bad[i].value, with.c_str(), with.size()), bad[i].value);
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed(bad[i].name, bad[i].value, NULL, 0), bad[i].value);
+    }
+}
+
+void test_setparam_value_chained_gpio_needs_xmc(void)
+{
+    std::string with = req("GET /setparam/?setcall=X HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
+    std::string without = req("GET /setparam/?setcall=X HTTP/1.1", {"Host: 192.168.68.71"});
+    struct NV
+    {
+        const char *name;
+        const char *value;
+    } bad[] = {{"setcall", "DK5EN-1 --gpio 13 on"}, {"onewiregpio", "13 --gpio 13 on"}, {"setcall", "DK5EN-1 &&GPIO 13 on"},
+               {"atxt", "x --Gpio list"}, {"setcall", "X --gpio13 on"}, {"setcall", "X -- gpio 13 off"}};
+    for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed(bad[i].name, bad[i].value, without.c_str(), without.size()), bad[i].value);
+        TEST_ASSERT_TRUE_MESSAGE(webGuardSetparamAllowed(bad[i].name, bad[i].value, with.c_str(), with.size()), bad[i].value);
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed(bad[i].name, bad[i].value, NULL, 0), bad[i].value);
+    }
+    // existing names and plain values stay open without X-MC
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("setcall", "DK5EN-1", without.c_str(), without.size()));
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("onewiregpio", "13", without.c_str(), without.size()));
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("atxt", "gpio 13 on", without.c_str(), without.size()));
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("atxt", "see gpiocontrol docs", without.c_str(), without.size()));
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("atxt", "a - -gpio b", without.c_str(), without.size()));
+    // the gpio<N> name itself still needs X-MC and is allowed with it
+    TEST_ASSERT_FALSE(webGuardSetparamAllowed("gpio13", "on", without.c_str(), without.size()));
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("gpio13", "on", with.c_str(), with.size()));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -983,5 +1059,9 @@ int main(int, char **)
     RUN_TEST(test_setparam_manualcommand_update_needs_xmc);
     RUN_TEST(test_setparam_any_name_update_value_needs_xmc);
     RUN_TEST(test_setparam_update_names_need_xmc);
+    RUN_TEST(test_setparam_gpio_needs_xmc);
+    RUN_TEST(test_setparam_gpio_lookalikes_are_not_gpio_params);
+    RUN_TEST(test_setparam_value_chained_gpiocontrol_always_refused);
+    RUN_TEST(test_setparam_value_chained_gpio_needs_xmc);
     return UNITY_END();
 }

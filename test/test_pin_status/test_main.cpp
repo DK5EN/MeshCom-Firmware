@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include "../../src/pin_status_json.h"
 #include "../../src/pin_assign_json.h"
+#include "../../src/gpio_status_json.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -68,6 +69,7 @@ static bool val(V &v)
             return false;
         }
     }
+    if (*v.p == '-' && v.p[1] >= '0' && v.p[1] <= '9') v.p++; // /gpiostatus lvl -1
     if (*v.p >= '0' && *v.p <= '9') { while (*v.p >= '0' && *v.p <= '9') v.p++; return true; }
     return false;
 }
@@ -547,6 +549,82 @@ static void test_assign_buffer_limit(void)
     TEST_ASSERT_EQUAL_UINT32(0, pinAssignJson(in, g_ab, 0));
 }
 
+
+// ---- GET /gpiostatus (src/gpio_status_json.h) ----
+void test_gpio_status_avail_zero_is_empty_doc(void)
+{
+    GpioStatusIn in = {false, false, NULL, 0};
+    char b[GPIO_STATUS_JSON_MAX];
+    TEST_ASSERT_EQUAL(strlen("{\"avail\":0,\"master\":0,\"pins\":[]}"), gpioStatusJson(in, b, sizeof(b)));
+    TEST_ASSERT_EQUAL_STRING("{\"avail\":0,\"master\":0,\"pins\":[]}", b);
+    TEST_ASSERT_TRUE(validJson(b));
+    // pins are ignored when not available
+    GpioStatusPin p[1] = {{13, "", 1, 1}};
+    GpioStatusIn in2 = {false, true, p, 1};
+    gpioStatusJson(in2, b, sizeof(b));
+    TEST_ASSERT_EQUAL_STRING("{\"avail\":0,\"master\":1,\"pins\":[]}", b);
+}
+void test_gpio_status_master_off_and_on(void)
+{
+    GpioStatusPin p[2] = {{13, "", 0, -1}, {14, NULL, 0, -1}};
+    char b[GPIO_STATUS_JSON_MAX];
+    GpioStatusIn off = {true, false, p, 2};
+    TEST_ASSERT_TRUE(gpioStatusJson(off, b, sizeof(b)) > 0);
+    TEST_ASSERT_EQUAL_STRING("{\"avail\":1,\"master\":0,\"pins\":[{\"pin\":13,\"own\":\"\",\"dir\":\"-\",\"lvl\":-1},{\"pin\":14,\"own\":\"\",\"dir\":\"-\",\"lvl\":-1}]}", b);
+    TEST_ASSERT_TRUE(validJson(b));
+    p[0].dir = 2; p[0].level = 1; p[1].dir = 1; p[1].level = 0;
+    GpioStatusIn on = {true, true, p, 2};
+    TEST_ASSERT_TRUE(gpioStatusJson(on, b, sizeof(b)) > 0);
+    TEST_ASSERT_EQUAL_STRING("{\"avail\":1,\"master\":1,\"pins\":[{\"pin\":13,\"own\":\"\",\"dir\":\"out\",\"lvl\":1},{\"pin\":14,\"own\":\"\",\"dir\":\"in\",\"lvl\":0}]}", b);
+    TEST_ASSERT_TRUE(validJson(b));
+}
+void test_gpio_status_owner_row_and_sanitising(void)
+{
+    GpioStatusPin p[3] = {{4, "ow", 0, -1}, {2, "led", 0, 7}, {5, "a\"b\\c-d_e123456789", 0, -1}};
+    GpioStatusIn in = {true, true, p, 3};
+    char b[GPIO_STATUS_JSON_MAX];
+    TEST_ASSERT_TRUE(gpioStatusJson(in, b, sizeof(b)) > 0);
+    TEST_ASSERT_NOT_NULL(strstr(b, "{\"pin\":4,\"own\":\"ow\",\"dir\":\"-\",\"lvl\":-1}"));
+    TEST_ASSERT_NOT_NULL(strstr(b, "{\"pin\":2,\"own\":\"led\",\"dir\":\"-\",\"lvl\":-1}")); // bad level -> -1
+    TEST_ASSERT_NOT_NULL(strstr(b, "\"own\":\"abcd_e12\""));                                         // no quote / backslash, 8 chars
+    TEST_ASSERT_TRUE(validJson(b));
+}
+void test_gpio_status_level_unknown_is_minus_one(void)
+{
+    GpioStatusPin p[1] = {{13, "", 1, -1}};
+    GpioStatusIn in = {true, true, p, 1};
+    char b[GPIO_STATUS_JSON_MAX];
+    TEST_ASSERT_TRUE(gpioStatusJson(in, b, sizeof(b)) > 0);
+    TEST_ASSERT_NOT_NULL(strstr(b, "\"dir\":\"in\",\"lvl\":-1"));
+}
+void test_gpio_status_buffer_too_small_fails(void)
+{
+    GpioStatusPin p[2] = {{13, "", 2, 1}, {14, "wind", 0, -1}};
+    GpioStatusIn in = {true, true, p, 2};
+    char b[GPIO_STATUS_JSON_MAX];
+    const size_t full = gpioStatusJson(in, b, sizeof(b));
+    TEST_ASSERT_TRUE(full > 0);
+    char s[GPIO_STATUS_JSON_MAX];
+    for (size_t sz = 1; sz <= full; sz++) // one byte short of the NUL-terminated document and below: failure, nothing half written
+    {
+        memset(s, 'x', sizeof(s));
+        TEST_ASSERT_EQUAL_MESSAGE(0, gpioStatusJson(in, s, sz), "must fail");
+        TEST_ASSERT_EQUAL(0, s[0]);
+    }
+    TEST_ASSERT_EQUAL(full, gpioStatusJson(in, s, full + 1)); // exactly enough
+    TEST_ASSERT_EQUAL(0, gpioStatusJson(in, NULL, 10));
+    TEST_ASSERT_EQUAL(0, gpioStatusJson(in, s, 0));
+}
+void test_gpio_status_worst_case_fits_max(void)
+{
+    GpioStatusPin p[GPIO_STATUS_MAX_PINS];
+    for (int i = 0; i < GPIO_STATUS_MAX_PINS; i++) { p[i].pin = 255; p[i].own = "wind"; p[i].dir = 2; p[i].level = -1; }
+    GpioStatusIn in = {true, true, p, GPIO_STATUS_MAX_PINS};
+    char b[GPIO_STATUS_JSON_MAX];
+    TEST_ASSERT_TRUE(gpioStatusJson(in, b, sizeof(b)) > 0);
+    TEST_ASSERT_TRUE(validJson(b));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -572,5 +650,11 @@ int main(int, char **)
     RUN_TEST(test_assign_mask_setter_refusals);
     RUN_TEST(test_assign_worst_case_fits_max);
     RUN_TEST(test_assign_buffer_limit);
+    RUN_TEST(test_gpio_status_avail_zero_is_empty_doc);
+    RUN_TEST(test_gpio_status_master_off_and_on);
+    RUN_TEST(test_gpio_status_owner_row_and_sanitising);
+    RUN_TEST(test_gpio_status_level_unknown_is_minus_one);
+    RUN_TEST(test_gpio_status_buffer_too_small_fails);
+    RUN_TEST(test_gpio_status_worst_case_fits_max);
     return UNITY_END();
 }

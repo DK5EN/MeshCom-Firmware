@@ -16,6 +16,8 @@ This file contains all web-based setup functions
 #endif
 #include <blocked_calls.h> // BLK-01
 #include <mcpout_refusal.h> // WEB-PIN-01
+#include "web_guard.h" // webGuardIsGpioParam
+#include "gpio_control.h" // GPIO-01 Part B: gpioCtlCommand (ESP32 only)
 #include <string>
 
 
@@ -657,6 +659,37 @@ void webSetup_setParam(setupStruct *setupData){
         setupData->returnCode = (bOut == (setupData->paramValue.compareTo("out")==0))?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
         setupData->returnValue = bOut?"out":"in";
 
+        return;
+    } else
+    /// ###################################### GPIO<N> (GPIO-01 Part B) ######################################
+    // Free-GPIO switch: gpio<N>=on|off|in|release. X-MC is required by webGuardSetparamAllowed() before we get here. The
+    // answer comes straight from gpioCtlCommand() (GpioRes), nothing is built into a console line and nothing is persisted
+    // (levels are RAM only). Refused (master off, pin not free) -> FAIL (HTTP 422). The master switch has no setparam.
+    if(webGuardIsGpioParam(setupData->paramName.c_str())) {
+#if defined(ESP32)
+        const String &v = setupData->paramValue;
+        GpioOp op = GPIO_OP_ON;
+        bool opOk = true;
+        if(v.equals("on")) op = GPIO_OP_ON;
+        else if(v.equals("off")) op = GPIO_OP_OFF;
+        else if(v.equals("in")) op = GPIO_OP_IN;
+        else if(v.equals("release")) op = GPIO_OP_RELEASE;
+        else opOk = false;
+        const String num = setupData->paramName.substring(4);
+        if(!opOk || num.length() > 3)
+        {
+            setupData->returnCode = WS_RETURNCODE_FAIL;
+            return;
+        }
+        PinClass why = PIN_FREE;
+        int lvl = -1;
+        const GpioRes gr = gpioCtlCommand(atoi(num.c_str()), op, &why, &lvl);
+        // GPIO_NOT_HELD (release of a pin we do not hold) changed nothing and needs no hardware: the pin is as asked
+        setupData->returnCode = (gr == GPIO_OK || gr == GPIO_NOT_HELD)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnValue = v;
+#else
+        setupData->returnCode = WS_RETURNCODE_FAIL; // no gpio control on this chip
+#endif
         return;
     } else
     /// ###################################### MCPOUT ######################################

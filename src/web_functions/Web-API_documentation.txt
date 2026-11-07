@@ -311,3 +311,29 @@ GET /pinassign
 
 	Numbers are clamped to 0..255. The Pins page polls it with /pinstatus every 5 s while it is shown, refuses a pin whose bit is clear
 	without asking the node, and shows "Refused by pin policy." when the node answers returncode 1 (HTTP 422).
+
+
+GET /gpiostatus
+
+	No parameters, GET only, read-only, node-local (no CORS); behind the login like the pages. Answer (JSON, one line, at most 1 KB):
+
+	{"avail":1,"master":0,"pins":[{"pin":13,"own":"","dir":"-","lvl":-1},{"pin":4,"own":"ow","dir":"-","lvl":-1}]}
+
+	avail		1 = the board offers free GPIOs and the build has gpio control (ESP32); 0 = nothing to show (nRF52: always
+			{"avail":0,"master":0,"pins":[]})
+	master		the gpio control master switch. It is console-only (--gpiocontrol on|off): there is no /setparam name for it
+			and no web or RM path switches it on. With master 0 every switch is refused.
+	pins		the pins the board lists as free, ascending
+	own		"" = free to switch; else what claims the pin right now: ow, btn, an, wind (the enabled function) or led
+			(board LED); such a pin has no switch
+	dir		in | out = held by gpio control; "-" = untouched
+	lvl		0 | 1 = level of a held pin; -1 = unknown (untouched pins are never read)
+
+	Switch: /setparam/?gpio<N>=on|off|in|release (N = pin number). Needs the header X-MC: 1 (HTTP 403 without it). The answer
+	is the setparam answer: returncode 0 / HTTP 200 when done, returncode 1 / HTTP 422 when refused (master off, pin not free,
+	or a value other than on|off|in|release). Release of a pin gpio control does not hold changes nothing and answers 0.
+	No other setparam value reaches gpio control: a value carrying a chained "--gpiocontrol" / "&&gpiocontrol" is always
+	refused (403, even with X-MC), a chained "--gpio" / "&&gpio" in any value needs X-MC like the update commands.
+	Levels live in RAM only: nothing is stored, after a reboot every pin is an untouched input. The Pins page shows the
+	table ("Free GPIO") only when the board offers a free pin, polls /gpiostatus after /pinassign every 5 s and, with
+	master 0, lists the rows read-only with the note "GPIO control is off (console: --gpiocontrol on).".

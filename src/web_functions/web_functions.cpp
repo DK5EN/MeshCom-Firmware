@@ -12,6 +12,8 @@
 #include <debugconf.h>
 #include "pin_status_json.h" // GET /pinstatus: pure JSON formatter (test/test_pin_status)
 #include "pin_assign_json.h" // GET /pinassign: pure JSON formatter (test/test_pin_status)
+#include "gpio_status_json.h" // GET /gpiostatus: pure JSON formatter (test/test_pin_status)
+#include "gpio_control.h"      // GPIO-01 Part B: state of the free-GPIO control (glue calls ESP32 only)
 #include "web_functions.h"
 #include "web_oled_shot.h"
 #include "web_txbuf.h"     // WEB-TX-01: webTxBeginChunked in send_http_header
@@ -122,6 +124,58 @@ void sub_page_pins();
 // noinline: an inlined copy puts the JSON buffer in work_webpage's frame, i.e. on every web request
 static void __attribute__((noinline)) sub_pin_status();
 static void __attribute__((noinline)) sub_pin_assign();
+static void __attribute__((noinline)) sub_gpio_status();
+
+// GPIO-01 Part B: the pins the board lists as free (PIN_FREE when no function claims anything), at most `max`. A pin that an
+// enabled function or the board LED claims right now gets that owner (pinFuncName() / "led") and no switch; the others come with
+// the gpio control state. ESP32 only: nRF52 has no gpio control, the count is 0 and the code compiles away.
+static size_t gpioStatusCollect(GpioStatusPin *out, size_t max)
+{
+#if defined(ESP32)
+    PinContext base = pinBoardContext(PIN_FN_COUNT);
+    const uint64_t claimedAll = pinBoardClaimed(PIN_FN_COUNT);
+    base.claimed = 0;
+    GpioPinRow rows[GPIO_STATUS_MAX_PINS];
+    const size_t nr = out ? gpioCtlSnapshot(rows, GPIO_STATUS_MAX_PINS) : 0;
+    size_t n = 0;
+    for (int p = 0; p <= pinChipMax(base.chip) && p < 64; p++)
+    {
+        if (pinClassify(base, p) != PIN_FREE) continue;
+        if (!out) return 1; // only asked whether there is any
+        if (n >= max) break;
+        GpioStatusPin &o = out[n++];
+        o.pin = p;
+        o.own = "";
+        o.dir = 0;
+        o.level = -1;
+        if (claimedAll & pinBit(p))
+        {
+            o.own = "fn"; // two functions on one pin
+            for (int f = 0; f < (int)PIN_FN_COUNT; f++)
+                if (!(pinBoardClaimed((PinFunc)f) & pinBit(p)))
+                {
+                    o.own = pinFuncName((PinFunc)f);
+                    break;
+                }
+#if defined(BOARD_LED)
+            if (p == (int)(BOARD_LED + 0) && o.own[0] == 'f') o.own = "led";
+#endif
+            continue;
+        }
+        for (size_t i = 0; i < nr; i++)
+            if (rows[i].pin == p)
+            {
+                o.dir = (int)rows[i].dir;
+                o.level = (int)rows[i].level;
+            }
+    }
+    return n;
+#else
+    (void)out;
+    (void)max;
+    return 0;
+#endif
+}
 
 // GPIO-01 W2: may the Pins page change this assignment on this build? The same guards as the wsParams rows of
 // web_setup.cpp (writable rows only). Used by GET /pinassign and by the nav button, so the page is reachable
@@ -1233,6 +1287,10 @@ void work_webpage(void)
                         { // Pins page: the four pin assignments (1-Wire, button, analog, anemometer), read-only, GET only
                             sub_pin_assign();
                         }
+                        else if (web_header.startsWith("GET /gpiostatus"))
+                        { // Pins page: the free GPIOs and the gpio control state, read-only, GET only
+                            sub_gpio_status();
+                        }
                         else if (web_header.startsWith("GET /rmnodes"))
                         { // RM GUI: the three saved nodes (slot, used, call), never a key
                             sub_rm_nodes_get();
@@ -1558,7 +1616,7 @@ void deliver_scaffold(bool bget_password)
         bool pinAsg = false;
         for (int i = 0; i < (int)PIN_FN_COUNT; i++)
             pinAsg = pinAsg || pinAssignAvail((PinFunc)i);
-        if (pinHw.board || pinHw.charge || bMCP23017 || pinAsg)
+        if (pinHw.board || pinHw.charge || bMCP23017 || pinAsg || gpioStatusCollect(NULL, 0))
             web_client.println("<Button class=\"nav_button\" title=\"Pins\" aria-label=\"Pins\" onclick=\"loadPage('pins',this,true)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"><circle cx=\"7\" cy=\"7\" r=\"2.5\"></circle><circle cx=\"17\" cy=\"7\" r=\"2.5\" fill=\"currentColor\"></circle><circle cx=\"7\" cy=\"17\" r=\"2.5\" fill=\"currentColor\"></circle><circle cx=\"17\" cy=\"17\" r=\"2.5\"></circle></g></svg></Button>\n");
     }
 
@@ -4380,6 +4438,10 @@ void sub_page_pins()
     web_client.println("<thead><tr class=\"font-bold\"><th scope=\"col\">Function</th><th scope=\"col\">Pin</th><th scope=\"col\">Default</th><th scope=\"col\">In use</th><th scope=\"col\">Note</th></tr></thead>");
     web_client.println("<tbody id=\"pn_asg_body\"></tbody></table>");
     web_client.println("<p class=\"font-small\" id=\"pn_asg_hint\" hidden>A pin the board uses itself is refused.</p>");
+    web_client.println("<table class=\"table mw-600\" id=\"pn_gpio\" hidden><caption class=\"font-small\">Free GPIO</caption>");
+    web_client.println("<thead><tr class=\"font-bold\"><th scope=\"col\">Pin</th><th scope=\"col\">Owner</th><th scope=\"col\">Direction</th><th scope=\"col\">Level</th><th scope=\"col\">Switch</th></tr></thead>");
+    web_client.println("<tbody id=\"pn_gpio_body\"></tbody></table>");
+    web_client.println("<p class=\"font-small\" id=\"pn_gpio_off\" hidden>GPIO control is off (console: --gpiocontrol on).</p>");
     web_client.println("<p id=\"pn_none\" hidden>No switchable outputs on this node.</p>");
     web_client.println("<table class=\"table mw-600\" id=\"pn_mcp\" hidden><caption class=\"font-small\">MCP23017 pins</caption>");
     web_client.println("<thead><tr class=\"font-bold\"><th scope=\"col\">Pin</th><th scope=\"col\">Name</th><th scope=\"col\">In/Out</th><th scope=\"col\">Level</th></tr></thead>");
@@ -4437,6 +4499,36 @@ static void __attribute__((noinline)) sub_pin_assign()
         web_client.println(body);
     else
         web_client.println("{\"ok\":false}");
+}
+
+/**
+ * ###########################################################################################################################
+ * GET /gpiostatus -- the free GPIOs with owner, direction and level (src/gpio_status_json.h documents the shape). Read-only,
+ * GET only, node-local. Switching goes through /setparam/?gpio<N>=on|off|in|release (web_setup.cpp, needs X-MC); the master
+ * switch has no web path at all (console --gpiocontrol). nRF52: always the empty document.
+ */
+static void __attribute__((noinline)) sub_gpio_status()
+{
+#if defined(ESP32)
+    GpioStatusPin pins[GPIO_STATUS_MAX_PINS];
+    GpioStatusIn in = {false, false, pins, 0};
+    in.n = gpioStatusCollect(pins, GPIO_STATUS_MAX_PINS);
+    in.avail = in.n > 0;
+    in.master = gpioCtlMaster();
+    char body[GPIO_STATUS_JSON_MAX];
+    const size_t n = gpioStatusJson(in, body, sizeof(body));
+    web_cors_ok = false; // node-local read, as /pinassign
+    send_http_header(n ? 200 : 500, RESPONSE_TYPE_JSON);
+    if (n)
+        web_client.println(body);
+    else
+        web_client.println("{\"ok\":false}");
+#else
+    // nRF52: constant empty document, no buffers on the 8 KB loop stack
+    web_cors_ok = false;
+    send_http_header(200, RESPONSE_TYPE_JSON);
+    web_client.println("{\"avail\":0,\"master\":0,\"pins\":[]}");
+#endif
 }
 
 /**

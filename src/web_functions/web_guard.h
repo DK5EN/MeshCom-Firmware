@@ -830,14 +830,57 @@ inline bool webGuardIsUpdParam(const char *name)
                              strcmp(name, "audelay") == 0 || strcmp(name, "auday") == 0 || strcmp(name, "autime") == 0);
 }
 
-// The decision setparam() makes (name already lower-cased, value percent-decoded). X-MC is needed for
-// - the update names (webGuardIsUpdParam), and
-// - an update command in the value of ANY name: every setparam branch pastes the value into "--<cmd> %s" and
-//   commandAction() splits on each "--", so setcall=X%20--update%20install runs --update install too.
-// Everything else is unchanged.
+// GPIO-01 Part B: the /setparam name that switches a free GPIO, "gpio" + 1 or more digits and nothing else (exact:
+// gpio, gpioctl, gpio1x, gpiocontrol are no match). The master switch (--gpiocontrol) is deliberately NOT a setparam.
+inline bool webGuardIsGpioParam(const char *name)
+{
+    if (name == NULL || strncmp(name, "gpio", 4) != 0 || name[4] == 0) return false;
+    for (const char *c = name + 4; *c; c++)
+        if (*c < '0' || *c > '9') return false;
+    return true;
+}
+
+// True if the text carries a chained console command whose name starts with `tok` (lower-case) after a "--" or
+// "&&" prefix, case-insensitive, blanks/tabs between prefix and name skipped. Prefix match on purpose (no
+// end-of-token check): "--gpio13 on", "--gpio<TAB>13" and "--gpiocontrol on" all hit "gpio".
+inline bool webGuardHasChainedCommand(const char *text, const char *tok)
+{
+    using namespace webguard_detail;
+    if (text == NULL || tok == NULL)
+        return false;
+    for (size_t i = 0; text[i] != 0; i++)
+    {
+        if (!((text[i] == '-' && text[i + 1] == '-') || (text[i] == '&' && text[i + 1] == '&')))
+            continue;
+        size_t j = i + 2;
+        while (text[j] == ' ' || text[j] == '\t')
+            j++;
+        size_t k = 0;
+        while (tok[k] != 0 && text[j + k] != 0 && lc(text[j + k]) == tok[k])
+            k++;
+        if (tok[k] == 0)
+            return true;
+    }
+    return false;
+}
+
+// The decision setparam() makes (name already lower-cased, value percent-decoded). Refused ALWAYS, even with X-MC:
+// - a value that carries the chained console command --gpiocontrol: the GPIO master switch is console-only
+//   (docs/concept-gpio-pins-20261106.md), never reachable through /setparam, neither as a name nor chained.
+// X-MC is needed for
+// - the update names (webGuardIsUpdParam),
+// - the free-GPIO switch names gpio<N> (webGuardIsGpioParam), and
+// - an update command or a --gpio command (prefix match "gpio": "--gpio 13 on", "--gpio13") in the value of ANY
+//   name: every setparam branch pastes the value into "--<cmd> %s" and commandAction() splits on each "--" ("&&" in
+//   the web), so setcall=X%20--update%20install runs --update install too and setcall=X%20--gpio%2013%20on would
+//   drive a pin.
+// Everything else is unchanged (no "--"/"&&" in the value: untouched).
 inline bool webGuardSetparamAllowed(const char *name, const char *value, const char *header, size_t len)
 {
-    if (!webGuardIsUpdParam(name) && !webGuardHasUpdCommand(value))
+    if (webGuardHasChainedCommand(value, "gpiocontrol"))
+        return false;
+    if (!webGuardIsUpdParam(name) && !webGuardIsGpioParam(name) && !webGuardHasUpdCommand(value) &&
+        !webGuardHasChainedCommand(value, "gpio"))
         return true;
     return webGuardHasXmc(header, len);
 }
