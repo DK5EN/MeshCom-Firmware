@@ -8,7 +8,7 @@ Base is upstream `dev` 4f60051c (merged into fork-dev 2026-11-02 as `560e65ab`, 
 [#1249](https://github.com/icssw-org/MeshCom-Firmware/pull/1249) (CHARS-01 national characters, TD-25/TD-24, closes #1221),
 [#1250](https://github.com/icssw-org/MeshCom-Firmware/pull/1250) (BAT-04 charge state and BLE `IS2`, closes #1073) and
 [#1251](https://github.com/icssw-org/MeshCom-Firmware/pull/1251) (WX-01 UV/wind/gust plus the TLM-03 T# fix, closes #999)
-plus sp2ong's #1246 (E290 OTP refresh default) are upstream; their branches and worktrees are removed. [#1257](https://github.com/icssw-org/MeshCom-Firmware/pull/1257) (`SNF-ECHO-01`) merged 2026-11-06 as `649b5b17`, not yet synced into `fork-dev`. Fork-only firmware left: the `dev` AU
+plus sp2ong's #1246 (E290 OTP refresh default) are upstream; their branches and worktrees are removed. [#1257](https://github.com/icssw-org/MeshCom-Firmware/pull/1257) (`SNF-ECHO-01`) merged 2026-11-06 as `649b5b17`, synced into `fork-dev` 2026-11-07 (tree unchanged). Fork-only firmware left: the `dev` AU
 channel, RM1 `upd chan`, `--gateway lab` (2fe7ebd4).
 Upstream `dev` is fully merged (nothing to sync, 2026-11-03). Unreleased on `fork-dev`: backlog sweep W0/W1
 (`7e99ad40`, `2c1108e2`) and the open-items campaign. Fork-only firmware still candidate for upstream PRs: the `dev` AU channel,
@@ -23,7 +23,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 - **T-Beam Auto Update download, open (`AU-24`):** see `docs/BACKLOG.md`. Read this before the next release.
 
-- **Store node echo fix 2026-11-06 (`SNF-ECHO-01`), upstream PR [#1257](https://github.com/icssw-org/MeshCom-Firmware/pull/1257) merged 2026-11-06 (`649b5b17`):** shipped in `v4.40a.11.06`. Still to do: `/sync-upstream`, then remove worktree `../MeshCom-PR-next` and branch `pr/snf-echo`. Field check still open: `refr=` on the affected store node. DK5EN-1 now runs a local `fork-dev` build of `42941ab2` (23:28:19), no longer the CI image of `44075ef3`. After the merge: `/sync-upstream`, then remove the worktree and branch.
+- **Store node echo fix 2026-11-06 (`SNF-ECHO-01`), upstream PR [#1257](https://github.com/icssw-org/MeshCom-Firmware/pull/1257) merged 2026-11-06 (`649b5b17`):** shipped in `v4.40a.11.06`. Synced 2026-11-07, worktree and branch `pr/snf-echo` removed. Field check still open: `refr=` on the affected store node. DK5EN-1 now runs a local `fork-dev` build of `42941ab2` (23:28:19), no longer the CI image of `44075ef3`. After the merge: `/sync-upstream`, then remove the worktree and branch.
 
 - **Release gate 2026-11-06, closed with `v4.40a.11.06`:** `docs/campaign-release-gate-20261106.md` holds the wave plan, decisions and state. T-Beam heap (`AU-23`) fixed in W1; `AU-22`, `EXT-PEER-01`, `WEB-PIN-01` and the `TD-34` icon fixed in W2; `RX-TX-02` settled in W3, no firmware loss; `fork-dev` pushed and CI images of `44075ef3` on all four bench nodes in W4; W5 bench pass done, `WEB-GRID-01` fixed, `BLE-SET-01` filed. Next: W6 soak, then the release decision.
 
