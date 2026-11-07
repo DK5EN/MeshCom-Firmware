@@ -5,8 +5,9 @@ DK5EN-14 (T-Deck Plus).
 
 ## Current state
 
-- W1 done 2026-11-07, committed. Next: **W2a** (static colour sites in `lv_obj_functions.cpp`) in parallel with
-  **W2b** (`tdeck_main.cpp` init, `tdeck_helpers` night hook and brightness API, logo and lock images).
+- W1 done 2026-11-07 (`f30c6f3c`). W2a+W2b done 2026-11-07 (`0e80342f`), advisor approved, gate green.
+  Next: **W2c** (runtime sites: header indicators, map points; lock glyph in the header), then **W2d** (setup
+  Auto/Dark/Light control, brightness slider, boot logo on screen), then W3 (web toggle), W4 (bench).
 - Prep commits: `a3cd6db5` (plan moved), `4f253308` (`[env:native_tdeck_theme]` and its ini baseline).
 
 ## W1 outcome
@@ -29,6 +30,25 @@ DK5EN-14 (T-Deck Plus).
   - `muted` serves hints.
 - Advisor: one rework round (primary contrast, header tokens, double tree walk, callback slots), applied by a fresh
   implementer and checked by the orchestrator.
+
+## W2a/W2b outcome (`0e80342f`)
+
+- **W2a:** 74 of 76 static colour sites in `lv_obj_functions.cpp` use shared styles or the file's single
+  `tdeck_theme_on_change` slot (`theme_recolor_cb`: header icon states `hdr_on`/`hdr_off`, file-local setup and
+  table styles). New shared style `tdeck_style_bubble_sys`. Kept: `:817` (commented out), `:1739` map recolour.
+- **W2b:** `tdeck_theme_init` after `lv_disp_drv_register`, before `setDisplayLayout`. Night hook
+  `themeNightSync` in `brightnessEvalPeriod`: sun period computed whether or not `bl auto` is on, fires on change,
+  never in the fallback period. Brightness API `brightnessActiveLevel`, `brightnessSetActiveLevel` (1..16, no
+  callback), `brightnessSetChangeCallback` (SYM+B). Images `mc_logo_img` (64x64 TRUE_COLOR_ALPHA) and `mc_lock_img`
+  (14x16 ALPHA_8BIT) from `tools/svg_to_lvgl_logo.py` (needs `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib`).
+- **Visible changes for the operator (W4 sign-off):** checked toggle buttons are `btn_on` red, not green (web-match);
+  tabs are fully opaque; the bubble sender line uses `muted`.
+- **Accepted, not fixed:** with `bl auto` off the theme can lag up to 60 s (not 10 s) after clock or position
+  first appear (tick interval keys on the backlight period). With `bl auto` off the `[TFT];bl` log shows the real
+  elevation instead of `na`; no parser depends on it.
+- **For W2c:** `tdeck_update_header_standby` (`~:2614-2634`) still sets the standby/kbl icon colours with
+  `lv_palette_main` LIME/GREY and fights `tab_icons_recolor`; migrate to `hdr_on`/`hdr_off`. W2c takes the second
+  `tdeck_theme_on_change` slot.
 
 ## Scope additions (operator, 2026-11-07)
 

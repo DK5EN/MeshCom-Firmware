@@ -73,7 +73,7 @@
 </ul>
 
 <div class="bluf">
-  <p>Ten weeks of fork work: 18 numbered releases, about 30 upstream PRs merged, CI releases since v4.40a.10.11. GPIO-01 (pins page, free GPIO control, RM1 pins/gpio) is implemented and running on the bench. Two campaigns started today and run in parallel: the Heltec V4 GNSS fix (GPSV4-01) is implemented on <code>fork-dev</code> and goes upstream next, untested on hardware; the T-Deck light/dark theme (TD-THEME-01) has its core and <code>--theme</code> command, the display wiring, keyboard-lock glyph and brightness slider are next.</p>
+  <p>Ten weeks of fork work: 18 numbered releases, about 30 upstream PRs merged, CI releases since v4.40a.10.11. GPIO-01 (pins page, free GPIO control, RM1 pins/gpio) is implemented and running on the bench. Two campaigns started today and run in parallel: the Heltec V4 GNSS fix (GPSV4-01) is implemented on <code>fork-dev</code> and goes upstream next, untested on hardware; the T-Deck light/dark theme (TD-THEME-01) has its core, <code>--theme</code> command and the static display wiring; header and map colours, keyboard-lock glyph, brightness slider and boot logo are next.</p>
 </div>
 
 <h2>Key facts</h2>
@@ -167,7 +167,8 @@ const rows = [
  {p:"Heltec V4 GNSS GPSV4-01",n:"W2 upstream PR (submit-pr, German body)",id:"GPSV4-01",st:"plan",s:"11-08",e:"11-09",note:"Body shown to the operator before gh pr create; marked untested on hardware"},
  {p:"Heltec V4 GNSS GPSV4-01",n:"W3 field follow-up (groups.io #1557, testers)",id:"GPSV4-01",st:"plan",s:"11-09",e:"11-21",note:"Reply draft for the operator; optional ci-proof build"},
  {p:"T-Deck theme TD-THEME-01",n:"W0 recon, W1 palette, styles, --theme, setting",id:"TD-THEME-01",st:"done",s:"11-07",e:"11-07",note:"f30c6f3c; host contrast test; one advisor rework round"},
- {p:"T-Deck theme TD-THEME-01",n:"W2a-W2d display wiring, lock glyph, brightness slider, boot logo",id:"TD-THEME-01",st:"plan",s:"11-08",e:"11-10",note:"98 colour sites in four serial waves on lv_obj_functions.cpp; scope added 11-07"},
+ {p:"T-Deck theme TD-THEME-01",n:"W2a/W2b static colour sites, theme init, night hook, images",id:"TD-THEME-01",st:"done",s:"11-07",e:"11-07",note:"0e80342f; 74 of 76 static sites; advisor approved"},
+ {p:"T-Deck theme TD-THEME-01",n:"W2c/W2d header and map sites, lock glyph, brightness slider, boot logo",id:"TD-THEME-01",st:"run",s:"11-07",e:"11-08",note:"serial waves on lv_obj_functions.cpp"},
  {p:"T-Deck theme TD-THEME-01",n:"W3 web GUI theme toggle",id:"TD-THEME-01",st:"plan",s:"11-10",e:"11-11",note:"Three-state control, T-Deck nodes only"},
  {p:"T-Deck theme TD-THEME-01",n:"W4 bench screenshots on DK5EN-14",id:"TD-THEME-01",st:"plan",s:"11-11",e:"11-12",note:"Both themes, every screen, contact sheet for sign-off"},
  {p:"Releases",n:"v4.40a.10.02",id:"",st:"rel",s:"10-02",e:"10-02",note:"Tags v4.40a and v4.40a.10.02"},
