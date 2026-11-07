@@ -270,6 +270,10 @@ constexpr int kHard[] = {
     #if defined(TDECK_SPI_MOSI)
     WX_RES(TDECK_SPI_MOSI)
     #endif
+    // GPIO-04: T-Deck Pro radio power enable (variants/t_deck_pro/configuration.h, set HIGH in tdeck_pro.cpp)
+    #if defined(BOARD_T_DECK_PRO) && defined(BOARD_LORA_EN)
+    WX_RES(BOARD_LORA_EN)
+    #endif
     // T5 e-paper: the SX1262 DIO1 (IRQ). It used to be reserved only through the LORA_DIO1 alias that esp32_main.cpp
     // builds from BOARD_LORA_IRQ; the alias is gone from this TU, so it is listed here.
     #if defined(BOARD_LORA_IRQ)
@@ -410,6 +414,11 @@ static_assert((kHardMask & ((1ULL << 46) | (1ULL << 1) | (1ULL << 47) | (1ULL <<
 static_assert((kHardMask & ((1ULL << 37) | (1ULL << 38) | (1ULL << 42) | (1ULL << 43) | (1ULL << 44) | (1ULL << 45) | (1ULL << 46) | (1ULL << 47))) ==
                   ((1ULL << 37) | (1ULL << 38) | (1ULL << 42) | (1ULL << 43) | (1ULL << 44) | (1ULL << 45) | (1ULL << 46) | (1ULL << 47)),
               "RAK4631: SX1262 pins (37, 38, 42-47) are not reserved HARD");
+#endif
+// GPIO-04: the T-Deck Pro powers its radio through BOARD_LORA_EN (46, driven HIGH in tdeck_pro.cpp); driving it from a
+// user function would switch the radio off.
+#if defined(BOARD_T_DECK_PRO) && defined(BOARD_LORA_EN)
+static_assert((kHardMask & (1ULL << BOARD_LORA_EN)) != 0, "T-Deck Pro: BOARD_LORA_EN (radio power enable) is not reserved HARD");
 #endif
 
 uint64_t pinBoardReservedHard() { return kHardMask; }
