@@ -34,6 +34,22 @@ def marker_image(env: str, payload: bytes = b"", *, magic: bytes = b"MCBOARD1", 
     return bytes(img) + payload
 
 
+def boot_image(env: str, size: str | None = None) -> bytes:
+    """A synthetic bootloader: esptool header (DIO, flash size of the env) + identity."""
+    size = size or pf.configured_flash_size(pf.load_config(REPO), env)
+    head = bytes([0xE9, 0x03, 0x02, (pf.FLASH_SIZE_CODE[size] << 4) | 0x0F])
+    return head + f"{env}/bootloader.bin".encode()
+
+
+def fake_file(env: str, name: str) -> bytes:
+    data = f"{env}/{name}".encode()
+    if name == "firmware.bin":
+        return marker_image(env, data)
+    if name == "bootloader.bin" and pf.chip_family(pf.load_config(REPO), env) != "NRF52":
+        return boot_image(env)
+    return data
+
+
 def fake_build(tmp_path: Path, envs) -> Path:
     """A .pio/build stand-in whose every file carries its own identity."""
     build = tmp_path / "build"
@@ -41,8 +57,7 @@ def fake_build(tmp_path: Path, envs) -> Path:
         d = build / env
         d.mkdir(parents=True)
         for name in ("bootloader.bin", "partitions.bin", "firmware.bin"):
-            data = f"{env}/{name}".encode()
-            (d / name).write_bytes(marker_image(env, data) if name == "firmware.bin" else data)
+            (d / name).write_bytes(fake_file(env, name))
     return build
 
 
@@ -342,9 +357,39 @@ def test_board_folder_is_self_contained_per_env(cfg, tmp_path):
         pf.stage_board(cfg, env, "v1", out / "v1" / env, REPO, build)
     for env in envs:
         for name in ("bootloader.bin", "partitions.bin", "firmware.bin"):
-            data = f"{env}/{name}".encode()
-            want = marker_image(env, data) if name == "firmware.bin" else data
-            assert (out / "v1" / env / name).read_bytes() == want
+            assert (out / "v1" / env / name).read_bytes() == fake_file(env, name)
+
+
+@pytest.mark.parametrize("env,size", [("LilyGo_T3_S3_V1_3", "4MB"),
+                                      ("heltec_wifi_lora_32_V3", "8MB"),
+                                      ("LilyGo_T_Connect_Pro", "16MB"),
+                                      ("ttgo_tbeam", "4MB")])
+def test_configured_flash_size(cfg, env, size):
+    assert pf.configured_flash_size(cfg, env) == size
+
+
+def test_every_esp_release_env_has_a_flash_size(cfg):
+    for env in pf.RELEASE_ENVS:
+        if pf.chip_family(cfg, env) != "NRF52":
+            assert pf.configured_flash_size(cfg, env) in pf.FLASH_SIZE_CODE
+
+
+def test_shared_8mb_bootloader_is_refused_for_the_4mb_t3_s3(cfg, tmp_path):
+    """Field bug 2026-11-07: the upstream flasher wrote bootloader-s3.bin (built
+    for the Heltec V3, 8 MB header) to a 4 MB T3-S3; the app abort-looped."""
+    env = "LilyGo_T3_S3_V1_3"
+    build = fake_build(tmp_path, [env])
+    (build / env / "bootloader.bin").write_bytes(boot_image(env, "8MB"))
+    with pytest.raises(SystemExit, match="header says 8MB flash, the board has 4MB"):
+        pf.stage_board(cfg, env, "v1", tmp_path / "out", REPO, build)
+
+
+def test_bootloader_that_is_no_esp_image_is_refused(cfg, tmp_path):
+    env = "heltec_wifi_lora_32_V3"
+    build = fake_build(tmp_path, [env])
+    (build / env / "bootloader.bin").write_bytes(b"not an image")
+    with pytest.raises(SystemExit, match="not an ESP32 image"):
+        pf.stage_board(cfg, env, "v1", tmp_path / "out", REPO, build)
 
 
 def test_missing_artifact_refuses_to_ship_a_partial_board(cfg, tmp_path):
@@ -415,7 +460,7 @@ def test_release_app_comes_from_release_support_from_build(cfg, tmp_path):
     out = tmp_path / "out"
     pf.stage_board(cfg, "t_deck", "v1", out, REPO, build, rel)
     assert (out / "firmware.bin").read_bytes() == marker_image("t_deck", b"CI-app")
-    assert (out / "bootloader.bin").read_bytes() == b"t_deck/bootloader.bin"
+    assert (out / "bootloader.bin").read_bytes() == boot_image("t_deck")
     assert (out / "partitions.bin").read_bytes() == b"t_deck/partitions.bin"
 
 
@@ -489,7 +534,7 @@ def test_check_from_release_compares_against_release_bytes(tmp_path, monkeypatch
             {"builds": [{"chipFamily": "ESP32-S3",
                          "parts": [{"path": "bootloader.bin"}, {"path": "firmware.bin"}]}]}
         ),
-        f"v1/{env}/bootloader.bin": f"{env}/bootloader.bin".encode(),
+        f"v1/{env}/bootloader.bin": fake_file(env, "bootloader.bin"),
         f"v1/{env}/firmware.bin": b"\xe9CI-app",
     }
     monkeypatch.setattr(pf, "REPO", tmp_path)

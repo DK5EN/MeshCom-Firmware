@@ -486,6 +486,48 @@ def check_partition_layout(cfg, env: str, parts, repo: Path = REPO) -> None:
             )
 
 
+# esptool image header, byte 3 high nibble: the flash size the second-stage
+# bootloader hands to the app. The app aborts at boot when it is larger than the
+# chip (IDF: "Detected size(4096k) smaller than the size in the binary image
+# header(8192k). Probe failed."). The web flasher writes with flashSize "keep",
+# so the header ships as built.
+FLASH_SIZE_CODE = {"1MB": 0, "2MB": 1, "4MB": 2, "8MB": 3, "16MB": 4, "32MB": 5,
+                   "64MB": 6, "128MB": 7}
+
+
+def configured_flash_size(cfg, env: str, repo: Path = REPO) -> str:
+    """board_upload.flash_size of the env, else upload.flash_size of the board JSON."""
+    size = resolve(cfg, env, "board_upload.flash_size")
+    if not size:
+        board = resolve(cfg, env, "board")
+        size = board_json(board.strip(), repo).get("upload", {}).get("flash_size") if board else None
+    if not size:
+        raise SystemExit(f"{env}: no flash size (board_upload.flash_size or board JSON)")
+    size = size.split(";", 1)[0].strip().upper()
+    if size not in FLASH_SIZE_CODE:
+        raise SystemExit(f"{env}: unknown flash size {size!r}")
+    return size
+
+
+def check_bootloader_flash_size(cfg, env: str, path: Path, repo: Path = REPO) -> None:
+    """Refuse a bootloader whose header flash size is not the board's.
+
+    The shared upstream bootloader-s3.bin is built for the Heltec V3 (8 MB);
+    written to the 4 MB T3-S3 it leaves the app in an abort/boot loop.
+    """
+    head = Path(path).read_bytes()[:4]
+    if len(head) < 4 or head[0] != 0xE9:
+        raise SystemExit(f"{env}: {path} is not an ESP32 image (byte 0 != 0xE9)")
+    want = configured_flash_size(cfg, env, repo)
+    code = head[3] >> 4
+    have = next((k for k, v in FLASH_SIZE_CODE.items() if v == code), f"code {code}")
+    if have != want:
+        raise SystemExit(
+            f"{env}: {path} header says {have} flash, the board has {want} -- "
+            f"ship the env's own bootloader, never a shared one"
+        )
+
+
 def esp_parts(cfg, env: str, family: str, repo: Path, build_dir: Path):
     """Ordered (offset, source path, published name) for one ESP32 board."""
     cmd = resolve(cfg, env, "upload_command")
@@ -664,6 +706,8 @@ def stage_board(cfg, env: str, version: str, dest: Path, repo: Path, build_dir: 
                 raise SystemExit(f"{env}: {src} missing -- build it, never ship a partial board")
             if name_out == "firmware.bin":
                 check_board_marker(env, src)
+            elif name_out == "bootloader.bin":
+                check_bootloader_flash_size(cfg, env, src, repo)
             shutil.copy2(src, dest / name_out)
             parts.append({"path": name_out, "offset": offset})
         builds = [{"chipFamily": family, "parts": parts}]
