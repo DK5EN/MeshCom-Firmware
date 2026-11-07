@@ -2974,6 +2974,26 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_clock_tick": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_clock_tick"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_command_match": {
   "build_flags": [
    "-std=gnu++17",
@@ -3188,6 +3208,26 @@
   "test_build_src": "True",
   "test_filter": [
    "test_dedup_replay"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_display_clock": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_display_clock"
   ],
   "test_framework": "unity"
  },

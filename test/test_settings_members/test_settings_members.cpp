@@ -395,6 +395,8 @@ const SetterCase kSetterCases[] = {
     {"node_bpin", 99.0, true, "--button gpio 99"},
     {"node_apin", 98.0, true, "--analog gpio 98"},
     {"node_owgpio", 99.0, true, "--onewire gpio 99"},
+    {"node_dht", 11.0, true, "--dht 11"},
+    {"node_dht", 22.0, true, "--dht 22"},
     {"node_ctry", 15.0, true, "--country (id 15 = PL, highest valid)"},
     {"node_sf", 12.0, true, "--txsf 12"},
     {"node_cr", 8.0, true, "--txcr 8"},

@@ -188,6 +188,44 @@ static void test_age_floor_prio_4_5_ausgeschlossen(void)
     TEST_ASSERT_EQUAL_UINT32(1500, csmaApplyAgeFloor(5500, 30000UL, MSG_PRIO_HIGH, 710, 0));
 }
 
+// ---- CSMA-01: re-arm a running wait, shorten only ----
+static unsigned long rearmFor(bool armed, uint8_t armed_prio, unsigned long armed_ms, uint8_t new_prio, long jit)
+{
+    if (!csmaShouldRearm(armed, armed_prio, new_prio)) return armed_ms;
+    return csmaRearm(armed_ms, csmaTimeoutPrio(0, new_prio, jit));
+}
+
+void test_csma01_hoehere_prio_verkuerzt_laufende_wartezeit()
+{
+    unsigned long relay = csmaTimeoutPrio(0, MSG_PRIO_NORMAL, 3);   // armed for a relay at the head
+    unsigned long cand  = csmaTimeoutPrio(0, MSG_PRIO_CRITICAL, 3);
+    TEST_ASSERT_TRUE(cand < relay);
+    TEST_ASSERT_EQUAL_UINT32(cand, rearmFor(true, MSG_PRIO_NORMAL, relay, MSG_PRIO_CRITICAL, 3));
+}
+
+void test_csma01_gleiche_oder_niedrigere_prio_aendert_nichts()
+{
+    unsigned long relay = csmaTimeoutPrio(0, MSG_PRIO_NORMAL, 2);
+    TEST_ASSERT_EQUAL_UINT32(relay, rearmFor(true, MSG_PRIO_NORMAL, relay, MSG_PRIO_NORMAL, 0));
+    TEST_ASSERT_EQUAL_UINT32(relay, rearmFor(true, MSG_PRIO_NORMAL, relay, MSG_PRIO_LOW, 0));
+    TEST_ASSERT_EQUAL_UINT32(relay, rearmFor(true, MSG_PRIO_NORMAL, relay, MSG_PRIO_BACKGROUND, 0));
+    TEST_ASSERT_FALSE(csmaShouldRearm(true, MSG_PRIO_CRITICAL, MSG_PRIO_HIGH));
+}
+
+void test_csma01_verlaengert_nie()
+{
+    // armed wait already shorter than the candidate (e.g. age floor): stays
+    TEST_ASSERT_EQUAL_UINT32(1500, csmaRearm(1500, 3105));
+    TEST_ASSERT_EQUAL_UINT32(1500, csmaRearm(1500, 1500));
+    TEST_ASSERT_EQUAL_UINT32(1500, rearmFor(true, MSG_PRIO_NORMAL, 1500, MSG_PRIO_CRITICAL, 3));
+}
+
+void test_csma01_nicht_scharf_keine_aenderung()
+{
+    TEST_ASSERT_FALSE(csmaShouldRearm(false, MSG_PRIO_NORMAL, MSG_PRIO_CRITICAL));
+    TEST_ASSERT_EQUAL_UINT32(4600, rearmFor(false, MSG_PRIO_NORMAL, 4600, MSG_PRIO_CRITICAL, 0));
+}
+
 
 int main(int, char **)
 {
@@ -208,5 +246,9 @@ int main(int, char **)
     RUN_TEST(test_age_stage2_wert);
     RUN_TEST(test_age_floor_min_mit_case_a);
     RUN_TEST(test_age_floor_prio_4_5_ausgeschlossen);
+    RUN_TEST(test_csma01_hoehere_prio_verkuerzt_laufende_wartezeit);
+    RUN_TEST(test_csma01_gleiche_oder_niedrigere_prio_aendert_nichts);
+    RUN_TEST(test_csma01_verlaengert_nie);
+    RUN_TEST(test_csma01_nicht_scharf_keine_aenderung);
     return UNITY_END();
 }

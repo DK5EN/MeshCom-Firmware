@@ -22,7 +22,7 @@ bench step stays an open `bench` row for the bulk bench later.
 | Wave | Rows                                                                                       | Status |
 | ---- | ------------------------------------------------------------------------------------------ | ------ |
 | W1   | BL-01, IDEE-04, BLE-SET-01, GPIO-06, RM-NOANS-01, TEST-OTA-01, SB-06, CLK-01 host tool     | done   |
-| W2   | SENS-04, CSMA-01, CLK-01 core (tick and display-gate helpers, deactivated tests)           | open   |
+| W2   | SENS-04, CSMA-01, CLK-01 core (tick and display-gate helpers, deactivated tests)           | done   |
 | W3   | CLK-01 instrumentation (`[CLOCK]`, `[DISPCLK]`, `--timesrc`, `--clockstat`, shots)         | open   |
 | W4   | GOLDEN-MACROS-01 (orchestrator: regenerate golden, add check to `test/golden/selftest.sh`) | open   |
 
@@ -65,3 +65,13 @@ Host gate green after two pin updates (toggle table 89 to 86 rows, `bMESH` sites
 all 33 board envs build. Advisor: first pass NOT APPROVED (SB-06 name check, `clock_drift.py` chunked read, locked
 count in docs), rework applied by the orchestrator, second pass APPROVED. SB-06 name check dropped by the operator.
 Follow-ups found by the advisor are backlog rows BL-01-FU, BLE-SET-01-FU, GPIO-08, SB-07, CLK-TOOL-01, RM-TXT-02.
+
+## W2 result (2026-11-08)
+
+Host gate green after regenerating `test/golden/native/variant-ini-effective.json` for the two new native envs, all
+board envs build. Advisor: first pass REWORK (the CLK refactor had removed the 15 s redraw gate of `sendDisplayTrack`,
+the track page; restored by the orchestrator with a source-pin test that failed before and passes after), second gate
+run green. Follow-ups found by the advisor are backlog rows CSMA-05 and SENS-05.
+
+Plan deviation: SENS-04 stores the DHT type in a new keyed member (`node_dht`) instead of a spare byte, because none
+exists; the keyed nRF52 store and ESP32 NVS are layout-independent and the frozen BLE v1 blob is untouched.

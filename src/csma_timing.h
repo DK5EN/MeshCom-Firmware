@@ -106,3 +106,23 @@ static inline unsigned long csmaApplyAgeFloor(unsigned long today_ms, uint32_t a
     unsigned long aged = csmaAgedHoldMs(stage, own_airtime_ms, jitter_slot);
     return aged < today_ms ? aged : today_ms;
 }
+
+/* ---- CSMA-01 (2026-11-07): re-arm a running CSMA wait when a higher-priority entry is enqueued ----
+ * OnRxDone arms csma_timeout for whatever heads the TX ring at that moment; a reply
+ * enqueued later (RM1 ~600 ms after the request) would otherwise wait in the relay
+ * window. Both helpers are pure; the caller owns the state. Priority numbers: a LOWER
+ * number is a HIGHER priority (MSG_PRIO_CRITICAL = 1 ... MSG_PRIO_BACKGROUND = 5). */
+
+/* Shorten only: the armed wait (a duration from the unchanged anchor) is replaced by the
+ * candidate when that is shorter, never lengthened. */
+static inline unsigned long csmaRearm(unsigned long armed_ms, unsigned long cand_ms)
+{
+    return cand_ms < armed_ms ? cand_ms : armed_ms;
+}
+
+/* Re-arm only if a wait is armed and the new entry is strictly higher priority than the
+ * one the wait was armed for. */
+static inline bool csmaShouldRearm(bool armed, uint8_t armed_prio, uint8_t new_prio)
+{
+    return armed && new_prio < armed_prio;
+}

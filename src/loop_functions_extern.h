@@ -406,6 +406,9 @@ extern std::atomic<bool> tx_is_active;   // flag to store we are transmitting  a
 
 extern int cad_attempt;
 extern unsigned long csma_timeout;
+extern uint8_t csma_armed_prio;       // CSMA-01: priority the running CSMA wait was armed for (0xFF = none)
+extern long    csma_armed_jitter;     // CSMA-01: jitter slot drawn for that wait
+extern unsigned long iReceiveTimeOutTime; // CSMA wait anchor (0 = no wait armed); defined in esp32_main/nrf52_main
 extern int rx_irq_defer_count;
 extern std::atomic<bool> cad_in_progress;
 extern std::atomic<bool> cad_done_flag;

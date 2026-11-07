@@ -23,6 +23,7 @@
 // in addTxRingEntryCore() below for every caller (addTxRingEntry() and
 // addTxRingEntryOnce() alike).
 #include <dm_stats.h>
+#include <csma_timing.h>
 
 #if defined(NATIVE_BUILD)
 // Native Testbuild: loop_functions.cpp (die kanonische Definitionsstelle
@@ -52,6 +53,13 @@ std::atomic<uint8_t> stat_ring_max;
 bool bNBRCANCEL;
 // GWRX-01: addUdpRxRingEntry() liest bNBRRELAY, gleiche Begruendung.
 bool bNBRRELAY;
+// CSMA-01: csmaRearmOnEnqueue() liest/schreibt die CSMA-Zustandsglobals; kanonisch in
+// loop_functions.cpp / lora_functions.cpp / *_main.cpp, hier nativ als Ersatz.
+int cad_attempt;
+unsigned long csma_timeout;
+uint8_t csma_armed_prio = 0xFF;
+long csma_armed_jitter;
+unsigned long iReceiveTimeOutTime;
 #endif
 
 // SL-03/SL-06 (siehe txring_functions.h): Herkunft je Ring-Slot. Anders als
@@ -728,6 +736,38 @@ static inline bool supersedeStatusOk(uint8_t st)
     return st == RING_STATUS_READY || st == RING_STATUS_DONE;
 }
 
+// CSMA-01 (2026-11-07): OnRxDone arms the CSMA wait (iReceiveTimeOutTime/csma_timeout) for whatever
+// heads the ring at that moment. A reply enqueued afterwards (RM1: ~600 ms later from the loop)
+// would sit in that wait with no priority benefit. Called after every accepted enqueue: if a wait
+// is armed and the new entry is strictly higher priority than the one it was armed for, the wait
+// is replaced by the new priority's timeout, SHORTEN ONLY (csmaRearm), on the same anchor.
+// No random(): the jitter slot of the armed draw is reused (clamped to the new class's range), so
+// the PRNG sequence is unchanged. A fresh entry has age 0, the age floor does not apply; if the
+// armed wait already used the floor it is shorter and stays.
+// Context: OnRxDone (arm) and doTX/loop (consume) share csma_timeout. On nRF52 the enqueue may run
+// in the LORA task while the loop reads it, so the read-modify-write sits in a critical section
+// (a 32-bit store is atomic, the section keeps the min() from overwriting a concurrent re-arm).
+// On ESP32 OnRxDone, the enqueue callers and the expiry check all run in the Arduino loop task.
+static void csmaRearmOnEnqueue(uint8_t prio)
+{
+#if defined(NRF52_SERIES)
+    taskENTER_CRITICAL();
+#endif
+    if(csmaShouldRearm(iReceiveTimeOutTime != 0, csma_armed_prio, prio))
+    {
+        long jit = csma_armed_jitter;
+        long maxj = csmaSlotsForPrio(prio);
+        if(jit > maxj) jit = maxj;
+        unsigned long before = csma_timeout;
+        csma_timeout = csmaRearm(csma_timeout, csmaTimeoutPrio(cad_attempt, prio, jit));
+        if(csma_timeout != before)
+            csma_armed_prio = prio;
+    }
+#if defined(NRF52_SERIES)
+    taskEXIT_CRITICAL();
+#endif
+}
+
 /**
  * TX-Ring: kompletter Enqueue-Vorgang (Slot-Wahl, Payload-Kopie, Prio/Overflow,
  * Eviction) in EINER Funktion unter EINEM Lock.
@@ -1039,6 +1079,9 @@ static int addTxRingEntryCore(const uint8_t* frame, uint16_t len,
 #endif
 
     // ---- Ab hier ausserhalb des Locks ----
+
+    if(resultSlot >= 0)
+        csmaRearmOnEnqueue(prio);   // CSMA-01
 
     if(supKeepNew)
     {

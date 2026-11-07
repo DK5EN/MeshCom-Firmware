@@ -69,6 +69,7 @@ ALIASES = {
     "start": "node_audstart",
     "msg": "node_audmsg",
     "gwrf": "node_gwrf",
+    "dht": "node_dht",
     "gwrc": "node_gwrc",
     "gwlab": "node_gwlab",
 }

@@ -2277,6 +2277,22 @@ static void test_pin_setters_ask_the_policy_and_restore()
     }
 }
 
+// SENS-04: --dht 11|22 stores the DHT type; anything else is refused and leaves the stored value alone.
+static void test_dht_setter_accepts_11_22_and_refuses_rest()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const size_t a = cmd.find("(char*)\"dht \") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(a != std::string::npos, "no --dht setter");
+    const std::string blk = cmd.substr(a, 1500);
+    const size_t refuse = blk.find("dht_type_valid(");
+    const size_t store = blk.find("meshcom_settings.node_dht_type = ");
+    const size_t save = blk.find("save_settings()");
+    TEST_ASSERT_TRUE_MESSAGE(refuse != std::string::npos, "the value is not validated");
+    TEST_ASSERT_TRUE_MESSAGE(blk.find("must be 11 or 22") != std::string::npos, "no refusal message");
+    TEST_ASSERT_TRUE_MESSAGE(store != std::string::npos && refuse < store && store < save, "store outside validate..save");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("--dht 11|22") != std::string::npos, "no help line");
+}
+
 // WX-01: BLE budget. UV/UVF/WIND/WINDP sit in the "S1" register document, not in "SE": SE alone is 241 of
 // BLE_JSON_PAYLOAD_MAX 244 JSON bytes in the worst case (all ints at -2147483648), so any further key there makes
 // bleJsonFrameFailSoft drop USERPIN. Worst case computed from the source: SE 241 (223 with sane pins), S1 199 with
@@ -2471,6 +2487,7 @@ int main(int, char **)
     RUN_TEST(test_a_plain_number_parses);
     RUN_TEST(test_windpin_windcal_rungs_validate_and_store);
     RUN_TEST(test_pin_setters_ask_the_policy_and_restore);
+    RUN_TEST(test_dht_setter_accepts_11_22_and_refuses_rest);
     RUN_TEST(test_wx_ble_keys_live_in_s1_and_fit_the_budget);
     RUN_TEST(test_wx_settings_rows_and_defaults);
     RUN_TEST(test_gpio_exact_tokens_and_button_release);

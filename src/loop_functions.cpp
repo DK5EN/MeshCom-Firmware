@@ -9,6 +9,7 @@
 #endif
 
 #include "loop_functions.h"
+#include "display_clock_gate.h"   // CLK-01: sendDisplayTime() redraw decision (test_display_clock)
 #include "gfx_charmap.h"   // national characters on the GFXfont displays (E290, WP, E213)
 #include "text_fold.h"     // CHARS-01: fold what the display font lacks
 #include "ack_attribution.h"
@@ -2104,24 +2105,26 @@ void sendDisplayTime()
             pagePointer=PAGE_MAX-1;
     }
 
+    // CLK-01: early returns and the 15 s gate as one pure decision (display_clock_gate.h).
+    // Order and conditions are unchanged; board guards stay here as hasDisplay.
+    DispClkInputs dcIn;
+    dcIn.hasDisplay = true;
     #if MC_HAS_U8G2   // GRD-01: war die wortgleiche 11-Term-Liste
         if(u8g2 == NULL)
-            return;
+            dcIn.hasDisplay = false;
     #endif
-
     #if defined (HAS_EPAPER) || defined (BOARD_T_DECK)  || defined (BOARD_T_DECK_PLUS) || defined (BOARD_T5_EPAPER)
-        return;
+        dcIn.hasDisplay = false;
     #endif
+    dcIn.displayIsOff = bDisplayIsOff;
+    dcIn.displayType  = iDisplayType;
+    dcIn.pageHold     = pageHold;
+    dcIn.setDisplay   = bSetDisplay;
+    dcIn.second       = meshcom_settings.node_date_second;
+    dcIn.oneButton    = bOneButton;
+    dcIn.displayDirty = bDisplayDirty;
 
-    //TEST ONLY printfdeb("Time bDisplayOff:%i iDisplayType:%i bSetDisplay:%i\n", bDisplayOff, iDisplayType, bSetDisplay);
-
-    if(bDisplayIsOff)
-        return;
-
-    if(iDisplayType == 0)
-        return;
-
-    if(bSetDisplay)
+    if(dispClkDecide(dcIn) != DispClkDecision::Draw)
         return;
 
     bSetDisplay = true;

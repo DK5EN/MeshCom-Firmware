@@ -260,6 +260,7 @@ FIELD_CLASSIFICATION: Dict[str, str] = {
     "node_gw": RUNTIME,
     "node_gwrc": PERSIST,
     "node_gwlab": PERSIST,
+    "node_dht_type": PERSIST,
     "node_gwrf": PERSIST,
     "node_gwsrv": PERSIST,
     "node_hamnet_only": PERSIST,
@@ -370,9 +371,9 @@ FIELD_CLASSIFICATION: Dict[str, str] = {
     "valid_mark_1": RUNTIME,
     "valid_mark_2": RUNTIME,
 }
-assert len(FIELD_CLASSIFICATION) == 162, (
+assert len(FIELD_CLASSIFICATION) == 163, (
     f"FIELD_CLASSIFICATION has {len(FIELD_CLASSIFICATION)} entries, expected "
-    f"162 (161 + node_tdtheme TD-THEME-01; 158 + node_audelay/node_auday/node_autime, AU install schedule; 157 + node_bleon TD-30; 156 + node_gwlab, F1 --gateway lab) -- TRIAGE_DOC section 3's original 147 minus auto_join, "
+    f"163 (162 + node_dht_type SENS-04; 161 + node_tdtheme TD-THEME-01; 158 + node_audelay/node_auday/node_autime, AU install schedule; 157 + node_bleon TD-30; 156 + node_gwlab, F1 --gateway lab) -- TRIAGE_DOC section 3's original 147 minus auto_join, "
     f"send_repeat_time and node_ackid, removed from struct s_meshcom_settings "
     f"outright in the D1-04 W3 struct merge (see the comment above this table), "
     f"plus node_ethmtu (2026-10-01, #1183), node_tz (2026-10-04, TZ-01) and "

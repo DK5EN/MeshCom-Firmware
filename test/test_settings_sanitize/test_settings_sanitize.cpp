@@ -326,6 +326,36 @@ static void test_backlight_level(void)
     TEST_ASSERT_EQUAL_INT(3, g_log_calls);
 }
 
+/* SENS-04: node_dht_type is 11 or 22; 0 (wiped), 7, 33 and negatives fall back to 11. */
+static void test_dht_type_sanitize(void)
+{
+    const int bad[] = {0, 7, 33, -1, 21, 12};
+    for (unsigned i = 0; i < sizeof(bad) / sizeof(bad[0]); i++)
+    {
+        int v = bad[i];
+        TEST_ASSERT_TRUE(sanitize_dht_type(v, capture_log));
+        TEST_ASSERT_EQUAL_INT(11, v);
+        TEST_ASSERT_EQUAL_STRING("node_dht", g_last_field);
+    }
+    int v = 22;
+    TEST_ASSERT_FALSE(sanitize_dht_type(v, capture_log));
+    TEST_ASSERT_EQUAL_INT(22, v);
+    v = 11;
+    TEST_ASSERT_FALSE(sanitize_dht_type(v, capture_log));
+    TEST_ASSERT_EQUAL_INT(11, v);
+}
+
+/* SENS-04: the driver reports "DHT11"/"DHT22"; the name must match the configured type. */
+static void test_dht_name_matches(void)
+{
+    TEST_ASSERT_TRUE(dht_name_matches("DHT11", 11));
+    TEST_ASSERT_TRUE(dht_name_matches("DHT22", 22));
+    TEST_ASSERT_FALSE(dht_name_matches("DHT22", 11));
+    TEST_ASSERT_FALSE(dht_name_matches("DHT11", 22));
+    TEST_ASSERT_FALSE(dht_name_matches("DHT21", 22));
+    TEST_ASSERT_FALSE(dht_name_matches(NULL, 11));
+}
+
 static char g_new_value[8];
 static void capture_new(const char *, const char *, const char *newv)
 {
@@ -485,6 +515,8 @@ int main(int, char **)
     RUN_TEST(test_maxv_grenze_null_und_nan);
     RUN_TEST(test_boot_nbrrelay_on_in_production);
     RUN_TEST(test_backlight_level);
+    RUN_TEST(test_dht_type_sanitize);
+    RUN_TEST(test_dht_name_matches);
     RUN_TEST(test_ping_target_ungueltig_wird_geleert);
     RUN_TEST(test_ping_target_gueltig_und_leer_bleiben);
     RUN_TEST(test_ping_target_ohne_terminator);

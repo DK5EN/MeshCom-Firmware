@@ -45,6 +45,7 @@
 #include <Arduino.h>
 #include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include "clock.h"
+#include "clock_tick.h"   // CLK-01: tick arithmetic (test_clock_tick)
 
 #include <time.h>
 
@@ -97,12 +98,12 @@ Clock::EEvent Clock::CheckEvent()
 	uint8_t        u8Day, u8Hour;
 
 	// check for next minute
-	if ((int32_t)(millis() - u32Next_m) > 0)
+	if (clockTickDue(millis(), u32Next_m))
 	{
 		// next minute
 		u8Day      = suClock_m.tm_mday;
 		u8Hour     = suClock_m.tm_hour;
-		u32Diff    = ((u32Next_m - u32Start_m) / 1000);
+		u32Diff    = clockTickSeconds(u32Start_m, u32Next_m);
 		tsClock_m += u32Diff;
 		localtime_r(&tsClock_m, &suClock_m);
 #if defined(TEST)
@@ -144,7 +145,7 @@ Clock::EEvent Clock::CheckEvent()
 
 		// set new update cycle
 		u32Start_m = millis();
-		u32Next_m  = u32Start_m + 1000; //((60 - suClock_m.tm_sec) * 1000);
+		u32Next_m  = clockTickRearm(u32Start_m); //((60 - suClock_m.tm_sec) * 1000);
 #if defined(TEST)
 		Serial.printf("[clock] now %lu -> then %lu\n", u32Start_m, u32Next_m);
 #endif

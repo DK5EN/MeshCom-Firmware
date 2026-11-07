@@ -149,6 +149,11 @@ void loraDeepSleep()
                                         // flag to indicate if we are after receiving
 extern unsigned long iReceiveTimeOutTime;
 
+// CSMA-01: what the running CSMA wait was armed for. Written by every arm (csma_compute_timeout_slot_nofloor
+// and the single draw in csma_compute_timeout_prio), read by csmaRearmOnEnqueue() in txring_functions.cpp.
+uint8_t csma_armed_prio = 0xFF;
+long    csma_armed_jitter = 0;
+
 int sendlng = 0;
 uint8_t lora_tx_buffer[UDP_TX_BUF_SIZE+10];  // lora tx buffer
 uint8_t preamble_cnt = 0;     // stores how often a preamble detect is thrown
@@ -4034,6 +4039,12 @@ static unsigned long csma_compute_timeout_slot_nofloor(int attempt, int slot) {
 
     uint8_t prio = (slot >= 0) ? ringPriority[slot] : MSG_PRIO_NORMAL;
 
+    // CSMA-01: remember what this wait is armed for (csmaRearmOnEnqueue() in txring_functions.cpp).
+    // The jitter is overwritten by the single draw in csma_compute_timeout_prio(); paths without
+    // that draw keep 0 (a valid draw).
+    csma_armed_prio = prio;
+    csma_armed_jitter = 0;
+
     if(bNBRCANCEL && slot >= 0 && (ringKind[slot] & 0x7F) == RING_KIND_RELAY)
     {
         // Fall B, Text: komplett bei der heutigen Basis UND heutigen Slots
@@ -4099,7 +4110,9 @@ unsigned long csma_compute_timeout_prio(int attempt, uint8_t priority) {
     if(attempt >= CSMA_MAX_ATTEMPTS)
         return CSMA_RAPID_RX_MS; // rapid-fire with preamble check, keine Ziehung
 
-    return csmaTimeoutPrio(attempt, priority, random(0, csmaSlotsForPrio(priority) + 1));
+    long jitter = random(0, csmaSlotsForPrio(priority) + 1);
+    csma_armed_jitter = jitter;  // CSMA-01: the draw the running wait was armed with
+    return csmaTimeoutPrio(attempt, priority, jitter);
 }
 
 void csma_reset(void) {
