@@ -239,12 +239,14 @@ flashes whatever is attached.
 | test_mh_phone                | Unit          |    12 | native_mh_phone                                              |
 | test_millis_rollover         | Regression    |     4 | native                                                       |
 | test_msg_input_budget        | Regression    |     7 | native_msg_input_budget                                      |
-| test_pin_status              | Unit          |    13 | native_pin_status                                            | Pin status JSON: escaping, limits, LED and MCP state (`src/pin_status_json.h`)   |
-| test_ext_reg                 | Unit          |    26 | native_ext_reg                                               | EXTUDP register query: request parse, secret filter (`src/ext_reg.h`)            |
-| test_au_schedule             | Unit          |    44 | native_au_schedule                                           | Auto update schedule and notice, install stays off (`src/fw_schedule.h`)         |
-| test_udp_hold                | Unit          |    32 | native_udp_hold                                              | Server outage hold ring: text filter, release, replay, limits (`src/udp_hold.h`) |
-| test_oled_shot               | Regression    |     5 | native_oled_shot                                             | OLED screenshot: u8g2 frame buffer layout (`src/oled_shot.h`)                    |
-| test_screen_shadow           | Regression    |     5 | native_screen_shadow                                         | T-Deck screenshot: LVGL flush copy, clipping                                     |
+| test_pin_status              | Unit          |    22 | native_pin_status                                            | Pin status and pin assignment JSON: escaping, limits, LED and MCP state, assignable masks (`src/pin_status_json.h`, `src/pin_assign_json.h`) |
+| test_gpio_control            | Unit          |    11 | native_gpio_control                                          | Free GPIO control state machine: master switch, refusals, on/off/in/release, function wins (`src/gpio_control.h`)                            |
+| test_pin_policy              | Unit          |    14 | native_pin_policy                                            | Pin policy: classes per board table, assign and load-repair rules, no free pin without a reviewed table (`src/pin_policy.h`)                 |
+| test_ext_reg                 | Unit          |    26 | native_ext_reg                                               | EXTUDP register query: request parse, secret filter (`src/ext_reg.h`)                                                                        |
+| test_au_schedule             | Unit          |    44 | native_au_schedule                                           | Auto update schedule and notice, install stays off (`src/fw_schedule.h`)                                                                     |
+| test_udp_hold                | Unit          |    32 | native_udp_hold                                              | Server outage hold ring: text filter, release, replay, limits (`src/udp_hold.h`)                                                             |
+| test_oled_shot               | Regression    |     5 | native_oled_shot                                             | OLED screenshot: u8g2 frame buffer layout (`src/oled_shot.h`)                                                                                |
+| test_screen_shadow           | Regression    |     5 | native_screen_shadow                                         | T-Deck screenshot: LVGL flush copy, clipping                                                                                                 |
 | test_msgid_counter           | Unit          |     6 | native                                                       |
 | test_msgstore                | Unit          |    60 | native                                                       |
 | test_msgstore_hook           | Unit          |     6 | native_msgstore_hook                                         |

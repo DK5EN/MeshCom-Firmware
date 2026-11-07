@@ -2274,6 +2274,8 @@ static void test_wx_settings_rows_and_defaults()
     const std::string sc = read_repo_file("src/settings_schema.h");
     TEST_ASSERT_TRUE(sc.find("\"node_windpin\", CFG_INT, node_wind_pin, 0.0, 48.0") != std::string::npos);
     TEST_ASSERT_TRUE(sc.find("\"node_windcal\", CFG_FLT, node_wind_cal, 0.1, 100.0") != std::string::npos);
+    TEST_ASSERT_TRUE(st.find("M(int, node_gpioctl, 0)") != std::string::npos);
+    TEST_ASSERT_TRUE(sc.find("\"node_gpioctl\", CFG_INT, node_gpioctl, 0.0, 1.0") != std::string::npos);
 }
 
 

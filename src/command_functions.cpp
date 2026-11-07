@@ -162,6 +162,7 @@ extern TinyGPSPlus gps;
 #include "gw_reg_runtime.h"   // --info ...REGISTRATION line
 #include "nvs_diag.h"         // --info ...NVS line
 #include "pin_board.h"        // GPIO-01: pin policy with the board context (after the variant includes)
+#include "gpio_control.h"     // GPIO-01 Part B: --gpio / --gpiocontrol (state machine; hardware glue on ESP32 only)
 
 #if defined(BOARD_T5_EPAPER)
 #include <t5-epaper/t5epaper_extern.h>
@@ -452,7 +453,18 @@ static void storeApplyMode(enum MsgStoreMode newMode)
 // ---------------------------------------------------------------------------
 
 static void tg_post_setlog_off() { memset(LogCallsign, 0x00, sizeof(LogCallsign)); }
-static void tg_post_button_on() { init_onebutton(); }
+// GPIO-01 Part B: function wins. A pin that gets assigned / enabled for 1-Wire, button, analog or anemometer is
+// released from --gpio control first (pinMode INPUT, state dropped). Nothing on nRF52.
+static void gpioFnWins(PinFunc f)
+{
+#if defined(ESP32)
+    const int p = pinBoardEffective(f);
+    if(p > 0) gpioCtlReleasePin(p);
+#else
+    (void)f;
+#endif
+}
+static void tg_post_button_on() { gpioFnWins(PIN_FN_BUTTON); init_onebutton(); }
 static void tg_post_680_off() { bme680_found = false; }
 static void tg_post_811_off() { mcu811_found = false; }
 // EXT-02 (second half): --extudp off used to leave hasExternIPaddress (and
@@ -476,7 +488,7 @@ static void tg_post_t5_on() { disp_next_power(true); }
 static void tg_post_t5_off() { disp_next_power(false); }
 #endif
 #if defined(ANALOG_PIN)
-static void tg_post_analog_check_on() { initAnalogPin(); }
+static void tg_post_analog_check_on() { gpioFnWins(PIN_FN_ANALOG); initAnalogPin(); }
 #endif
 #if defined (ENABLE_INA226)
 static void tg_post_ina226_on() { setupINA226(); }
@@ -537,6 +549,7 @@ static void tg_post_wind_on()
 {
     wxMeanReset(&wx_wind_mean);   // fresh window on switch-on (telemetry may be inactive, see TLM-03)
     wxGustReset(&wx_wind_gust);
+    gpioFnWins(PIN_FN_WIND);
     if(meshcom_settings.node_wind_pin == 0) { printfdeb("wind on, but no pin set: use --windpin <gpio>\n"); return; }
     if(!pinBoardLoadedUsable(PIN_FN_WIND, meshcom_settings.node_wind_pin)) { printfdeb("wind pin %i not allowed on this board\n", meshcom_settings.node_wind_pin); return; }
     windBegin(meshcom_settings.node_wind_pin);
@@ -1774,6 +1787,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--wind on/off           anemometer\n");
             #endif
             printdeb("--windpin 99            anemometer GPIO (ESP32)\n--windcal 2.4           km/h per Hz (ESP32)\n");
+            printdeb("--gpiocontrol on/off    free GPIO control master (ESP32)\n--gpio list            free GPIOs and levels\n--gpio 13 on/off/in/release  drive, read, free a pin\n");
             #if defined(LPS33)
             printdeb("--lps33 on/off          LPS33\n");
             #endif
@@ -2162,6 +2176,8 @@ void commandAction(char *umsg_text, bool ble)
             return;
         }
 
+        gpioFnWins(PIN_FN_BUTTON);
+
         save_settings();
 
         if(ble)
@@ -2210,6 +2226,8 @@ void commandAction(char *umsg_text, bool ble)
 
             return;
         }
+
+        gpioFnWins(PIN_FN_ANALOG);
 
         save_settings();
 
@@ -2800,6 +2818,87 @@ void commandAction(char *umsg_text, bool ble)
 
         save_settings();
     }
+    // GPIO-01 Part B: --gpiocontrol / --gpio. Every board answers; only ESP32 has the code (nRF52: "not on this board").
+    else
+    if(commandCheck(msg_text+2, (char*)"gpiocontrol ") == 0)
+    {
+    #if defined(ESP32)
+        const char *ga = msg_text+14;
+        if(strncasecmp(ga, "on", 2) == 0 && (ga[2] == 0 || ga[2] == ' ' || ga[2] == '\r' || ga[2] == '\n'))
+        {
+            meshcom_settings.node_gpioctl = 1;
+            gpioCtlSetMaster(true);
+        }
+        else
+        if(strncasecmp(ga, "off", 3) == 0 && (ga[3] == 0 || ga[3] == ' ' || ga[3] == '\r' || ga[3] == '\n'))
+        {
+            meshcom_settings.node_gpioctl = 0;
+            gpioCtlSetMaster(false);
+        }
+        else
+        {
+            printfdeb("gpiocontrol: use on or off\n");
+            return;
+        }
+        printfdeb("\ngpiocontrol:%s\n", meshcom_settings.node_gpioctl ? "on" : "off");
+        bReturn = true;
+        save_settings();
+    #else
+        printfdeb("gpio control: not on this board\n");
+        return;
+    #endif
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"gpio ") == 0)
+    {
+    #if defined(ESP32)
+        const char *ga = msg_text+7;
+        bReturn = true;
+        // exact tokens: "list" | "<n> on|off|in|release", nothing after (no "listen", "13on", trailing garbage)
+        char gtok[12] = {0};
+        char gop[10] = {0};
+        char gextra[4] = {0};
+        const int gn = sscanf(ga, "%11s %9s %3s", gtok, gop, gextra);
+        if(gn == 1 && strcasecmp(gtok, "list") == 0)
+        {
+            GpioPinRow rows[8];
+            const size_t n = gpioCtlSnapshot(rows, 8);
+            printfdeb("gpio control: %s\n", gpioCtlMaster() ? "on" : "off");
+            if(n == 0) printfdeb("gpio: no pin offered on this board\n");
+            for(size_t i = 0; i < n; i++)
+            {
+                if(rows[i].level < 0) printfdeb("gpio %i %s %s -\n", (int)rows[i].pin, pinClassName((PinClass)rows[i].cls), gpioDirName((GpioDir)rows[i].dir));
+                else printfdeb("gpio %i %s %s %i\n", (int)rows[i].pin, pinClassName((PinClass)rows[i].cls), gpioDirName((GpioDir)rows[i].dir), (int)rows[i].level);
+            }
+            return;
+        }
+        bool gdigits = gtok[0] != 0 && strlen(gtok) <= 3;
+        for(const char *d = gtok; *d && gdigits; d++)
+            if(*d < '0' || *d > '9') gdigits = false;
+        if(gn != 2 || !gdigits)
+        {
+            printfdeb("gpio: use list, <n> on/off/in/release\n");
+            return;
+        }
+        const int gpin = atoi(gtok);
+        GpioOp op;
+        if(strcasecmp(gop, "on") == 0) op = GPIO_OP_ON;
+        else if(strcasecmp(gop, "off") == 0) op = GPIO_OP_OFF;
+        else if(strcasecmp(gop, "in") == 0) op = GPIO_OP_IN;
+        else if(strcasecmp(gop, "release") == 0) op = GPIO_OP_RELEASE;
+        else { printfdeb("gpio: use list, <n> on/off/in/release\n"); return; }
+        PinClass why = PIN_FORBIDDEN;
+        int lvl = -1;
+        const GpioRes gr = gpioCtlCommand(gpin, op, &why, &lvl);
+        if(gr == GPIO_REFUSED_MASTER) printfdeb("gpio %i refused: master off\n", gpin);
+        else if(gr == GPIO_REFUSED_CLASS) printfdeb("gpio %i refused: %s\n", gpin, pinClassName(why));
+        else if(gr == GPIO_NOT_HELD) printfdeb("gpio %i not held\n", gpin);
+        else if(op == GPIO_OP_IN) printfdeb("gpio %i in: %i\n", gpin, lvl);
+        else printfdeb("gpio %i %s\n", gpin, gop);
+    #else
+        printfdeb("gpio control: not on this board\n");
+    #endif
+    }
     // WX-01 (upstream #999): outside the OneWire block, so every board answers
     else
     if(commandCheck(msg_text+2, (char*)"windpin ") == 0)
@@ -2820,6 +2919,8 @@ void commandAction(char *umsg_text, bool ble)
             return;
 
         meshcom_settings.node_wind_pin = newPin;
+
+        gpioFnWins(PIN_FN_WIND);
 
         if(ble)
         {
@@ -2904,6 +3005,8 @@ void commandAction(char *umsg_text, bool ble)
         one_found=false;
         dht_found=false;
 
+        gpioFnWins(PIN_FN_ONEWIRE);
+
         meshcom_settings.node_sset2 |= 0x0001;
 
         if(ble)
@@ -2968,6 +3071,8 @@ void commandAction(char *umsg_text, bool ble)
             meshcom_settings.node_owgpio = iowold;
             return;
         }
+
+        gpioFnWins(PIN_FN_ONEWIRE);
 
         if(ble)
         {

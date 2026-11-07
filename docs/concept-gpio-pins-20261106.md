@@ -73,15 +73,15 @@ Worst case from `REVIEW.md` section 1.4: `6 + (9 + 4 x 10 + 1) + 9 + 1 + text + 
 
 ### Settings and contracts (R3)
 
-| Surface         | Part A                                       | Part B                                     |
-| --------------- | -------------------------------------------- | ------------------------------------------ |
-| Settings struct | no new field                                 | `node_gpioctl` only, levels stay in RAM    |
-| BLE settings v1 | unchanged, frozen                            | unchanged, not added                       |
-| BLE JSON, app   | unchanged                                    | unchanged                                  |
-| Config backup   | existing keys                                | `node_gpioctl` through `settings_schema.h` |
-| Displays        | unchanged                                    | unchanged                                  |
-| On-air format   | RM1 DM text only                             | RM1 DM text only                           |
-| McApp, MCProxy  | new RM1 names are unknown there, no breakage | same                                       |
+| Surface         | Part A                                       | Part B                                                                                                                                                   |
+| --------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Settings struct | no new field                                 | `node_gpioctl` only, levels stay in RAM                                                                                                                  |
+| BLE settings v1 | unchanged, frozen                            | unchanged, not added                                                                                                                                     |
+| BLE JSON, app   | unchanged                                    | unchanged                                                                                                                                                |
+| Config backup   | existing keys                                | not exported: `node_gpioctl` is persisted only (`SETTINGS_PERSIST_WX`), so an imported backup never switches gpio control on (decision 4), changed in W3 |
+| Displays        | unchanged                                    | unchanged                                                                                                                                                |
+| On-air format   | RM1 DM text only                             | RM1 DM text only                                                                                                                                         |
+| McApp, MCProxy  | new RM1 names are unknown there, no breakage | same                                                                                                                                                     |
 
 New settings go through `src/meshcom_settings.h`, `src/settings_schema.h` and `test_command_setters`, as `node_wind_pin` did (`src/settings_schema.h:137`).
 

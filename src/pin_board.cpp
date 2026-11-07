@@ -462,7 +462,14 @@ uint64_t pinBoardClaimed(PinFunc except)
 {
     uint64_t m = 0;
     if (except != PIN_FN_ONEWIRE && bONEWIRE) m |= pinBit(pinBoardEffective(PIN_FN_ONEWIRE));
-    if (except != PIN_FN_BUTTON && bButtonCheck) m |= pinBit(pinBoardEffective(PIN_FN_BUTTON));
+    if (except != PIN_FN_BUTTON && bButtonCheck)
+    {
+        // the stored pin AND the one OneButton reads right now (they differ after --button gpio until a restart);
+        // pinBit() is 0 for a negative or out-of-range pin, and pin 0 means "none" for the in-use value
+        m |= pinBit(pinBoardEffective(PIN_FN_BUTTON));
+        const int inUse = pinBoardInUse(PIN_FN_BUTTON);
+        if (inUse > 0) m |= pinBit(inUse);
+    }
     if (except != PIN_FN_ANALOG && bAnalogCheck) m |= pinBit(pinBoardEffective(PIN_FN_ANALOG));
 #if defined(ESP32)
     if (except != PIN_FN_WIND && bWINDON) m |= pinBit(pinBoardEffective(PIN_FN_WIND));
