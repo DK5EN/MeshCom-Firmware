@@ -11,7 +11,7 @@ archive journals (see "Where things are").
 
 ## Next: the release train
 
-Defined in [BACKLOG.md](BACKLOG.md) 3.2 "Release train": implement the 11 `impl` rows, one bulk build, bulk flash
+Defined in [BACKLOG.md](BACKLOG.md) 3.2 "Release train": implement the 12 `impl` rows, one bulk build, bulk flash
 of DK5EN-1, -14, -90, -92, one bulk bench session (28 `bench` rows plus the checks below), docs, then commit, push
 and `/release-firmware`. Soak on DK5EN-98, the GPSV4-01 upstream PR and field checks follow after the release.
 
@@ -23,6 +23,9 @@ and `/release-firmware`. Soak on DK5EN-98, the GPSV4-01 upstream PR and field ch
   [campaign-gpsv4-01-20261107.md](campaign-gpsv4-01-20261107.md).
 - **GPIO-01:** done, no bench test by decision; GPIO-06 (T-Deck Pro pin) is an `impl` row, GPIO-07 a field test.
   [campaign-gpio-01-20261107.md](campaign-gpio-01-20261107.md).
+
+- **CLK-01:** planned 2026-11-07, display clock lags then jumps (T3 S3 field report); W0 instrumentation next.
+  [campaign-clk-01-20261107.md](campaign-clk-01-20261107.md).
 
 ## Bench checks owed from campaign docs (add to the bulk bench)
 
