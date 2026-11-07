@@ -279,6 +279,12 @@ bool sanitize_loaded_settings(void)
         fixed++;
     if(sanitize_backlight_level(meshcom_settings.node_bl_night, BL_NIGHT_DEFAULT, "node_bl_night", sanitize_log))
         fixed++;
+    // TD-THEME-01: 0 auto, 1 dark, 2 light; anything else is a corrupt value -> auto
+    if(meshcom_settings.node_tdeck_theme > 2)
+    {
+        meshcom_settings.node_tdeck_theme = 0;
+        fixed++;
+    }
     #endif
 
     #if !defined(NATIVE_BUILD)   // the repair rule is host-tested in test_pin_policy; the board context needs the variant macros

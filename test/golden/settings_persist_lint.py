@@ -223,6 +223,7 @@ for _names, _reason in [
     (("node_bl_day", "node_blday"), _TDECK),
     (("node_bl_night", "node_blnight"), _TDECK),
     (("node_bl_auto", "node_blauto"), _TDECK),
+    (("node_tdeck_theme", "node_tdtheme"), _TDECK),
     (("node_date_year",), _CLOCK_MARKER),
     (("node_date_month",), _CLOCK_MARKER),
     (("node_date_day",), _CLOCK_MARKER),
