@@ -9,6 +9,7 @@
 | Presentation  | [`presentation/mesh-roadmap.html`](presentation/mesh-roadmap.html) (GitHub Pages, German, interactive)                                                 |
 | Evidence rule | Every number is read from the code, cited from a doc or a web source, or marked COMPUTED / INFERRED / NO SOURCE                                        |
 | Review        | Adversarial review (28 findings) and verification pass applied 2026-10-21                                                                              |
+| Addendum      | 2026-11-07: 4.9.1 to 4.9.7, EMCOMM proof in the RM1 budget, truncated hashes, signed batch, binary proof frame, RM2, prior art, decision chain         |
 
 ## 1. BLUF
 
@@ -35,7 +36,9 @@ roadmap:
 5. **EMCOMM needs a priority flag and sender authentication together.** A priority flag
    without authentication invites flooding. RM1's HMAC is symmetric and does not scale
    to "many receivers verify one sender"; a signature with pinned keys does, at 88 bytes
-   Base64 in a text payload (section 4.9).
+   Base64 in a text payload (section 4.9). Addendum 2026-11-07: no signature fits the RM1
+   budget per frame; the remaining design is a signed batch, the message as text plus one
+   binary proof frame for several messages (4.9.3 to 4.9.7).
 
 Order of the roadmap (section 6): measurement, TX buffer, buffer parity, hop clamp
 cleanup, PM priority, end of life for old firmware, EMCOMM authentication, tag
@@ -459,6 +462,220 @@ Assessment: A3 with manual pinning plus A4 as optional directory is the scalable
 A1 is a quick bench prototype with known weaknesses. About 0.8 s extra per frame
 restricts signatures to EMCOMM traffic, not every message.
 
+#### 4.9.1 Addendum 2026-11-07: a signature in the RM1 budget?
+
+Question from the operator: can an EMCOMM message carry a proof of origin that anyone holding the
+sender's public key can check, in no more space than the RM1 tag (16 characters)? Context: the
+DJ8MEH synopsis ([`emcomm-synopse-dj8meh-20261107.html`](emcomm-synopse-dj8meh-20261107.html))
+expects most operators not to sign, so the per-frame cost must stay small.
+
+**Short answer: not per frame.** A per-frame proof can have only two of the three properties
+"public", "verifiable at once" and "16 characters":
+
+| Pair                             | What it is                                     | Why it fails the third                                                                                                                                                                                                                                        |
+| -------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| public + at once                 | a digital signature                            | Ed25519 64 B; the shortest practical schemes (BLS12-381, Schnorr with a 128-bit challenge) need about 48 B. Schemes with very short signatures (multivariate: Quartz, Rainbow) need public keys of hundreds of kB, and Rainbow was broken in 2022 (NO SOURCE) |
+| at once + 16 characters          | a truncated MAC (RM1, options A1/A2 above)     | needs a shared secret: whoever can verify can also forge                                                                                                                                                                                                      |
+| public + 16 characters per frame | delayed proof (hash chain, signed batch below) | verification comes later, not with the frame                                                                                                                                                                                                                  |
+
+#### 4.9.2 Truncating the hash: "send 6 characters, the receiver computes and compares"
+
+The idea: append only the first 6 characters of a hash to the text; the receiver computes the full
+value itself and compares the prefix. Whether that works depends entirely on **what goes into the
+hash**, not on the truncation:
+
+| Input of the hash                                    | Can the receiver compute it?          | Can a forger compute it? | Verdict                                                                                                |
+| ---------------------------------------------------- | ------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------ |
+| only public data (text, callsign, MAC, number)       | yes                                   | yes, just as easily      | no authentication at all; the synopsis rates "hash over MAC or callsign" red for this reason           |
+| a secret key plus the message (HMAC)                 | only with the key                     | only with the key        | works, and truncation is fine (this is RM1); but every verifier holds the key and can forge (A1/A2)    |
+| a signature (private key signs, public key verifies) | no: it cannot recompute the signature | no                       | truncation breaks it: verification needs all 64 bytes, a prefix cannot be checked against a public key |
+
+So truncation itself is not the weakness; it only sets the guessing odds:
+
+- 6 hex characters = 24 bit, 6 Base64 characters = 36 bit, 6 raw bytes = 48 bit. A forger without
+  the key wins one blind guess in 2^24 (1 in 16.8 million) to 2^48. On a LoRa channel that is
+  online guessing at a few frames per minute, so even 24 bit holds against blind forgery as long as
+  failed checks are visible (COMPUTED).
+- A short tag gives no protection against **offline password cracking**. RM1 derives its key from
+  a password of at most 14 characters; two observed frames with their tags let an attacker test
+  password candidates offline, whatever the tag length. An EMCOMM MAC key must be random (128 bit),
+  not a password.
+- A hash prefix in a **signed list** (4.9.3) is a different case: there the attacker sees the real
+  message and its hash, and must find a different text with the same prefix (a second preimage):
+  2^36 work at 36 bit is a GPU hour, 2^48 is heavy but not out of reach, 2^64 is out of reach for
+  this threat model (COMPUTED order of magnitude).
+
+#### 4.9.3 Signed batch ("Sammelsignatur")
+
+Delayed public proof in the RM1 budget on average:
+
+1. Each EMCOMM text message carries only its EMCOMM number (synopsis, green; 4 characters).
+   Old firmware shows it as normal text.
+2. Every N messages or T minutes the sender emits one **proof frame**: first number, count, one
+   truncated hash per message (SHA-256 over src, dst, number and text, 6 bytes), one Ed25519
+   signature over the whole list.
+3. Receivers show a new message at once as "unverified" and switch it to "verified (call)" or
+   "invalid" when the proof frame arrives. This matches the three display states and "never hide
+   an EMCOMM message" from the synopsis.
+4. The "public hash" an operator hands out (card, QR code, confirmation between OMs) is the
+   **fingerprint of the public key**, 8 to 12 bytes. The full key (32 B) travels once in a key
+   frame (A5) and is checked against the pinned fingerprint. This is where a 16-character value
+   is enough: for naming a key, not for signing a message.
+
+A hash chain with delayed key disclosure (TESLA) also reaches 16 characters per frame, but it is
+only secure with a common clock and a bound on delivery time. Store-and-forward and changing paths
+in an emergency break exactly that bound. Rejected in favour of the signed batch.
+
+#### 4.9.4 Binary frame for proofs
+
+A text payload ends at 0x00 and passes the charset filter (2.3), so binary cannot ride in it; a
+signature as Base64 costs 37 % more bytes than raw. Sizes at SF11/BW250, about 8.9 ms per byte
+(derived from 88 characters = 786 ms above) and about 0.5 s fixed cost per extra frame (preamble
+32 symbols = 297 ms plus about 25 B header and trailer); all COMPUTED:
+
+| Variant                                            | Bytes on air                | Extra airtime        | Per message  |
+| -------------------------------------------------- | --------------------------- | -------------------- | ------------ |
+| A3 Ed25519 Base64 in every text frame              | 88                          | about 786 ms         | 786 ms       |
+| A3 Ed25519 raw, if a text frame could carry binary | 64                          | about 572 ms         | 572 ms       |
+| Signed batch, binary proof frame, N = 5            | about 10 + 5 x 6 + 64 = 104 | about 0.93 s + 0.5 s | about 0.29 s |
+| Signed batch, binary proof frame, N = 10           | about 134                   | about 1.2 s + 0.5 s  | about 0.17 s |
+| RM1 tag for comparison                             | 16 characters               | about 147 ms         | 147 ms       |
+
+At most about 26 hashes of 6 B fit next to the signature in one 255 B frame (INFERRED from the
+header estimate).
+
+Recommendation: **text stays text, proof goes binary.** The EMCOMM message remains an 0x3A text
+frame (E1/E4), visible to the whole fleet; the proof frame is a new message type (E2) that only
+new firmware reads. Its known contra applies: old firmware neither shows nor relays it, so proofs
+reach a receiver only through upgraded relays, and the frame must reach the server and EXTUDP as
+Base64 or JSON at the IP boundary. Open: which free type byte is safe against external-radio
+framing (2.3).
+
+#### 4.9.5 RM2: RM1 as a binary frame?
+
+The same frame type could carry remote management. Sizes for a typical command (COMPUTED):
+
+| Field         | RM1 text                          | RM2 binary            |
+| ------------- | --------------------------------- | --------------------- |
+| Marker        | `RM1 ` 4                          | type byte + version 2 |
+| Counter       | up to 10 digits + space           | 4                     |
+| Command       | name, e.g. `reboot ` 7            | opcode 1              |
+| Arguments     | up to 39 characters               | typed, often smaller  |
+| Tag           | 16 hex characters                 | 8                     |
+| Example total | `RM1 4000000000 reboot <tag>`: 38 | about 15              |
+
+Saving: about 23 B, about 0.2 s per command, the same order per reply.
+
+| Pro                                                       | Contra                                                                                                                                                                 |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| shorter frames; full 8-byte tag at half the RM1 text cost | old relays drop the new type, so RM2 reaches a distant node only through upgraded relays; RM1 must stay as fallback                                                    |
+| typed arguments, no text escaping rules                   | every client changes: `tools/remote_cmd.py`, the web GUI RM page, mcapp; BLE/app DMs carry text today                                                                  |
+| shares the proof frame infrastructure of 4.9.4            | not readable on air without a published decoder; § 16 AFuV forbids coding to hide content: publishing the format is the answer, but it belongs in the regulatory check |
+|                                                           | RM traffic is rare; 0.2 s per command does not move channel load                                                                                                       |
+
+A cheap step inside text: the RM1 tag as standard Base64 (A-Z a-z 0-9 + /, no padding) carries
+96 bit in the same 16 characters instead of 64, or the same 64 bit in 11 characters. The alphabet
+avoids the forbidden `--`, `;`, `{` and `%`.
+
+Assessment: build the binary proof frame for EMCOMM first; RM2 only when it can reuse that frame
+type and a second reason appears (bulk configuration, many nodes). RM1 stays in any case.
+
+#### 4.9.6 Prior art: how others authenticate on the air
+
+Web research 2026-11-07. Only the Pavlin draft was read in full; every other row rests on search
+results and project documentation, not on a reading of the primary specification (marked
+UNVERIFIED where it matters).
+
+| Group                | System                                        | Method                                                                                                                                                                           | Size per message                   | Who can verify                 | Lesson for us                                                                                                                             |
+| -------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Classic EMCOMM       | DARC Notfunk, ARES/RACES                      | procedure: known stations, net control, message forms; no cryptographic method found                                                                                             | 0                                  | nobody, by procedure only      | confirms DJ8MEH: in an emergency most operators will not sign                                                                             |
+| Classic EMCOMM       | Winlink                                       | login only: the server names three password positions, the client answers with those characters plus filler (MD5 inside); messages carry no signature                            | 0                                  | the server                     | authenticates the session, not the message; not transferable to a broadcast                                                               |
+| APRS                 | Pavlin (KA2DDO), Internet-Draft 2015, expired | HMAC-MD5 over Unix minute, sender, addressee and text; shared key, distributed off air; tag `\S` + 4 to 20 characters ASCII-85; replay protection by timestamp only              | 6 to 22 characters                 | every holder of the shared key | asked our question and chose a shared secret, explicitly because a signature is longer than an APRS text; read in full                    |
+| APRS                 | Polaric-aprsd                                 | MD5 MAC, Base64, truncated to 8 characters                                                                                                                                       | 8 characters                       | every holder of the key        | same choice as Pavlin, in production                                                                                                      |
+| LoRa mesh            | Meshtastic                                    | XEdDSA: Ed25519 signature from the node's X25519 key; a packet with a wrong signature is dropped                                                                                 | 64 B binary                        | anyone with the public key     | full signature in a binary frame; firmware 2.5 to 2.7.14 fell back silently to the legacy scheme when a flag was missing (CVE-2025-53627) |
+| LoRa mesh            | MeshCore                                      | node identity = Ed25519 public key (32 B); adverts carry key, timestamp and a 64 B signature; routing uses a truncated prefix of the public key                                  | 64 B on adverts                    | anyone                         | the short "public hash" is used to name a key, not to prove a message; that matches 4.9.3 item 4                                          |
+| Packet / LoRa        | Reticulum LXMF                                | Ed25519 over destination, source, payload and message id                                                                                                                         | 64 B, 111 B total overhead, binary | anyone with the public key     | full signature, binary, cost accepted                                                                                                     |
+| Digital voice        | M17                                           | ECDSA (secp256r1 in a decoder) over a rolling digest of the whole stream; the signature follows in extra frames at the end of the transmission (UNVERIFIED in the spec appendix) | one signature per transmission     | anyone with the public key     | amortises one signature over many frames: the same idea as the signed batch                                                               |
+| Satellite navigation | Galileo OSNMA                                 | TESLA: HMAC-SHA-256 tags truncated to 40 bit, keys from a one-way chain with a signed root, disclosed later; tags accumulated to 80 bit; receiver clock within 30 s              | 40 bit tag + delayed 128 bit key   | anyone, delayed, with a clock  | short public tags do work, but only with a fixed broadcast schedule and a clock bound, which a store-and-forward mesh lacks               |
+
+Legal: no explicit ruling on signatures found, neither in DL/OE nor in the US. The common US
+reading (FCC 97.113(a)(4)) is that a signature does not obscure the meaning, so it is allowed; it
+rests on interpretation, not on a ruling. The regulatory check for DL and OE stays open (4.9).
+
+Sources:
+
+- Pavlin draft: <https://raw.githubusercontent.com/richark/aretf/master/ARETF-APRS-Authentication.txt>
+- Polaric: <https://polaricserver.readthedocs.io/en/latest/aprs-messages.html>
+- Winlink login: <https://winlink.org/node/469>, <https://winlink.org/node/484>,
+  <https://sources.debian.org/src/golang-github-la5nta-wl2k-go/1.0.1-1/fbb/secure.go>
+- DARC Notfunk: <https://www.darc.de/fileadmin/filemounts/distrikte/p/Distrikt_P/Dokumente/DV_2022_Stetten/Neues_Notfunkkonzept_des_DARC.pdf>,
+  handbook (chapter 5.2 not read): <https://z25.vfdb.org/wp-content/uploads/2018/06/DARC_Notfunk-Handbuch.pdf>
+- Meshtastic: <https://meshtastic.org/docs/about/overview/encryption/limitations/>,
+  <https://meshtastic.org/docs/development/reference/encryption-technical/>,
+  <https://github.com/meshtastic/firmware/security/advisories/GHSA-377p-prwp-4hwf>
+- MeshCore: <https://swaits.github.io/meshcore-spec/latest/15-identity.html>, <https://docs.meshcore.nz/payloads>
+- LXMF: <https://github.com/markqvist/lxmf>
+- M17: <https://en.wikipedia.org/wiki/M17_(amateur_radio)>, <https://m17project.org/wp-content/uploads/2025/11/M17_spec.pdf>
+- OSNMA: <https://gnss-sdr.org/osnma/>, <https://arxiv.org/pdf/2403.14739>
+- Legal reading: <https://perens.com/?p=1180>,
+  <https://mailman.ardc.net/mailman3/hyperkitty/list/44net@mailman.ampr.org/message/GDOOIRJQCTXWIMDXH45QPQBNFM24FVEG/>
+
+#### 4.9.7 Decision chain: why the signed batch remains
+
+Requirements for EMCOMM sender authentication, from 4.8, 4.9 and the DJ8MEH synopsis:
+
+| ID  | Requirement                                                                                                 |
+| --- | ----------------------------------------------------------------------------------------------------------- |
+| R1  | Many receivers verify one sender, and no verifier can sign in the sender's name (public verifiability)      |
+| R2  | Small airtime: SF11 costs about 8.9 ms per byte; the cost falls only on those who sign, since most will not |
+| R3  | Works in a lossy mesh with store-and-forward: no common clock and no bound on delivery time can be assumed  |
+| R4  | The old fleet still sees the message; no EMCOMM message is hidden; no silent fallback to "unsigned"         |
+| R5  | Content stays readable; the format is published (§ 16 AFuV, regulatory check pending)                       |
+| R6  | Runs on ESP32 and nRF52840 with keys of a few dozen bytes                                                   |
+
+Every candidate and the requirement that rules it out:
+
+| Candidate                                                          | Used by                    | Fails  | Reason                                                                                         |
+| ------------------------------------------------------------------ | -------------------------- | ------ | ---------------------------------------------------------------------------------------------- |
+| Hash over public data (MAC, callsign, text)                        | DJ8MEH proposal            | R1     | anyone computes it; it does not change with the sender's secret (synopsis, red)                |
+| Identity via neighbours and path                                   | DJ8MEH proposal            | R1     | callsign and path are unsigned and spoofable; paths change in an emergency (synopsis, red)     |
+| Procedure only (known stations, net control)                       | classic EMCOMM             | R1     | no technical proof; stays as the baseline for unsigned EMCOMM messages, not as authentication  |
+| HMAC with a shared net key (A1)                                    | Pavlin, Polaric            | R1     | every key holder can sign as anyone; one leak breaks all                                       |
+| HMAC with per-sender keys at every receiver (A2)                   | -                          | R1     | every receiver holds the secret and can forge; does not scale                                  |
+| Key derived from a password                                        | RM1, Winlink login         | R1     | two observed tags allow offline guessing of the password (4.9.2)                               |
+| Truncated signature                                                | -                          | R1     | cannot be checked: verification needs the full signature (4.9.2)                               |
+| Very short signatures (multivariate: Quartz, Rainbow)              | -                          | R6     | public keys of hundreds of kB; Rainbow broken in 2022                                          |
+| BLS or short Schnorr (about 48 B)                                  | -                          | R2, R6 | saves only 16 B against Ed25519; pairings on an MCU are slow and not in a vetted small library |
+| Ed25519 per message, Base64 in the text (A3)                       | -                          | R2     | about 786 ms per message                                                                       |
+| Ed25519 per message, whole message as a binary frame               | Meshtastic, MeshCore, LXMF | R2, R4 | about 572 ms per message; the old fleet neither shows nor relays the message itself            |
+| TESLA / hash chain with delayed key disclosure                     | Galileo OSNMA              | R3     | secure only with a clock bound and a delivery-time bound; store-and-forward breaks both        |
+| **Signed batch: text message + binary proof frame (4.9.3, 4.9.4)** | M17 (same principle)       | none   | see below                                                                                      |
+
+How the signed batch meets each requirement:
+
+- **R1:** Ed25519 with pinned public keys; a verifier holds no secret.
+- **R2:** about 0.17 to 0.29 s per message for N = 10 or 5 (COMPUTED); only signers pay.
+- **R3:** no clock needed; the delay is only until the proof frame arrives. A lost message does not
+  block the others, because the proof lists one hash prefix per message.
+- **R4:** the message stays an 0x3A text frame, shown by every firmware; new firmware shows
+  "unverified", then "verified (call)" or "invalid". An EMCOMM message without a proof is never
+  shown as verified (lesson from Meshtastic CVE-2025-53627).
+- **R5:** text in the clear; the proof frame format is published.
+- **R6:** one Ed25519 verification per batch, not per message.
+
+Accepted weaknesses, each with its mitigation:
+
+| Weakness                                                            | Mitigation                                                                                       |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Verification comes minutes after the message                        | three display states; the sender can force a proof frame at once for an urgent message           |
+| Proof frames reach a receiver only through upgraded relays          | fleet share grows; the text message itself is unaffected                                         |
+| A hash prefix of 48 bit allows a second preimage at about 2^48 work | 8 B prefixes (2^64) when the batch size allows; the conflict with the real message stays visible |
+| Key distribution remains a separate problem                         | fingerprint (8 to 12 B) handed out and confirmed between OMs; key frame on air (A5); revocation  |
+| Replay of an old message                                            | the EMCOMM number is inside the signed hash; repeats are marked, not dropped (synopsis)          |
+
+Decisions left to the operator (section 7, items 5 to 7): batch size N or interval T, hash prefix
+length, whether a delay until "verified" is acceptable, and the timing of RM2.
+
 ### 4.10 End of life for old firmware
 
 A filter exists: frames **originated** by firmware below 4.35 are dropped at decode
@@ -610,5 +827,10 @@ bench suite stage 3, DK5EN-98 soaks. Each wave adds its golden set to that list.
 2. Whether forced `--nbrrelay on` should become RM1-switchable (section 3).
 3. EMCOMM trust root: manual pinning only, or a directory, and who runs it (4.9).
 4. EOL threshold and date (4.10).
-5. Regulatory check of signatures on 70 cm in DL and OE (4.9).
-6. Whether W0 may run on DK5EN-98 (production gateway).
+5. Regulatory check of signatures on 70 cm in DL and OE (4.9), including a binary frame type
+   with a published format (4.9.4, 4.9.5).
+6. EMCOMM proof: signed batch with a binary proof frame (4.9.3, 4.9.4): batch size N or interval
+   T, hash prefix length (6 B or 8 B), and whether a delay of minutes until "verified" is
+   acceptable in operation.
+7. RM2 as a binary frame (4.9.5): now, later together with the proof frame, or not at all.
+8. Whether W0 may run on DK5EN-98 (production gateway).
