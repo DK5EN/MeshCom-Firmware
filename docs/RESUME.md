@@ -1,7 +1,7 @@
 # RESUME -- pick up here
 
 **Stand:** 2026-11-07, branch `fork-dev`, last release **`v4.40a.11.06`** (Latest, tag on `3ecf429e`, 68 assets, built by CI).
-Base is upstream `dev` 4f60051c (merged into fork-dev 2026-11-02 as `560e65ab`, tree unchanged): our
+Base is upstream `dev` 649b5b17 (merged into fork-dev 2026-11-07 as `71c324e7`, tree unchanged): our
 [#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243), [#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244),
 [#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245), [#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247)
 (LRF ping/beacon/RX-silence), [#1248](https://github.com/icssw-org/MeshCom-Firmware/pull/1248) (REVIEW.md) and
@@ -86,15 +86,15 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
   **merge** `upstream/dev` (not rebase) to re-sync.
 - All PRs target upstream `dev`; PR text is German and lists files, functions and the why.
   Minimal, targeted changes only. DK5EN never merges upstream himself (the maintainers review and merge).
-- Merged upstream PRs of ours since 4.40a: #1200, #1201, #1207, #1208, #1213, #1214, #1224, #1233, #1235, #1243, #1244, #1245, #1247, #1248, #1249, #1250, #1251.
+- Merged upstream PRs of ours since 4.40a: #1200, #1201, #1207, #1208, #1213, #1214, #1224, #1233, #1235, #1238, #1243, #1244, #1245, #1247, #1248, #1249, #1250, #1251, #1257.
 - Nothing temporary remains in `src/` (`389ace0d` reverted 2026-10-15).
 
 ## Last release and flasher policy
 
-- `v4.40a.11.01` (tag on `47f339ad`, CI-built), 68 assets, Latest.
-- Upstream (icssw-org), checked 2026-11-06: Latest is `v4.40a.10.28` (published 2026-10-28, tag on `10203967`, the #1240
+- `v4.40a.11.06` (tag on `3ecf429e`, CI-built, run 42306803386), 68 assets, Latest.
+- Upstream (icssw-org), checked 2026-11-07: Latest is `v4.40a.10.28` (published 2026-10-28, tag on `10203967`, the #1240
   merge), 68 assets including 28 `.autoupdate` (zlib, `78 da`, sampled on two), so upstream CI builds them, first in this
-  release. `upstream/dev` is at `4f60051c`, 31 commits after that tag (#1243 to #1251), none released upstream yet.
+  release. `upstream/dev` is at `649b5b17`, 35 commits after that tag (#1243 to #1257), none released upstream yet.
   `fork-dev` is 0 commits behind `upstream/dev`.
 - CI builds and publishes since `v4.40a.10.11`: `MeshCom CI` (`.github/workflows/meshcom-ci.yml`) fires on
   `v*` tags (release, Latest) and `ci-proof-*` tags (draft; delete draft and tag afterwards). Recipe:
