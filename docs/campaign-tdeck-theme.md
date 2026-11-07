@@ -6,8 +6,10 @@ DK5EN-14 (T-Deck Plus).
 ## Current state
 
 - W1 done 2026-11-07 (`f30c6f3c`). W2a+W2b done 2026-11-07 (`0e80342f`), advisor approved, gate green.
-  Next: **W2c** (runtime sites: header indicators, map points; lock glyph in the header), then **W2d** (setup
-  Auto/Dark/Light control, brightness slider, boot logo on screen), then W3 (web toggle), W4 (bench).
+  W2c+W2d (merged, `80c10bd3`) and W3 (`f4c944e1`) done 2026-11-07, advisor rework applied, gate green.
+  Next: **W4** bench screenshots on DK5EN-14 (needs the operator).
+- **Operator decision 2026-11-07:** the map keeps its colours. Map points (`add_map_point`) and the map recolour
+  are out of scope.
 - Prep commits: `a3cd6db5` (plan moved), `4f253308` (`[env:native_tdeck_theme]` and its ini baseline).
 
 ## W1 outcome
@@ -50,6 +52,23 @@ DK5EN-14 (T-Deck Plus).
   `lv_palette_main` LIME/GREY and fights `tab_icons_recolor`; migrate to `hdr_on`/`hdr_off`. W2c takes the second
   `tdeck_theme_on_change` slot.
 
+## W2c/W2d and W3 outcome (`80c10bd3`, `f4c944e1`)
+
+- **Header:** sat, battery, wifi, bt and the standby/kbl icons use `hdr_on`/`hdr_off`/`hdr_err`/`warn` and
+  re-colour on a live switch (`header_theme_cb`, second of four `tdeck_theme_on_change` slots). Battery below 20 %
+  shows `warn`.
+- **Lock glyph:** `mc_lock_img` right of the standby button (x=106), visible while `node_keyboardlock` is on.
+- **Setup tab:** rows backlight, "Bright" slider (1..16, active day/night slot, follows SYM+B, no value label),
+  "Theme" dropdown Auto/Dark/Light, then starttone.
+- **Boot logo:** on the "booting..." tab, centred above the list; the list moves down and shrinks by 64 px there
+  and is restored on every other path (advisor rework: also on `msg_tabs_clear_all` and the empty-list branch).
+- **Web (W3):** three buttons on the settings page (T-Deck and T-Deck Plus only), `GET /setparam/?tdecktheme=`
+  runs the console `--theme` path. Test `tools/webgui_tdeck_theme_test.js` in regression stage 2. Advisor rework:
+  the label's `for=` clicked the Auto button, removed, with a test that failed before.
+- **W4 checks from the advisor:** lock glyph against the bt/wifi icons with keylock on and battery at 100 % (the
+  right-hand header chain is aligned leftwards, real glyph widths unknown); the "booting..." tab with the logo
+  (list 64 px shorter, long version text scrolls); every screen in both themes.
+
 ## Scope additions (operator, 2026-11-07)
 
 - **Keyboard-lock glyph** in the header while the keyboard lock is on.
@@ -79,7 +98,7 @@ that file; a parallel writer handles the other T-Deck files.
 | W1   | Sonnet medium | new `tdeck_palette.h`, new `tdeck_theme.{h,cpp}`, `meshcom_settings.h`, `settings_schema.h`, `esp32_flash.cpp`, `command_functions.cpp`, test | palette, resolve, parser, styles, `--theme`, setting                  |
 | W2a  | Sonnet medium | `lv_obj_functions.cpp`                                                                                                                        | static sites in `setDisplayLayout`, `apply_tab_bar_styles`, bubbles   |
 | W2b  | Sonnet medium | `tdeck_main.cpp`, `tdeck_helpers.{h,cpp}`, new `mc_logo_img.c`, new `tools/svg_to_lvgl_logo.py`                                               | theme init, night hook, boot logo asset (parallel with W2a)           |
-| W2c  | Sonnet medium | `lv_obj_functions.cpp`                                                                                                                        | runtime sites (header indicators, map points, bubbles), lock glyph    |
+| W2c  | Sonnet medium | `lv_obj_functions.cpp`                                                                                                                        | runtime header sites, lock glyph (map dropped, merged with W2d)       |
 | W2d  | Sonnet medium | `lv_obj_functions.cpp`, `event_functions.cpp`                                                                                                 | setup Auto/Dark/Light control, brightness slider, boot logo on screen |
 | W3   | Sonnet medium | `web_functions.cpp`, `mc.js`, `web_assets.h` (regenerated), `tools/webgui_settings_test.js`                                                   | web GUI theme toggle                                                  |
 | W4   | orchestrator  | bench                                                                                                                                         | DK5EN-14 screenshots per theme, contact sheet                         |

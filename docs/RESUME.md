@@ -22,7 +22,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 - **Running campaigns (2026-11-07), resume from their docs:**
   - GPSV4-01 (Heltec V4 GNSS): W1 committed on `fork-dev`, next W2 upstream PR. [campaign-gpsv4-01-20261107.md](campaign-gpsv4-01-20261107.md).
-  - TD-THEME-01 (T-Deck light/dark theme, plus keyboard-lock glyph and brightness slider): W1 and W2a/W2b committed (`0e80342f`), next W2c, W2d, W3, W4. [campaign-tdeck-theme.md](campaign-tdeck-theme.md).
+  - TD-THEME-01 (T-Deck light/dark theme, plus keyboard-lock glyph and brightness slider): W1-W3 committed (last `f4c944e1`), next W4 bench screenshots on DK5EN-14. [campaign-tdeck-theme.md](campaign-tdeck-theme.md).
 - **GPIO-01 implemented, not released (2026-11-07):** pin assignments and free GPIO control on the Pins page and over RM1 (`pins`, `gpio`), W0-W5 on `fork-dev`, host gate green, all build targets green, no bench test by decision. Open items in BACKLOG: GPIO-05 (RM `btn` read-only, operator decision), GPIO-06, GPIO-07 (field test). Next planned: GPSV4-01 (Heltec V4 GNSS), [plan](plan-heltec-v4-gps-20261107.md). [campaign-gpio-01-20261107.md](campaign-gpio-01-20261107.md).
 
 - **T-Beam Auto Update download, open (`AU-24`):** see `docs/BACKLOG.md`. Read this before the next release.
