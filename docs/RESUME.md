@@ -20,7 +20,7 @@ are"); open work lives in [docs/BACKLOG.md](BACKLOG.md).
 
 - **`v4.40a.11.06` shipped 2026-11-07, fleet updated:** DK5EN-1, -14, -92 by Auto Update in Chrome, DK5EN-90 by USB DFU with the CI zip (Chrome's serial chooser could not be driven), DK5EN-98 last through its Safeboot page in Chrome, still on channel `prod`. Web flasher verified (31 boards, 0 mismatches). T-Beam idle heap on the release image passes (+136 B against 64016 B).
 
-- **GPIO-01 implemented, not released (2026-11-07):** pin assignments and free GPIO control on the Pins page and over RM1 (`pins`, `gpio`), W0-W5 on `fork-dev`, host gate green, all build targets green, no bench test by decision. Operator to confirm RM `btn` read-only. [campaign-gpio-01-20261107.md](campaign-gpio-01-20261107.md).
+- **GPIO-01 implemented, not released (2026-11-07):** pin assignments and free GPIO control on the Pins page and over RM1 (`pins`, `gpio`), W0-W5 on `fork-dev`, host gate green, all build targets green, no bench test by decision. Open items in BACKLOG: GPIO-05 (RM `btn` read-only, operator decision), GPIO-06, GPIO-07 (field test). Next planned: GPSV4-01 (Heltec V4 GNSS), [plan](plan-heltec-v4-gps-20261107.md). [campaign-gpio-01-20261107.md](campaign-gpio-01-20261107.md).
 
 - **T-Beam Auto Update download, open (`AU-24`):** see `docs/BACKLOG.md`. Read this before the next release.
 

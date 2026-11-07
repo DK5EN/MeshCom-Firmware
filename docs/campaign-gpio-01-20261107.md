@@ -41,4 +41,4 @@ Final gate: `tools/regression.sh --stage 1,2` green after W5 (Unity 103 envs 365
 
 Follow-up wave (2026-11-07): GPIO-02 fixed (`--button gpio` no longer re-inits OneButton on the old pin; source-slice test seen failing before), GPIO-03 done (T5 and RAK4631 radio pins HARD, `static_assert`s seen failing before), deferred web nits closed (one message on a refused write, analog 0/99 shown as unset, "serial or telnet console" note, `web_guard.h` comment, `manualcommand` offset-0 guard test, `/pinstatus` docs). Advisor APPROVED. Gate: Unity 103 envs 3659/3659, stage 2 PASS; builds green: T-Beam, Heltec V3, RAK4631, T-Deck Plus, T-Echo, T5, T114, T-Deck Pro.
 
-Open for the operator: confirm that `btn` stays read-only over RM (W5); GPIO-04 (T-Deck Pro `BOARD_LORA_EN` 46 not reserved, predates GPIO-01) in BACKLOG.
+GPIO-04 done 2026-11-07 (T-Deck Pro `BOARD_LORA_EN` 46 reserved HARD). Campaign closed; every open item is in `docs/BACKLOG.md`: GPIO-05 (RM `btn` read-only, operator decision), GPIO-06 (T-Deck Pro pin 46 double definition, other enable pins), GPIO-07 (field test after the next release).
