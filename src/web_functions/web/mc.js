@@ -125,6 +125,11 @@ function raOn(){var o=rmEl('ra_on'),v=o.checked?'on':'off';o.disabled=true;fetch
 raM(k?'Remote management is '+v+'.':'Could not change it. Is a password set?',!k);raSt();})
 .catch(function(e){raX(e,'The node did not answer. Try again.');raSt();});}
 // RA-JS-END
+// T-Deck display theme buttons of the Settings page (TD-THEME-01 W3): one /setparam/?tdecktheme=auto|dark|light, no reload.
+// TD-JS-BEGIN
+function tdMark(v){['auto','dark','light'].forEach(function(n){var b=document.getElementById('tdtheme_'+n);if(b){var on=n==v;b.setAttribute('aria-pressed',on?'true':'false');b.classList.toggle('mctab-on',on);}});}
+function tdSet(v){fetch('/setparam/?tdecktheme='+encodeURIComponent(v)).then(function(r){return r.json();}).then(function(j){if(j&&j.returncode==0)tdMark(v);else alert('The T-Deck theme could not be set.');}).catch(function(){alert('The node did not answer. Try again.');});}
+// TD-JS-END
 // Web login password card (WEB-PWD-01): the login of this web GUI, NOT the RM/KISS password. Body only, never a URL.
 // WP-JS-BEGIN
 var wpA=0,wpT=0;

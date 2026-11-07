@@ -220,6 +220,8 @@ stage2() {
         node tools/webgui_rm_test.js
     NODE_PATH="$jsdom/node_modules" run_step "node webgui_settings_test.js" stage2-webgui-settings \
         node tools/webgui_settings_test.js
+    NODE_PATH="$jsdom/node_modules" run_step "node webgui_tdeck_theme_test.js" stage2-webgui-tdeck-theme \
+        node tools/webgui_tdeck_theme_test.js
     NODE_PATH="$jsdom/node_modules" run_step "node webgui_theme_test.js" stage2-webgui-theme \
         node tools/webgui_theme_test.js
     NODE_PATH="$jsdom/node_modules" run_step "node webgui_au_test.js" stage2-webgui-au \

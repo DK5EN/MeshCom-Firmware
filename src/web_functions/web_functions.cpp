@@ -49,6 +49,10 @@
 #include "watchdog_feed.h"  // meshcom_wdt_feed(): neighbour matrix rows run in the WDT-guarded loop task
 #include "board_led.h"         // LED-08: ledFitted() for the setup controls and info rows
 #include "pin_board.h"         // GPIO-01: pin policy with the board context (GET /pinassign)
+#if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+#include "t-deck/tdeck_palette.h" // TD-THEME-01 W3: tdeck_theme_parse/name (header only)
+#include "command_functions.h"   // commandAction() for setparam tdecktheme
+#endif
 #include "charge_led_mode.h"   // LED-02: chargeLedModeName() for the info row
 #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
 #include "esp32/esp32_pmu.h"    // LED-02: effective charge-LED mode (RM override)
@@ -3321,6 +3325,21 @@ void sub_page_setup()
         if (ledHw.charge)
             _create_setup_switch_element("chargeled", "Charge LED", "on = follows charging, off = dark", bCHARGE_LED);
     }
+#if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+    { // TD-THEME-01 W3: T-Deck DISPLAY theme (not the web page theme); stored value 0 auto, 1 dark, 2 light; setparam tdecktheme -> --theme
+        // TD-HTML-BEGIN
+        web_client.println("<label id=\"tdtheme_lbl\">T-Deck display theme <span class=\"font-small\">(device screen, not this page)</span></label>");
+        web_client.println("<div class=\"mcledgrp\" role=\"group\" aria-labelledby=\"tdtheme_lbl\">");
+        for (int i = 0; i < 3; i++)
+        {
+            const bool on = (meshcom_settings.node_tdeck_theme == i) || (i == 0 && meshcom_settings.node_tdeck_theme > 2);
+            web_client.printf("<button type=\"button\" class=\"mctab mcledbtn%s\" id=\"tdtheme_%s\" aria-pressed=\"%s\" onclick=\"tdSet('%s')\">%s</button>\n",
+                              on ? " mctab-on" : "", tdeck_theme_name(i), on ? "true" : "false", tdeck_theme_name(i), tdeck_theme_name(i));
+        }
+        web_client.println("</div>");
+        // TD-HTML-END
+    }
+#endif
 
 // We support OTA only for ESP based devices, not RAK
 #ifdef ESP32
@@ -4996,6 +5015,23 @@ void setparam(String web_header)
     setupData.returnCode = 255;
     setupData.returnValue = "";
 
+#if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
+    if (param_name.equals("tdecktheme"))
+    { // TD-THEME-01 W3: same path as the console --theme (store, save_settings, tdeck_theme_reapply); only auto|dark|light
+        const int t = tdeck_theme_parse(param_value.c_str());
+        if (t >= 0)
+        {
+            char message_text[32];
+            snprintf(message_text, sizeof(message_text), "--theme %s", tdeck_theme_name((uint8_t)t));
+            commandAction(message_text, isPhoneReady == 1);
+            setupData.returnCode = (meshcom_settings.node_tdeck_theme == t) ? WS_RETURNCODE_OKAY : WS_RETURNCODE_FAIL;
+        }
+        else
+            setupData.returnCode = WS_RETURNCODE_FAIL;
+        setupData.returnValue = tdeck_theme_name(meshcom_settings.node_tdeck_theme);
+    }
+    else
+#endif
     webSetup_setParam(&setupData);
 
     //Serial.printf("pName: %s\n", setupData.paramName);
