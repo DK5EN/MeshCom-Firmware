@@ -20,7 +20,7 @@ BMESH_ALLOWLIST = {
     "aprs_functions.cpp": 1,
     "command_functions.cpp": 4,
     "esp32/esp32_main.cpp": 1,
-    "loop_functions.cpp": 3,
+    "loop_functions.cpp": 2,   # 3 -> 2: --nbrreport comment removed (BL-01, 2026-11-07)
     "loop_functions.h": 1,
     "loop_functions_extern.h": 1,
     "lora_functions.cpp": 3,

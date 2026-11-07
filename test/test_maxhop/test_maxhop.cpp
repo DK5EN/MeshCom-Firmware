@@ -146,6 +146,38 @@ static void test_optionsliste_schutz_gegen_kleine_puffer(void)
     TEST_ASSERT_EQUAL_INT(4, two[1]);
 }
 
+// IDEE-04: Relay-Schritt klemmt das Hop-Nibble auf MAXHOP_RELAY_LIMIT und laesst
+// die Flag-Bits (High-Nibble) unberuehrt.
+static void test_relay_hop_klemmt_nibble_15_mit_flags(void)
+{
+    const uint8_t out = relayHopNext(0xF0 | 15);
+    TEST_ASSERT_EQUAL_UINT8(MAXHOP_RELAY_LIMIT - 1, out & 0x0F);
+    TEST_ASSERT_EQUAL_UINT8(0xF0, out & 0xF0);
+}
+
+static void test_relay_hop_klemmt_nibble_8(void)
+{
+    TEST_ASSERT_EQUAL_UINT8(6, relayHopNext(8));
+    TEST_ASSERT_EQUAL_UINT8(6, relayHopNext(0x80 | 8) & 0x0F);
+    TEST_ASSERT_EQUAL_UINT8(0x80, relayHopNext(0x80 | 8) & 0xF0);
+}
+
+static void test_relay_hop_regulaere_werte_unveraendert(void)
+{
+    TEST_ASSERT_EQUAL_UINT8(6, relayHopNext(7));
+    TEST_ASSERT_EQUAL_UINT8(2, relayHopNext(3));
+    TEST_ASSERT_EQUAL_UINT8(0, relayHopNext(1));
+    TEST_ASSERT_EQUAL_UINT8(0x20, relayHopNext(0x20 | 1));
+}
+
+static void test_relay_hop_nibble_0_bleibt_unveraendert(void)
+{
+    // Das Gate (nibble > 0) im Aufrufer relayt 0 nicht; der Helper darf nicht
+    // in das High-Nibble umbrechen.
+    TEST_ASSERT_EQUAL_UINT8(0, relayHopNext(0));
+    TEST_ASSERT_EQUAL_UINT8(0x40, relayHopNext(0x40));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -156,5 +188,9 @@ int main(int, char **)
     RUN_TEST(test_optionsliste_nimmt_aktuellen_wert_auf);
     RUN_TEST(test_optionsliste_absteigend_und_ohne_duplikat);
     RUN_TEST(test_optionsliste_schutz_gegen_kleine_puffer);
+    RUN_TEST(test_relay_hop_klemmt_nibble_15_mit_flags);
+    RUN_TEST(test_relay_hop_klemmt_nibble_8);
+    RUN_TEST(test_relay_hop_regulaere_werte_unveraendert);
+    RUN_TEST(test_relay_hop_nibble_0_bleibt_unveraendert);
     return UNITY_END();
 }

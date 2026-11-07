@@ -67,13 +67,13 @@
 <body>
 <h1>MeshCom fork: campaigns since September 2026, and the backlog ahead</h1>
 <ul class="meta">
-  <li>State: 2026-11-07 evening; branch <code>fork-dev</code> at <code>959b01a6</code>; backlog verified and debloated</li>
+  <li>State: 2026-11-07 late evening; branch <code>fork-dev</code> at <code>83bf116f</code>; release-train implementation W1 in its gate</li>
   <li>Tokens and cost: local Claude Code transcripts at API list prices (method in the foot)</li>
   <li>Sources: commit dates on <code>fork-dev</code>, release tags, <code>docs/campaign-*.md</code>, <code>docs/BACKLOG.md</code>, <code>docs/RESUME.md</code></li>
 </ul>
 
 <div class="bluf">
-  <p>Ten weeks of fork work: 18 numbered releases, about 30 upstream PRs merged, CI releases since v4.40a.10.11. GPIO-01, GPSV4-01 W1 and TD-THEME-01 W1-W3 are on <code>fork-dev</code>, unreleased. Next is one release train: implement the 11 open code items, one bulk build, flash the four bench nodes, one bulk bench session, docs, release around 11-14. Soak, field checks and the GPSV4-01 upstream PR follow after it.</p>
+  <p>Ten weeks of fork work: 18 numbered releases, about 30 upstream PRs merged, CI releases since v4.40a.10.11. GPIO-01, GPSV4-01 W1 and TD-THEME-01 W1-W3 are on <code>fork-dev</code>, unreleased. Now running: the release train, implementing 11 of the 12 open code items in four waves (pure coding, no bench; CSMA-03 deferred), one bulk build, flash the four bench nodes, one bulk bench session, docs, release around 11-14. Soak, field checks and the GPSV4-01 upstream PR follow after it.</p>
 </div>
 
 <h2>Key facts</h2>
@@ -109,7 +109,7 @@
   <div>
     <h2>Ahead</h2>
     <ul>
-      <li><b>Release train (to ~11-14):</b> implement 11 rows (BL-01, SENS-04, SB-06, CSMA-01/03, BLE-SET-01, GPIO-06, IDEE-04 hop clamp, RM-NOANS-01, two tooling rows), bulk build, bulk flash, bulk bench (28 rows incl. TD-THEME-01 W4), docs, release.</li>
+      <li><b>Release train (to ~11-14):</b> implement 11 rows in waves W1-W4 (BL-01, SENS-04, SB-06, CSMA-01, BLE-SET-01, GPIO-06, IDEE-04 hop clamp, RM-NOANS-01, CLK-01 W0, two tooling rows; plan in <code>campaign-impl-train-20261107.md</code>), bulk build, bulk flash, bulk bench (28 rows incl. TD-THEME-01 W4), docs, release.</li>
       <li><b>After the release:</b> DK5EN-98 soak with OK (AU-24, GWRX-01), GPSV4-01 upstream PR, field checks, studies.</li>
       <li><b>Waiting:</b> 11 rows on reporters, maintainers and the OE1KBC/OE1KFR talk; 18 ideas, none committed.</li>
     </ul>
@@ -192,7 +192,10 @@ const rows = [
  {p:"Upstream PRs merged",n:"#1240, #1243 to #1245 (E290, web login)",id:"",st:"rel",s:"10-31",e:"10-31",note:""},
  {p:"Upstream PRs merged",n:"#1246 to #1251 (LRF, characters, battery)",id:"",st:"rel",s:"11-02",e:"11-02",note:""},
  {p:"Upstream PRs merged",n:"#1257 (store-node echo)",id:"",st:"rel",s:"11-07",e:"11-07",note:""},
- {p:"Release train",n:"Implement the 11 impl rows",id:"",st:"plan",s:"11-08",e:"11-10",note:"BL-01, SENS-04, SB-06, CSMA-01, CSMA-03, BLE-SET-01, TEST-OTA-01, RM-NOANS-01, GPIO-06, GOLDEN-MACROS-01, IDEE-04"},
+ {p:"Release train",n:"Impl W1: 8 writers in parallel",id:"IMPL-TRAIN",st:"run",s:"11-07",e:"11-07",note:"BL-01, IDEE-04, BLE-SET-01, GPIO-06, RM-NOANS-01, TEST-OTA-01, SB-06, CLK-01 host tool; all 8 back, host gate, board builds and Opus advisor running"},
+ {p:"Release train",n:"Impl W2: SENS-04, CSMA-01, CLK-01 core",id:"IMPL-TRAIN",st:"plan",s:"11-08",e:"11-08",note:"DHT type as new keyed setting; CSMA re-arm shorten-only; clock tick and display-gate helpers, tests deactivated until the fix"},
+ {p:"Release train",n:"Impl W3: CLK-01 instrumentation",id:"CLK-01",st:"plan",s:"11-08",e:"11-09",note:"[CLOCK], [DISPCLK], --timesrc, --clockstat, --oledshot, --tdshot; INSTRUMENT builds only"},
+ {p:"Release train",n:"Impl W4: GOLDEN-MACROS-01",id:"IMPL-TRAIN",st:"plan",s:"11-09",e:"11-09",note:"Regenerate variant-macros-effective.txt, add its check to the golden selftest. CSMA-03 not in this train (operator)"},
  {p:"Release train",n:"Bulk build: host gate and every board env",id:"",st:"plan",s:"11-11",e:"11-11",note:"regression.sh --stage 1,2, then each env once, sequential"},
  {p:"Release train",n:"Bulk flash DK5EN-1, -14, -90, -92",id:"",st:"plan",s:"11-11",e:"11-11",note:"Not DK5EN-98"},
  {p:"Release train",n:"Bulk bench: 28 bench rows plus campaign checks",id:"",st:"plan",s:"11-12",e:"11-13",note:"TD-THEME-01 W4, TD-22/23/27-34, CSMA-02/04, AU-14, BOOT-01, NRF-BLEDFU, web rows; list in BACKLOG 3.2"},

@@ -210,10 +210,15 @@ class FakeNode:
         with self.lock:
             if self.in_app:
                 return 404, "not in safeboot"
-            if self.upload_active and not self.cancel_bug_allow_during_upload:
-                return 400, "cancel refused: upload in progress"
+            # Same order as src/safeboot/main.cpp /ota/cancel: app_invalid (409)
+            # first, then "in progress" (400), and "in progress" is the OTA
+            # state (receiving/verifying), not the client's socket still being
+            # open. An aborted session is not in flight even while the client
+            # thread is still winding down its stall tail.
             if not self.app_valid:
                 return 409, "cancel refused: app_invalid"
+            if (self.state in ("receiving", "verifying") and not self.cancel_bug_allow_during_upload):
+                return 400, "cancel refused: upload in progress"
             my_epoch = self.epoch
         self.serial.push("[SAFEBOOT];fallback;reason;cancel\n")
         threading.Thread(target=self._reboot_to_app_after, args=(self.reboot_delay_s, my_epoch),

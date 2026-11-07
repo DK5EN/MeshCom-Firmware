@@ -22,6 +22,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -996,6 +998,31 @@ static void test_net_mode_existing_keyed_store_keeps_its_value(void)
 
 // ---------------------------------------------------------------------------
 
+// BLE-SET-01: the nRF52 settings characteristic 0xF0A1 was dead on air (setFixedLen(2001) is
+// above the 510-byte attribute limit, so begin() never registered it). The path is removed;
+// this source scrape keeps it from coming back unnoticed.
+static std::string read_repo_source(const char *rel)
+{
+    std::string file(__FILE__);
+    // __FILE__ may be relative to the repo root (pio runs the compiler from there).
+    const size_t cut = file.find("test/test_nrf52_settings_paths/");
+    TEST_ASSERT_TRUE_MESSAGE(cut != std::string::npos, "cannot derive the repo root from __FILE__");
+    std::ifstream in(file.substr(0, cut) + rel, std::ios::binary);
+    TEST_ASSERT_TRUE_MESSAGE(in.good(), rel);
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    return ss.str();
+}
+
+static void test_ble_set_01_dead_settings_characteristic_is_gone(void)
+{
+    const std::string src = read_repo_source("src/nrf52/nrf52_ble.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("0xF0A1") == std::string::npos, "UUID 0xF0A1 is back in nrf52_ble.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("setFixedLen(") == std::string::npos, "setFixedLen() is back in nrf52_ble.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("g_lora_data") == std::string::npos, "g_lora_data is back in nrf52_ble.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("settings_rx_callback(uint16_t") == std::string::npos, "settings_rx_callback() is back in nrf52_ble.cpp");
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -1040,6 +1067,8 @@ int main(void)
     RUN_TEST(test_rewritten_legacy_blob_beats_stale_keyed_store);
     RUN_TEST(test_rewritten_legacy_blob_counter_beats_stale_counters_file);
     RUN_TEST(test_unchanged_legacy_blob_does_not_override_keyed_store);
+
+    RUN_TEST(test_ble_set_01_dead_settings_characteristic_is_gone);
 
     return UNITY_END();
 }

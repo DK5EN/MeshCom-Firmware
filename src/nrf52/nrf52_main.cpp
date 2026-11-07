@@ -798,9 +798,6 @@ void nrf52setup()
     bNBRCANCEL = (meshcom_settings.node_sset4 & 0x1000) != 0;
     // --nbrsym on|off (Stufe 2): 0x2000 invertiert gespeichert, siehe command_functions.cpp.
     bNBRSYM = (meshcom_settings.node_sset4 & 0x2000) == 0;
-    // --nbrreport off|auto|on (Stufe 3, HN-Bericht): 0x0100 off, 0x0200 on, keines von beiden auto.
-    bNBRRPTOFF = (meshcom_settings.node_sset4 & 0x0100) != 0;
-    bNBRRPTON  = (meshcom_settings.node_sset4 & 0x0200) != 0;
 
     bDisplayInfo = bLORADEBUG;
 

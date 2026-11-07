@@ -6,6 +6,7 @@
 #include "ElegantOTA.h"
 #include "ota_state.h"
 #include "fw_apply.h"
+#include "app_check.h"
 #include <WiFi.h>
 #include <esp_wifi.h>
 
@@ -431,7 +432,32 @@ void wifiConnect() {
    esp_err_t rc = esp_image_verify(ESP_IMAGE_VERIFY_SILENT, &pos, &data);
    bool valid = (rc == ESP_OK);
 #endif
-   Serial.printf("[SAFEBOOT];app;image;%s;rc;%d\n", valid ? "valid" : "invalid", (int)rc);
+   // SB-06: identity checks on top of the structural verdict (src/safeboot/
+   // app_check.h). Both paths read the 24-byte header and the app desc from
+   // flash, so the fallback path gets the same checks.
+   safeboot::AppCheck why = safeboot::AppCheck::Ok;
+   if (valid)
+   {
+     esp_image_header_t hdr;
+     esp_app_desc_t desc;
+     bool hdrOk = (esp_partition_read(partition, 0, &hdr, sizeof(hdr)) == ESP_OK);
+     bool descOk = (esp_ota_get_partition_description(partition, &desc) == ESP_OK);
+#if CONFIG_IDF_TARGET_ESP32S3
+     const uint16_t expectedChip = ESP_CHIP_ID_ESP32S3;
+#else
+     const uint16_t expectedChip = ESP_CHIP_ID_ESP32;
+#endif
+     why = hdrOk ? safeboot::checkAppImage((uint16_t)hdr.chip_id, expectedChip, hdr.segment_count, descOk,
+                                           desc.magic_word, desc.project_name)
+                 : safeboot::AppCheck::BadHeader;
+     valid = (why == safeboot::AppCheck::Ok);
+   }
+   if (valid)
+     Serial.printf("[SAFEBOOT];app;image;valid;rc;%d\n", (int)rc);
+   else if (why != safeboot::AppCheck::Ok)
+     Serial.printf("[SAFEBOOT];app;image;invalid;rc;%d;why;%s\n", (int)rc, safeboot::appCheckWhy(why));
+   else
+     Serial.printf("[SAFEBOOT];app;image;invalid;rc;%d\n", (int)rc);
    return valid;
  }
 

@@ -12,6 +12,7 @@
 
 #include <string.h>
 
+#include <safeboot/app_check.h>
 #include <safeboot/fw_apply.h>
 #include <safeboot/ota_state.h>
 #include <safeboot/zstream.h>
@@ -1185,6 +1186,69 @@ static void test_zstream_init_resets_a_used_inflater(void) {
     TEST_ASSERT_EQUAL_UINT32(100, sink2.len);
 }
 
+// ---------------------------------------------------------------------
+// SB-06: app image identity checks (src/safeboot/app_check.h)
+// ---------------------------------------------------------------------
+using safeboot::AppCheck;
+using safeboot::checkAppImage;
+
+static AppCheck app_check_good(uint16_t chip = 9, uint8_t segs = 5, bool descOk = true,
+                               uint32_t magic = safeboot::APP_DESC_MAGIC,
+                               const char *name = "arduino-lib-builder")
+{
+    char field[32] = {0};
+    strncpy(field, name, sizeof(field));
+    return checkAppImage(chip, 9, segs, descOk, magic, field);
+}
+
+void test_app_check_accepts_matching_image(void)
+{
+    TEST_ASSERT_EQUAL((int)AppCheck::Ok, (int)app_check_good());
+    TEST_ASSERT_EQUAL((int)AppCheck::Ok, (int)app_check_good(9, 1));
+    TEST_ASSERT_EQUAL((int)AppCheck::Ok, (int)app_check_good(9, 16));
+}
+
+void test_app_check_rejects_wrong_chip(void)
+{
+    TEST_ASSERT_EQUAL((int)AppCheck::ChipMismatch, (int)app_check_good(0));
+    TEST_ASSERT_EQUAL((int)AppCheck::ChipMismatch, (int)app_check_good(5));
+    TEST_ASSERT_EQUAL_STRING("chip", safeboot::appCheckWhy(AppCheck::ChipMismatch));
+}
+
+void test_app_check_rejects_bad_segment_count(void)
+{
+    TEST_ASSERT_EQUAL((int)AppCheck::BadSegmentCount, (int)app_check_good(9, 0));
+    TEST_ASSERT_EQUAL((int)AppCheck::BadSegmentCount, (int)app_check_good(9, 17));
+    TEST_ASSERT_EQUAL((int)AppCheck::BadSegmentCount, (int)app_check_good(9, 255));
+}
+
+void test_app_check_rejects_missing_or_wrong_desc(void)
+{
+    TEST_ASSERT_EQUAL((int)AppCheck::BadDesc, (int)app_check_good(9, 5, false));
+    TEST_ASSERT_EQUAL((int)AppCheck::BadDesc, (int)app_check_good(9, 5, true, 0xDEADBEEFu));
+    // the project name is not checked, so a missing name does not matter
+    TEST_ASSERT_EQUAL((int)AppCheck::Ok, (int)checkAppImage(9, 9, 5, true, safeboot::APP_DESC_MAGIC, nullptr));
+}
+
+void test_app_check_ignores_project_name(void)
+{
+    // Operator decision 2026-11-07: no project-name check. Every Arduino-ESP32 build
+    // carries "arduino-lib-builder"; a framework switch would otherwise make every old
+    // Safeboot refuse every new app.
+    TEST_ASSERT_EQUAL((int)AppCheck::Ok, (int)app_check_good(9, 5, true, safeboot::APP_DESC_MAGIC, "hello_world"));
+    TEST_ASSERT_EQUAL((int)AppCheck::Ok, (int)app_check_good(9, 5, true, safeboot::APP_DESC_MAGIC, ""));
+    TEST_ASSERT_EQUAL((int)AppCheck::Ok, (int)app_check_good(9, 5, true, safeboot::APP_DESC_MAGIC, "meshcom-idf5"));
+}
+
+void test_app_check_reason_order_chip_first(void)
+{
+    // everything wrong: the chip id is reported first
+    TEST_ASSERT_EQUAL((int)AppCheck::ChipMismatch, (int)app_check_good(0, 0, false, 0, "x"));
+    TEST_ASSERT_EQUAL_STRING("segs", safeboot::appCheckWhy(AppCheck::BadSegmentCount));
+    TEST_ASSERT_EQUAL_STRING("desc", safeboot::appCheckWhy(AppCheck::BadDesc));
+    TEST_ASSERT_EQUAL_STRING("hdr", safeboot::appCheckWhy(AppCheck::BadHeader));
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_good_path_reaches_done_with_one_switch_partition);
@@ -1241,5 +1305,11 @@ int main(int, char**) {
     RUN_TEST(test_zstream_write_failure_propagates_and_is_sticky);
     RUN_TEST(test_zstream_rejects_bad_dictionary_and_uninitialised_use);
     RUN_TEST(test_zstream_init_resets_a_used_inflater);
+    RUN_TEST(test_app_check_accepts_matching_image);
+    RUN_TEST(test_app_check_rejects_wrong_chip);
+    RUN_TEST(test_app_check_rejects_bad_segment_count);
+    RUN_TEST(test_app_check_rejects_missing_or_wrong_desc);
+    RUN_TEST(test_app_check_ignores_project_name);
+    RUN_TEST(test_app_check_reason_order_chip_first);
     return UNITY_END();
 }

@@ -106,7 +106,7 @@ against this document in parallel. Change it here first, then everywhere.
   unpacked: bad header, corrupt data or adler32 mismatch); `verifying` is the window between the last chunk and the `Update.end()` verdict.
 - `received`/`total`: bytes of the current or last session; `total` 0 when unknown. For a `.autoupdate`
   upload `received` counts the received (compressed) bytes.
-- `app_valid`: true when the app partition holds a complete, verified image (checked at boot and
+- `app_valid`: true when the app partition holds a complete, verified image that also passes the identity checks below (checked at boot and
   re-checked after every abort). False after an aborted upload has written into the single app
   slot: the node then stays in safeboot until a full upload succeeds. It becomes true again after a
   successful upload (state `done`) and is re-checked when the partition switch is applied.
@@ -160,7 +160,20 @@ the file name: the node decides from the **first byte of the upload body**.
 `[SAFEBOOT];ota;format;<raw|zlib>` (once per upload, when the first body byte is sniffed),
 `[SAFEBOOT];ota;verify;result;ok`, `[SAFEBOOT];ota;end;result;<success|error>`,
 `[SAFEBOOT];fallback;reason;<timeout|cancel>`, `[SAFEBOOT];app;image;<valid|invalid>;rc;<n>` (at boot
-and after every abort).
+and after every abort). When `esp_image_verify()` succeeded but an identity check rejects the image, the line is
+`[SAFEBOOT];app;image;invalid;rc;0;why;<hdr|chip|segs|desc>`; the `valid` line and a plain verify failure
+(no `why`) are unchanged.
+
+**App image identity checks (SB-06, `src/safeboot/app_check.h`):** after `esp_image_verify()` succeeds,
+`checkAppImageValid()` additionally requires (in this order, first failure is reported): `hdr` the image
+header is readable from flash; `chip` the header `chip_id` equals the running chip (ESP32 0x0000, ESP32-S3
+0x0009); `segs` header `segment_count` is 1..16 (`ESP_IMAGE_MAX_SEGMENTS`); `desc` the `esp_app_desc_t` is
+readable and its `magic_word` is `0xABCD5432`. Chip and segment count are also checked inside
+`esp_image_verify()`; the repeat only gives a readable reason. The same checks run on the
+`SAFEBOOT_APP_VALID_VIA_SET_BOOT_PARTITION` fallback path (header and desc are read from flash). No SHA-256 by
+design. No `project_name` check (operator decision 2026-11-07): every Arduino-ESP32 build carries the generic
+`arduino-lib-builder`, so the check would not tell MeshCom from other Arduino images, and a framework switch
+that changes the name would make every Safeboot in the field refuse every new app.
 
 ## State machine (host-testable, `src/safeboot/ota_state.h`)
 

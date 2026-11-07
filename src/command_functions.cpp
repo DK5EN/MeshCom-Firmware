@@ -606,16 +606,6 @@ static void tg_post_nbrrelay_off()   { bNBRCANCEL = false; }
 static void tg_post_nbrrelay_count() { bNBRCANCEL = false; }
 static void tg_post_nbrrelay_on()    { bNBRRELAY = true; }
 
-// --nbrreport off|auto|on (Nachbarschaftsmatrix Stufe 3, HN-Bericht): zwei Bits in
-// node_sset4 -- 0x0100 "off" (bNBRRPTOFF), 0x0200 "on" (bNBRRPTON), keines von
-// beiden "auto" (Default, kein bestehender Knoten braucht Migration). Jede Zeile
-// schreibt ihr eigenes Flag per row.flag/TG_FLAG_TRUE und raeumt das jeweils
-// andere per Nachlaeufer weg, damit hoechstens eines der beiden je gesetzt ist --
-// gleiches Muster wie bei --nbrrelay oben.
-static void tg_post_nbrreport_off()  { bNBRRPTON = false; }
-static void tg_post_nbrreport_auto() { bNBRRPTOFF = false; bNBRRPTON = false; }
-static void tg_post_nbrreport_on()   { bNBRRPTOFF = false; }
-
 static const ToggleRow COMMAND_TOGGLES[] =
 {
     { "--setinfo off",        &bDisplayInfo,         nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_ECHO_LN },
@@ -660,12 +650,6 @@ static const ToggleRow COMMAND_TOGGLES[] =
     // Neuberechnung noetig: die Relay-Entscheidung liest bNBRSYM je Frame neu.
     { "--nbrsym on",          &bNBRSYM,              &meshcom_settings.node_sset4,    0xFFFFDFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--nbrsym off",         &bNBRSYM,              &meshcom_settings.node_sset4,    0xFFFFFFFF,   0x2000,       nullptr,                       TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
-    // --nbrreport off|auto|on (Stufe 3, HN-Bericht): 0x0100/0x0200 in node_sset4,
-    // siehe tg_post_nbrreport_*() oben. Jede Zeile loescht zuerst BEIDE Bits
-    // (and_mask 0xFFFFFCFF), dann setzt or_mask hoechstens eines davon.
-    { "--nbrreport off",      &bNBRRPTOFF,           &meshcom_settings.node_sset4,    0xFFFFFCFF,   0x0100,       tg_post_nbrreport_off,         TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
-    { "--nbrreport auto",     nullptr,               &meshcom_settings.node_sset4,    0xFFFFFCFF,   0x00000000,   tg_post_nbrreport_auto,        TG_DIRTY_NONE,   TG_SAVE | TG_BLE_ECHO },
-    { "--nbrreport on",       &bNBRRPTON,            &meshcom_settings.node_sset4,    0xFFFFFCFF,   0x0200,       tg_post_nbrreport_on,          TG_DIRTY_NONE,   TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--viadebug on",        &bDisplayVia,          nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--viadebug off",       &bDisplayVia,          nullptr,                         0xFFFFFFFF,   0x00000000,   nullptr,                       TG_DIRTY_NONE,   TG_BLE_ECHO },
     // Upstream d93c05a0/31ef8648: the phone gets SN + SN1, not a text echo the
@@ -1723,7 +1707,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--sendpos               send position now\n--sendtrack             send track/APRS beacon now\n--sendhey               send HEY beacon now\n--sendtele              send telemetry now\n--posshot               one-shot position now\n--postime 300..86400    position interval s (0 = default)\n");
             delay(100);
 
-            printdeb("\n== Neighbour matrix ==\n--nbrreset              clear matrix\n--nbrcheck              consistency check\n--nbrrelay off/count/on relay decision: off / log only / active\n--nbrsym on/off         assume symmetric links\n--nbrreport off/auto/on HN neighbour report\n");
+            printdeb("\n== Neighbour matrix ==\n--nbrreset              clear matrix\n--nbrcheck              consistency check\n--nbrrelay off/count/on relay decision: off / log only / active\n--nbrsym on/off         assume symmetric links\n");
             delay(100);
 
             printdeb("\n== APRS ==\n--symid <c>             symbol table\n--symcd <c>             symbol code\n--aprscomment <t>/none  comment (alias --atxt)\n--aprsmc <call>         APRS destination call (default APRSMC)\n--track on/off          SmartBeaconing\n");
@@ -7880,12 +7864,11 @@ void commandAction(char *umsg_text, bool ble)
 
             // Stufe 2 (docs/nbr-wichtigkeit-konzept.md 5.8 Punkt 4): Modus und die
             // fuenf Zaehler, damit ein Feldlauf ohne Web-Seite ablesbar bleibt.
-            printfdeb("...NBRRELAY %s ...relays A %lu B %lu ...cancelled %lu ...possible %lu ...refused %lu ...NBRSYM %s ...NBRREPORT %s\n",
+            printfdeb("...NBRRELAY %s ...relays A %lu B %lu ...cancelled %lu ...possible %lu ...refused %lu ...NBRSYM %s\n",
                 (bNBRCANCEL?"on":(bNBRRELAY?"count":"off")),
                 (unsigned long)stat_nbr_relay_a, (unsigned long)stat_nbr_relay_b, (unsigned long)stat_nbr_cancel,
                 (unsigned long)stat_nbr_cancel_possible, (unsigned long)stat_nbr_refuse_alone,
-                (bNBRSYM?"on":"off"),
-                (bNBRRPTOFF?"off":(bNBRRPTON?"on":"auto")));
+                (bNBRSYM?"on":"off"));
 
             #if defined(ESP32)
             // F3: why the node last booted, readable over the net console too.

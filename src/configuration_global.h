@@ -593,7 +593,7 @@ static inline bool flashLayoutCompatible(int stored)
 #define NBR_NCNT_AIR_MAX 99
 #endif
 
-// HN-Nachbarschaftsmeldung (HEY-Rahmen an "HN", max_hop 0, --nbrreport): fester
+// HN-Nachbarschaftsmeldung (HEY-Rahmen an "HN", max_hop 0, fest auf auto): fester
 // Takt im langsamsten Trickle-Intervall, NICHT dem Trickle unterworfen (kein
 // Schnellstart nach Topologieaenderung, keine Unterdrueckung) -- die Liste ist
 // je Knoten einmalig, nie redundant.

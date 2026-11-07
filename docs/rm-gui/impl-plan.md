@@ -158,7 +158,7 @@ W0) is orchestrator-owned. Every `pio` call goes through
 - `/rmnodes`: save, duplicate (`dup`), bad slot (`slot`); the list never contains a key; the saved node
   survived a reboot of DK5EN-92.
 - Send by slot DK5EN-92 -> DK5EN-1: `status` (`s=gtdMwl p=2/22`, plus `led=0` at the time of the bench), `led on`, `led off` confirmed; a lost
-  command ended as "no answer after 75 s"; the sender policy locked the target after two unanswered sends.
+  command ended as "no answer after 171 s"; the sender policy locked the target after two unanswered sends.
   Replies can take longer than 14 s over LoRa.
 - Chrome (Remote page on DK5EN-92 via `dk5en-92.local`): sidebar intact (Setup icon + Remote mast), heard chips,
   saved-node chip, Test connection, tiles with state from the last answer, countdown after each send,

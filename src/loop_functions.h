@@ -156,16 +156,16 @@ bool heyTrickleSuppress(int consistent);
 // F6: --gateway on/off -- reset the trickle to Imin and announce the new state
 // with a HEY at once (sendHeyShot(), 30 s floor).
 void heyGatewayChanged();
-// HN-Bericht (Nachbarschaftsmatrix Stufe 3, --nbrreport): periodischer, von
+// HN-Bericht (Nachbarschaftsmatrix Stufe 3): periodischer, von
 // sendHey() unabhaengiger Bericht "wen ich direkt hoere" an Ziel "HN",
-// max_hop 0. Der Aufrufer (esp32_main.cpp/nrf52_main.cpp) entscheidet Takt
-// und Modus (off/auto/on); diese Funktion sendet immer, wenn gerufen.
+// max_hop 0. Der Aufrufer (nbrReportTick()) entscheidet den Takt; diese
+// Funktion sendet immer, wenn gerufen.
 void sendNbrReport();
 // Eigener Takt fuer sendNbrReport(), UNABHAENGIG vom Trickle-Intervall und nie
 // unterdrueckt: erster Bericht NBR_REPORT_FIRST_S nach dem Start, danach alle
-// NBR_REPORT_INTERVAL_S + 0..NBR_REPORT_JITTER_S s Zufallsversatz. Wertet
-// --nbrreport (bNBRRPTOFF/bNBRRPTON) und im Modus auto zusaetzlich bMESH/
-// bGATEWAY aus. Von esp32loop()/nrf52loop() je einmal pro Durchlauf gerufen,
+// NBR_REPORT_INTERVAL_S + 0..NBR_REPORT_JITTER_S s Zufallsversatz. Fest auf
+// "auto" (BL-01, 2026-11-07): sendet nur, wenn weder bMESH noch bGATEWAY
+// gesetzt ist. Von esp32loop()/nrf52loop() je einmal pro Durchlauf gerufen,
 // gleiche Stelle wie der Trickle-HEY-Block.
 void nbrReportTick();
 void sendTelemetry(int ID);

@@ -2971,11 +2971,11 @@ void sub_page_neighbours()
     // sind (nbrReportTick() in loop_functions.cpp) -- die dritte Zeile sagt
     // fuer den aktuell konfigurierten Modus dazu, ob das gerade zutrifft.
     {
-        const char *nbrreport_mode = bNBRRPTOFF ? "off" : (bNBRRPTON ? "on" : "auto");
-        bool nbrreport_sends_now = bNBRRPTON || (!bNBRRPTOFF && !bMESH && !bGATEWAY);
+        const char *nbrreport_mode = "auto";
+        bool nbrreport_sends_now = (!bMESH && !bGATEWAY);
         web_client.printf("<p>HN report: %s (every %d min, SNR &gt;= %d dB)%s</p>",
                            nbrreport_mode, (int)(NBR_REPORT_INTERVAL_S / 60), (int)LORA_SNR_STABLE_MIN_DB,
-                           (bNBRRPTOFF ? "" : (nbrreport_sends_now ? " -- sending" : " -- not sending (mesh/gateway on)")));
+                           (nbrreport_sends_now ? " -- sending" : " -- not sending (mesh/gateway on)"));
     }
 
     web_client.println("</div>");
@@ -4205,7 +4205,6 @@ void sub_page_info()
     web_client.printf("NBR debug: %s<br>", (bNBRDEBUG ? "on" : "off"));
     web_client.printf("NBR relay: %s<br>", (bNBRCANCEL ? "on" : (bNBRRELAY ? "count" : "off")));
     web_client.printf("NBR sym: %s<br>", (bNBRSYM ? "on" : "off"));
-    web_client.printf("NBR report: %s<br>", (bNBRRPTOFF ? "off" : (bNBRRPTON ? "on" : "auto")));
     web_client.printf("</td></tr>\n");
 
     #if defined(ESP32) && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS) || defined(BOARD_T_DECK_PRO))

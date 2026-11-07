@@ -2,6 +2,7 @@
 #include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include "csma_timing.h"   // W0.6: CSMA back-off arithmetic, native-tested
 #include "mesh_policy.h"   // BL-01: meshTxAllowed(), --mesh off = nur kein Repeat fremder Frames
+#include "maxhop.h"      // IDEE-04: relayHopNext(), native-tested
 #include "Arduino.h"
 #include "configuration.h"
 
@@ -2509,7 +2510,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                                 if(bGATEWAY && meshcom_settings.node_hasIPaddress)
                                     aprsmsg.msg_server = true;  // signal to another gateway not to send to MESHCOM-Server
 
-                                aprsmsg.max_hop--;
+                                // IDEE-04: clamp hop nibble 8-15 (old firmware) to MAX_HOP_LIMIT, then decrement
+                                static_assert(MAXHOP_RELAY_LIMIT == MAX_HOP_LIMIT, "maxhop.h MAXHOP_RELAY_LIMIT must equal MAX_HOP_LIMIT");
+                                aprsmsg.max_hop = relayHopNext(aprsmsg.max_hop);
 
                                 aprsmsg.msg_last_hw = BOARD_HARDWARE | 0x80; // hardware  last sending node   last sending node (0x80)
                                 aprsmsg.msg_source_mod = (getMOD() & 0xF) | (meshcom_settings.node_country << 4); // modulation & country

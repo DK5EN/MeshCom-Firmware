@@ -14,6 +14,8 @@
  */
 #pragma once
 
+#include <stdint.h>
+
 #define MAXHOP_TEXT_MIN      1
 #define MAXHOP_TEXT_MAX      6
 #define MAXHOP_TEXT_FALLBACK 4      /* == MAX_HOP_TEXT_DEFAULT */
@@ -73,4 +75,27 @@ inline int maxHopOptionList(int current, int *out, int cap)
         out[n++] = cur;
 
     return n;
+}
+
+/* IDEE-04: relay hop step. max_hop_byte is the low hop nibble (bits 0-3) plus
+ * optionally the high nibble. On air the high nibble of frame byte 5 carries
+ * flags (0x80 server, 0x40 track, 0x20 app-offline, 0x10 mesh; see
+ * aprs_functions.cpp); the receiver already splits them into bools, but the
+ * helper keeps bits 4-7 untouched anyway. A hop nibble above MAXHOP_RELAY_LIMIT
+ * (old firmware sends 8-15) is clamped to the limit before the decrement, so
+ * such frames cannot circle longer than a regular one. A nibble of 0 is not
+ * relayed: the caller's gate stays (nibble > 0); the helper returns the byte
+ * unchanged for 0. */
+#define MAXHOP_RELAY_LIMIT 7        /* == MAX_HOP_LIMIT, static_assert in lora_functions.cpp */
+
+inline uint8_t relayHopNext(uint8_t max_hop_byte)
+{
+    uint8_t hop = max_hop_byte & 0x0F;
+    const uint8_t flags = max_hop_byte & 0xF0;
+
+    if (hop == 0)
+        return max_hop_byte;                /* nothing to decrement, no borrow into the flags */
+    if (hop > MAXHOP_RELAY_LIMIT)
+        hop = MAXHOP_RELAY_LIMIT;
+    return (uint8_t)(flags | (hop - 1));
 }

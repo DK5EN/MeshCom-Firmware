@@ -3,6 +3,10 @@
 #include <unity.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <fstream>
+#include <sstream>
+#include <string>
 #include "../../src/pin_status_json.h"
 #include "../../src/pin_assign_json.h"
 #include "../../src/gpio_status_json.h"
@@ -642,9 +646,66 @@ void test_gpio_status_worst_case_fits_max(void)
     TEST_ASSERT_TRUE(validJson(b));
 }
 
+// GPIO-06: T-Deck Pro pin reservation. src/pin_board.cpp is not compiled in the native envs (it needs the board macros), so
+// this reads the two sources: the value of each enable / keyboard define in variants/t_deck_pro/configuration.h, and that
+// kHard[] in src/pin_board.cpp lists the macro under the Pro guard.
+static std::string gpio06_read(const char *rel)
+{
+    char cwd[4096];
+    TEST_ASSERT_NOT_NULL(getcwd(cwd, sizeof(cwd)));
+    std::string dir(cwd);
+    for (int hops = 0; hops < 16; hops++)
+    {
+        std::ifstream probe(dir + "/platformio.ini");
+        if (probe.good()) break;
+        const size_t pos = dir.find_last_of('/');
+        if (pos == std::string::npos || pos == 0) TEST_FAIL_MESSAGE("could not derive repo root");
+        dir = dir.substr(0, pos);
+    }
+    std::ifstream f((dir + "/" + rel).c_str(), std::ios::binary);
+    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
+    std::ostringstream o;
+    o << f.rdbuf();
+    return o.str();
+}
+
+static int gpio06_define(const std::string &cfg, const char *name)
+{
+    const std::string key = std::string("#define ") + name;
+    size_t at = 0;
+    while ((at = cfg.find(key, at)) != std::string::npos)
+    {
+        const size_t e = at + key.size();
+        if (e < cfg.size() && (cfg[e] == ' ' || cfg[e] == '\t'))
+            return atoi(cfg.c_str() + e);
+        at = e;
+    }
+    return -1;
+}
+
+static void test_tdeck_pro_enable_and_keyboard_pins_are_reserved(void)
+{
+    const std::string cfg = gpio06_read("variants/t_deck_pro/configuration.h");
+    const std::string src = gpio06_read("src/pin_board.cpp");
+    const size_t hardAt = src.find("constexpr int kHard[]");
+    const size_t softAt = src.find("constexpr int kSoft[]");
+    TEST_ASSERT_TRUE(hardAt != std::string::npos && softAt != std::string::npos && hardAt < softAt);
+    const std::string hard = src.substr(hardAt, softAt - hardAt);
+
+    struct { const char *name; int pin; } want[] = {
+        {"TDECK_KEYBOARD_INT", 15}, {"BOARD_GPS_EN", 39}, {"BOARD_1V8_EN", 38}, {"BOARD_6609_EN", 41}, {"BOARD_LORA_EN", 46}};
+    for (const auto &w : want)
+    {
+        TEST_ASSERT_EQUAL_INT_MESSAGE(w.pin, gpio06_define(cfg, w.name), w.name);
+        TEST_ASSERT_TRUE_MESSAGE(hard.find(std::string("WX_RES(") + w.name + ")") != std::string::npos, w.name);
+        TEST_ASSERT_TRUE_MESSAGE(src.find(std::string("(1ULL << ") + w.name + ")") != std::string::npos, w.name);
+    }
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_tdeck_pro_enable_and_keyboard_pins_are_reserved);
     RUN_TEST(test_all_absent);
     RUN_TEST(test_led_modes);
     RUN_TEST(test_led_busy_and_rm);

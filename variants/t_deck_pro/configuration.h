@@ -117,7 +117,7 @@
 #define MAX_POINTS 30                      // max count of points
 #define MAX_POSROW 40                       // max numbers of rows in POS view
 
-#define TDECK_KEYBOARD_INT  46
+#define TDECK_KEYBOARD_INT  15   // GPIO-06: keyboard IRQ (was 46 = LoRa EN, copied from T-Deck)
 #define TDECK_BL_PIN        42
 
 // EN

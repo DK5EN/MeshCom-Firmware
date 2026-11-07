@@ -675,7 +675,7 @@ flowchart TD
 - **Gateway-Ausnahme (F6):** Ein Gateway unterdrückt nie, wenn sein letzter eigener HEY ≥ Imax alt ist. So geht mindestens ein HG pro 15 min raus (`heyShouldSuppress()`, `src/hey_policy.h`).
 - **nRF52** nutzt dieselbe Entscheidungslogik. Es loggt nur `SUPPRESS`, nicht `SEND` und `TOPO_CHANGE`.
 - **Kein Schalter:** Trickle lässt sich nicht abschalten. Mit `ENABLE_SOFTSER` (ESP32) kommen 10 min auf jedes Intervall.
-- **HN-Nachbarschaftsmeldungen** (`--nbrreport`) laufen auf eigenem Takt (erste nach 5 min, dann alle 15 min + 0-30 s Jitter) und werden nie unterdrückt.
+- **HN-Nachbarschaftsmeldungen** (fest `auto`: nur ohne Mesh und Gateway) laufen auf eigenem Takt (erste nach 5 min, dann alle 15 min + 0-30 s Jitter) und werden nie unterdrückt.
 - **Alterung:** Ein HEY, der 3 min nicht gesendet werden konnte, wird aus dem Ring verworfen (`RING_BG_MAX_AGE_MS`).
 
 **Erwartete Einsparung (Entwurf):** 60-70% weniger HEY-Traffic in stabilen Netzen. **Gemessen** (2026-03-18, 5 Gateway-Nodes, 9,5 h, `docs/hey-supp.md`): 29-75 %, im Mittel 53 % weniger eigene HEYs.

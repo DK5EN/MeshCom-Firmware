@@ -1357,7 +1357,7 @@ function leaks(P, canary) {
       sent: [
         ent('DK5EN-1', 'status', STATUS_NEW, { ago: 3 }),
         ent('DK5EN-1', 'gps off', 'err rejected', { ago: 70, st: 'err', msg: 'The node tried, but the setting did not change.' }),
-        ent('DK5EN-1', 'sendpos', '', { ago: 80, st: 'noanswer', msg: 'No answer after 75 seconds. Check the password.' }),
+        ent('DK5EN-1', 'sendpos', '', { ago: 80, st: 'noanswer', msg: 'No answer after 171 seconds. Check the password.' }),
       ],
       targets: [{ dst: 'DK5EN-1', locked: 0, retry: 0, pending: 0, chainErr: 'nosync', chainMsg: 'The connection check got no answer, so your command was not sent.' }],
     });
@@ -1365,7 +1365,7 @@ function leaks(P, canary) {
     await P.init();
     const t = P.text('rm_msgs');
     check('messages: ok status becomes "Connected. Version ..." (was: activity)', /Connected\. Version 4\.40a, up 2 h 10 min, battery 87 %/.test(t), t);
-    check('messages: err and no-answer sentences come from msg (was: activity)', /The node tried, but the setting did not change\./.test(t) && /No answer after 75 seconds/.test(t));
+    check('messages: err and no-answer sentences come from msg (was: activity)', /The node tried, but the setting did not change\./.test(t) && /No answer after 171 seconds/.test(t));
     check('messages: chain message of the target is shown (was: activity)', /DK5EN-1: The connection check got no answer/.test(P.text('rm_chain')));
     check('raw table lists the sent entries', P.el('rm_msgs').querySelectorAll('tr').length === 3);
     check('heard chips: call, hardware, age; null rssi prints no "null"', (() => { const c = P.el('rm_nodes').textContent; return /DK5EN-1/.test(c) && /HELTEC_V3/.test(c) && /2 min ago, -95 dBm/.test(c) && /OE1ABC-5/.test(c) && !/null/.test(c); })(), P.el('rm_nodes').textContent);
@@ -1386,7 +1386,7 @@ function leaks(P, canary) {
     check('W1d messages: sent -> verified ok, same DOM node', row0() === r1 && r1.children[2].textContent === 'verified' && /Connected/.test(r1.children[3].textContent) && r1.children[2].className === 'rmok');
     await P.setPoll({ sent: [ent('DK5EN-1', 'gps off', 'err rejected', { ctr: 7, ago: 24, st: 'err', msg: 'The node tried, but the setting did not change.' })] });
     check('W1d messages: verified err is marked, rows are keyed', P.el('rm_msgs').querySelectorAll('tr').length === 1 && row0().children[2].className === 'rmbad' && /did not change/.test(row0().children[3].textContent));
-    await P.setPoll({ sent: [ent('DK5EN-1', 'sendpos', '', { ctr: 8, ago: 5, st: 'noanswer', msg: 'No answer after 75 seconds.' }), ent('DK5EN-1', 'led on', 'ok led=on', { ctr: 9, ago: 3, ver: 0, st: 'unverified', msg: 'Not verified.' })] });
+    await P.setPoll({ sent: [ent('DK5EN-1', 'sendpos', '', { ctr: 8, ago: 5, st: 'noanswer', msg: 'No answer after 171 seconds.' }), ent('DK5EN-1', 'led on', 'ok led=on', { ctr: 9, ago: 3, ver: 0, st: 'unverified', msg: 'Not verified.' })] });
     const rs = P.el('rm_msgs').querySelectorAll('tr');
     check('W1d messages: no answer and unverified badges, newest first', rs.length === 2 && rs[0].children[2].textContent === 'unverified' && rs[1].children[2].textContent === 'no answer', [...rs].map((x) => x.children[2].textContent).join());
     check('W1d old ids are gone, the Radio card exists once and has no TX stepper (RS-02)', !['rm_act', 'rm_laststatus', 'rm_sent', 'rm_txval', 'rm_txdn', 'rm_txup', 'rm_txapply', 'rm_radio', 'rm_rs', 'rm_test', 'rm_sync', 'rm_lockline', 'rm_pinon', 'rm_pinoff'].some((i) => P.el(i)) && [...P.el('rm_page').querySelectorAll('.cardlabel')].filter((l) => l.textContent === 'Radio').length === 1);
@@ -1402,7 +1402,7 @@ function leaks(P, canary) {
     const srv = mkServer();
     srv.nodes[0] = { slot: 0, used: 1, call: 'DK5EN-1' };
     srv.status = srv.mkStatus({ sent: [
-      ent('DK5EN-1', 'sync', '', { ctr: 0, ago: 90, st: 'noanswer', msg: 'No answer after 75 seconds. Check the password.' }),
+      ent('DK5EN-1', 'sync', '', { ctr: 0, ago: 90, st: 'noanswer', msg: 'No answer after 171 seconds. Check the password.' }),
       ent('DK5EN-1', 'sync', '', { ctr: 0, ago: 3, st: 'waiting' }),
     ] });
     const P = await mkPage(srv);

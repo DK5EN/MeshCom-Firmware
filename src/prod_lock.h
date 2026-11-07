@@ -120,7 +120,7 @@ inline const char *prodLockRefuses(const char *cmd, bool instrument)
         return nullptr;
 
     static const char *const LOCKED[] = {
-        "nbrrelay", "nbrsym", "nbrreport", "shortpath", "pingtime", "pingmax",
+        "nbrrelay", "nbrsym", "shortpath", "pingtime", "pingmax",
         "specstart", "specend", "specstep", "specsamples"
     };
 

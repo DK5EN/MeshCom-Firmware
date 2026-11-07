@@ -69,11 +69,9 @@ BLEDis ble_dis;
 
 /** LoRa service 0xF0A0 */
 BLEService lora_service = BLEService(0xF0A0);
-/** LoRa settings  characteristic 0xF0A1 */
-BLECharacteristic g_lora_data = BLECharacteristic(0xF0A1);
-
-// Settings callback
-void settings_rx_callback(uint16_t conn_hdl, BLECharacteristic *chr, uint8_t *data, uint16_t len);
+// BLE-SET-01: the settings characteristic of this service was never reachable on air
+// (its fixed length exceeded the attribute limit) and is removed; the service itself
+// stays, it is advertised.
 
 // Connect callback
 void connect_callback(uint16_t conn_handle);
@@ -429,7 +427,7 @@ void nrf52BleServiceDisconnect(void)
 	}
 }
 
-// CONC-17: settings_rx_callback() runs in the Bluefruit Ada callback task,
+// CONC-17: the settings write callback (removed, BLE-SET-01) ran in the Bluefruit Ada callback task,
 // which can be preempted mid-write by a higher-priority task or, on a tick
 // wake-up, an equal-priority one — a torn image could put a beacon on the air
 // with a spliced callsign or frequency once applied.
@@ -447,77 +445,15 @@ static BleSettingsV1Stage s_bleSettingsStage;
 static uint32_t s_appliedBleSettingsSeq = 0;
 
 /**
- * @brief Initialize the settings characteristic
+ * @brief Start the LoRa service (no characteristic, see BLE-SET-01)
  *
  */
 BLEService init_settings_characteristic(void)
 {
 	// Initialize the LoRa setting service
 	lora_service.begin();
-	g_lora_data.setProperties(CHR_PROPS_NOTIFY | CHR_PROPS_READ | CHR_PROPS_WRITE);
-	g_lora_data.setPermission(SECMODE_OPEN, SECMODE_OPEN);
-	g_lora_data.setFixedLen(sizeof(s_ble_settings_v1) + 1);
-	g_lora_data.setWriteCallback(settings_rx_callback);
-
-	g_lora_data.begin();
-
-	// The characteristic ships the frozen v1 wire image, never
-	// s_meshcom_settings directly (see ble_settings_v1.h). write() copies
-	// synchronously, so the shared scratch is free again when it returns.
-	s_ble_settings_v1 &outImage = bleSettingsV1Scratch();
-	bleSettingsToV1(meshcom_settings, outImage);
-	bleSettingsV1MaskSecrets(outImage);
-	g_lora_data.write((void *)&outImage, sizeof(outImage));
 
 	return lora_service;
-}
-
-/**
- * Callback if data has been sent from the connected client
- * @param conn_hdl
- * 		The connection handle
- * @param chr
- *      The called characteristic
- * @param data
- *      Pointer to received data
- * @param len
- *      Length of the received data
- */
-void settings_rx_callback(uint16_t conn_hdl, BLECharacteristic *chr, uint8_t *data, uint16_t len)
-{
-	(void)conn_hdl;
-	API_LOG("SETT", "Settings received");
-
-	delay(1000);
-
-	// Check the characteristic
-	if (chr->uuid == g_lora_data.uuid)
-	{
-		if (!bleSettingsV1LengthOk(len))
-		{
-			API_LOG("SETT", "Received settings have wrong size %d", len);
-			return;
-		}
-
-		const s_ble_settings_v1 *rcvdSettings = (const s_ble_settings_v1 *)data;
-		if (!bleSettingsV1MarkersOk(*rcvdSettings))
-		{
-			API_LOG("SETT", "Received settings data do not have required markers");
-			return;
-		}
-
-		// CONC-17: stage only, apply from the Main Loop (see the comment
-		// above s_bleSettingsStage).
-		stageBleSettingsV1(s_bleSettingsStage, *rcvdSettings);
-
-		// Notify task about the event
-		if (g_task_sem != NULL)
-		{
-			g_task_event_type |= BLE_CONFIG;
-			API_LOG("SETT", "Waking up loop task");
-			xSemaphoreGive(g_task_sem);
-		}
-	}
 }
 
 static void bleSanitizeLog(const char *field, const char *oldv, const char *newv)
@@ -526,7 +462,7 @@ static void bleSanitizeLog(const char *field, const char *oldv, const char *newv
 }
 
 /**
- * @brief Apply a settings write staged by settings_rx_callback(), if any.
+ * @brief Apply a settings write staged by stageBleSettingsV1(), if any.
  * Must be called from the Main Loop task only (CONC-17).
  */
 void applyPendingBleSettings(void)
@@ -565,16 +501,6 @@ void applyPendingBleSettings(void)
 
 	// Save new settings
 	save_settings();
-
-	// Update settings. write() and notify() both copy before returning
-	// (notify() per MTU chunk), so the shared scratch is free afterwards.
-	s_ble_settings_v1 &outImage = bleSettingsV1Scratch();
-	bleSettingsToV1(meshcom_settings, outImage);
-	bleSettingsV1MaskSecrets(outImage);
-	g_lora_data.write((void *)&outImage, sizeof(outImage));
-
-	// Inform connected device about new settings
-	g_lora_data.notify((void *)&outImage, sizeof(outImage));
 
 	/*KBC
 	if (meshcom_settings.resetRequest)

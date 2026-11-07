@@ -376,14 +376,6 @@ bool bNBRCANCEL = false;  // on: Abbruch und Backoff nach Fall wirklich anwenden
 // NBR_SYM_MIN_SNR fuer die Schwelle. Bit seit 2026-09-25 auf 0x2000 (vorher
 // 0x0080, kollidierte mit upstream KISS/TCP), siehe settings_sanitize.h.
 bool bNBRSYM = true;
-// --nbrreport off|auto|on (Stufe 3, HN-Bericht): zwei Bits in node_sset4 --
-// 0x0100 "off" (nie senden), 0x0200 "on" (immer senden), keines von beiden
-// "auto" (Default fuer jeden bestehenden Knoten, keine Migration noetig):
-// Bericht nur, wenn weder bMESH noch bGATEWAY (siehe sendNbrReport()-Aufrufer
-// in esp32_main.cpp/nrf52_main.cpp). Modell wie --nbrrelay oben: EIN Bool je
-// Bit, jede Kommandozeile schreibt nur ihr eigenes.
-bool bNBRRPTOFF = false;   // 0x0100 gesetzt
-bool bNBRRPTON = false;    // 0x0200 gesetzt
 uint32_t stat_nbr_relay_a = 0;          // eingereihte Relays Fall A (Allein-Maske != 0)
 uint32_t stat_nbr_relay_b = 0;          // eingereihte Relays Fall B
 uint32_t stat_nbr_cancel = 0;           // abgebrochene Relays (nur on)
@@ -6103,17 +6095,11 @@ void nbrReportTick()
     if((uint32_t)(millis() - nbrreport_timer) < nbrreport_due_ms)
         return;
 
-    // off (bNBRRPTOFF) nie, on (bNBRRPTON) immer, sonst auto: nur wenn weder
+    // Fest "auto" (--nbrreport entfernt, BL-01): nur senden, wenn weder
     // Mesh-Relay noch Gateway-Betrieb an sind -- ein Gateway hoert die
     // eigentliche Information laengst aus dem Server, ein Mesh-Relay flutet
     // ohnehin schon.
-    bool bSend;
-    if(bNBRRPTON)
-        bSend = true;
-    else if(bNBRRPTOFF)
-        bSend = false;
-    else
-        bSend = (!bMESH && !bGATEWAY);
+    bool bSend = (!bMESH && !bGATEWAY);
 
     if(bSend)
         sendNbrReport();

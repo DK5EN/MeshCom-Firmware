@@ -52,18 +52,6 @@ static void nbr_post_probe() { nbr_post_flag_seen = flagNbr; nbr_post_sset_seen 
 static bool flagSym;
 static int  ssetSym;
 
-// --nbrreport off|auto|on (Stufe 3, HN-Bericht): eigenes Paar wie --nbrrelay
-// (drei Woerter, zwei Flags), aber die dritte Zeile ("auto") hat KEIN eigenes
-// Flag -- sie raeumt per post() beide auf. Die post()-Hooks spiegeln die
-// echten tg_post_nbrreport_*() aus src/command_functions.cpp: jede Zeile
-// schreibt ihr eigenes Flag ueber row.flag/TG_FLAG_TRUE und loescht das
-// jeweils andere per Nachlaeufer.
-static bool flagRptOff, flagRptOn;
-static int  ssetRpt;
-static void nbrreport_post_off()  { flagRptOn = false; }
-static void nbrreport_post_auto() { flagRptOff = false; flagRptOn = false; }
-static void nbrreport_post_on()   { flagRptOff = false; }
-
 static const ToggleRow TBL[] =
 {
     // name              flag    sset    and_mask     or_mask      post         dirty            opt
@@ -83,10 +71,6 @@ static const ToggleRow TBL[] =
     // Bit seit 2026-09-25 0x2000 (vorher 0x0080, kollidierte mit upstream KISS/TCP).
     { "--nbrsym on",    &flagSym, &ssetSym, 0xFFFFDFFF, 0x00000000, nullptr,        TG_DIRTY_NONE, TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
     { "--nbrsym off",   &flagSym, &ssetSym, 0xFFFFFFFF, 0x2000,     nullptr,        TG_DIRTY_NONE, TG_SAVE | TG_BLE_ECHO },
-    // Nachbildung der drei echten "--nbrreport off/auto/on"-Zeilen (src/command_functions.cpp).
-    { "--nbrreport off",  &flagRptOff, &ssetRpt, 0xFFFFFCFF, 0x0100,     nbrreport_post_off,  TG_DIRTY_NONE, TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
-    { "--nbrreport auto", nullptr,     &ssetRpt, 0xFFFFFCFF, 0x00000000, nbrreport_post_auto, TG_DIRTY_NONE, TG_SAVE | TG_BLE_ECHO },
-    { "--nbrreport on",   &flagRptOn,  &ssetRpt, 0xFFFFFCFF, 0x0200,     nbrreport_post_on,   TG_DIRTY_NONE, TG_SAVE | TG_FLAG_TRUE | TG_BLE_ECHO },
 };
 static const size_t N = sizeof(TBL) / sizeof(TBL[0]);
 
@@ -102,9 +86,6 @@ static void reset()
     nbr_post_sset_seen = -1;
     flagSym = false;
     ssetSym = 0;
-    flagRptOff = false;
-    flagRptOn = false;
-    ssetRpt = 0;
 }
 
 static ToggleAction run(const char *cmd) { return toggleApply(TBL, N, cmd); }
@@ -393,76 +374,6 @@ static void test_nbr_boot_restore_reads_moved_bits()
     }
 }
 
-// --nbrreport off|auto|on (Stufe 3, HN-Bericht): drei echte Zeilen auf
-// node_sset4, Bits 0x0100 (off) und 0x0200 (on), keines von beiden (0x0000)
-// fuer auto. Jede Zeile loescht ERST beide Bits (and_mask 0xFFFFFCFF), dann
-// setzt or_mask hoechstens eines davon -- anders als --nbrrelay (wo "on" BEIDE
-// Bits setzt), hier schliessen sich die drei Zustaende gegenseitig aus.
-static void test_nbrreport_off_sets_flag_and_bit_0x0100_and_clears_on_flag()
-{
-    reset();
-    flagRptOn = true;
-    ssetRpt = 0x0200;   // Ausgangszustand "on"
-    ToggleAction a = run("nbrreport off");
-    TEST_ASSERT_TRUE(a.matched);
-    TEST_ASSERT_TRUE(flagRptOff);
-    TEST_ASSERT_EQUAL_HEX32(0x0100u, (unsigned)(ssetRpt & 0x0300));
-    TEST_ASSERT_TRUE(a.save);
-    TEST_ASSERT_TRUE(a.ble_echo);
-
-    TEST_ASSERT_TRUE(a.post_after == nbrreport_post_off);   // not run yet
-    TEST_ASSERT_TRUE(flagRptOn);   // still stale until post_after() runs
-    a.post_after();
-    TEST_ASSERT_FALSE(flagRptOn);
-}
-
-static void test_nbrreport_on_sets_flag_and_bit_0x0200_and_clears_off_flag()
-{
-    reset();
-    flagRptOff = true;
-    ssetRpt = 0x0100;   // Ausgangszustand "off"
-    ToggleAction a = run("nbrreport on");
-    TEST_ASSERT_TRUE(a.matched);
-    TEST_ASSERT_TRUE(flagRptOn);
-    TEST_ASSERT_EQUAL_HEX32(0x0200u, (unsigned)(ssetRpt & 0x0300));
-    TEST_ASSERT_TRUE(a.save);
-    TEST_ASSERT_TRUE(a.ble_echo);
-
-    a.post_after();
-    TEST_ASSERT_FALSE(flagRptOff);
-}
-
-// "auto" has no flag column of its own (row.flag == nullptr): both bits go to
-// zero, and its post() hook clears BOTH bools once the caller runs it.
-static void test_nbrreport_auto_clears_both_bits_and_both_flags_via_post()
-{
-    reset();
-    flagRptOff = true;
-    flagRptOn = true;
-    ssetRpt = 0x0300;   // beide Bits gesetzt (kann in der Praxis nicht vorkommen, testet trotzdem)
-    ToggleAction a = run("nbrreport auto");
-    TEST_ASSERT_TRUE(a.matched);
-    TEST_ASSERT_EQUAL_HEX32(0x0000u, (unsigned)(ssetRpt & 0x0300));
-    TEST_ASSERT_TRUE(a.save);
-    TEST_ASSERT_TRUE(a.ble_echo);
-
-    TEST_ASSERT_TRUE(a.post_after == nbrreport_post_auto);
-    a.post_after();
-    TEST_ASSERT_FALSE(flagRptOff);
-    TEST_ASSERT_FALSE(flagRptOn);
-}
-
-// The and_mask (0xFFFFFCFF) must clear ONLY the two report bits: bits 16-31
-// and a neighbouring bit already in use (0x2000, --nbrsym since 2026-09-25)
-// survive untouched.
-static void test_nbrreport_off_mask_leaves_other_bits_alone()
-{
-    reset();
-    ssetRpt = (int)0x7FFF2200u;   // upper bits + nbrsym-Bit 0x2000 + report-on-Bit 0x0200
-    run("nbrreport off");
-    TEST_ASSERT_EQUAL_HEX32(0x7FFF2100u, (unsigned)ssetRpt);
-}
-
 // ---------------------------------------------------------------------------
 // EXT-02, second half (docs/BACKLOG.md 3.8as): the "--extudp off" row in the
 // REAL COMMAND_TOGGLES table (src/command_functions.cpp) used to carry
@@ -688,59 +599,17 @@ static void test_real_nbrsym_rows_use_bit_0x2000_inverted()
         "a '--nbrsym' row still carries the old, now KISS-colliding bit 0x0080");
 }
 
-// --nbrreport off|auto|on (Stufe 3, HN-Bericht): drei echte Zeilen, Bits
-// 0x0100/0x0200 in node_sset4, jede mit and_mask 0xFFFFFCFF (loescht beide),
-// eigenem Flag (auto: nullptr) und eigenem post()-Hook.
-static void test_real_nbrreport_rows_use_bits_0x0100_and_0x0200()
+// BL-01: --nbrreport was removed; the HN report is pinned to "auto". No row,
+// post hook, flag or boot-restore line may come back.
+static void test_nbrreport_switch_is_gone()
 {
-    std::string src = read_whole_file(repo_root() + "/src/command_functions.cpp");
-
-    std::string off = real_row(src, "\"--nbrreport off\"");
-    std::string auto_row = real_row(src, "\"--nbrreport auto\"");
-    std::string on = real_row(src, "\"--nbrreport on\"");
-    TEST_ASSERT_FALSE_MESSAGE(off.empty() || auto_row.empty() || on.empty(),
-        "one of the three '--nbrreport' rows is missing in src/command_functions.cpp");
-
-    TEST_ASSERT_EQUAL_STRING("&meshcom_settings.node_sset4", nth_field(off, 2).c_str());
-    TEST_ASSERT_EQUAL_STRING("&meshcom_settings.node_sset4", nth_field(auto_row, 2).c_str());
-    TEST_ASSERT_EQUAL_STRING("&meshcom_settings.node_sset4", nth_field(on, 2).c_str());
-
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFFCFF", nth_field(off, 3).c_str(), "'off' must clear both 0x0100|0x0200");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFFCFF", nth_field(auto_row, 3).c_str(), "'auto' must clear both 0x0100|0x0200");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("0xFFFFFCFF", nth_field(on, 3).c_str(), "'on' must clear both 0x0100|0x0200");
-
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x0100", nth_field(off, 4).c_str(), "'off' must set 0x0100");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x00000000", nth_field(auto_row, 4).c_str(), "'auto' must set no bit");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("0x0200", nth_field(on, 4).c_str(), "'on' must set 0x0200");
-
-    TEST_ASSERT_EQUAL_STRING("&bNBRRPTOFF", nth_field(off, 1).c_str());
-    TEST_ASSERT_EQUAL_STRING("nullptr", nth_field(auto_row, 1).c_str());
-    TEST_ASSERT_EQUAL_STRING("&bNBRRPTON", nth_field(on, 1).c_str());
-
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("tg_post_nbrreport_off", nth_field(off, 5).c_str(),
-        "'--nbrreport off' row must clear bNBRRPTON via post(), or both bools can end up true");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("tg_post_nbrreport_auto", nth_field(auto_row, 5).c_str(),
-        "'--nbrreport auto' row must clear both bools via post()");
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("tg_post_nbrreport_on", nth_field(on, 5).c_str(),
-        "'--nbrreport on' row must clear bNBRRPTOFF via post(), or both bools can end up true");
-}
-
-// Default-an-Semantik (Boot-Restore): beide Boot-Pfade muessen bNBRRPTOFF UND
-// bNBRRPTON je aus ihrem eigenen Bit lesen, sonst startet ein frischer Knoten
-// (node_sset4 == 0, keine Migration) nicht im dokumentierten "auto".
-static void test_nbrreport_boot_restore_reads_both_bits()
-{
-    const char *mains[] = { "/src/esp32/esp32_main.cpp", "/src/nrf52/nrf52_main.cpp" };
-    for (const char *f : mains)
+    std::string cmd = read_whole_file(repo_root() + "/src/command_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("--nbrreport") == std::string::npos, "'--nbrreport' row/help is back");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("bNBRRPT") == std::string::npos, "bNBRRPT* flag is back in command_functions.cpp");
+    for(const char *f : {"/src/esp32/esp32_main.cpp", "/src/nrf52/nrf52_main.cpp"})
     {
         std::string src = read_whole_file(repo_root() + f);
-        TEST_ASSERT_TRUE_MESSAGE(
-            src.find("bNBRRPTOFF = (meshcom_settings.node_sset4 & 0x0100) != 0;") != std::string::npos,
-            (std::string(f) + ": bNBRRPTOFF boot restore missing/changed").c_str());
-        TEST_ASSERT_TRUE_MESSAGE(
-            src.find("bNBRRPTON  = (meshcom_settings.node_sset4 & 0x0200) != 0;") != std::string::npos ||
-            src.find("bNBRRPTON = (meshcom_settings.node_sset4 & 0x0200) != 0;") != std::string::npos,
-            (std::string(f) + ": bNBRRPTON boot restore missing/changed").c_str());
+        TEST_ASSERT_TRUE_MESSAGE(src.find("bNBRRPT") == std::string::npos, f);
     }
 }
 
@@ -1157,15 +1026,10 @@ int main(int, char **)
     RUN_TEST(test_nbrsym_on_mask_leaves_upper_bits_alone);
     RUN_TEST(test_nbrsym_boot_restore_reads_inverted_bit);
     RUN_TEST(test_nbr_boot_restore_reads_moved_bits);
-    RUN_TEST(test_nbrreport_off_sets_flag_and_bit_0x0100_and_clears_on_flag);
-    RUN_TEST(test_nbrreport_on_sets_flag_and_bit_0x0200_and_clears_off_flag);
-    RUN_TEST(test_nbrreport_auto_clears_both_bits_and_both_flags_via_post);
-    RUN_TEST(test_nbrreport_off_mask_leaves_other_bits_alone);
-    RUN_TEST(test_nbrreport_boot_restore_reads_both_bits);
     RUN_TEST(test_real_nbrdebug_on_row_uses_bit_0x0400_and_nbrDebugApply);
     RUN_TEST(test_real_nbrrelay_rows_use_bits_0x0800_and_0x1000);
     RUN_TEST(test_real_nbrsym_rows_use_bit_0x2000_inverted);
-    RUN_TEST(test_real_nbrreport_rows_use_bits_0x0100_and_0x0200);
+    RUN_TEST(test_nbrreport_switch_is_gone);
     RUN_TEST(test_real_nbrdebug_off_row_clears_only_bit_0x0400);
     RUN_TEST(test_real_extudp_off_row_has_a_non_null_post_action);
     RUN_TEST(test_real_extudp_off_post_action_resets_the_extern_socket);

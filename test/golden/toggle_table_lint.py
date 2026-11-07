@@ -23,7 +23,7 @@ WHAT EACH CHECK IS FOR
    code path for them at all).
 
    Three-state switches are the one exception (2026-09-25): a row may end in
-   another lowercase word -- ``--nbrrelay count``, ``--nbrreport auto`` --
+   another lowercase word -- ``--nbrrelay count`` --
    when the same base also has an "on" and an "off" row. Such a row is still
    an exact token (no trailing space, no argument), so ``toggleApply()``
    handles it like any other row; what the rule keeps out is a lone word row
@@ -750,9 +750,9 @@ def self_test() -> int:
     real_rows, real_hard, real_warn = run_checks(real_table, real_text,
                                                  require_pinned=True)
     expect(
-        "the real tree has 89 rows and no hard failures (%d rows, %d hard, %d warn)"
+        "the real tree has 86 rows and no hard failures (%d rows, %d hard, %d warn)"
         % (len(real_rows), len(real_hard), len(real_warn)),
-        len(real_rows) == 89 and real_hard == [],   # 89 since --board led steady (WEB-LED-01, 2026-11-02)
+        len(real_rows) == 86 and real_hard == [],   # 86 since --nbrreport off/auto/on left (BL-01, 2026-11-07)
     )
     if real_hard:
         for h in real_hard:

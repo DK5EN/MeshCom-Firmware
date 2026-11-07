@@ -11,11 +11,16 @@ archive journals (see "Where things are").
 
 ## Next: the release train
 
-Defined in [BACKLOG.md](BACKLOG.md) 3.2 "Release train": implement the 12 `impl` rows, one bulk build, bulk flash
+Defined in [BACKLOG.md](BACKLOG.md) 3.2 "Release train": implement the `impl` rows (running, see IMPL-TRAIN below), one bulk build, bulk flash
 of DK5EN-1, -14, -90, -92, one bulk bench session (28 `bench` rows plus the checks below), docs, then commit, push
 and `/release-firmware`. Soak on DK5EN-98, the GPSV4-01 upstream PR and field checks follow after the release.
 
 ## Running campaigns
+
+- **IMPL-TRAIN:** release-train implementation, pure coding. W1 done (BL-01, IDEE-04, BLE-SET-01, GPIO-06,
+  RM-NOANS-01, TEST-OTA-01, SB-06, `clock_drift.py`); next W2 (SENS-04, CSMA-01, CLK-01 core), W3 (CLK-01
+  instrumentation), W4 (GOLDEN-MACROS-01). Then one INSTRUMENT flash of DK5EN-1/-14/-92 for the clock and theme
+  bench. [campaign-impl-train-20261107.md](campaign-impl-train-20261107.md).
 
 - **TD-THEME-01:** W1-W3 done (last `f4c944e1`); W4 is the bench pass on DK5EN-14 (screenshots of both themes,
   lock glyph against the bt/wifi icons, boot logo tab). [campaign-tdeck-theme.md](campaign-tdeck-theme.md).

@@ -9,7 +9,7 @@
 ...DEBUG man ...DEBUG en
 ...DEBUG off ...LORADEBUG off ...NBRDEBUG off ...TXCAPTURE off ...GPSDEBUG off/0 ...SOFTSERDEBUG off
 ...WXDEBUG off ...BLEDEBUG off
-...NBRRELAY off ...relays A 0 B 0 ...cancelled 0 ...possible 0 ...refused 0 ...NBRSYM on ...NBRREPORT auto
+...NBRRELAY off ...relays A 0 B 0 ...cancelled 0 ...possible 0 ...refused 0 ...NBRSYM on
 ...DisplayInfo off ...DisplayCont off ...DisplyLog off ...contrast 255 ...ackinfo off
 ...EXTUDP off ...EXT IP none ...NOPMOTHER off
 ...BTCODE 000000

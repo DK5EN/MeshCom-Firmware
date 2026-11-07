@@ -274,6 +274,19 @@ constexpr int kHard[] = {
     #if defined(BOARD_T_DECK_PRO) && defined(BOARD_LORA_EN)
     WX_RES(BOARD_LORA_EN)
     #endif
+    // GPIO-06: the other T-Deck Pro enables (variants/t_deck_pro/configuration.h) and the keyboard interrupt
+    #if defined(BOARD_T_DECK_PRO) && defined(TDECK_KEYBOARD_INT)
+    WX_RES(TDECK_KEYBOARD_INT)   // 15: keyboard IRQ
+    #endif
+    #if defined(BOARD_T_DECK_PRO) && defined(BOARD_GPS_EN)
+    WX_RES(BOARD_GPS_EN)         // 39: GPS module enable
+    #endif
+    #if defined(BOARD_T_DECK_PRO) && defined(BOARD_1V8_EN)
+    WX_RES(BOARD_1V8_EN)         // 38: 1.8 V rail enable (gyroscope module)
+    #endif
+    #if defined(BOARD_T_DECK_PRO) && defined(BOARD_6609_EN)
+    WX_RES(BOARD_6609_EN)        // 41: modem (7682/7672) module enable
+    #endif
     // T5 e-paper: the SX1262 DIO1 (IRQ). It used to be reserved only through the LORA_DIO1 alias that esp32_main.cpp
     // builds from BOARD_LORA_IRQ; the alias is gone from this TU, so it is listed here.
     #if defined(BOARD_LORA_IRQ)
@@ -431,6 +444,14 @@ static_assert((kHardMask & ((1ULL << 37) | (1ULL << 38) | (1ULL << 42) | (1ULL <
 // user function would switch the radio off.
 #if defined(BOARD_T_DECK_PRO) && defined(BOARD_LORA_EN)
 static_assert((kHardMask & (1ULL << BOARD_LORA_EN)) != 0, "T-Deck Pro: BOARD_LORA_EN (radio power enable) is not reserved HARD");
+#endif
+// GPIO-06: keyboard IRQ 15 (was a copy of the T-Deck 46, which is the LoRa EN pin here), GPS EN 39, 1V8 EN 38, modem EN 41.
+#if defined(BOARD_T_DECK_PRO) && defined(TDECK_KEYBOARD_INT) && defined(BOARD_GPS_EN) && defined(BOARD_1V8_EN) && defined(BOARD_6609_EN)
+static_assert(TDECK_KEYBOARD_INT == 15 && BOARD_1V8_EN == 38 && BOARD_GPS_EN == 39 && BOARD_6609_EN == 41 && BOARD_LORA_EN == 46,
+              "T-Deck Pro: keyboard IRQ must be 15, enables 38 / 39 / 41, LoRa EN 46");
+static_assert((kHardMask & ((1ULL << TDECK_KEYBOARD_INT) | (1ULL << BOARD_GPS_EN) | (1ULL << BOARD_1V8_EN) | (1ULL << BOARD_6609_EN))) ==
+                  ((1ULL << TDECK_KEYBOARD_INT) | (1ULL << BOARD_GPS_EN) | (1ULL << BOARD_1V8_EN) | (1ULL << BOARD_6609_EN)),
+              "T-Deck Pro: keyboard IRQ 15 and enables 38 / 39 / 41 are not reserved HARD");
 #endif
 // GPSV4-01: Heltec V4 GNSS (Meshtastic variants/esp32s3/heltec_v4/variant.h): GNSS TX -> ESP RX is GPIO39, ESP TX -> GNSS RX
 // is GPIO38, enable GPIO34 (active LOW), reset GPIO42, PPS GPIO41. I2C therefore must not sit on 41/42 (it moved to 4/3).

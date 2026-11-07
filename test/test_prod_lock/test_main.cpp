@@ -50,7 +50,7 @@ void tearDown(void) {}
 static void test_gate_refuses_locked_names_in_production(void)
 {
     static const char *const cmds[] = {
-        "nbrrelay on", "nbrrelay count", "nbrrelay off", "nbrsym off", "nbrreport on", "shortpath on",
+        "nbrrelay on", "nbrrelay count", "nbrrelay off", "nbrsym off", "shortpath on",
         "pingtime 30", "pingmax 3", "pingmax max", "specstart 433.0", "specend 435.0",
         "specstep 0.5", "specsamples 600", "NBRRELAY on", "shortpath"
     };

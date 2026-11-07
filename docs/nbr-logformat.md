@@ -215,7 +215,7 @@ zeigt, wie sehr sich die Stufe-2-Relay-Entscheidung auf den Fallback statt auf B
 stuetzt. Die Rolle `VETO` (siehe unten) zaehlt dort NICHT mit -- sie ist das Gegenteil einer
 angewendeten Annahme und gehoert zum HN-Bericht.
 
-## Stufe 3: HN-Nachbarschaftsmeldung (`--nbrreport off|auto|on`)
+## Stufe 3: HN-Nachbarschaftsmeldung (fest `auto`)
 
 ### Warum ein eigener Frame
 
@@ -287,12 +287,12 @@ Alle `NBR_REPORT_INTERVAL_S` (== `TRICKLE_IMAX_S`, 15 min), erste Meldung `NBR_R
 Meldung unterliegt zu keinem Zeitpunkt der Trickle-Unterdrueckung -- die eigene Hoerliste ist je
 Knoten einmalig und nie redundant zu einem anderen Sender.
 
-### Schalter `--nbrreport off|auto|on`
+### Modus (fest `auto`)
 
-Persistiert in `node_sset4`: `0x0100` gesetzt heisst `off`, `0x0200` gesetzt heisst `on`, keins
-von beiden heisst `auto` (Default). `auto` sendet nur, wenn Mesh AUS UND Gateway AUS sind -- genau
-die Situation, in der der Knoten sonst unsichtbar bliebe. `--info` bekommt das Feld
-` ...NBRREPORT off|auto|on` angehaengt.
+Der Schalter `--nbrreport off|auto|on` wurde entfernt (BL-01, 2026-11-07); das Verhalten ist
+dauerhaft `auto`: Die Meldung wird nur gesendet, wenn Mesh AUS UND Gateway AUS sind -- genau die
+Situation, in der der Knoten sonst unsichtbar bliebe. Die frueheren Bits `0x0100`/`0x0200` in
+`node_sset4` werden nicht mehr gelesen; ein dort gespeicherter Wert bleibt ohne Wirkung.
 
 ### Empfaenger: gelistete Eintraege werden zu Kanten
 

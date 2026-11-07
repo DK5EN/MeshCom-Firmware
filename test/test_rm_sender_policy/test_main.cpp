@@ -200,7 +200,10 @@ static void test_state_names_and_messages(void)
     // the no-answer sentence is flag-neutral: the lockout is named only as a consequence of strict security
     {
         const char *m = rmStateMessage(RM_ST_NOANSWER);
-        TEST_ASSERT_NOT_NULL(strstr(m, "75 seconds"));
+        char secs[32];
+        snprintf(secs, sizeof(secs), "after %u seconds", (unsigned)(RM_NOANSWER_MS / 1000u));
+        TEST_ASSERT_NOT_NULL_MESSAGE(strstr(m, secs), "no-answer text must name the real RM_NOANSWER_MS");
+        TEST_ASSERT_NULL(strstr(m, "75 seconds"));
         TEST_ASSERT_NOT_NULL(strstr(m, "With strict security on"));
         TEST_ASSERT_NULL(strstr(m, ". A third failed try"));
     }
