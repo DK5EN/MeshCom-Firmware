@@ -795,6 +795,19 @@ void WZ_GPS_Deactivate() {
             digitalWrite(GPS_EN_PIN, LOW);
         #endif /*GPS_EN_PIN*/
     #endif
+
+    #if defined(BOARD_HELTEC_V4) && defined(HV4_GPS_EN_PIN)
+        gpio_hold_dis((gpio_num_t) HV4_GPS_EN_PIN);
+        pinMode(HV4_GPS_EN_PIN, OUTPUT);
+        digitalWrite(HV4_GPS_EN_PIN, !HV4_GPS_EN_ACTIVE);   // GNSS off
+        pinMode(HV4_GPS_WAKE_PIN, OUTPUT);
+        digitalWrite(HV4_GPS_WAKE_PIN, LOW);
+        // Release the lines into the unpowered kit (UART TX idles HIGH, reset is HIGH),
+        // so it is not fed through its IO clamp diodes. GPSSerial.end() is not used: on a
+        // UART that was never begun it takes a NULL mutex. A later WZ_GPS_Init re-attaches TX.
+        pinMode(GPS_TX_PIN, INPUT);
+        pinMode(HV4_GPS_RST_PIN, INPUT);
+    #endif
 }
 
 void WZ_GPS_Reset() {
@@ -807,6 +820,28 @@ void WZ_GPS_Reset() {
             digitalWrite(GPS_EN_PIN, HIGH);
             delay(100);
         #endif /*GPS_EN_PIN*/
+    #endif
+
+    #if defined(BOARD_HELTEC_V4) && defined(HV4_GPS_EN_PIN)
+    if(!bGPSON)
+    {
+        // GPS switched off (e.g. `--gps reset` while off): keep the kit unpowered
+        WZ_GPS_Deactivate();
+    }
+    else
+    {
+        // Heltec V4 (GPSV4-01): a deep-sleep hold may still sit on the enable pad
+        gpio_hold_dis((gpio_num_t) HV4_GPS_EN_PIN);
+        pinMode(HV4_GPS_EN_PIN, OUTPUT);
+        digitalWrite(HV4_GPS_EN_PIN, HV4_GPS_EN_ACTIVE);   // GNSS on (active LOW)
+        pinMode(HV4_GPS_WAKE_PIN, OUTPUT);
+        digitalWrite(HV4_GPS_WAKE_PIN, HIGH);
+        delay(1000);   // power-up warm-up, as Meshtastic
+        pinMode(HV4_GPS_RST_PIN, OUTPUT);
+        digitalWrite(HV4_GPS_RST_PIN, LOW);
+        delay(150);
+        digitalWrite(HV4_GPS_RST_PIN, HIGH);
+    }
     #endif
 
     #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)

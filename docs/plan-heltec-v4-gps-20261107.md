@@ -26,6 +26,8 @@ reporter's board: `GPS_TX_PIN 38` (towards GNSS), `GPS_RX_PIN 39` (towards CPU),
 
 - **I2C moves to 4/3.** This is a breaking change for anyone with a BME/AHT/SHT/RTC on header pins 41/42.
   The release notes and the PR body must say so.
+- **Superseded 2026-11-07 (W0):** no R8 runtime guard. IDF 4.4.7 has no eFuse field that tells S3R2 from S3R8, so the
+  plan's fallback applies: R2 only, documented in the variant. The guard text below is historical.
 - **R2 only, R8 deferred.** The fix targets the ESP32-S3R2 board (the reporters' version). R8 (octal
   PSRAM: GPIO34 is a PSRAM line, GNSS enable reportedly on 42) gets a runtime guard and a BACKLOG row,
   merged with `LED-V4R8` / LED-17.

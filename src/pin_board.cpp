@@ -346,6 +346,18 @@ constexpr int kSoft[] = {
     #if defined(GPS_PPS_PIN)
     WX_RES(GPS_PPS_PIN)
     #endif
+    #if defined(HV4_GPS_EN_PIN)
+    WX_RES(HV4_GPS_EN_PIN)
+    #endif
+    #if defined(HV4_GPS_WAKE_PIN)
+    WX_RES(HV4_GPS_WAKE_PIN)
+    #endif
+    #if defined(HV4_GPS_RST_PIN)
+    WX_RES(HV4_GPS_RST_PIN)
+    #endif
+    #if defined(HV4_GPS_PPS_PIN)
+    WX_RES(HV4_GPS_PPS_PIN)
+    #endif
     #if defined(BUTTON_PIN)
     WX_RES(BUTTON_PIN)
     #endif
@@ -419,6 +431,13 @@ static_assert((kHardMask & ((1ULL << 37) | (1ULL << 38) | (1ULL << 42) | (1ULL <
 // user function would switch the radio off.
 #if defined(BOARD_T_DECK_PRO) && defined(BOARD_LORA_EN)
 static_assert((kHardMask & (1ULL << BOARD_LORA_EN)) != 0, "T-Deck Pro: BOARD_LORA_EN (radio power enable) is not reserved HARD");
+#endif
+// GPSV4-01: Heltec V4 GNSS (Meshtastic variants/esp32s3/heltec_v4/variant.h): GNSS TX -> ESP RX is GPIO39, ESP TX -> GNSS RX
+// is GPIO38, enable GPIO34 (active LOW), reset GPIO42, PPS GPIO41. I2C therefore must not sit on 41/42 (it moved to 4/3).
+#if defined(BOARD_HELTEC_V4)
+static_assert(GPS_RX_PIN == 39 && GPS_TX_PIN == 38, "Heltec V4: GNSS RX must be 39 (GNSS TX) and TX 38 (GNSS RX), not swapped");
+static_assert(HV4_GPS_EN_PIN == 34 && HV4_GPS_RST_PIN == 42, "Heltec V4: GNSS enable must be 34 and reset 42");
+static_assert(I2C_SDA != 41 && I2C_SDA != 42 && I2C_SCL != 41 && I2C_SCL != 42, "Heltec V4: I2C must not use 41/42 (GNSS PPS / reset)");
 #endif
 
 uint64_t pinBoardReservedHard() { return kHardMask; }
