@@ -68,6 +68,7 @@
 <h1>MeshCom fork: campaigns since September 2026, and the backlog ahead</h1>
 <ul class="meta">
   <li>State: 2026-11-07; branch <code>fork-dev</code></li>
+  <li>Tokens and cost: local Claude Code transcripts at API list prices (method in the foot)</li>
   <li>Sources: commit dates on <code>fork-dev</code>, release tags, <code>docs/campaign-*.md</code>, <code>docs/BACKLOG.md</code>, <code>docs/RESUME.md</code></li>
 </ul>
 
@@ -80,6 +81,7 @@
   <li><b>September, foundation:</b> KISS mode v2, RAM diet, Safeboot OTA session, PN retry.</li>
   <li><b>October, platform:</b> fork consolidated on <code>fork-dev</code>; Auto Update AU-01..21; RM1 remote management; web flasher autodetect; TX pool; web login.</li>
   <li><b>November so far:</b> national characters, battery charge state, release gate, v4.40a.11.06; GPIO-01 waves W0-W5 plus follow-ups GPIO-02..04 in one day.</li>
+  <li><b>Claude usage so far:</b> <span id="kf-usage"></span></li>
   <li><b>Ahead:</b> <span id="kf-ahead"></span> backlog items scheduled as estimates through mid-December; dates after today are not commitments.</li>
 </ul>
 
@@ -116,50 +118,51 @@
 
 <details>
   <summary>Table view</summary>
-  <table id="tbl"><thead><tr><th>Phase</th><th>Work</th><th>ID</th><th>Status</th><th>Start</th><th>End</th><th>Note</th></tr></thead><tbody></tbody></table>
+  <table id="tbl"><thead><tr><th>Phase</th><th>Work</th><th>ID</th><th>Status</th><th>Start</th><th>End</th><th>Tokens</th><th>Cost</th><th>Note</th></tr></thead><tbody></tbody></table>
 </details>
 
+<p class="foot" id="usagefoot"></p>
 <p class="foot">Bars use commit-date ranges; many campaigns took one to three days, so their bars are short. Start dates of long campaigns (RM1, TXP-01) may be earlier than the first commit shown. "Ahead" rows are estimates in a plausible order; GPIO-07 waits for the next release. "Open leftovers" marks a finished campaign with items still open in BACKLOG.</p>
 
 <script>
 const rows = [
- {p:"Foundation (September)",n:"GPS Kalman filter, KISS address fixes",id:"",st:"done",s:"09-03",e:"09-03",note:"Upstream v4.35s backpressure merged into KISS mode"},
- {p:"Foundation (September)",n:"T-Deck, T-Beam Supreme, deep sleep, APRS fixes",id:"",st:"done",s:"09-12",e:"09-13",note:"Keyboard, mute, u8g2, ping, DHCP, web GUI fixes"},
- {p:"Foundation (September)",n:"KISS mode v2 (tap, echo, trace)",id:"KISS",st:"done",s:"09-18",e:"09-22",note:"Upstream #1149 callsign/SSID canonicalisation merged"},
- {p:"Foundation (September)",n:"RAM diet (byte FIFO, web header)",id:"RAM",st:"done",s:"09-21",e:"09-21",note:"Loop task and byte FIFO RAM reductions"},
- {p:"Foundation (September)",n:"Safeboot OTA session, flash save, BLE/battery disable",id:"",st:"done",s:"09-25",e:"09-26",note:"Safeboot OTA session"},
- {p:"Foundation (September)",n:"PN retry (personal message retry)",id:"PN-RETRY",st:"done",s:"09-27",e:"09-28",note:"Concept, retry ring slots"},
- {p:"Foundation (September)",n:"Charset and APRS decode fixes",id:"",st:"done",s:"09-28",e:"09-28",note:"Charset keep, APRS add, web decode"},
- {p:"Fork and bench",n:"Fork consolidation, Pages, flasher, neo line retired",id:"",st:"done",s:"10-01",e:"10-03",note:"fork-dev only; tag archive/fork-neo-test-20261002"},
- {p:"Fork and bench",n:"Backlog sweep 1 (RF-09, CSMA)",id:"",st:"done",s:"10-03",e:"10-03",note:"campaign-backlog-sweep-20261003"},
- {p:"Fork and bench",n:"OTA regression, passive soak",id:"REG-01",st:"done",s:"10-03",e:"10-04",note:"RX-01 soak found REBOOT-98"},
- {p:"Fork and bench",n:"T-Deck W02 bench (TD-20, TD-15, TD-09)",id:"TD-20",st:"done",s:"10-04",e:"10-04",note:"campaign-tdeck-w02-20261004"},
- {p:"Fork and bench",n:"RCA DK5EN-98 and T-Deck, log analysis",id:"",st:"done",s:"10-12",e:"10-13",note:"campaign-loganalyse-20261012"},
- {p:"Fork and bench",n:"Web watchdog WEB-WDT and WEB-STOP",id:"WEB-WDT",st:"done",s:"10-19",e:"10-19",note:"BL-04 closed with WEB-WDT-01"},
- {p:"Fork and bench",n:"Backlog sweep 2 (TD-31, BL-02, BOOT-01)",id:"",st:"done",s:"11-02",e:"11-02",open:true,note:"Host-only fixes; bench checks listed in the campaign"},
- {p:"Fork and bench",n:"Bench fixes and release gate",id:"",st:"done",s:"11-06",e:"11-06",note:"AU T-Beam fix; campaign-release-gate-20261106"},
- {p:"Core features",n:"Time zone from POSIX/NTP",id:"TZ-01",st:"done",s:"10-04",e:"10-04",note:"Derive and wire format"},
- {p:"Core features",n:"Store-and-forward gateway, onboard RTC, MTU",id:"SNF-GW",st:"done",s:"10-04",e:"10-04",note:"SNF-GW-01..05, RTC-1..3, NMTU-01"},
- {p:"Core features",n:"Ethernet ETH-04 (DB0AIS)",id:"ETH-04",st:"done",s:"10-09",e:"10-11",note:"Feature and docs"},
- {p:"Core features",n:"Sensors, TX send-once, temperature offset",id:"",st:"done",s:"10-10",e:"10-10",note:"Sensors apply, TX send-once"},
- {p:"Core features",n:"GPS-11 position Kalman filter",id:"GPS-11",st:"done",s:"10-17",e:"10-17",note:"campaign-gps11-position-kf"},
- {p:"Core features",n:"National characters end to end",id:"CHARS-01",st:"done",s:"11-01",e:"11-02",note:"Upstream #1249 merged"},
- {p:"Core features",n:"Battery charge state, WX UV and wind",id:"BAT-04",st:"done",s:"11-02",e:"11-02",note:"Upstream #1250, #1251 merged"},
- {p:"Auto Update",n:"AU-01..12 auto update, Safeboot, HTTPS, web UI",id:"AU-01",st:"done",s:"10-05",e:"10-05",note:"Feasibility through versioned images"},
- {p:"Auto Update",n:"AU-15, AU-16 DIO bootloader, PSRAM TLS",id:"AU-16",st:"done",s:"10-17",e:"10-19",note:"campaign-au16-dio-bootloader"},
- {p:"Auto Update",n:"AU-18 RX-deaf, AU-20 BLE pause heap",id:"AU-20",st:"done",s:"10-23",e:"10-23",note:"campaign-au18, campaign-au20"},
- {p:"Auto Update",n:"AU-21 TFT sprite heap (Wireless Tracker)",id:"AU-21",st:"done",s:"10-23",e:"10-25",open:true,note:"Sprite fixed; S3 TLS heap floor open"},
- {p:"Remote management and web",n:"RM1 HMAC remote management RM-01..08",id:"RM-01",st:"done",s:"10-05",e:"10-11",note:"Remote page, LED"},
- {p:"Remote management and web",n:"Web flasher autodetect WF-01..05",id:"WF-05",st:"done",s:"10-19",e:"10-19",note:"Env name, board identity"},
- {p:"Remote management and web",n:"Web flash TRACK, T-Beam first boot",id:"TRK-02",st:"done",s:"10-24",e:"10-24",open:true,note:"TRK-03 fixed; TRK-02 not reproduced"},
- {p:"Remote management and web",n:"T-Deck heap and WiFi TD-21b, TD-22, TD-23",id:"TD-21b",st:"done",s:"10-25",e:"10-25",note:"WIFI-HEAP, day/night switch"},
- {p:"Remote management and web",n:"Web login, UDP-05, HEY-UP, PF-01",id:"WEB-AUTH",st:"done",s:"10-30",e:"10-30",note:"campaign-webui-login"},
- {p:"Mesh and LoRa",n:"Gateway RX and ACK, BL-01",id:"GWACK-01",st:"done",s:"10-23",e:"10-24",open:true,note:"Both ACK copies one id, bench 28/28; GWRX night open"},
- {p:"Mesh and LoRa",n:"Call blocklist --blockcall",id:"BLK-01",st:"done",s:"10-24",e:"10-25",open:true,note:"Fork-key migration not benched"},
- {p:"Mesh and LoRa",n:"TX pool",id:"TXP-01",st:"done",s:"10-24",e:"10-30",note:"campaign-tx-pool"},
- {p:"Mesh and LoRa",n:"LRF ping/beacon RX silence, logreport",id:"LRF",st:"done",s:"11-01",e:"11-01",note:"Upstream #1247 merged 11-02"},
- {p:"Pin control GPIO-01",n:"GPIO-01 W0-W5: pin table, policy, Pins page, RM1 pins/gpio",id:"GPIO-01",st:"done",s:"11-07",e:"11-07",note:"Host gate green, all build targets green"},
- {p:"Pin control GPIO-01",n:"Follow-ups GPIO-02..04, web GPIO switch, button GPIO 0",id:"GPIO-01",st:"run",s:"11-07",e:"11-08",note:"On the bench (DK5EN-1); not released"},
+ {p:"Foundation (September)",n:"GPS Kalman filter, KISS address fixes",id:"",st:"done",s:"09-03",e:"09-03",nolog:1,note:"Upstream v4.35s backpressure merged into KISS mode"},
+ {p:"Foundation (September)",n:"T-Deck, T-Beam Supreme, deep sleep, APRS fixes",id:"",st:"done",s:"09-12",e:"09-13",nolog:1,note:"Keyboard, mute, u8g2, ping, DHCP, web GUI fixes"},
+ {p:"Foundation (September)",n:"KISS mode v2 (tap, echo, trace)",id:"KISS",st:"done",s:"09-18",e:"09-22",nolog:1,note:"Upstream #1149 callsign/SSID canonicalisation merged"},
+ {p:"Foundation (September)",n:"RAM diet (byte FIFO, web header)",id:"RAM",st:"done",s:"09-21",e:"09-21",nolog:1,note:"Loop task and byte FIFO RAM reductions"},
+ {p:"Foundation (September)",n:"Safeboot OTA session, flash save, BLE/battery disable",id:"",st:"done",s:"09-25",e:"09-26",nolog:1,note:"Safeboot OTA session"},
+ {p:"Foundation (September)",n:"PN retry (personal message retry)",id:"PN-RETRY",st:"done",s:"09-27",e:"09-28",nolog:1,note:"Concept, retry ring slots"},
+ {p:"Foundation (September)",n:"Charset and APRS decode fixes",id:"",st:"done",s:"09-28",e:"09-28",nolog:1,note:"Charset keep, APRS add, web decode"},
+ {p:"Fork and bench",n:"Fork consolidation, Pages, flasher, neo line retired",id:"",st:"done",s:"10-01",e:"10-03",nolog:1,note:"fork-dev only; tag archive/fork-neo-test-20261002"},
+ {p:"Fork and bench",n:"Backlog sweep 1 (RF-09, CSMA)",id:"",st:"done",s:"10-03",e:"10-03",nolog:1,note:"campaign-backlog-sweep-20261003"},
+ {p:"Fork and bench",n:"OTA regression, passive soak",id:"REG-01",st:"done",s:"10-03",e:"10-04",nolog:1,note:"RX-01 soak found REBOOT-98"},
+ {p:"Fork and bench",n:"T-Deck W02 bench (TD-20, TD-15, TD-09)",id:"TD-20",st:"done",s:"10-04",e:"10-04",nolog:1,note:"campaign-tdeck-w02-20261004"},
+ {p:"Fork and bench",n:"RCA DK5EN-98 and T-Deck, log analysis",id:"",st:"done",s:"10-12",e:"10-13",tok:294702733,usd:98.99,note:"campaign-loganalyse-20261012"},
+ {p:"Fork and bench",n:"Web watchdog WEB-WDT and WEB-STOP",id:"WEB-WDT",st:"done",s:"10-19",e:"10-19",tok:130303929,usd:52.84,note:"BL-04 closed with WEB-WDT-01"},
+ {p:"Fork and bench",n:"Backlog sweep 2 (TD-31, BL-02, BOOT-01)",id:"",st:"done",s:"11-02",e:"11-02",open:true,tok:159898200,usd:68.44,note:"Host-only fixes; bench checks listed in the campaign"},
+ {p:"Fork and bench",n:"Bench fixes and release gate",id:"",st:"done",s:"11-06",e:"11-06",tok:268469926,usd:115.12,note:"AU T-Beam fix; campaign-release-gate-20261106"},
+ {p:"Core features",n:"Time zone from POSIX/NTP",id:"TZ-01",st:"done",s:"10-04",e:"10-04",nolog:1,note:"Derive and wire format"},
+ {p:"Core features",n:"Store-and-forward gateway, onboard RTC, MTU",id:"SNF-GW",st:"done",s:"10-04",e:"10-04",nolog:1,note:"SNF-GW-01..05, RTC-1..3, NMTU-01"},
+ {p:"Core features",n:"Ethernet ETH-04 (DB0AIS)",id:"ETH-04",st:"done",s:"10-09",e:"10-11",tok:414061618,usd:142.18,note:"Feature and docs"},
+ {p:"Core features",n:"Sensors, TX send-once, temperature offset",id:"",st:"done",s:"10-10",e:"10-10",tok:314688130,usd:130.76,note:"Sensors apply, TX send-once"},
+ {p:"Core features",n:"GPS-11 position Kalman filter",id:"GPS-11",st:"done",s:"10-17",e:"10-17",tok:74106332,usd:33.11,note:"campaign-gps11-position-kf"},
+ {p:"Core features",n:"National characters end to end",id:"CHARS-01",st:"done",s:"11-01",e:"11-02",tok:260920026,usd:102.86,note:"Upstream #1249 merged"},
+ {p:"Core features",n:"Battery charge state, WX UV and wind",id:"BAT-04",st:"done",s:"11-02",e:"11-02",tok:159898200,usd:68.44,note:"Upstream #1250, #1251 merged"},
+ {p:"Auto Update",n:"AU-01..12 auto update, Safeboot, HTTPS, web UI",id:"AU-01",st:"done",s:"10-05",e:"10-05",nolog:1,note:"Feasibility through versioned images"},
+ {p:"Auto Update",n:"AU-15, AU-16 DIO bootloader, PSRAM TLS",id:"AU-16",st:"done",s:"10-17",e:"10-19",tok:644702454,usd:240.64,note:"campaign-au16-dio-bootloader"},
+ {p:"Auto Update",n:"AU-18 RX-deaf, AU-20 BLE pause heap",id:"AU-20",st:"done",s:"10-23",e:"10-23",tok:111482437,usd:36.20,note:"campaign-au18, campaign-au20"},
+ {p:"Auto Update",n:"AU-21 TFT sprite heap (Wireless Tracker)",id:"AU-21",st:"done",s:"10-23",e:"10-25",open:true,tok:111482437,usd:36.20,note:"Sprite fixed; S3 TLS heap floor open"},
+ {p:"Remote management and web",n:"RM1 HMAC remote management RM-01..08",id:"RM-01",st:"done",s:"10-05",e:"10-11",tok:14170856,usd:8.39,note:"Remote page, LED"},
+ {p:"Remote management and web",n:"Web flasher autodetect WF-01..05",id:"WF-05",st:"done",s:"10-19",e:"10-19",tok:130303929,usd:52.84,note:"Env name, board identity"},
+ {p:"Remote management and web",n:"Web flash TRACK, T-Beam first boot",id:"TRK-02",st:"done",s:"10-24",e:"10-24",open:true,tok:120167693,usd:46.37,note:"TRK-03 fixed; TRK-02 not reproduced"},
+ {p:"Remote management and web",n:"T-Deck heap and WiFi TD-21b, TD-22, TD-23",id:"TD-21b",st:"done",s:"10-25",e:"10-25",tok:438552121,usd:149.48,note:"WIFI-HEAP, day/night switch"},
+ {p:"Remote management and web",n:"Web login, UDP-05, HEY-UP, PF-01",id:"WEB-AUTH",st:"done",s:"10-30",e:"10-30",tok:115225775,usd:56.87,note:"campaign-webui-login"},
+ {p:"Mesh and LoRa",n:"Gateway RX and ACK, BL-01",id:"GWACK-01",st:"done",s:"10-23",e:"10-24",open:true,tok:111482437,usd:36.20,note:"Both ACK copies one id, bench 28/28; GWRX night open"},
+ {p:"Mesh and LoRa",n:"Call blocklist --blockcall",id:"BLK-01",st:"done",s:"10-24",e:"10-25",open:true,tok:120167693,usd:46.37,note:"Fork-key migration not benched"},
+ {p:"Mesh and LoRa",n:"TX pool",id:"TXP-01",st:"done",s:"10-24",e:"10-30",tok:232686217,usd:102.88,note:"campaign-tx-pool"},
+ {p:"Mesh and LoRa",n:"LRF ping/beacon RX silence, logreport",id:"LRF",st:"done",s:"11-01",e:"11-01",tok:260920026,usd:102.86,note:"Upstream #1247 merged 11-02"},
+ {p:"Pin control GPIO-01",n:"GPIO-01 W0-W5: pin table, policy, Pins page, RM1 pins/gpio",id:"GPIO-01",st:"done",s:"11-07",e:"11-07",tok:102534793,usd:44.61,note:"Host gate green, all build targets green"},
+ {p:"Pin control GPIO-01",n:"Follow-ups GPIO-02..04, web GPIO switch, button GPIO 0",id:"GPIO-01",st:"run",s:"11-07",e:"11-08",tok:102534793,usd:44.61,note:"On the bench (DK5EN-1); not released"},
  {p:"Releases",n:"v4.40a.10.02",id:"",st:"rel",s:"10-02",e:"10-02",note:"Tags v4.40a and v4.40a.10.02"},
  {p:"Releases",n:"v4.40a.10.05, .10.06",id:"",st:"rel",s:"10-05",e:"10-05",note:"Two tags"},
  {p:"Releases",n:"v4.40a.10.11 (first CI release)",id:"",st:"rel",s:"10-11",e:"10-11",note:"CI builds and publishes from this tag"},
@@ -199,6 +202,10 @@ const rows = [
  {p:"Backlog ahead",n:"EmComm proposals DJ8MEH",id:"EMCOMM-SYN",st:"plan",s:"12-09",e:"12-13",note:"13 items rated: 5 green, 5 yellow, 3 red"},
 ];
 
+const USAGE = { tok: 5016555201, usd: 1952.38, unTok: 323082960, unUsd: 135.12, since: "2026-10-08", asOf: "11-07 16:42" };
+const fmtTok = n => n >= 1e9 ? (n / 1e9).toFixed(2) + " G" : n >= 1e6 ? (n / 1e6).toFixed(1) + " M" : n >= 1e3 ? Math.round(n / 1e3) + " k" : String(n);
+const useTok = r => r.nolog ? "no log" : r.tok === undefined ? "" : fmtTok(r.tok);
+const useUsd = r => r.nolog ? "" : r.usd === undefined ? "" : "$" + r.usd.toFixed(2);
 const D = s => Date.UTC(2026, +s.slice(0, 2) - 1, +s.slice(3, 5));
 const DAY = 864e5;
 const t0 = D("09-01"), t1 = D("12-16"), NOW = D("11-07");
@@ -206,12 +213,20 @@ const phases = [];
 for (const r of rows) { let ph = phases.find(p => p.name === r.p); if (!ph) phases.push(ph = { name: r.p, rows: [] }); ph.rows.push(r); }
 for (const ph of phases) ph.rows.sort((a, b) => D(a.s) - D(b.s));
 document.getElementById("kf-ahead").textContent = rows.filter(r => r.st === "plan").length;
+document.getElementById("kf-usage").textContent = `${fmtTok(USAGE.tok)} tokens, $${USAGE.usd.toFixed(0)} at list price since ${USAGE.since} (the oldest transcript on this machine).`;
+document.getElementById("usagefoot").textContent =
+  `Tokens and cost: every API request in the local Claude Code transcripts of this repo since ${USAGE.since} (subagents included), ` +
+  `priced at API list prices (Opus 5.5 $4/$20, Sonnet 5.5 $2/$10, Haiku 5.5 $0.10/$0.50 per MTok in/out; cache read 5-10 %, cache write 1.25x/2x input). ` +
+  `Tokens count input, output, cache reads and cache writes. A request goes to the bar whose day window contains it (the later-starting bar when two overlap; bars starting the same day share it). ` +
+  `Releases, merges and ahead rows own no window. Total ${fmtTok(USAGE.tok)}, $${USAGE.usd.toFixed(0)}; of that ${fmtTok(USAGE.unTok)}, $${USAGE.unUsd.toFixed(0)} fell between bars. ` +
+  `Bars that ended before ${USAGE.since} show "no log". The plan is a subscription, so these are list-price equivalents, not the bill. ` +
+  `Generated by tools/gantt_usage.py, as of ${USAGE.asOf} CET.`;
 
 const tbody = document.querySelector("#tbl tbody");
 const LAB = { done: "Done", run: "Running", plan: "Ahead (estimate)", rel: "Done" };
 for (const ph of phases) for (const r of ph.rows) {
   const tr = document.createElement("tr");
-  [ph.name, r.n, r.id, LAB[r.st] + (r.open ? ", open leftovers" : ""), "2026-" + r.s, "2026-" + r.e, r.note].forEach(v => { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); });
+  [ph.name, r.n, r.id, LAB[r.st] + (r.open ? ", open leftovers" : ""), "2026-" + r.s, "2026-" + r.e, useTok(r), useUsd(r), r.note].forEach(v => { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); });
   tbody.appendChild(tr);
 }
 
@@ -222,7 +237,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 function draw() {
   const host = document.getElementById("chart");
   host.querySelector("svg")?.remove();
-  const W = Math.max(1000, host.clientWidth), LW = 330, x0 = LW + 8, x1 = W - 16;
+  const W = Math.max(1100, host.clientWidth), LW = 330, RW = 130, x0 = LW + 8, x1 = W - RW - 8;
   const rowH = 20, phaseH = 24, top = 40;
   const H = top + phases.reduce((a, p) => a + phaseH + p.rows.length * rowH, 0) + 10;
   const X = t => x0 + (t - t0) / (t1 - t0) * (x1 - x0);
@@ -247,6 +262,8 @@ function draw() {
     }
   }
 
+  el("text", { x: W - RW + 54, y: 32, "text-anchor": "end" }, ax).textContent = "tokens";
+  el("text", { x: W - 6, y: 32, "text-anchor": "end" }, ax).textContent = "cost";
   const tip = document.getElementById("tip");
   let y = top;
   for (const ph of phases) {
@@ -270,12 +287,17 @@ function draw() {
         shape = el("rect", a, svg);
         if (r.open) el("circle", { cx: xe + 5, cy, r: 2.5, fill: C("--now") }, svg);
       }
+      if (r.st === "done" || r.st === "run") {
+        const t = useTok(r), u = useUsd(r);
+        el("text", { x: W - RW + 54, y: y + 14, class: "lbl id", "text-anchor": "end" }, svg).textContent = t;
+        if (u) el("text", { x: W - 6, y: y + 14, class: "lbl id", "text-anchor": "end" }, svg).textContent = u;
+      }
       const hit = el("rect", { x: 0, y, width: W, height: rowH, fill: "transparent" }, svg);
       hit.addEventListener("mousemove", ev => {
         tip.style.display = "block";
         tip.innerHTML = "";
         const b = document.createElement("b"); b.textContent = r.n + (r.id ? " (" + r.id + ")" : ""); tip.appendChild(b);
-        tip.appendChild(document.createTextNode((r.s === r.e ? "2026-" + r.s : "2026-" + r.s + " to " + r.e) + " · " + LAB[r.st] + (r.open ? ", open leftovers" : "") + (r.note ? " · " + r.note : "")));
+        tip.appendChild(document.createTextNode((r.s === r.e ? "2026-" + r.s : "2026-" + r.s + " to " + r.e) + " · " + LAB[r.st] + (r.open ? ", open leftovers" : "") + (useTok(r) ? " · " + useTok(r) + (useUsd(r) ? ", " + useUsd(r) : "") : "") + (r.note ? " · " + r.note : "")));
         const hb = host.getBoundingClientRect();
         tip.style.left = Math.min(ev.clientX - hb.left + 12, hb.width - 370) + "px";
         tip.style.top = (ev.clientY - hb.top + 14) + "px";
