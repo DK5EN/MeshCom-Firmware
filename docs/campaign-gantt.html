@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fork Campaign Gantt</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --surface: #fcfcfb; --surface-2: #f2f1ee; --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #8a8984;
+    --grid: #e4e3df; --done: #2a78d6; --run: #0e9fb3; --plan: #8a8984; --now: #d62f45; --rel: #1d4f91;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #1a1a19; --surface-2: #242423; --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #8f8e86;
+      --grid: #343432; --done: #3987e5; --run: #2cc3d6; --plan: #8f8e86; --now: #ec5d70; --rel: #8db8f0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #1a1a19; --surface-2: #242423; --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #8f8e86;
+    --grid: #343432; --done: #3987e5; --run: #2cc3d6; --plan: #8f8e86; --now: #ec5d70; --rel: #8db8f0;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 28px; background: var(--surface); color: var(--ink);
+         font: 12.5px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; font-weight: 600; }
+  h2 { font-size: 14px; margin: 0 0 6px; font-weight: 600; }
+  .meta { list-style: none; padding: 0; margin: 0 0 14px; color: var(--ink-2); font-size: 11px; }
+  .meta li { margin: 1px 0; }
+  .bluf { background: var(--surface-2); border-radius: 6px; padding: 12px 16px; margin: 0 0 18px; max-width: 1100px; }
+  .bluf p { margin: 0; font-size: 14px; font-weight: 600; }
+  ul.facts { margin: 0 0 18px; padding-left: 18px; max-width: 1100px; color: var(--ink-2); }
+  ul.facts li { margin: 3px 0; }
+  ul.facts b { color: var(--ink); font-weight: 600; }
+  .legend { display: flex; gap: 20px; margin: 0 0 10px; color: var(--ink-2); align-items: center; flex-wrap: wrap; }
+  .sw { display: inline-block; width: 22px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+  .sw.done { background: var(--done); }
+  .sw.run { background: repeating-linear-gradient(135deg, var(--run) 0 4px, color-mix(in srgb, var(--run) 55%, var(--surface)) 4px 7px); }
+  .sw.plan { border: 1.5px dashed var(--plan); }
+  .sw.rel { width: 10px; height: 10px; background: var(--rel); transform: rotate(45deg); border-radius: 1px; }
+  .sw.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--now); }
+  .sw.now { width: 2px; height: 14px; background: var(--now); border-radius: 0; }
+  #chart { position: relative; overflow-x: auto; }
+  svg { display: block; }
+  .axis text { fill: var(--ink-3); font-size: 11px; }
+  .axis text.month { fill: var(--ink-2); font-weight: 600; }
+  .gridline { stroke: var(--grid); stroke-width: 1; }
+  .lbl { fill: var(--ink); font-size: 12.5px; }
+  .lbl.phase { font-weight: 600; }
+  .lbl.id { fill: var(--ink-2); font-size: 11px; }
+  .phasebg { fill: var(--surface-2); }
+  .tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--surface);
+         padding: 8px 10px; border-radius: 6px; font-size: 12.5px; max-width: 360px; display: none; z-index: 5; }
+  .tip b { display: block; margin-bottom: 2px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 1100px; margin-top: 22px; }
+  .cols ul { margin: 0; padding-left: 18px; color: var(--ink-2); }
+  .cols li { margin: 3px 0; }
+  .cols b { color: var(--ink); font-weight: 600; }
+  details { margin-top: 22px; max-width: 1100px; }
+  summary { cursor: pointer; color: var(--ink-2); }
+  table { border-collapse: collapse; margin-top: 8px; width: 100%; font-size: 11px; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  th { color: var(--ink-2); font-weight: 600; }
+  .foot { color: var(--ink-3); margin-top: 18px; font-size: 11px; max-width: 1100px; }
+  @media (max-width: 700px) { body { padding: 16px; } .cols { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<h1>MeshCom fork: campaigns since September 2026, and the backlog ahead</h1>
+<ul class="meta">
+  <li>State: 2026-11-07; branch <code>fork-dev</code></li>
+  <li>Sources: commit dates on <code>fork-dev</code>, release tags, <code>docs/campaign-*.md</code>, <code>docs/BACKLOG.md</code>, <code>docs/RESUME.md</code></li>
+</ul>
+
+<div class="bluf">
+  <p>Ten weeks of fork work: 18 numbered releases, about 30 upstream PRs merged, CI releases since v4.40a.10.11. GPIO-01 (pins page, free GPIO control, RM1 pins/gpio) is implemented and running on the bench; next up are AU-24, the GPIO-01 field test, GPSV4-01 and TD-THEME-01.</p>
+</div>
+
+<h2>Key facts</h2>
+<ul class="facts">
+  <li><b>September, foundation:</b> KISS mode v2, RAM diet, Safeboot OTA session, PN retry.</li>
+  <li><b>October, platform:</b> fork consolidated on <code>fork-dev</code>; Auto Update AU-01..21; RM1 remote management; web flasher autodetect; TX pool; web login.</li>
+  <li><b>November so far:</b> national characters, battery charge state, release gate, v4.40a.11.06; GPIO-01 waves W0-W5 plus follow-ups GPIO-02..04 in one day.</li>
+  <li><b>Ahead:</b> <span id="kf-ahead"></span> backlog items scheduled as estimates through mid-December; dates after today are not commitments.</li>
+</ul>
+
+<div class="legend">
+  <span><span class="sw done"></span>Done</span>
+  <span><span class="sw run"></span>Running</span>
+  <span><span class="sw plan"></span>Ahead (estimate)</span>
+  <span><span class="sw rel"></span>Release / upstream merge (one day)</span>
+  <span><span class="sw dot"></span>Open leftovers in BACKLOG</span>
+  <span><span class="sw now"></span>Today</span>
+</div>
+
+<div id="chart"><div class="tip" id="tip"></div></div>
+
+<div class="cols">
+  <div>
+    <h2>Done</h2>
+    <ul>
+      <li><b>Auto Update:</b> AU-01..12 (Safeboot, HTTPS, web UI), AU-15/16 DIO bootloader and PSRAM TLS, AU-18/20/21 heap fixes.</li>
+      <li><b>Remote management RM1:</b> HMAC-authenticated commands, Remote page, queue card; RM1 <code>pins</code>/<code>gpio</code> since GPIO-01.</li>
+      <li><b>Mesh and LoRa:</b> gateway ACK (GWACK-01), call blocklist (BLK-01), TX pool (TXP-01), LRF ping/beacon.</li>
+      <li><b>Web:</b> web login (WEB-AUTH), watchdog, web flasher autodetect, Pins page with free GPIO control.</li>
+    </ul>
+  </div>
+  <div>
+    <h2>Ahead</h2>
+    <ul>
+      <li><b>Next:</b> GPIO-05/06 decisions, AU-24 T-Beam auto update heap, GPIO-07 field test after the next release.</li>
+      <li><b>Planned:</b> GPSV4-01 Heltec V4 GNSS (<code>docs/plan-heltec-v4-gps-20261107.md</code>), TD-THEME-01 T-Deck light/dark theme.</li>
+      <li><b>Then:</b> AU-14 watchdog, CSMA slot sizing, nRF52 BLE DFU, RM-EXT, build parallelism.</li>
+    </ul>
+  </div>
+</div>
+
+<details>
+  <summary>Table view</summary>
+  <table id="tbl"><thead><tr><th>Phase</th><th>Work</th><th>ID</th><th>Status</th><th>Start</th><th>End</th><th>Note</th></tr></thead><tbody></tbody></table>
+</details>
+
+<p class="foot">Bars use commit-date ranges; many campaigns took one to three days, so their bars are short. Start dates of long campaigns (RM1, TXP-01) may be earlier than the first commit shown. "Ahead" rows are estimates in a plausible order; GPIO-07 waits for the next release. "Open leftovers" marks a finished campaign with items still open in BACKLOG.</p>
+
+<script>
+const rows = [
+ {p:"Foundation (September)",n:"GPS Kalman filter, KISS address fixes",id:"",st:"done",s:"09-03",e:"09-03",note:"Upstream v4.35s backpressure merged into KISS mode"},
+ {p:"Foundation (September)",n:"T-Deck, T-Beam Supreme, deep sleep, APRS fixes",id:"",st:"done",s:"09-12",e:"09-13",note:"Keyboard, mute, u8g2, ping, DHCP, web GUI fixes"},
+ {p:"Foundation (September)",n:"KISS mode v2 (tap, echo, trace)",id:"KISS",st:"done",s:"09-18",e:"09-22",note:"Upstream #1149 callsign/SSID canonicalisation merged"},
+ {p:"Foundation (September)",n:"RAM diet (byte FIFO, web header)",id:"RAM",st:"done",s:"09-21",e:"09-21",note:"Loop task and byte FIFO RAM reductions"},
+ {p:"Foundation (September)",n:"Safeboot OTA session, flash save, BLE/battery disable",id:"",st:"done",s:"09-25",e:"09-26",note:"Safeboot OTA session"},
+ {p:"Foundation (September)",n:"PN retry (personal message retry)",id:"PN-RETRY",st:"done",s:"09-27",e:"09-28",note:"Concept, retry ring slots"},
+ {p:"Foundation (September)",n:"Charset and APRS decode fixes",id:"",st:"done",s:"09-28",e:"09-28",note:"Charset keep, APRS add, web decode"},
+ {p:"Fork and bench",n:"Fork consolidation, Pages, flasher, neo line retired",id:"",st:"done",s:"10-01",e:"10-03",note:"fork-dev only; tag archive/fork-neo-test-20261002"},
+ {p:"Fork and bench",n:"Backlog sweep 1 (RF-09, CSMA)",id:"",st:"done",s:"10-03",e:"10-03",note:"campaign-backlog-sweep-20261003"},
+ {p:"Fork and bench",n:"OTA regression, passive soak",id:"REG-01",st:"done",s:"10-03",e:"10-04",note:"RX-01 soak found REBOOT-98"},
+ {p:"Fork and bench",n:"T-Deck W02 bench (TD-20, TD-15, TD-09)",id:"TD-20",st:"done",s:"10-04",e:"10-04",note:"campaign-tdeck-w02-20261004"},
+ {p:"Fork and bench",n:"RCA DK5EN-98 and T-Deck, log analysis",id:"",st:"done",s:"10-12",e:"10-13",note:"campaign-loganalyse-20261012"},
+ {p:"Fork and bench",n:"Web watchdog WEB-WDT and WEB-STOP",id:"WEB-WDT",st:"done",s:"10-19",e:"10-19",note:"BL-04 closed with WEB-WDT-01"},
+ {p:"Fork and bench",n:"Backlog sweep 2 (TD-31, BL-02, BOOT-01)",id:"",st:"done",s:"11-02",e:"11-02",open:true,note:"Host-only fixes; bench checks listed in the campaign"},
+ {p:"Fork and bench",n:"Bench fixes and release gate",id:"",st:"done",s:"11-06",e:"11-06",note:"AU T-Beam fix; campaign-release-gate-20261106"},
+ {p:"Core features",n:"Time zone from POSIX/NTP",id:"TZ-01",st:"done",s:"10-04",e:"10-04",note:"Derive and wire format"},
+ {p:"Core features",n:"Store-and-forward gateway, onboard RTC, MTU",id:"SNF-GW",st:"done",s:"10-04",e:"10-04",note:"SNF-GW-01..05, RTC-1..3, NMTU-01"},
+ {p:"Core features",n:"Ethernet ETH-04 (DB0AIS)",id:"ETH-04",st:"done",s:"10-09",e:"10-11",note:"Feature and docs"},
+ {p:"Core features",n:"Sensors, TX send-once, temperature offset",id:"",st:"done",s:"10-10",e:"10-10",note:"Sensors apply, TX send-once"},
+ {p:"Core features",n:"GPS-11 position Kalman filter",id:"GPS-11",st:"done",s:"10-17",e:"10-17",note:"campaign-gps11-position-kf"},
+ {p:"Core features",n:"National characters end to end",id:"CHARS-01",st:"done",s:"11-01",e:"11-02",note:"Upstream #1249 merged"},
+ {p:"Core features",n:"Battery charge state, WX UV and wind",id:"BAT-04",st:"done",s:"11-02",e:"11-02",note:"Upstream #1250, #1251 merged"},
+ {p:"Auto Update",n:"AU-01..12 auto update, Safeboot, HTTPS, web UI",id:"AU-01",st:"done",s:"10-05",e:"10-05",note:"Feasibility through versioned images"},
+ {p:"Auto Update",n:"AU-15, AU-16 DIO bootloader, PSRAM TLS",id:"AU-16",st:"done",s:"10-17",e:"10-19",note:"campaign-au16-dio-bootloader"},
+ {p:"Auto Update",n:"AU-18 RX-deaf, AU-20 BLE pause heap",id:"AU-20",st:"done",s:"10-23",e:"10-23",note:"campaign-au18, campaign-au20"},
+ {p:"Auto Update",n:"AU-21 TFT sprite heap (Wireless Tracker)",id:"AU-21",st:"done",s:"10-23",e:"10-25",open:true,note:"Sprite fixed; S3 TLS heap floor open"},
+ {p:"Remote management and web",n:"RM1 HMAC remote management RM-01..08",id:"RM-01",st:"done",s:"10-05",e:"10-11",note:"Remote page, LED"},
+ {p:"Remote management and web",n:"Web flasher autodetect WF-01..05",id:"WF-05",st:"done",s:"10-19",e:"10-19",note:"Env name, board identity"},
+ {p:"Remote management and web",n:"Web flash TRACK, T-Beam first boot",id:"TRK-02",st:"done",s:"10-24",e:"10-24",open:true,note:"TRK-03 fixed; TRK-02 not reproduced"},
+ {p:"Remote management and web",n:"T-Deck heap and WiFi TD-21b, TD-22, TD-23",id:"TD-21b",st:"done",s:"10-25",e:"10-25",note:"WIFI-HEAP, day/night switch"},
+ {p:"Remote management and web",n:"Web login, UDP-05, HEY-UP, PF-01",id:"WEB-AUTH",st:"done",s:"10-30",e:"10-30",note:"campaign-webui-login"},
+ {p:"Mesh and LoRa",n:"Gateway RX and ACK, BL-01",id:"GWACK-01",st:"done",s:"10-23",e:"10-24",open:true,note:"Both ACK copies one id, bench 28/28; GWRX night open"},
+ {p:"Mesh and LoRa",n:"Call blocklist --blockcall",id:"BLK-01",st:"done",s:"10-24",e:"10-25",open:true,note:"Fork-key migration not benched"},
+ {p:"Mesh and LoRa",n:"TX pool",id:"TXP-01",st:"done",s:"10-24",e:"10-30",note:"campaign-tx-pool"},
+ {p:"Mesh and LoRa",n:"LRF ping/beacon RX silence, logreport",id:"LRF",st:"done",s:"11-01",e:"11-01",note:"Upstream #1247 merged 11-02"},
+ {p:"Pin control GPIO-01",n:"GPIO-01 W0-W5: pin table, policy, Pins page, RM1 pins/gpio",id:"GPIO-01",st:"done",s:"11-07",e:"11-07",note:"Host gate green, all build targets green"},
+ {p:"Pin control GPIO-01",n:"Follow-ups GPIO-02..04, web GPIO switch, button GPIO 0",id:"GPIO-01",st:"run",s:"11-07",e:"11-08",note:"On the bench (DK5EN-1); not released"},
+ {p:"Releases",n:"v4.40a.10.02",id:"",st:"rel",s:"10-02",e:"10-02",note:"Tags v4.40a and v4.40a.10.02"},
+ {p:"Releases",n:"v4.40a.10.05, .10.06",id:"",st:"rel",s:"10-05",e:"10-05",note:"Two tags"},
+ {p:"Releases",n:"v4.40a.10.11 (first CI release)",id:"",st:"rel",s:"10-11",e:"10-11",note:"CI builds and publishes from this tag"},
+ {p:"Releases",n:"v4.40a.10.16",id:"",st:"rel",s:"10-16",e:"10-16",note:""},
+ {p:"Releases",n:"v4.40a.10.17, .10.18",id:"",st:"rel",s:"10-17",e:"10-17",note:"Two tags"},
+ {p:"Releases",n:"v4.40a.10.19 to .10.21",id:"",st:"rel",s:"10-19",e:"10-19",note:"Three tags 10-18 and 10-19"},
+ {p:"Releases",n:"v4.40a.10.22",id:"",st:"rel",s:"10-23",e:"10-23",note:""},
+ {p:"Releases",n:"v4.40a.10.23 to .10.25",id:"",st:"rel",s:"10-25",e:"10-25",note:"Three tags 10-24 and 10-25"},
+ {p:"Releases",n:"v4.40a.10.28",id:"",st:"rel",s:"10-26",e:"10-26",note:""},
+ {p:"Releases",n:"v4.40a.10.30",id:"",st:"rel",s:"10-30",e:"10-30",note:""},
+ {p:"Releases",n:"v4.40a.11.01",id:"",st:"rel",s:"11-01",e:"11-01",note:""},
+ {p:"Releases",n:"v4.40a.11.06 (latest)",id:"",st:"rel",s:"11-06",e:"11-06",note:"Fleet updated 11-07"},
+ {p:"Upstream PRs merged",n:"#1207, #1208, #1209 (TZ, MTU, escaping)",id:"",st:"rel",s:"10-12",e:"10-12",note:""},
+ {p:"Upstream PRs merged",n:"#1210 to #1212",id:"",st:"rel",s:"10-15",e:"10-15",note:""},
+ {p:"Upstream PRs merged",n:"#1213, #1214 (gw_servers, T-Deck reply)",id:"",st:"rel",s:"10-18",e:"10-18",note:""},
+ {p:"Upstream PRs merged",n:"#1215, #1219, #1224, #1225",id:"",st:"rel",s:"10-22",e:"10-22",note:"Merges 10-19 and 10-22"},
+ {p:"Upstream PRs merged",n:"#1233 to #1236 (console, GPS filter, board LED, via)",id:"",st:"rel",s:"10-24",e:"10-24",note:""},
+ {p:"Upstream PRs merged",n:"#1238, #1239 (CI auto update)",id:"",st:"rel",s:"10-25",e:"10-25",note:""},
+ {p:"Upstream PRs merged",n:"#1240, #1243 to #1245 (E290, web login)",id:"",st:"rel",s:"10-31",e:"10-31",note:""},
+ {p:"Upstream PRs merged",n:"#1246 to #1251 (LRF, characters, battery)",id:"",st:"rel",s:"11-02",e:"11-02",note:""},
+ {p:"Upstream PRs merged",n:"#1257 (store-node echo)",id:"",st:"rel",s:"11-07",e:"11-07",note:""},
+ {p:"Backlog ahead",n:"RM button pin over RM1 (decision)",id:"GPIO-05",st:"plan",s:"11-09",e:"11-11",note:"pins btn answers err blocked; keep or allow with a pull-up check"},
+ {p:"Backlog ahead",n:"T-Deck Pro pin 46 double definition",id:"GPIO-06",st:"plan",s:"11-09",e:"11-10",note:"Keyboard INT and radio enable both 46; check schematic"},
+ {p:"Backlog ahead",n:"T-Beam auto update heap",id:"AU-24",st:"plan",s:"11-10",e:"11-14",note:"Download refused (TLS low heap) after hours of uptime with BLE on"},
+ {p:"Backlog ahead",n:"GPIO-01 field test after the next release",id:"GPIO-07",st:"plan",s:"11-14",e:"11-21",note:"Never run on hardware by decision; OMs test in the field"},
+ {p:"Backlog ahead",n:"Heltec V4 GNSS fix (W0-W3, upstream PR)",id:"GPSV4-01",st:"plan",s:"11-16",e:"11-27",note:"UART swapped, GNSS never powered, I2C on GNSS lines"},
+ {p:"Backlog ahead",n:"AU download watchdog reboot",id:"AU-14",st:"plan",s:"11-17",e:"11-20",note:"Classic ESP32 reboot in download, cause unknown"},
+ {p:"Backlog ahead",n:"E22 NVS-full RM password store",id:"RM-NVS-01",st:"plan",s:"11-18",e:"11-20",note:"Waiting for reporter --info and log"},
+ {p:"Backlog ahead",n:"T-Deck light/dark theme",id:"TD-THEME-01",st:"plan",s:"11-23",e:"11-30",note:"--theme dark|light|auto, web palette, logo on boot screen"},
+ {p:"Backlog ahead",n:"Gateway RX count-mode night on DK5EN-98",id:"GWRX-01",st:"plan",s:"11-24",e:"11-26",note:"Needs operator OK"},
+ {p:"Backlog ahead",n:"Boot screen version text",id:"BOOT-01",st:"plan",s:"11-30",e:"12-02",note:"Boot screen still says MeshCom 4.0"},
+ {p:"Backlog ahead",n:"CSMA slot sizing and CAD measurement",id:"CSMA-02",st:"plan",s:"12-01",e:"12-06",note:"CSMA-02/03/04"},
+ {p:"Backlog ahead",n:"gzip static web assets follow-up",id:"WEB-GZ-01",st:"plan",s:"12-02",e:"12-04",note:""},
+ {p:"Backlog ahead",n:"Parallel local board builds",id:"BUILD-PAR-01",st:"plan",s:"12-05",e:"12-08",note:"APFS clone of the package store per worker"},
+ {p:"Backlog ahead",n:"nRF52 BLE OTA update",id:"NRF-BLEDFU",st:"plan",s:"12-07",e:"12-12",note:"Update without USB via the Nordic app"},
+ {p:"Backlog ahead",n:"Extended RM commands",id:"RM-EXT",st:"plan",s:"12-07",e:"12-11",note:""},
+ {p:"Backlog ahead",n:"EmComm proposals DJ8MEH",id:"EMCOMM-SYN",st:"plan",s:"12-09",e:"12-13",note:"13 items rated: 5 green, 5 yellow, 3 red"},
+];
+
+const D = s => Date.UTC(2026, +s.slice(0, 2) - 1, +s.slice(3, 5));
+const DAY = 864e5;
+const t0 = D("09-01"), t1 = D("12-16"), NOW = D("11-07");
+const phases = [];
+for (const r of rows) { let ph = phases.find(p => p.name === r.p); if (!ph) phases.push(ph = { name: r.p, rows: [] }); ph.rows.push(r); }
+for (const ph of phases) ph.rows.sort((a, b) => D(a.s) - D(b.s));
+document.getElementById("kf-ahead").textContent = rows.filter(r => r.st === "plan").length;
+
+const tbody = document.querySelector("#tbl tbody");
+const LAB = { done: "Done", run: "Running", plan: "Ahead (estimate)", rel: "Done" };
+for (const ph of phases) for (const r of ph.rows) {
+  const tr = document.createElement("tr");
+  [ph.name, r.n, r.id, LAB[r.st] + (r.open ? ", open leftovers" : ""), "2026-" + r.s, "2026-" + r.e, r.note].forEach(v => { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); });
+  tbody.appendChild(tr);
+}
+
+const NS = "http://www.w3.org/2000/svg";
+const el = (n, a, p) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function draw() {
+  const host = document.getElementById("chart");
+  host.querySelector("svg")?.remove();
+  const W = Math.max(1000, host.clientWidth), LW = 330, x0 = LW + 8, x1 = W - 16;
+  const rowH = 20, phaseH = 24, top = 40;
+  const H = top + phases.reduce((a, p) => a + phaseH + p.rows.length * rowH, 0) + 10;
+  const X = t => x0 + (t - t0) / (t1 - t0) * (x1 - x0);
+  const svg = el("svg", { width: W, height: H, role: "img", "aria-label": "Gantt chart of the fork campaigns from September 2026" });
+  host.appendChild(svg);
+  const cs = getComputedStyle(document.documentElement), C = k => cs.getPropertyValue(k).trim();
+  const defs = el("defs", {}, svg);
+  const pat = el("pattern", { id: "stripes", width: 7, height: 7, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, defs);
+  el("rect", { width: 7, height: 7, fill: C("--run") }, pat);
+  el("rect", { width: 3, height: 7, fill: C("--surface"), "fill-opacity": 0.45 }, pat);
+
+  const ax = el("g", { class: "axis" }, svg);
+  for (let t = t0; t <= t1; t += DAY) {
+    const d = new Date(t);
+    if (d.getUTCDate() === 1) {
+      el("line", { x1: X(t), x2: X(t), y1: 6, y2: H, class: "gridline" }, ax);
+      el("text", { x: X(t) + 4, y: 14, class: "month" }, ax).textContent = MONTHS[d.getUTCMonth()] + " 2026";
+    }
+    if (d.getUTCDay() === 1) {
+      el("line", { x1: X(t), x2: X(t), y1: 22, y2: H, class: "gridline", "stroke-opacity": 0.5 }, ax);
+      el("text", { x: X(t) + 2, y: 32 }, ax).textContent = d.getUTCDate();
+    }
+  }
+
+  const tip = document.getElementById("tip");
+  let y = top;
+  for (const ph of phases) {
+    el("rect", { x: 0, y, width: W, height: phaseH, class: "phasebg" }, svg);
+    el("text", { x: 6, y: y + 16, class: "lbl phase" }, svg).textContent = ph.name;
+    y += phaseH;
+    for (const r of ph.rows) {
+      const lab = el("text", { x: 14, y: y + 14, class: "lbl" }, svg);
+      const max = r.id ? 36 : 46; lab.textContent = r.n.length > max ? r.n.slice(0, max - 1) + "…" : r.n;
+      if (r.id) el("text", { x: LW, y: y + 14, class: "lbl id", "text-anchor": "end" }, svg).textContent = r.id;
+      const xs = X(D(r.s)), xe = X(D(r.e) + DAY), cy = y + rowH / 2;
+      let shape;
+      if (r.st === "rel") {
+        const c = (xs + xe) / 2, k = 5;
+        shape = el("path", { d: `M${c} ${cy - k}L${c + k} ${cy}L${c} ${cy + k}L${c - k} ${cy}Z`, fill: C("--rel") }, svg);
+      } else {
+        const a = { x: xs, y: y + 4, width: Math.max(4, xe - xs), height: rowH - 8, rx: 3 };
+        if (r.st === "done") a.fill = C("--done");
+        else if (r.st === "run") a.fill = "url(#stripes)";
+        else { a.fill = "none"; a.stroke = C("--plan"); a["stroke-width"] = 1.5; a["stroke-dasharray"] = "4 3"; }
+        shape = el("rect", a, svg);
+        if (r.open) el("circle", { cx: xe + 5, cy, r: 2.5, fill: C("--now") }, svg);
+      }
+      const hit = el("rect", { x: 0, y, width: W, height: rowH, fill: "transparent" }, svg);
+      hit.addEventListener("mousemove", ev => {
+        tip.style.display = "block";
+        tip.innerHTML = "";
+        const b = document.createElement("b"); b.textContent = r.n + (r.id ? " (" + r.id + ")" : ""); tip.appendChild(b);
+        tip.appendChild(document.createTextNode((r.s === r.e ? "2026-" + r.s : "2026-" + r.s + " to " + r.e) + " · " + LAB[r.st] + (r.open ? ", open leftovers" : "") + (r.note ? " · " + r.note : "")));
+        const hb = host.getBoundingClientRect();
+        tip.style.left = Math.min(ev.clientX - hb.left + 12, hb.width - 370) + "px";
+        tip.style.top = (ev.clientY - hb.top + 14) + "px";
+      });
+      hit.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+      y += rowH;
+    }
+  }
+  el("line", { x1: X(NOW + DAY / 2), x2: X(NOW + DAY / 2), y1: 20, y2: H, stroke: C("--now"), "stroke-width": 2 }, svg);
+  el("text", { x: X(NOW + DAY / 2) + 4, y: 14, fill: C("--now"), "font-size": 11 }, svg).textContent = "today";
+}
+draw();
+addEventListener("resize", draw);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+</script>
+</body>
+</html>
