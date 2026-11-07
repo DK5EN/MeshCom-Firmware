@@ -2,7 +2,7 @@
 
 **Plan for the next firmware batch, after the current release. Nothing here changes the frozen firmware `86fb4a7a`.** The operator took all five decisions on 2026-11-06. It runs as six waves and ends in one CI build, one bench sitting and an overnight soak.
 
-Status 2026-11-06: planned and decided, not started. Backlog item `GPIO-01`.
+Status 2026-11-07: in implementation, see [campaign-gpio-01-20261107.md](campaign-gpio-01-20261107.md). Backlog item `GPIO-01`. Operator change 2026-11-07: no bench sitting and no soak; OMs test it in the field. The W6 bench steps below are therefore not run.
 
 ## Key facts
 
