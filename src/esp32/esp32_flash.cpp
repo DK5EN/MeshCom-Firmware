@@ -297,7 +297,9 @@ bool sanitize_loaded_settings(void)
             const int was = *r.field;
             if(r.fn == PIN_FN_ANALOG && was >= 99) continue;   // 99 = unset
             if(r.fn == PIN_FN_BUTTON && was == 99) continue;   // 99 = no button
-            const int now = pinRepairLoaded(pinBoardContext(r.fn), was, pinBoardDefault(r.fn));
+            // pinRepairLoaded() keeps the 0 = no default sentinel; pinBoardDefault() returns -1 for none (never store it)
+            const int bd = pinBoardDefault(r.fn);
+            const int now = pinRepairLoaded(pinBoardContext(r.fn), was, bd < 0 ? 0 : bd);
             if(now != was)
             {
                 *r.field = now;

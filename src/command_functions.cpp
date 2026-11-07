@@ -453,6 +453,9 @@ static void storeApplyMode(enum MsgStoreMode newMode)
 // ---------------------------------------------------------------------------
 
 static void tg_post_setlog_off() { memset(LogCallsign, 0x00, sizeof(LogCallsign)); }
+// pinCanAssign()/pinRepairLoaded() (src/pin_policy.h) still take the 0 = "no default" sentinel; pinBoardDefault() now
+// returns -1 for none (0 is a real GPIO). Keep their behaviour: hand them the old value, never -1.
+static inline int pinBoardDefaultLegacy(PinFunc f) { const int d = pinBoardDefault(f); return d < 0 ? 0 : d; }
 // GPIO-01 Part B: function wins. A pin that gets assigned / enabled for 1-Wire, button, analog or anemometer is
 // released from --gpio control first (pinMode INPUT, state dropped). Nothing on nRF52.
 static void gpioFnWins(PinFunc f)
@@ -460,9 +463,9 @@ static void gpioFnWins(PinFunc f)
 #if defined(ESP32)
     // the stored pin and the one in use now (the button pin is read at boot, they differ until a restart)
     const int p = pinBoardEffective(f);
-    if(p > 0) gpioCtlReleasePin(p);
+    if(p >= 0) gpioCtlReleasePin(p);   // -1 = none, 0 is GPIO 0
     const int u = pinBoardInUse(f);
-    if(u > 0 && u != p) gpioCtlReleasePin(u);
+    if(u >= 0 && u != p) gpioCtlReleasePin(u);
 #else
     (void)f;
 #endif
@@ -534,7 +537,7 @@ static void tg_post_uv_off() { ltr390End(); ltr390_found = false; }
 static bool pinSetterRefuses(PinFunc f, const char *fn, int pin)
 {
     if(f == PIN_FN_BUTTON && pin == 99) return false;
-    if(pinCanAssign(pinBoardContext(f), f, pin, pinBoardDefault(f))) return false;
+    if(pinCanAssign(pinBoardContext(f), f, pin, pinBoardDefaultLegacy(f))) return false;
     printfdeb("%s gpio %i refused: %s\n", fn, pin, pinClassName(pinClassify(pinBoardContext(f), pin)));
     return true;
 }
@@ -546,7 +549,7 @@ static bool pinSetterRefuses(PinFunc f, const char *fn, int pin)
 // the chip does not have, strapping, claimed and (no pull-up) input-only pins. Pin 0 = off is always accepted.
 bool wxWindPinOk(int pin)
 {
-    return pinCanAssign(pinBoardContext(PIN_FN_WIND), PIN_FN_WIND, pin, pinBoardDefault(PIN_FN_WIND));
+    return pinCanAssign(pinBoardContext(PIN_FN_WIND), PIN_FN_WIND, pin, pinBoardDefaultLegacy(PIN_FN_WIND));
 }
 static void tg_post_wind_on()
 {

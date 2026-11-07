@@ -508,6 +508,23 @@ static void test_assign_mask_setter_refusals(void)
     TEST_ASSERT_EQUAL_UINT64(pinAssignMask(c, PIN_FN_ONEWIRE, 17) & ~7ULL, ow);   // only those bits differ
 }
 
+static void test_assign_def_eff_minus_one_is_none_zero_is_gpio0(void)
+{
+    PinAssignIn in;
+    memset(&in, 0, sizeof(in));
+    in.chip = PIN_CHIP_ESP32;
+    in.fn[PIN_FN_ONEWIRE].def = -1;
+    in.fn[PIN_FN_ONEWIRE].eff = -1;
+    in.fn[PIN_FN_BUTTON].def = 0;   // GPIO 0 button (13 variants)
+    in.fn[PIN_FN_BUTTON].eff = 0;
+    in.fn[PIN_FN_ANALOG].pin = -5;  // stored values stay clamped to 0
+    char buf[PIN_ASSIGN_JSON_MAX];
+    TEST_ASSERT_TRUE(pinAssignJson(in, buf, sizeof(buf)) > 0);
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"id\":\"ow\",\"param\":\"onewiregpio\",\"avail\":0,\"pin\":0,\"def\":-1,\"eff\":-1,"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"id\":\"btn\",\"param\":\"buttongpio\",\"avail\":0,\"pin\":0,\"def\":0,\"eff\":0,"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"id\":\"an\",\"param\":\"angpio\",\"avail\":0,\"pin\":0,"));
+}
+
 static void test_assign_worst_case_fits_max(void)
 {
     PinAssignIn in = assignBase();
@@ -648,6 +665,7 @@ int main(int, char **)
     RUN_TEST(test_assign_mask_from_policy);
     RUN_TEST(test_assign_mask_default_exemption);
     RUN_TEST(test_assign_mask_setter_refusals);
+    RUN_TEST(test_assign_def_eff_minus_one_is_none_zero_is_gpio0);
     RUN_TEST(test_assign_worst_case_fits_max);
     RUN_TEST(test_assign_buffer_limit);
     RUN_TEST(test_gpio_status_avail_zero_is_empty_doc);

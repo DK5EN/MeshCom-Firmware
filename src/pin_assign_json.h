@@ -12,9 +12,9 @@
  *  avail    0 = this build cannot change the assignment (function not compiled in, or read-only on the board): the page
  *           shows "not on this board" and offers no input.
  *  pin      stored setting (0 = board default; button 99 = no button; analog 99 = unset reads as 0).
- *  def      board default (0 = none; the anemometer has none).
- *  eff      pin in use, 0 = none: the stored pin, or the default when the stored one is 0; the button reports the pin read
- *           at boot (a new setting only counts after a restart), 0 when it is 99 = no button.
+ *  def      board default (-1 = none, 0 is GPIO 0; the anemometer has none).
+ *  eff      pin in use, -1 = none (0 is GPIO 0): the stored pin, or the default when the stored one is 0; the button reports the pin read
+ *           at boot (a new setting only counts after a restart), -1 when it is 99 = no button.
  *  on       the function is switched on (bONEWIRE, bButtonCheck, bAnalogCheck, bWINDON).
  *  restart  a change takes effect only after a reboot (button); the others apply at once.
  *  ok       64-bit mask as hex text (a JS number cannot hold 64 bits): bit n set = the setter accepts pin n for this
@@ -22,7 +22,7 @@
  *           Bit 0 (= default / off) is set unless the setter refuses 0 (analog; 1-Wire on BOARD_RAK4630 also 1 and 2).
  *           The button's 99 = "no button" cannot be a bit: the setter accepts it always, the page knows it. The page uses
  *           the mask to refuse a pin before asking the node; the node's own answer stays authoritative.
- * Numbers are clamped to 0..255 (a negative or huge stored value prints as 0 / 255), so the size is fixed per entry.
+ * Numbers are clamped to 0..255 (a negative or huge stored value prints as 0 / 255; def / eff print any negative as -1), so the size is fixed per entry.
  *
  * The result is NUL-terminated and complete, or the buffer is left empty and 0 is returned (never half a document).
  */
@@ -120,6 +120,13 @@ struct Out
         while (k)
             put(t[--k]);
     }
+    void snum(int v)   // def / eff: -1 = no pin (0 is a real GPIO)
+    {
+        if (v < 0)
+            puts("-1");
+        else
+            num(v);
+    }
     void mask(uint64_t m)
     {
         static const char H[] = "0123456789abcdef";
@@ -155,9 +162,9 @@ inline size_t pinAssignJson(const PinAssignIn &in, char *buf, size_t len)
         o.puts(",\"pin\":");
         o.num(f.pin);
         o.puts(",\"def\":");
-        o.num(f.def);
+        o.snum(f.def);
         o.puts(",\"eff\":");
-        o.num(f.eff);
+        o.snum(f.eff);
         o.puts(",\"on\":");
         o.put(f.on ? '1' : '0');
         o.puts(",\"restart\":");

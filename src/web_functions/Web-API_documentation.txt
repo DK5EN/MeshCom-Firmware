@@ -303,9 +303,9 @@ GET /pinassign
 	param		the /setparam/ name that writes the assignment (the Setup page uses the same)
 	avail		0 = this build cannot change it (function not compiled in, or read-only on the board)
 	pin		stored setting, 0 = board default (button: 99 = no button; analog: 99 = unset reads as 0)
-	def		board default, 0 = no pin (the board has no default; the anemometer never has one)
-	eff		pin in use, 0 = no pin (board has no default and none stored): the stored pin, or the default when the stored one is 0. The button reports the pin read
-			at boot (a newly stored value counts after a restart), 0 when it is 99 = no button
+	def		board default, -1 = no pin (0 is GPIO 0; the board has no default; the anemometer never has one)
+	eff		pin in use, -1 = no pin (0 is GPIO 0; board has no default and none stored): the stored pin, or the default when the stored one is 0. The button reports the pin read
+			at boot (a newly stored value counts after a restart), -1 when it is 99 = no button
 	on		the function is switched on
 	restart		1 = a change takes effect after a restart (button); 0 = applies at once (1-Wire, analog, anemometer)
 	ok		64-bit mask as hex text: bit n set = the setter accepts pin n for this function now (pin policy, minus the pins

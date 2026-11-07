@@ -448,10 +448,11 @@ bool pinBoardOctal()
 #endif
 }
 
-// Board default pin of a function; 0 = none. Wind has no default.
+// Board default pin of a function; -1 = none (0 is a real GPIO: BUTTON_PIN 0 on 13 variants). Wind has no default.
+// 1-Wire / analog: a macro of 0 or below (OneWire_GPIO -1) means no default.
 int pinBoardDefault(PinFunc f)
 {
-    int d = 0;
+    int d = -1;
     switch (f)
     {
     case PIN_FN_ONEWIRE:
@@ -471,10 +472,11 @@ int pinBoardDefault(PinFunc f)
         break;
     default: break;
     }
-    return d > 0 ? d : 0;
+    if (f != PIN_FN_BUTTON && d <= 0) return -1;
+    return d >= 0 ? d : -1;
 }
 
-// Effective pin of a function (a setting of 0 / unset means the board default), 0 = none.
+// Effective pin of a function (a setting of 0 / unset means the board default), -1 = none.
 int pinBoardEffective(PinFunc f)
 {
     int v = 0;
@@ -489,10 +491,11 @@ int pinBoardEffective(PinFunc f)
     default: break;
     }
     if (f == PIN_FN_ANALOG && v >= 99) v = 0;   // 99 = unset
-    if (f == PIN_FN_BUTTON && v >= 99) return 0; // 99 = no button (not the board default)
+    if (f == PIN_FN_BUTTON && v >= 99) return -1; // 99 = no button (not the board default)
 #if defined(BOARD_TBEAM)
     if (f == PIN_FN_ONEWIRE && v == 16) v = 0;  // onewire_functions.cpp: stored 16 -> 0 -> OneWire_GPIO
 #endif
+    if (f == PIN_FN_WIND) return v > 0 ? v : -1; // wind: 0 = off, no default
     if (v <= 0) v = pinBoardDefault(f);
     return v;
 }
@@ -501,7 +504,7 @@ int pinBoardEffective(PinFunc f)
 // (esp32_main.cpp / nrf52_main.cpp -> iButtonPin), so until a restart a newly stored value is not in use yet.
 int pinBoardInUse(PinFunc f)
 {
-    if (f == PIN_FN_BUTTON) return iButtonPin >= 99 ? 0 : (int)iButtonPin;
+    if (f == PIN_FN_BUTTON) return iButtonPin >= 99 ? -1 : (int)iButtonPin; // 0 is GPIO 0
     return pinBoardEffective(f);
 }
 
@@ -513,10 +516,10 @@ uint64_t pinBoardClaimed(PinFunc except)
     if (except != PIN_FN_BUTTON && bButtonCheck)
     {
         // the stored pin AND the one OneButton reads right now (they differ after --button gpio until a restart);
-        // pinBit() is 0 for a negative or out-of-range pin, and pin 0 means "none" for the in-use value
+        // pinBit() is 0 for a negative or out-of-range pin; -1 = none, 0 is GPIO 0
         m |= pinBit(pinBoardEffective(PIN_FN_BUTTON));
         const int inUse = pinBoardInUse(PIN_FN_BUTTON);
-        if (inUse > 0) m |= pinBit(inUse);
+        if (inUse >= 0) m |= pinBit(inUse);
     }
     if (except != PIN_FN_ANALOG && bAnalogCheck) m |= pinBit(pinBoardEffective(PIN_FN_ANALOG));
 #if defined(ESP32)

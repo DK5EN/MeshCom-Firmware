@@ -346,7 +346,7 @@ werden verworfen und nicht weitergeleitet; die Liste ist ab Werk leer).
 **`pins`** - Pin-Zuordnung der Funktionen 1-Wire (`ow`), Taste (`btn`), Analog (`an`) und Windmesser (`wind`).
 
 - `pins` (lesen): `ok ow=<n> btn=<n> an=<n> wind=<n>`, dezimal, je der wirksame Pin (`0` = kein Pin, die Platine hat keinen
-  Standardpin). Platinen ohne Windmesser (nRF52) melden `wind=0`; ohne Analog-Pin `an=0`, ohne 1-Wire-Pin `ow=0`. Längste Antwort 26 Zeichen.
+  Standardpin). `btn=0` kann auch GPIO 0 bedeuten, auf Platinen, deren Taste an GPIO 0 hängt. Platinen ohne Windmesser (nRF52) melden `wind=0`; ohne Analog-Pin `an=0`, ohne 1-Wire-Pin `ow=0`. Längste Antwort 26 Zeichen.
 - `pins <ow|an|wind> <n>` (schreiben, `n` 0..48, ohne führende Null): setzt genau eine Zuordnung über denselben
   Konsolen-Setter wie `--onewire gpio`, `--analog gpio`, `--windpin`; dessen Prüfung (Pin zulässig, nicht belegt)
   gilt unverändert. `n` = 0 setzt die Platinen-Vorgabe (`wind`: aus); `an` lehnt 0 ab, `ow` auf dem RAK4630 lehnt 0 bis 2 ab (`err refused`). Antwort wie beim Lesen, mit dem
@@ -692,7 +692,7 @@ list is empty by default).
 **`pins`** - pin assignment of the functions 1-Wire (`ow`), button (`btn`), analog (`an`) and anemometer (`wind`).
 
 - `pins` (read): `ok ow=<n> btn=<n> an=<n> wind=<n>`, decimal, each the effective pin (`0` = no pin, the board has no
-  default pin). Boards without the anemometer (nRF52) report `wind=0`; without an analog pin `an=0`, without a 1-Wire
+  default pin). `btn=0` can also mean GPIO 0 on boards whose button is GPIO 0. Boards without the anemometer (nRF52) report `wind=0`; without an analog pin `an=0`, without a 1-Wire
   pin `ow=0`. Longest reply 26 characters.
 - `pins <ow|an|wind> <n>` (write, `n` 0..48, no leading zero): sets exactly one assignment through the same
   console setter as `--onewire gpio`, `--analog gpio`, `--windpin`; its check (pin allowed, not in use) applies

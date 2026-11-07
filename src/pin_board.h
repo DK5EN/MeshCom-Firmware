@@ -14,9 +14,9 @@ uint64_t pinBoardReservedSoft();
 PinChip pinBoardChip();
 // octal PSRAM/flash takes GPIO 33-37 on the S3
 bool pinBoardOctal();
-// Board default pin of a function, 0 = none (the anemometer has none).
+// Board default pin of a function, -1 = none (0 is a real GPIO) (the anemometer has none).
 int pinBoardDefault(PinFunc f);
-// Effective pin from the stored setting (0 / unset = board default; analog and button 99 = unset / no button -> 0 = none).
+// Effective pin from the stored setting (0 / unset = board default; analog and button 99 = unset / no button -> -1 = none).
 int pinBoardEffective(PinFunc f);
 // The pin a function uses right now: the button pin is read once at boot (iButtonPin), the others follow the setting.
 int pinBoardInUse(PinFunc f);

@@ -2251,7 +2251,7 @@ static void test_windpin_windcal_rungs_validate_and_store()
 static void test_pin_setters_ask_the_policy_and_restore()
 {
     const std::string cmd = read_repo_file("src/command_functions.cpp");
-    TEST_ASSERT_TRUE_MESSAGE(cmd.find("pinCanAssign(pinBoardContext(f), f, pin, pinBoardDefault(f))") != std::string::npos, "helper does not ask the policy");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("pinCanAssign(pinBoardContext(f), f, pin, pinBoardDefaultLegacy(f))") != std::string::npos, "helper does not ask the policy");
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("%s gpio %i refused: %s") != std::string::npos, "no refusal line");
     struct Rung { const char *key; const char *call; const char *restore; };
     const std::vector<Rung> rungs = {
@@ -2332,6 +2332,25 @@ static void test_gpio_exact_tokens_and_button_release()
     const std::string fw = slice_body(src, "static void gpioFnWins(PinFunc f)", "no gpioFnWins");
     TEST_ASSERT_TRUE_MESSAGE(fw.find("pinBoardInUse(f)") != std::string::npos, "gpioFnWins does not release the in-use pin");
     TEST_ASSERT_TRUE_MESSAGE(fw.find("pinBoardEffective(f)") != std::string::npos, "gpioFnWins does not release the stored pin");
+}
+
+// GPIO 0 is a real pin (BUTTON_PIN 0 on 13 variants): "no pin" is -1 in the runtime helpers of src/pin_board.cpp. pin_board.cpp
+// is not host-built, so pin the source: the old 0 = none returns must not come back, nor the claim skip for pin 0.
+static void test_pin_board_none_is_minus_one_gpio0_is_a_pin()
+{
+    const std::string src = read_repo_file("src/pin_board.cpp");
+    const std::string d = slice_body(src, "int pinBoardDefault(PinFunc f)", "no pinBoardDefault");
+    TEST_ASSERT_TRUE_MESSAGE(d.find("d > 0 ? d : 0") == std::string::npos, "pinBoardDefault maps GPIO 0 to none again");
+    TEST_ASSERT_TRUE_MESSAGE(d.find("int d = -1;") != std::string::npos, "pinBoardDefault does not start at -1 = none");
+    const std::string u = slice_body(src, "int pinBoardInUse(PinFunc f)", "no pinBoardInUse");
+    TEST_ASSERT_TRUE_MESSAGE(u.find("iButtonPin >= 99 ? -1 :") != std::string::npos, "pinBoardInUse: 99 is not -1");
+    TEST_ASSERT_TRUE_MESSAGE(u.find(">= 99 ? 0") == std::string::npos, "pinBoardInUse still returns 0 for no button");
+    const std::string e = slice_body(src, "int pinBoardEffective(PinFunc f)", "no pinBoardEffective");
+    TEST_ASSERT_TRUE_MESSAGE(e.find("v >= 99) return -1;") != std::string::npos, "pinBoardEffective: button 99 is not -1");
+    const std::string cl = slice_body(src, "uint64_t pinBoardClaimed(PinFunc except)", "no pinBoardClaimed");
+    TEST_ASSERT_TRUE_MESSAGE(cl.find("inUse >= 0") != std::string::npos && cl.find("inUse > 0") == std::string::npos, "pinBoardClaimed skips GPIO 0 of the button");
+    const std::string cf = read_repo_file("src/command_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(cf.find("pinCanAssign(pinBoardContext(f), f, pin, pinBoardDefault(f))") == std::string::npos, "pinCanAssign gets -1 as boardDefault");
 }
 
 // GPIO-02: --button gpio <n> only stores the pin; OneButton reads iButtonPin once at boot, so the setter must neither
@@ -2513,6 +2532,7 @@ int main(int, char **)
     RUN_TEST(test_bat04_ble_is2_register);
     RUN_TEST(test_lrf_w1_advisor_rework_pins);
     RUN_TEST(test_shed_is_gated_staged_and_polled);
+    RUN_TEST(test_pin_board_none_is_minus_one_gpio0_is_a_pin);
     RUN_TEST(test_guard_chain_announces_the_check_result_before_the_download);
     return UNITY_END();
 }

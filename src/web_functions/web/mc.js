@@ -308,8 +308,8 @@ if(!f.avail){r.inp.value='';r.inp.disabled=true;r.sb.hidden=true;r.def.textConte
 r.inp.disabled=false;r.sb.hidden=false;
 var un=f.id=='an'&&(f.pin==0||f.pin>=99);r.inp.placeholder=un?'unset':'';
 if(!r.inp.getAttribute('data-dirty')&&document.activeElement!==r.inp)r.inp.value=un?'':f.pin;
-r.def.textContent=f.def?f.def:'none';
-r.eff.textContent=f.eff?f.eff:'none';
+r.def.textContent=f.def>=0?f.def:'none';
+r.eff.textContent=f.eff>=0?f.eff:'none';
 r.note.textContent=(f.on?'on':'off')+', '+(f.restart?'a change applies after a restart':'a change applies at once');
 // 0 only where the setter takes it; 99 only for the button
 var h=[];if(pnPinOk(f.ok,0,f.id))h.push(f.id=='wind'?'0 = off':'0 = board default');if(f.id=='btn')h.push('99 = no button');

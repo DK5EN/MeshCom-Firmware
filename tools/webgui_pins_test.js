@@ -488,6 +488,15 @@ const grows = () => w.document.querySelectorAll('#pn_gpio_body tr');
   assignFail = null; pinAssign = freshAssign();
   w.loadPage('info', $('navinfo'), true); await settle();
 
+  // GPIO 0 is a real pin (13 boards have their button there): def / eff 0 shows "0", -1 shows "none"
+  pinAssign.fn[1].def = 0; pinAssign.fn[1].eff = 0; pinAssign.fn[0].def = -1; pinAssign.fn[0].eff = -1;
+  w.loadPage('info', $('navinfo'), true); await settle();
+  w.loadPage('pins', $('navpins'), true); await settle();
+  check('assign: button default 0 / in use 0 shows "0" (GPIO 0), not "none"', arows()[1].querySelectorAll('td')[1].textContent === '0' && arows()[1].querySelectorAll('td')[2].textContent === '0', arows()[1].querySelectorAll('td')[1].textContent + '/' + arows()[1].querySelectorAll('td')[2].textContent);
+  check('assign: def / eff -1 shows "none"', arows()[0].querySelectorAll('td')[1].textContent === 'none' && arows()[0].querySelectorAll('td')[2].textContent === 'none', arows()[0].querySelectorAll('td')[1].textContent + '/' + arows()[0].querySelectorAll('td')[2].textContent);
+  pinAssign = freshAssign();
+  w.loadPage('info', $('navinfo'), true); await settle();
+
   // ---- session expired: HTTP 401 on /pinstatus stops the polling and says why ----
   pinStatus = freshStatus();
   w.loadPage('pins', $('navpins'), true); await settle();

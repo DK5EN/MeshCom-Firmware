@@ -4472,7 +4472,7 @@ static void __attribute__((noinline)) sub_pin_assign()
         PinAssignFn &o = in.fn[i];
         o.def = pinBoardDefault(f);
         o.eff = pinBoardInUse(f);   // the button: the pin read at boot (a new setting needs a restart)
-        o.ok = pinAssignMask(pinBoardContext(f), f, o.def, pinBoardSetterRefused(f));
+        o.ok = pinAssignMask(pinBoardContext(f), f, o.def < 0 ? 0 : o.def, pinBoardSetterRefused(f));   // policy: 0 = no default
     }
     for (int i = 0; i < (int)PIN_FN_COUNT; i++)
         in.fn[i].avail = pinAssignAvail((PinFunc)i);
