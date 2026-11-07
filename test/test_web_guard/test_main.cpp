@@ -943,7 +943,7 @@ void test_setparam_gpio_needs_xmc(void)
 void test_setparam_gpio_lookalikes_are_not_gpio_params(void)
 {
     std::string without = req("GET /setparam/?gpioctl=on HTTP/1.1", {"Host: 192.168.68.71"});
-    const char *names[] = {"gpioctl", "gpio", "gpio1x", "gpiocontrol", "xgpio13", "gpio-1", "gpio 13", "GPIO13", "onewiregpio", ""};
+    const char *names[] = {"gpio", "gpio1x", "gpiocontrol", "xgpio13", "gpio-1", "gpio 13", "GPIO13", "onewiregpio", ""};
     for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++)
     {
         TEST_ASSERT_FALSE_MESSAGE(webGuardIsGpioParam(names[i]), names[i]);
@@ -952,8 +952,31 @@ void test_setparam_gpio_lookalikes_are_not_gpio_params(void)
     TEST_ASSERT_FALSE(webGuardIsGpioParam(NULL));
 }
 
+// GPIO-01 web switch (operator decision 2026-11-07): the master has exactly one web path, the name gpioctl, X-MC-gated.
+void test_setparam_gpioctl_needs_xmc(void)
+{
+    std::string with = req("GET /setparam/?gpioctl=on HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
+    std::string without = req("GET /setparam/?gpioctl=on HTTP/1.1", {"Host: 192.168.68.71"});
+    const char *vals[] = {"on", "off"};
+    for (size_t i = 0; i < 2; i++)
+    {
+        TEST_ASSERT_FALSE(webGuardSetparamAllowed("gpioctl", vals[i], without.c_str(), without.size()));
+        TEST_ASSERT_FALSE(webGuardSetparamAllowed("gpioctl", vals[i], NULL, 0));
+        TEST_ASSERT_TRUE(webGuardSetparamAllowed("gpioctl", vals[i], with.c_str(), with.size()));
+    }
+    TEST_ASSERT_TRUE(webGuardIsGpioCtlParam("gpioctl"));
+    TEST_ASSERT_FALSE(webGuardIsGpioCtlParam("gpioctl1"));
+    TEST_ASSERT_FALSE(webGuardIsGpioCtlParam("gpiocontrol"));
+    TEST_ASSERT_FALSE(webGuardIsGpioCtlParam("gpio13"));
+    TEST_ASSERT_FALSE(webGuardIsGpioCtlParam(NULL));
+    // the name does not widen the gpio<N> match, and a chained --gpiocontrol in the value is refused with X-MC
+    TEST_ASSERT_FALSE(webGuardIsGpioParam("gpioctl"));
+    TEST_ASSERT_FALSE(webGuardSetparamAllowed("gpioctl", "on --gpiocontrol on", with.c_str(), with.size()));
+    TEST_ASSERT_FALSE(webGuardSetparamAllowed("gpioctl", "x &&gpiocontrol on", with.c_str(), with.size()));
+}
+
 // GPIO-01 W4 rework: setparam values are pasted into "--<cmd> %s" and chained by commandAction(). The GPIO master
-// (--gpiocontrol) is console-only and refused in every value even with X-MC; --gpio needs X-MC like the upd tokens.
+// (--gpiocontrol) is refused as a chained command in every value even with X-MC (its only web path is the X-MC-gated gpioctl name); --gpio needs X-MC like the upd tokens.
 void test_setparam_value_chained_gpiocontrol_always_refused(void)
 {
     std::string with = req("GET /setparam/?setcall=X HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
@@ -1076,6 +1099,7 @@ int main(int, char **)
     RUN_TEST(test_setparam_update_names_need_xmc);
     RUN_TEST(test_setparam_gpio_needs_xmc);
     RUN_TEST(test_setparam_gpio_lookalikes_are_not_gpio_params);
+    RUN_TEST(test_setparam_gpioctl_needs_xmc);
     RUN_TEST(test_setparam_value_chained_gpiocontrol_always_refused);
     RUN_TEST(test_setparam_value_chained_gpio_needs_xmc);
     RUN_TEST(test_setparam_manualcommand_token_at_offset_zero);

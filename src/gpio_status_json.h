@@ -7,7 +7,7 @@
  *   {"avail":0|1,"master":0|1,"pins":[{"pin":13,"own":"","dir":"in|out|-","lvl":-1|0|1},...]}
  *
  *  avail   1 = the board offers at least one free pin and this build has gpio control (ESP32); 0 = nothing to show.
- *  master  the gpio control master switch (console --gpiocontrol on|off; no web or RM path switches it).
+ *  master  the gpio control master switch (console --gpiocontrol on|off or web /setparam/?gpioctl=on|off with X-MC; no RM path switches it).
  *  pins    ascending; every pin the board lists as free when no function claims anything.
  *  own     "" = free to switch; else the function that claims the pin right now (pinFuncName(): ow, btn, an, wind, or
  *          "led"): the page shows the owner and offers no switch.

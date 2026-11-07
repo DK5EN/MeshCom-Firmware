@@ -325,7 +325,7 @@ if(g!=pnG)return;pnAsgKnown=true;pnNone();pnGpio(g);
 });
 }
 // Free GPIO (GET /gpiostatus, src/gpio_status_json.h): chained after /pinassign, the last link of the chain (pnBusy ends here).
-// A failed answer keeps the rows. The master switch is console-only: the page only reads it. Writes: /setparam/?gpio<N>=on|off|in|release.
+// A failed answer keeps the rows. The master is switched by /setparam/?gpioctl=on|off (X-MC), the pins by /setparam/?gpio<N>=on|off|in|release.
 var pnGpOwn={ow:'1-Wire',btn:'Button',an:'Analog',wind:'Anemometer',led:'Board LED',fn:'a function'};
 var pnGpOps=['on','off','in','release'];
 function pnGpRow(pin){
@@ -348,6 +348,8 @@ var ps=j.pins||[],seen={};
 pnGpAny=!!j.avail&&ps.length>0;pnGpKnown=true;pnNone();
 var e=pnEl('pn_gpio');if(e)e.hidden=!pnGpAny;
 e=pnEl('pn_gpio_off');if(e)e.hidden=!pnGpAny||!!j.master;
+e=pnEl('pn_gpioctl');if(e)e.hidden=!j.avail;
+for(var m=0;m<2;m++){var mo=m?'on':'off',mb=pnEl('pn_gpioctl_'+mo),mon=(mo=='on')==!!j.master;if(mb){mb.setAttribute('aria-pressed',mon?'true':'false');mb.classList.toggle('mctab-on',mon);}}
 for(var i=0;i<ps.length&&pnGpAny;i++){
 var p=ps[i],r=pnGpRow(p.pin);seen[p.pin]=1;
 r.own.textContent=p.own?(pnGpOwn[p.own]||p.own):'free';
@@ -369,6 +371,7 @@ if(g!=pnG)return;pnBusy=false;pnGpKnown=true;pnNone();pnArm();
 });
 }
 function pinsLed(m){pnSet('boardled',m);}
+function pinsGpioCtl(m){pnSet('gpioctl',m);}
 function pinsChg(m){pnSet('chargeled',m=='auto'?'on':'off');}
 function pnBtn(txt,fn,cls){var b=document.createElement('button');b.type='button';b.className=cls||'mctab';b.textContent=txt;b.onclick=fn;return b;}
 // maxLength counts characters; the store takes 15 bytes, so pnCut() caps by UTF-8 bytes

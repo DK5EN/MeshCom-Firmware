@@ -831,13 +831,20 @@ inline bool webGuardIsUpdParam(const char *name)
 }
 
 // GPIO-01 Part B: the /setparam name that switches a free GPIO, "gpio" + 1 or more digits and nothing else (exact:
-// gpio, gpioctl, gpio1x, gpiocontrol are no match). The master switch (--gpiocontrol) is deliberately NOT a setparam.
+// gpio, gpioctl, gpio1x, gpiocontrol are no match).
 inline bool webGuardIsGpioParam(const char *name)
 {
     if (name == NULL || strncmp(name, "gpio", 4) != 0 || name[4] == 0) return false;
     for (const char *c = name + 4; *c; c++)
         if (*c < '0' || *c > '9') return false;
     return true;
+}
+
+// GPIO-01 web switch (operator decision 2026-11-07): the /setparam name of the free-GPIO master, exactly "gpioctl"
+// (name already lower-cased). Needs X-MC; web_setup.cpp accepts only the values on / off.
+inline bool webGuardIsGpioCtlParam(const char *name)
+{
+    return name != NULL && strcmp(name, "gpioctl") == 0;
 }
 
 // True if the text carries a chained console command whose name starts with `tok` (lower-case) after a "--" or
@@ -865,11 +872,12 @@ inline bool webGuardHasChainedCommand(const char *text, const char *tok)
 }
 
 // The decision setparam() makes (name already lower-cased, value percent-decoded). Refused ALWAYS, even with X-MC:
-// - a value that carries the chained console command --gpiocontrol: the GPIO master switch is console-only
-//   (docs/concept-gpio-pins-20261106.md), never reachable through /setparam, neither as a name nor chained.
+// - a value that carries the chained console command --gpiocontrol: the GPIO master now has exactly one web path,
+//   the X-MC-gated name gpioctl (webGuardIsGpioCtlParam, docs/concept-gpio-pins-20261106.md); it is never reachable
+//   chained through the value of another name (or of gpioctl itself).
 // X-MC is needed for
 // - the update names (webGuardIsUpdParam),
-// - the free-GPIO switch names gpio<N> (webGuardIsGpioParam), and
+// - the free-GPIO switch names gpio<N> (webGuardIsGpioParam) and the master name gpioctl (webGuardIsGpioCtlParam), and
 // - an update command or a --gpio command (prefix match "gpio": "--gpio 13 on", "--gpio13") in the value of ANY
 //   name: every setparam branch pastes the value into "--<cmd> %s" and commandAction() splits on each "--" (the web
 //   translates only a leading "&&" of manualcommand into "--", web_setup.cpp), so setcall=X%20--update%20install runs --update install too and setcall=X%20--gpio%2013%20on would
@@ -879,7 +887,8 @@ inline bool webGuardSetparamAllowed(const char *name, const char *value, const c
 {
     if (webGuardHasChainedCommand(value, "gpiocontrol"))
         return false;
-    if (!webGuardIsUpdParam(name) && !webGuardIsGpioParam(name) && !webGuardHasUpdCommand(value) &&
+    if (!webGuardIsUpdParam(name) && !webGuardIsGpioParam(name) && !webGuardIsGpioCtlParam(name) &&
+        !webGuardHasUpdCommand(value) &&
         !webGuardHasChainedCommand(value, "gpio"))
         return true;
     return webGuardHasXmc(header, len);

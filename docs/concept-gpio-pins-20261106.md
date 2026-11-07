@@ -58,6 +58,7 @@ New pure header `src/pin_policy.h`, without Arduino, host-testable. Every path a
 - **Console:** `--gpio list`, `--gpio <n> on|off`, `--gpio <n> in`, `--gpio <n> release`.
 - **Master switch:** `--gpiocontrol on|off`, default off. Off means no pin is touched at boot and every write is refused.
 - **Web:** table on the Pins page: pin, class, owner, direction, level, switch. Polling every 5 s only while the page is open, like today (`src/web_functions/web/mc.js:232`). Forbidden pins are listed with the reason, so the page explains itself.
+- **Web switch for the master (added 2026-11-07, operator decision):** `/setparam/?gpioctl=on|off`, X-MC-gated, persisted, with an off/on button pair on the Pins page. RM1 and the config import still cannot turn it on; a chained `--gpiocontrol` in any value stays refused.
 - **Web guard:** writes need `X-MC: 1` like update actions (`src/web_functions/web_guard.h:786`), so a foreign page cannot toggle a pin.
 - **RM1:** new `gpio <n> <on|off|in>`, plus `gpio` alone to read. It works only when `--gpiocontrol` is on, and a remote command cannot switch the master on.
 - **After a reboot:** every pin returns to input, because levels stay in RAM (decision 1).
@@ -98,13 +99,14 @@ Measured against the final release image, on a classic ESP32 because that is the
 
 Taken by the operator on 2026-11-06, as recommended.
 
-| #   | Question                                              | Decision                                                                                                    |
-| --- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| 1   | Do output levels survive a reboot?                    | No. A saved level on the wrong pin can stop a boot, and RAM only avoids it                                  |
-| 2   | Should RM1 switch free GPIOs at all?                  | Yes, only with the master switch on and RM1 enabled                                                         |
-| 3   | Should RM1 change pin assignments?                    | Yes, policy-checked, with a confirm step in the web RM page; button excluded over RM, W5 advisor 2026-11-07 |
-| 4   | Master switch default for free GPIOs?                 | Off. An update must not make any node's pins remotely switchable                                            |
-| 5   | Input pins: show a live level, or only the direction? | Show the level, sampled in the 5 s poll                                                                     |
+| #   | Question                                              | Decision                                                                                                      |
+| --- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 1   | Do output levels survive a reboot?                    | No. A saved level on the wrong pin can stop a boot, and RAM only avoids it                                    |
+| 2   | Should RM1 switch free GPIOs at all?                  | Yes, only with the master switch on and RM1 enabled                                                           |
+| 3   | Should RM1 change pin assignments?                    | Yes, policy-checked, with a confirm step in the web RM page; button excluded over RM, W5 advisor 2026-11-07   |
+| 4   | Master switch default for free GPIOs?                 | Off. An update must not make any node's pins remotely switchable                                              |
+| 5   | Input pins: show a live level, or only the direction? | Show the level, sampled in the 5 s poll                                                                       |
+| 6   | Web switch for the master?                            | Yes, since 2026-11-07 (operator decision): X-MC-gated `gpioctl`; RM and config import still cannot turn it on |
 
 ## Waves
 

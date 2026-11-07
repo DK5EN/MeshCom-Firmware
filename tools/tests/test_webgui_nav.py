@@ -29,8 +29,8 @@ def test_no_button_starts_inside_an_open_multi_print_button():
     assert not prev_open
 
 
-def test_remote_button_exists_after_setup_and_before_reboot():
+def test_nav_order_pins_after_wx_remote_after_position():
+    # operator decision 2026-11-07: Pins right after Weather, Remote right after Position (before MHeard)
     text = "\n".join(nav_lines())
-    i_setup = text.index("loadPage('setup',this,true)")
-    i_remote = text.index("loadPage('remote',this,true)")
-    assert i_setup < i_remote
+    i = {p: text.index("loadPage('%s',this,true)" % p) for p in ("wx", "pins", "position", "remote", "mheard", "setup")}
+    assert i["wx"] < i["pins"] < i["position"] < i["remote"] < i["mheard"] < i["setup"]

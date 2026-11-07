@@ -2371,6 +2371,26 @@ static void test_web_setup_gpio_rung_source_pins()
                              "the rung matches the value by prefix or substring");
     const size_t bad = pin_find(rung, "if(!opOk", 0, "the rung does not test the refused value");
     pin_find(rung, "WS_RETURNCODE_FAIL", bad, "the refused value does not set WS_RETURNCODE_FAIL");
+
+    // GPIO-01 web switch: the gpioctl rung (before the GPIO<N> rung) sets the master, persists, takes exactly on/off
+    const size_t cf = pin_find(web, "GPIOCTL (GPIO-01 web switch)", 0, "no GPIOCTL rung marker");
+    const std::string cr = web.substr(cf, from - cf);
+    TEST_ASSERT_TRUE_MESSAGE(cr.find("gpioCtlSetMaster(") != std::string::npos, "the gpioctl rung does not call gpioCtlSetMaster()");
+    TEST_ASSERT_TRUE_MESSAGE(cr.find("save_settings()") != std::string::npos, "the gpioctl rung does not persist");
+    TEST_ASSERT_TRUE_MESSAGE(cr.find("node_gpioctl") != std::string::npos, "the gpioctl rung does not set node_gpioctl");
+    TEST_ASSERT_TRUE_MESSAGE(cr.find("webGuardIsGpioCtlParam(") != std::string::npos, "the gpioctl rung is not keyed on the exact name");
+    TEST_ASSERT_TRUE_MESSAGE(cr.find("snprintf") == std::string::npos, "the gpioctl rung builds a string with snprintf");
+    TEST_ASSERT_TRUE_MESSAGE(cr.find("commandAction") == std::string::npos, "the gpioctl rung reaches commandAction");
+    TEST_ASSERT_TRUE_MESSAGE(cr.find("cv.equals(\"on\")") != std::string::npos && cr.find("cv.equals(\"off\")") != std::string::npos,
+                             "the gpioctl rung does not accept exactly on and off");
+    for (size_t at = cr.find("cv.equals(\""); at != std::string::npos; at = cr.find("cv.equals(\"", at + 1))
+    { // every accepted value is on or off, nothing else ("1", "true", ...)
+        const std::string tok = cr.substr(at + 11, cr.find('"', at + 11) - (at + 11));
+        TEST_ASSERT_TRUE_MESSAGE(tok == "on" || tok == "off", ("the gpioctl rung accepts another value: " + tok).c_str());
+    }
+    TEST_ASSERT_TRUE_MESSAGE(cr.find("startsWith") == std::string::npos && cr.find("indexOf") == std::string::npos,
+                             "the gpioctl rung matches the value by prefix or substring");
+    TEST_ASSERT_TRUE_MESSAGE(cr.find("WS_RETURNCODE_FAIL") != std::string::npos, "the gpioctl rung has no FAIL path");
 }
 
 

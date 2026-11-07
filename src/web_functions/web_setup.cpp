@@ -661,6 +661,29 @@ void webSetup_setParam(setupStruct *setupData){
 
         return;
     } else
+    /// ###################################### GPIOCTL (GPIO-01 web switch) ######################################
+    // Free-GPIO master: gpioctl=on|off (operator decision 2026-11-07). X-MC is required by webGuardSetparamAllowed(). Same
+    // effect as the console --gpiocontrol (setting, gpioCtlSetMaster: off releases every held pin, persisted), but no console
+    // line is built. RM and the config import still cannot set it. Any other value -> FAIL (HTTP 422).
+    if(webGuardIsGpioCtlParam(setupData->paramName.c_str())) {
+#if defined(ESP32)
+        const String &cv = setupData->paramValue;
+        if(cv.equals("on") || cv.equals("off"))
+        {
+            const bool cOn = cv.equals("on");
+            meshcom_settings.node_gpioctl = cOn ? 1 : 0;
+            gpioCtlSetMaster(cOn);
+            save_settings();
+            setupData->returnCode = WS_RETURNCODE_OKAY;
+            setupData->returnValue = cv;
+        }
+        else
+            setupData->returnCode = WS_RETURNCODE_FAIL;
+#else
+        setupData->returnCode = WS_RETURNCODE_FAIL; // no gpio control on this chip
+#endif
+        return;
+    } else
     /// ###################################### GPIO<N> (GPIO-01 Part B) ######################################
     // Free-GPIO switch: gpio<N>=on|off|in|release. X-MC is required by webGuardSetparamAllowed() before we get here. The
     // answer comes straight from gpioCtlCommand() (GpioRes), nothing is built into a console line and nothing is persisted
