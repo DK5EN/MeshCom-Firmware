@@ -2047,14 +2047,15 @@ void test_bat04_info_charge_line_pin(void)
     TEST_ASSERT_TRUE_MESSAGE(blk.find("Charge: ") != std::string::npos, "no \"Charge: \" line");
 }
 
-// body of wxWindPinOk() (from its signature to the closing brace in column 0)
-static std::string wx_wind_pin_ok_body(const std::string &cmd)
+// body of pinBoardReservedHard() / pinBoardReservedSoft() in src/pin_board.h (the reserved-pin macro lists; they
+// used to be the body of wxWindPinOk())
+static std::string pin_board_fn_body(const std::string &hdr, const char *fn)
 {
-    const size_t a = cmd.find("bool wxWindPinOk(int pin)\n{");
+    const size_t a = hdr.find(std::string("inline uint64_t ") + fn + "()\n{");
     if(a == std::string::npos) return "";
-    const size_t b = cmd.find("\n}\n", a);
+    const size_t b = hdr.find("\n}\n", a);
     if(b == std::string::npos) return "";
-    return cmd.substr(a, b - a);
+    return hdr.substr(a, b - a);
 }
 
 // Worst-case JSON size of one BLE register document, computed from the source block (no ArduinoJson in this
@@ -2100,7 +2101,7 @@ static void test_windpin_windcal_rungs_validate_and_store()
 
     const std::string pr = cmd.substr(pin, 1800);
     TEST_ASSERT_TRUE_MESSAGE(pr.find("cmdStoreInt(") != std::string::npos, "--windpin does not parse via cmdStoreInt");
-    TEST_ASSERT_TRUE_MESSAGE(pr.find("wxWindPinOk(") != std::string::npos, "--windpin does not check the reserved pins");
+    TEST_ASSERT_TRUE_MESSAGE(pr.find("pinSetterRefuses(PIN_FN_WIND") != std::string::npos, "--windpin does not ask the pin policy");
     TEST_ASSERT_TRUE_MESSAGE(pr.find("node_wind_pin") != std::string::npos, "--windpin does not store node_wind_pin");
     TEST_ASSERT_TRUE_MESSAGE(pr.find("save_settings()") != std::string::npos, "--windpin does not save");
 
@@ -2110,12 +2111,20 @@ static void test_windpin_windcal_rungs_validate_and_store()
     TEST_ASSERT_TRUE_MESSAGE(cr.find("0.1, 100.0") != std::string::npos, "--windcal range is not 0.1..100");
     TEST_ASSERT_TRUE_MESSAGE(cr.find("save_settings()") != std::string::npos, "--windcal does not save");
 
-    // pin check: the reserved list is built from the board macros and goes through wxPinAllowed
-    TEST_ASSERT_TRUE_MESSAGE(cmd.find("#include \"wx_pins.h\"") != std::string::npos, "wx_pins.h not included");
-    TEST_ASSERT_TRUE_MESSAGE(cmd.find("wxPinAllowed(") != std::string::npos, "wxPinAllowed not used");
-    // ... searched INSIDE the wxWindPinOk body only (the same text elsewhere in the file must not satisfy it)
-    const std::string body = wx_wind_pin_ok_body(cmd);
-    TEST_ASSERT_TRUE_MESSAGE(!body.empty(), "no wxWindPinOk() body");
+    // pin check: wxWindPinOk() is a thin wrapper over the policy; the reserved list is built from the board macros
+    // (src/pin_board.h) and goes through pinCanAssign
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("#include \"pin_board.h\"") != std::string::npos, "pin_board.h not included");
+    const size_t wk = cmd.find("bool wxWindPinOk(int pin)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(wk != std::string::npos, "no wxWindPinOk() body");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.substr(wk, 300).find("pinCanAssign(pinBoardContext(PIN_FN_WIND), PIN_FN_WIND") != std::string::npos, "wxWindPinOk is not the policy");
+    const std::string hdr = read_repo_file("src/pin_board.h");
+    const std::string hard = pin_board_fn_body(hdr, "pinBoardReservedHard");
+    const std::string soft = pin_board_fn_body(hdr, "pinBoardReservedSoft");
+    TEST_ASSERT_TRUE_MESSAGE(!hard.empty(), "no pinBoardReservedHard() body");
+    TEST_ASSERT_TRUE_MESSAGE(!soft.empty(), "no pinBoardReservedSoft() body");
+    const std::string body = hard + soft;
+    TEST_ASSERT_TRUE_MESSAGE(hdr.find("c.soft = pinBoardReservedSoft();") != std::string::npos, "context does not carry the soft mask");
+    TEST_ASSERT_TRUE_MESSAGE(hdr.find("c.reserved = pinBoardReservedHard();") != std::string::npos, "context does not carry the hard mask");
     for(const char *m : {"LORA_CS", "LORA_NSS", "LORA_RST", "LORA_RESET", "LORA_DIO0", "LORA_DIO1", "LORA_DIO2",
                          "SX1262X_CS", "SX1262X_IRQ", "SX1262X_RST", "SX1262X_GPIO",
                          "SX1268_CS", "SX1268_IRQ", "SX1268_RST", "SX1268_GPIO",
@@ -2131,17 +2140,33 @@ static void test_windpin_windcal_rungs_validate_and_store()
         TEST_ASSERT_TRUE_MESSAGE(body.find(std::string("#if defined(") + m + ")") != std::string::npos, m);
         TEST_ASSERT_TRUE_MESSAGE(body.find(std::string("WX_RES(") + m + ")") != std::string::npos, m);
     }
-    for(const char *m : {"SS", "SCK", "MISO", "MOSI"})   // Arduino variant constants, not macros: unguarded
-        TEST_ASSERT_TRUE_MESSAGE(body.find(std::string("WX_RES(") + m + ")") != std::string::npos, m);
-    TEST_ASSERT_TRUE_MESSAGE(body.find("defined(CONFIG_IDF_TARGET_ESP32S3)") != std::string::npos, "no S3 switch");
+    // Arduino variant constants, not macros: unguarded and SOFT only. On boards whose radio is not on the framework
+    // default SPI (T3-S3: SS 10 / SCK 12, T-ETH-Elite: SCK 12 / MISO 13) they are ordinary pins, so a stored
+    // 1-Wire/button/analog pin there must survive the load repair; new assignments are still refused.
+    for(const char *m : {"SS", "SCK", "MISO", "MOSI"})
+        TEST_ASSERT_TRUE_MESSAGE(soft.find(std::string("WX_RES(") + m + ")") != std::string::npos && hard.find(std::string("WX_RES(") + m + ")") == std::string::npos, (std::string(m) + " is not SOFT only").c_str());
+    // HARD = radio / Ethernet / SD only; SOFT = I2C, GPS, button, display reset, Vext, ADC control, battery
+    for(const char *m : {"LORA_CS", "SX1262X_CS", "RADIO_CS_PIN", "E22_NSS", "ETH_CS_PIN", "SDCARD_CS", "TDECK_SPI_SCK"})
+        TEST_ASSERT_TRUE_MESSAGE(hard.find(std::string("WX_RES(") + m + ")") != std::string::npos, (std::string(m) + " is not HARD").c_str());
+    for(const char *m : {"I2C_SDA", "I2C_SCL", "GPS_RX_PIN", "GPS_TX_PIN", "BUTTON_PIN"})
+        TEST_ASSERT_TRUE_MESSAGE(soft.find(std::string("WX_RES(") + m + ")") != std::string::npos && hard.find(std::string("WX_RES(") + m + ")") == std::string::npos, (std::string(m) + " is not SOFT only").c_str());
+    TEST_ASSERT_TRUE_MESSAGE(hdr.find("defined(CONFIG_IDF_TARGET_ESP32S3)") != std::string::npos, "no S3 switch");
     // an EMPTY macro (LORA_DIO0 on the T-Beam Supreme) or a runtime expression (SS) must still compile:
     // every entry goes through WX_RES(x) = (int)(x + 0); a bare (int)(X) cast is a syntax error for an empty X
-    TEST_ASSERT_TRUE_MESSAGE(cmd.find("#define WX_RES(x) , (int)(x + 0)") != std::string::npos, "WX_RES is not (int)(x + 0)");
+    TEST_ASSERT_TRUE_MESSAGE(hdr.find("#define WX_RES(x) , (int)(x + 0)") != std::string::npos, "WX_RES is not (int)(x + 0)");
     TEST_ASSERT_TRUE_MESSAGE(body.find("(int)(") == std::string::npos, "a reserved entry is a bare (int)(X) cast");
     // octal PSRAM/flash (GPIO 33-37) and pins the chip does not have
-    TEST_ASSERT_TRUE_MESSAGE(body.find("CONFIG_SPIRAM_MODE_OCT") != std::string::npos, "no octal-PSRAM switch");
-    TEST_ASSERT_TRUE_MESSAGE(body.find("pin < 0 || pin >= GPIO_NUM_MAX || !GPIO_IS_VALID_GPIO(pin)") != std::string::npos, "no GPIO validity check");
-    TEST_ASSERT_TRUE_MESSAGE(body.find("is_s3, octal)") != std::string::npos, "octal flag not passed to wxPinAllowed");
+    TEST_ASSERT_TRUE_MESSAGE(hdr.find("CONFIG_SPIRAM_MODE_OCT") != std::string::npos, "no octal-PSRAM switch");
+    // docs/gpio-pin-map.md section 3 classes: display reset, Vext, ADC control, battery pin
+    for(const char *m : {"PIN_DISPLAY_RST", "VEXT_CTRL", "PIN_PCB_VEXT", "ADC_CTRL", "ADC_CTRL_PIN", "BATTERY_PIN"})
+    {
+        TEST_ASSERT_TRUE_MESSAGE(soft.find(std::string("defined(") + m + ")") != std::string::npos, m);
+        TEST_ASSERT_TRUE_MESSAGE(soft.find(std::string("WX_RES(") + m + ")") != std::string::npos, m);
+    }
+    // not pin numbers in every env: RESET_OLED / VEXT_ENABLE alias Arduino constants some variants do not declare
+    // (T-Beam: RST_OLED, Vext) or are a level (VEXT_ENABLE 1 on t114 / t_echo); RST_OLED / OLED_RST are never macros
+    for(const char *m : {"WX_RES(RESET_OLED)", "WX_RES(VEXT_ENABLE)", "WX_RES(RST_OLED)", "WX_RES(OLED_RST)"})
+        TEST_ASSERT_TRUE_MESSAGE(body.find(m) == std::string::npos, m);
 
     // per board: the radio/SPI pins the variant really defines are in the reserved list (Heltec V3, T-Beam Supreme,
     // E22 S3, T-Beam 1W, T3-S3, T-ETH-Elite, ESP32 E22 DevKit, T-Beam classic is in the Arduino core's LORA_* macros)
@@ -2170,6 +2195,38 @@ static void test_windpin_windcal_rungs_validate_and_store()
     // unsupported boards: answered, nothing stored
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("windpin not supported on this board") != std::string::npos, "no unsupported answer for --windpin");
     TEST_ASSERT_TRUE_MESSAGE(cmd.find("windcal not supported on this board") != std::string::npos, "no unsupported answer for --windcal");
+}
+
+// GPIO-01 W1b: every setter that assigns one of the four pins asks the policy and restores the old value
+// (the harness does not compile command_functions.cpp, so these are source pins on the real rungs; the decision
+// itself is covered by test_pin_policy and test_wx_pins).
+static void test_pin_setters_ask_the_policy_and_restore()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("pinCanAssign(pinBoardContext(f), f, pin, pinBoardDefault(f))") != std::string::npos, "helper does not ask the policy");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("%s gpio %i refused: %s") != std::string::npos, "no refusal line");
+    struct Rung { const char *key; const char *call; const char *restore; };
+    const std::vector<Rung> rungs = {
+        {"(char*)\"onewire gpio \") == 0", "pinSetterRefuses(PIN_FN_ONEWIRE, \"onewire\"", "node_owgpio = iowold"},
+        {"(char*)\"button gpio \") == 0", "pinSetterRefuses(PIN_FN_BUTTON, \"button\"", "node_button_pin = ibt"},
+        {"(char*)\"analog gpio \") == 0", "pinSetterRefuses(PIN_FN_ANALOG, \"analog\"", "node_analog_pin = iap"},
+        {"(char*)\"windpin \") == 0", "pinSetterRefuses(PIN_FN_WIND, \"windpin\"", nullptr},
+    };
+    for(const Rung &r : rungs)
+    {
+        const size_t a = cmd.find(r.key);
+        TEST_ASSERT_TRUE_MESSAGE(a != std::string::npos, r.key);
+        const std::string blk = cmd.substr(a, 2200);
+        const size_t c = blk.find(r.call);
+        TEST_ASSERT_TRUE_MESSAGE(c != std::string::npos, r.call);
+        const size_t save = blk.find("save_settings()");
+        TEST_ASSERT_TRUE_MESSAGE(save != std::string::npos && c < save, "the policy runs after the save");
+        if(r.restore)
+        {
+            const size_t rs = blk.find(r.restore, c);
+            TEST_ASSERT_TRUE_MESSAGE(rs != std::string::npos && rs < save, r.restore);
+        }
+    }
 }
 
 // WX-01: BLE budget. UV/UVF/WIND/WINDP sit in the "S1" register document, not in "SE": SE alone is 241 of
@@ -2268,6 +2325,7 @@ int main(int, char **)
     UNITY_BEGIN();
     RUN_TEST(test_a_plain_number_parses);
     RUN_TEST(test_windpin_windcal_rungs_validate_and_store);
+    RUN_TEST(test_pin_setters_ask_the_policy_and_restore);
     RUN_TEST(test_wx_ble_keys_live_in_s1_and_fit_the_budget);
     RUN_TEST(test_wx_settings_rows_and_defaults);
     RUN_TEST(test_a_non_numeric_argument_is_zero_not_leftover);

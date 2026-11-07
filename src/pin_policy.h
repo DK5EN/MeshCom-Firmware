@@ -28,9 +28,13 @@ struct PinContext
 {
     PinChip chip;
     bool octal;
-    uint64_t reserved;            // from variant macros (firmware side)
+    uint64_t reserved;            // HARD, from variant macros: radio, its SPI bus, Ethernet, SD: busy whenever the firmware runs
+    uint64_t soft;                // SOFT, from variant macros: I2C, GPS, button, display reset, Vext, ADC control, battery:
+                                  // refused when a user SETS a pin, never repaired at load (convention while the function is off)
     uint64_t claimed;             // pins of other enabled functions (without the asker's own pin)
     const PinBoardTable *table;   // NULL: no table, no output pin
+    // every field defined, so `PinContext c;` (src/wx_pins.h, firmware, tests) never leaves `soft` uninitialised
+    PinContext() : chip(PIN_CHIP_NONE), octal(false), reserved(0), soft(0), claimed(0), table(NULL) {}
 };
 
 inline uint64_t pinBit(int pin) { return (pin < 0 || pin > 63) ? 0ULL : (1ULL << pin); }
@@ -124,7 +128,7 @@ inline PinClass pinClassify(const PinContext &c, int pin)
 {
     uint64_t bit = pinBit(pin);
     if (pin < 0 || pin > pinChipMax(c.chip) || !pinChipExists(c.chip, pin) || pinChipForbidden(c.chip, c.octal, pin) ||
-        (c.reserved & bit))
+        (c.reserved & bit) || (c.soft & bit))
         return PIN_FORBIDDEN;
     if (pinChipStrapping(c.chip, pin)) return PIN_STRAPPING;
     if (pinChipInputOnly(c.chip, pin)) return PIN_INPUT_ONLY;
@@ -143,9 +147,22 @@ inline bool pinCanAssign(const PinContext &c, PinFunc f, int pin, int boardDefau
     {
     case PIN_UNREVIEWED:
     case PIN_FREE: return true;
-    case PIN_INPUT_ONLY: return f != PIN_FN_ONEWIRE;
+    case PIN_INPUT_ONLY: return f == PIN_FN_ANALOG || f == PIN_FN_BUTTON; // 1-Wire needs an output, the anemometer a pull-up
     default: return false;
     }
+}
+
+// Load-time repair of a stored pin: only a pin that is electrically unusable (chip-forbidden, not on the chip,
+// out of range, or HARD-reserved: radio, Ethernet, SD, SPI bus) goes back to 0 = board default. SOFT pins (GPS,
+// I2C, button, Vext, battery, ...) are free while their function is off, so a stored pin there is kept (AC2).
+// Strapping, claimed, unreviewed and input-only pins stay too, so no working setup breaks.
+inline int pinRepairLoaded(const PinContext &c, int pin, int boardDefault)
+{
+    if (pin == 0 || pin == boardDefault) return pin;
+    if (pin < 0 || pin > pinChipMax(c.chip) || !pinChipExists(c.chip, pin) || pinChipForbidden(c.chip, c.octal, pin) ||
+        (c.reserved & pinBit(pin)))
+        return 0;
+    return pin;
 }
 
 inline const char *pinClassName(PinClass k)

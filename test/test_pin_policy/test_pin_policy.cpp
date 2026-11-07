@@ -6,10 +6,10 @@
 void setUp(void) {}
 void tearDown(void) {}
 
-static PinContext ctx(PinChip c, bool octal, const PinBoardTable *t, uint64_t res = 0, uint64_t cl = 0)
+static PinContext ctx(PinChip c, bool octal, const PinBoardTable *t, uint64_t res = 0, uint64_t cl = 0, uint64_t soft = 0)
 {
     PinContext x;
-    x.chip = c; x.octal = octal; x.reserved = res; x.claimed = cl; x.table = t;
+    x.chip = c; x.octal = octal; x.reserved = res; x.soft = soft; x.claimed = cl; x.table = t;
     return x;
 }
 static uint64_t B(int n) { return 1ULL << n; }
@@ -133,10 +133,69 @@ void test_assign(void)
     TEST_ASSERT_FALSE(pinCanAssign(c, PIN_FN_BUTTON, 12, 0));
     TEST_ASSERT_TRUE(pinCanAssign(c, PIN_FN_BUTTON, 34, 0));
     TEST_ASSERT_TRUE(pinCanAssign(c, PIN_FN_ANALOG, 36, 0));
-    TEST_ASSERT_TRUE(pinCanAssign(c, PIN_FN_WIND, 35, 0));
-    TEST_ASSERT_FALSE(pinCanAssign(c, PIN_FN_ONEWIRE, 34, 0));
+    TEST_ASSERT_FALSE(pinCanAssign(c, PIN_FN_WIND, 35, 0));    // anemometer needs a pull-up: input-only refused
+    TEST_ASSERT_FALSE(pinCanAssign(c, PIN_FN_ONEWIRE, 34, 0)); // 1-Wire needs an output
     TEST_ASSERT_FALSE(pinCanAssign(c, PIN_FN_BUTTON, 6, 0));
     TEST_ASSERT_TRUE(pinCanAssign(c, PIN_FN_ONEWIRE, 13, 0));
+}
+
+void test_assign_input_only(void)
+{
+    PinContext c = ctx(PIN_CHIP_ESP32, false, NULL);
+    for (int p = 34; p <= 39; p++)
+    {
+        TEST_ASSERT_TRUE(pinCanAssign(c, PIN_FN_ANALOG, p, 0));
+        TEST_ASSERT_TRUE(pinCanAssign(c, PIN_FN_BUTTON, p, 0));
+        TEST_ASSERT_FALSE(pinCanAssign(c, PIN_FN_ONEWIRE, p, 0));
+        TEST_ASSERT_FALSE(pinCanAssign(c, PIN_FN_WIND, p, 0));
+    }
+    // the board default stays assignable whatever its class
+    TEST_ASSERT_TRUE(pinCanAssign(c, PIN_FN_ONEWIRE, 36, 36));
+}
+
+void test_repair_loaded(void)
+{
+    PinContext c = ctx(PIN_CHIP_ESP32, false, NULL);
+    TEST_ASSERT_EQUAL_INT(0, pinRepairLoaded(c, 6, 0));     // SPI flash -> board default
+    TEST_ASSERT_EQUAL_INT(0, pinRepairLoaded(c, 1, 4));     // console TX
+    TEST_ASSERT_EQUAL_INT(0, pinRepairLoaded(c, 99, 0));    // not a pin of the chip
+    TEST_ASSERT_EQUAL_INT(0, pinRepairLoaded(c, 0, 4));     // 0 stays 0
+    TEST_ASSERT_EQUAL_INT(12, pinRepairLoaded(c, 12, 0));   // strapping kept
+    TEST_ASSERT_EQUAL_INT(34, pinRepairLoaded(c, 34, 0));   // input-only kept
+    TEST_ASSERT_EQUAL_INT(13, pinRepairLoaded(c, 13, 0));   // unreviewed kept
+    TEST_ASSERT_EQUAL_INT(1, pinRepairLoaded(c, 1, 1));     // equals the board default: kept
+    PinContext cl = ctx(PIN_CHIP_ESP32, false, NULL, 0, B(13));
+    TEST_ASSERT_EQUAL_INT(13, pinRepairLoaded(cl, 13, 0));  // claimed kept
+    PinContext r = ctx(PIN_CHIP_ESP32, false, NULL, B(13));
+    TEST_ASSERT_EQUAL_INT(0, pinRepairLoaded(r, 13, 0));    // radio / variant reserved -> repaired
+    PinContext s3 = ctx(PIN_CHIP_ESP32S3, true, NULL);
+    TEST_ASSERT_EQUAL_INT(0, pinRepairLoaded(s3, 35, 0));   // octal PSRAM
+    TEST_ASSERT_EQUAL_INT(46, pinRepairLoaded(s3, 46, 0));  // S3 strapping kept
+}
+
+// GPIO-01 W1b rework: HARD (radio, Ethernet, SD, SPI bus) vs SOFT (I2C, GPS, button, Vext, battery, ...) board pins.
+// Heltec V2: GPS_RX 13 / GPS_TX 12 are only a convention while GPS is off, so a stored 1-Wire pin there keeps working.
+void test_repair_soft_pin_kept(void)
+{
+    PinContext c = ctx(PIN_CHIP_ESP32, false, NULL, 0, 0, B(13) | B(12));   // soft = GPS pins
+    TEST_ASSERT_EQUAL_INT(13, pinRepairLoaded(c, 13, 0));   // stored onewire on a soft (GPS) pin is kept
+    TEST_ASSERT_EQUAL_INT(12, pinRepairLoaded(c, 12, 0));
+}
+
+void test_repair_hard_pin_reset(void)
+{
+    PinContext c = ctx(PIN_CHIP_ESP32, false, NULL, B(18), 0, B(13));       // hard = radio SCK
+    TEST_ASSERT_EQUAL_INT(0, pinRepairLoaded(c, 18, 0));    // stored onewire on a hard (radio) pin is reset to 0
+    TEST_ASSERT_EQUAL_INT(13, pinRepairLoaded(c, 13, 0));   // soft still kept in the same context
+}
+
+void test_soft_pin_refused_by_can_assign(void)
+{
+    PinContext c = ctx(PIN_CHIP_ESP32, false, NULL, 0, 0, B(13));
+    TEST_ASSERT_EQUAL(PIN_FORBIDDEN, pinClassify(c, 13));
+    for (int f = 0; f < PIN_FN_COUNT; f++) TEST_ASSERT_FALSE(pinCanAssign(c, (PinFunc)f, 13, 0));  // soft pin refused
+    TEST_ASSERT_TRUE(pinCanAssign(c, PIN_FN_ONEWIRE, 13, 13));   // the function's own board default stays assignable
+    TEST_ASSERT_TRUE(pinCanAssign(c, PIN_FN_ONEWIRE, 14, 0));
 }
 
 void test_names(void)
@@ -158,6 +217,11 @@ int main(int, char **)
     RUN_TEST(test_classify_nrf52);
     RUN_TEST(test_free_reserved_claimed);
     RUN_TEST(test_assign);
+    RUN_TEST(test_assign_input_only);
+    RUN_TEST(test_repair_loaded);
+    RUN_TEST(test_repair_soft_pin_kept);
+    RUN_TEST(test_repair_hard_pin_reset);
+    RUN_TEST(test_soft_pin_refused_by_can_assign);
     RUN_TEST(test_names);
     return UNITY_END();
 }

@@ -1,5 +1,6 @@
 // WX-01 (upstream #999): --windpin validation (src/wx_pins.h).
 #include <unity.h>
+#include <initializer_list>
 #include "wx_pins.h"
 
 void setUp(void) {}
@@ -24,7 +25,7 @@ static void test_reserved_board_pins_rejected(void)
 
 static void test_negative_reserved_entries_ignored(void)
 {
-    TEST_ASSERT_TRUE(wxPinAllowed(1, R, NR, false, false));
+    TEST_ASSERT_TRUE(wxPinAllowed(14, R, NR, false, false));
     TEST_ASSERT_FALSE(wxPinAllowed(-1, R, NR, false, false));
 }
 
@@ -32,7 +33,21 @@ static void test_flash_pins_classic(void)
 {
     for (int p = 6; p <= 11; p++) TEST_ASSERT_FALSE(wxPinAllowed(p, NULL, 0, false, false));
     TEST_ASSERT_TRUE(wxPinAllowed(26, NULL, 0, false, false));
-    TEST_ASSERT_TRUE(wxPinAllowed(12, NULL, 0, false, false));
+    // GPIO-01: 12 is a strapping pin on the classic ESP32 and is refused now (was accepted by WX-01)
+    TEST_ASSERT_FALSE(wxPinAllowed(12, NULL, 0, false, false));
+}
+
+static void test_strapping_console_and_holes(void)
+{
+    for (int p : {2, 5, 12, 15}) TEST_ASSERT_FALSE(wxPinAllowed(p, NULL, 0, false, false));   // classic strapping (0 = off)
+    TEST_ASSERT_FALSE(wxPinAllowed(1, NULL, 0, false, false));    // console UART0
+    TEST_ASSERT_FALSE(wxPinAllowed(3, NULL, 0, false, false));
+    TEST_ASSERT_FALSE(wxPinAllowed(24, NULL, 0, false, false));   // not bonded
+    for (int p : {3, 45, 46}) TEST_ASSERT_FALSE(wxPinAllowed(p, NULL, 0, true, false));       // S3 strapping
+    for (int p : {19, 20, 43, 44}) TEST_ASSERT_FALSE(wxPinAllowed(p, NULL, 0, true, false));  // S3 USB, console
+    for (int p = 22; p <= 25; p++) TEST_ASSERT_FALSE(wxPinAllowed(p, NULL, 0, true, false));  // S3 holes
+    TEST_ASSERT_TRUE(wxPinAllowed(13, NULL, 0, false, false));
+    TEST_ASSERT_TRUE(wxPinAllowed(4, NULL, 0, true, false));
 }
 
 static void test_flash_pins_s3(void)
@@ -77,6 +92,7 @@ int main(int, char **)
     RUN_TEST(test_reserved_board_pins_rejected);
     RUN_TEST(test_negative_reserved_entries_ignored);
     RUN_TEST(test_flash_pins_classic);
+    RUN_TEST(test_strapping_console_and_holes);
     RUN_TEST(test_flash_pins_s3);
     RUN_TEST(test_input_only_pins_classic_only);
     RUN_TEST(test_octal_psram_pins_s3);

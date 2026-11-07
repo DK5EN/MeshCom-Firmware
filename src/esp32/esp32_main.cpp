@@ -1135,6 +1135,7 @@ bool is_new_packet(uint8_t compBuffer[4]);     // switch if we have a packet rec
 #include "gateway_service.h"
 #include "gw_reg_runtime.h"
 #include "wx_pins.h"
+#include "pin_board.h"   // GPIO-01
 #ifdef ENABLE_LTR390
 #include "ltr390.h"
 #endif
@@ -1913,7 +1914,17 @@ void esp32setup()
     #endif
 
     #if defined(ENABLE_WIND)
-        if(bWINDON && meshcom_settings.node_wind_pin != 0 && wxWindPinOk(meshcom_settings.node_wind_pin))
+        // GPIO-01: a stored forbidden pin is repaired (esp32_flash.cpp sanitize_loaded_settings); strapping/claimed
+        // pins of an existing setup keep working, input-only pins have no pull-up for the anemometer
+        {
+            const int wp = pinRepairLoaded(pinBoardContext(PIN_FN_WIND), meshcom_settings.node_wind_pin, pinBoardDefault(PIN_FN_WIND));
+            if(wp != meshcom_settings.node_wind_pin)
+            {
+                Serial.printf("[WIND]...gpio %i forbidden on this board, reset to off\n", meshcom_settings.node_wind_pin);
+                meshcom_settings.node_wind_pin = wp;
+            }
+        }
+        if(bWINDON && pinBoardLoadedUsable(PIN_FN_WIND, meshcom_settings.node_wind_pin))
             windBegin(meshcom_settings.node_wind_pin);
     #endif
 

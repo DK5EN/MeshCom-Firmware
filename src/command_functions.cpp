@@ -161,6 +161,7 @@ extern TinyGPSPlus gps;
 #include "gw_link_status.h"   // --info ...Server line
 #include "gw_reg_runtime.h"   // --info ...REGISTRATION line
 #include "nvs_diag.h"         // --info ...NVS line
+#include "pin_board.h"        // GPIO-01: pin policy with the board context (after the variant includes)
 
 #if defined(BOARD_T5_EPAPER)
 #include <t5-epaper/t5epaper_extern.h>
@@ -512,298 +513,32 @@ static void tg_post_gps_on() { gpsInitDone = false; init_loop_function(); }
 static void tg_post_uv_on() { wxMeanReset(&wx_uv_mean); ltr390_found = ltr390Begin(); }   // fresh window on switch-on
 static void tg_post_uv_off() { ltr390End(); ltr390_found = false; }
 #endif
+// GPIO-01: every setter that assigns one of the four pins asks the policy. Prints one line and returns true
+// when the pin is refused; the caller restores the old value. 0 = board default / off always passes, 99 is the
+// documented "no button" sentinel of --button gpio.
+static bool pinSetterRefuses(PinFunc f, const char *fn, int pin)
+{
+    if(f == PIN_FN_BUTTON && pin == 99) return false;
+    if(pinCanAssign(pinBoardContext(f), f, pin, pinBoardDefault(f))) return false;
+    printfdeb("%s gpio %i refused: %s\n", fn, pin, pinClassName(pinClassify(pinBoardContext(f), pin)));
+    return true;
+}
+
 #if defined(ENABLE_WIND)
-// WX-01: pins the anemometer must not take: the radio (chip select, reset, busy, DIO/IRQ, RF switch, SPI bus),
-// ETH, SD card, I2C, GPS and button pins of the board (each macro only where the variant defines it), the
-// default SPI bus of the Arduino variant (SS/SCK/MISO/MOSI are constants there, not macros), the flash pins,
-// on the ESP32-S3 with octal PSRAM/flash GPIO 33-37, pins the chip does not have and, on the classic
-// ESP32, the input-only pins 34-39.
-// WX_RES(x) is safe for a macro that is defined EMPTY (LORA_DIO0 on the T-Beam Supreme: "+ 0" makes it 0, which
-// only reserves pin 0 = "off" anyway) and for one that is a runtime expression (SS, RST_LoRa: Arduino constants).
-#define WX_RES(x) , (int)(x + 0)
+// WX-01 / GPIO-01: may the anemometer take this pin? Thin wrapper over the pin policy (src/pin_policy.h) with the
+// board's real context (src/pin_board.h: reserved variant macros, other functions' pins, chip, octal PSRAM).
+// Refused: radio/ETH/SD/I2C/GPS/button/display/power pins of the board, flash, console, USB, octal PSRAM, pins
+// the chip does not have, strapping, claimed and (no pull-up) input-only pins. Pin 0 = off is always accepted.
 bool wxWindPinOk(int pin)
 {
-    const int reserved[] = {
-        -1
-    #if defined(LORA_CS)
-    WX_RES(LORA_CS)
-    #endif
-    #if defined(LORA_NSS)
-    WX_RES(LORA_NSS)
-    #endif
-    #if defined(LORA_RST)
-    WX_RES(LORA_RST)
-    #endif
-    #if defined(LORA_RESET)
-    WX_RES(LORA_RESET)
-    #endif
-    #if defined(LORA_DIO0)
-    WX_RES(LORA_DIO0)
-    #endif
-    #if defined(LORA_DIO1)
-    WX_RES(LORA_DIO1)
-    #endif
-    #if defined(LORA_DIO2)
-    WX_RES(LORA_DIO2)
-    #endif
-    #if defined(LORA_DIO3)
-    WX_RES(LORA_DIO3)
-    #endif
-    #if defined(LORA_SCK)
-    WX_RES(LORA_SCK)
-    #endif
-    #if defined(LORA_MISO)
-    WX_RES(LORA_MISO)
-    #endif
-    #if defined(LORA_MOSI)
-    WX_RES(LORA_MOSI)
-    #endif
-    #if defined(LORA_IRQ)
-    WX_RES(LORA_IRQ)
-    #endif
-    #if defined(LORA_IO0)
-    WX_RES(LORA_IO0)
-    #endif
-    #if defined(LORA_IO1)
-    WX_RES(LORA_IO1)
-    #endif
-    #if defined(LORA_IO2)
-    WX_RES(LORA_IO2)
-    #endif
-    #if defined(SX1262X_CS)
-    WX_RES(SX1262X_CS)
-    #endif
-    #if defined(SX1262X_IRQ)
-    WX_RES(SX1262X_IRQ)
-    #endif
-    #if defined(SX1262X_RST)
-    WX_RES(SX1262X_RST)
-    #endif
-    #if defined(SX1262X_GPIO)
-    WX_RES(SX1262X_GPIO)
-    #endif
-    #if defined(SX1268_CS)
-    WX_RES(SX1268_CS)
-    #endif
-    #if defined(SX1268_IRQ)
-    WX_RES(SX1268_IRQ)
-    #endif
-    #if defined(SX1268_RST)
-    WX_RES(SX1268_RST)
-    #endif
-    #if defined(SX1268_GPIO)
-    WX_RES(SX1268_GPIO)
-    #endif
-    #if defined(SX126x_CS)
-    WX_RES(SX126x_CS)
-    #endif
-    #if defined(SX126x_IRQ)
-    WX_RES(SX126x_IRQ)
-    #endif
-    #if defined(SX126x_RST)
-    WX_RES(SX126x_RST)
-    #endif
-    #if defined(SX126x_GPIO)
-    WX_RES(SX126x_GPIO)
-    #endif
-    #if defined(SX126x_BUSY)
-    WX_RES(SX126x_BUSY)
-    #endif
-    #if defined(RF95_SCK)
-    WX_RES(RF95_SCK)
-    #endif
-    #if defined(RF95_MISO)
-    WX_RES(RF95_MISO)
-    #endif
-    #if defined(RF95_MOSI)
-    WX_RES(RF95_MOSI)
-    #endif
-    #if defined(RF95_NSS)
-    WX_RES(RF95_NSS)
-    #endif
-    #if defined(RADIO_SCLK_PIN)
-    WX_RES(RADIO_SCLK_PIN)
-    #endif
-    #if defined(RADIO_MISO_PIN)
-    WX_RES(RADIO_MISO_PIN)
-    #endif
-    #if defined(RADIO_MOSI_PIN)
-    WX_RES(RADIO_MOSI_PIN)
-    #endif
-    #if defined(RADIO_CS_PIN)
-    WX_RES(RADIO_CS_PIN)
-    #endif
-    #if defined(RADIO_RST_PIN)
-    WX_RES(RADIO_RST_PIN)
-    #endif
-    #if defined(RADIO_IRQ_PIN)
-    WX_RES(RADIO_IRQ_PIN)
-    #endif
-    #if defined(RADIO_BUSY_PIN)
-    WX_RES(RADIO_BUSY_PIN)
-    #endif
-    #if defined(RADIO_DIO1_PIN)
-    WX_RES(RADIO_DIO1_PIN)
-    #endif
-    #if defined(RADIO_SCK)
-    WX_RES(RADIO_SCK)
-    #endif
-    #if defined(RADIO_MISO)
-    WX_RES(RADIO_MISO)
-    #endif
-    #if defined(RADIO_MOSI)
-    WX_RES(RADIO_MOSI)
-    #endif
-    #if defined(RADIO_CTRL)
-    WX_RES(RADIO_CTRL)
-    #endif
-    #if defined(RADIO_LDO_EN)
-    WX_RES(RADIO_LDO_EN)
-    #endif
-    #if defined(PIN_LORA_NSS)
-    WX_RES(PIN_LORA_NSS)
-    #endif
-    #if defined(PIN_LORA_DIO_1)
-    WX_RES(PIN_LORA_DIO_1)
-    #endif
-    #if defined(PIN_LORA_NRST)
-    WX_RES(PIN_LORA_NRST)
-    #endif
-    #if defined(PIN_LORA_BUSY)
-    WX_RES(PIN_LORA_BUSY)
-    #endif
-    #if defined(PIN_LORA_SCK)
-    WX_RES(PIN_LORA_SCK)
-    #endif
-    #if defined(PIN_LORA_MISO)
-    WX_RES(PIN_LORA_MISO)
-    #endif
-    #if defined(PIN_LORA_MOSI)
-    WX_RES(PIN_LORA_MOSI)
-    #endif
-    #if defined(E22_NSS)
-    WX_RES(E22_NSS)
-    #endif
-    #if defined(E22_BUSY)
-    WX_RES(E22_BUSY)
-    #endif
-    #if defined(E22_DIO1)
-    WX_RES(E22_DIO1)
-    #endif
-    #if defined(E22_NRST)
-    WX_RES(E22_NRST)
-    #endif
-    #if defined(E22_RXEN)
-    WX_RES(E22_RXEN)
-    #endif
-    #if defined(E22_TXEN)
-    WX_RES(E22_TXEN)
-    #endif
-    #if defined(E22_SCK)
-    WX_RES(E22_SCK)
-    #endif
-    #if defined(ETH_CS_PIN)
-    WX_RES(ETH_CS_PIN)
-    #endif
-    #if defined(ETH_INT_PIN)
-    WX_RES(ETH_INT_PIN)
-    #endif
-    #if defined(ETH_RST_PIN)
-    WX_RES(ETH_RST_PIN)
-    #endif
-    #if defined(ETH_SCLK_PIN)
-    WX_RES(ETH_SCLK_PIN)
-    #endif
-    #if defined(ETH_MISO_PIN)
-    WX_RES(ETH_MISO_PIN)
-    #endif
-    #if defined(ETH_MOSI_PIN)
-    WX_RES(ETH_MOSI_PIN)
-    #endif
-    #if defined(SDCARD_CS)
-    WX_RES(SDCARD_CS)
-    #endif
-    #if defined(SDCARD_SCLK)
-    WX_RES(SDCARD_SCLK)
-    #endif
-    #if defined(SDCARD_MISO)
-    WX_RES(SDCARD_MISO)
-    #endif
-    #if defined(SDCARD_MOSI)
-    WX_RES(SDCARD_MOSI)
-    #endif
-    #if defined(TDECK_SDCARD_CS)
-    WX_RES(TDECK_SDCARD_CS)
-    #endif
-    #if defined(TDECK_SPI_SCK)
-    WX_RES(TDECK_SPI_SCK)
-    #endif
-    #if defined(TDECK_SPI_MISO)
-    WX_RES(TDECK_SPI_MISO)
-    #endif
-    #if defined(TDECK_SPI_MOSI)
-    WX_RES(TDECK_SPI_MOSI)
-    #endif
-    #if defined(I2C_SDA)
-    WX_RES(I2C_SDA)
-    #endif
-    #if defined(I2C_SCL)
-    WX_RES(I2C_SCL)
-    #endif
-    #if defined(I2C1_SDA)
-    WX_RES(I2C1_SDA)
-    #endif
-    #if defined(I2C1_SCL)
-    WX_RES(I2C1_SCL)
-    #endif
-    #if defined(SDA_PIN)
-    WX_RES(SDA_PIN)
-    #endif
-    #if defined(SCL_PIN)
-    WX_RES(SCL_PIN)
-    #endif
-    #if defined(GPS_RX_PIN)
-    WX_RES(GPS_RX_PIN)
-    #endif
-    #if defined(GPS_TX_PIN)
-    WX_RES(GPS_TX_PIN)
-    #endif
-    #if defined(GPS_EN_PIN)
-    WX_RES(GPS_EN_PIN)
-    #endif
-    #if defined(GPS_PPS_PIN)
-    WX_RES(GPS_PPS_PIN)
-    #endif
-    #if defined(BUTTON_PIN)
-    WX_RES(BUTTON_PIN)
-    #endif
-        WX_RES(SS)
-        WX_RES(SCK)
-        WX_RES(MISO)
-        WX_RES(MOSI)
-    };
-    #if defined(CONFIG_IDF_TARGET_ESP32S3)
-    const bool is_s3 = true;
-    #else
-    const bool is_s3 = false;
-    #endif
-    // octal PSRAM/flash (qio_opi, opi_opi in the board JSON -> sdkconfig.h) takes GPIO 33-37
-    #if defined(CONFIG_SPIRAM_MODE_OCT) || defined(CONFIG_ESPTOOLPY_OCT_FLASH)
-    const bool octal = true;
-    #else
-    const bool octal = false;
-    #endif
-    // a pin the chip does not have (GPIO 22-25 on the S3, 20/24/28-31 on the classic ESP32)
-    if(pin != 0 && (pin < 0 || pin >= GPIO_NUM_MAX || !GPIO_IS_VALID_GPIO(pin))) return false;
-    return wxPinAllowed(pin, reserved, sizeof(reserved) / sizeof(reserved[0]), is_s3, octal);
+    return pinCanAssign(pinBoardContext(PIN_FN_WIND), PIN_FN_WIND, pin, pinBoardDefault(PIN_FN_WIND));
 }
-#undef WX_RES
 static void tg_post_wind_on()
 {
     wxMeanReset(&wx_wind_mean);   // fresh window on switch-on (telemetry may be inactive, see TLM-03)
     wxGustReset(&wx_wind_gust);
     if(meshcom_settings.node_wind_pin == 0) { printfdeb("wind on, but no pin set: use --windpin <gpio>\n"); return; }
-    if(!wxWindPinOk(meshcom_settings.node_wind_pin)) { printfdeb("wind pin %i not allowed on this board\n", meshcom_settings.node_wind_pin); return; }
+    if(!pinBoardLoadedUsable(PIN_FN_WIND, meshcom_settings.node_wind_pin)) { printfdeb("wind pin %i not allowed on this board\n", meshcom_settings.node_wind_pin); return; }
     windBegin(meshcom_settings.node_wind_pin);
 }
 static void tg_post_wind_off() { windEnd(); }
@@ -2420,6 +2155,13 @@ void commandAction(char *umsg_text, bool ble)
         }
         #endif
 
+        if(pinSetterRefuses(PIN_FN_BUTTON, "button", meshcom_settings.node_button_pin))
+        {
+            meshcom_settings.node_button_pin = ibt;
+
+            return;
+        }
+
         save_settings();
 
         if(ble)
@@ -2461,6 +2203,13 @@ void commandAction(char *umsg_text, bool ble)
             return;
         }
         #endif
+
+        if(pinSetterRefuses(PIN_FN_ANALOG, "analog", meshcom_settings.node_analog_pin))
+        {
+            meshcom_settings.node_analog_pin = iap;
+
+            return;
+        }
 
         save_settings();
 
@@ -3067,11 +2816,8 @@ void commandAction(char *umsg_text, bool ble)
             return;
         }
 
-        if(!wxWindPinOk(newPin))
-        {
-            printfdeb("windpin %i not allowed (LoRa, I2C, GPS, button, flash or input-only pin), ignored\n", newPin);
+        if(pinSetterRefuses(PIN_FN_WIND, "windpin", newPin))
             return;
-        }
 
         meshcom_settings.node_wind_pin = newPin;
 
@@ -3196,6 +2942,7 @@ void commandAction(char *umsg_text, bool ble)
     else
     if(commandCheck(msg_text+2, (char*)"onewire gpio ") == 0)
     {
+        const int iowold = meshcom_settings.node_owgpio;
         CmdSetResult setres = cmdStoreInt(msg_text+15, &meshcom_settings.node_owgpio, 0.0, 99.0, &iVar);
 
         if(setres == CMD_SET_NAN) { cmdArgNotNumber("onewire gpio", msg_text+15); return; }
@@ -3211,9 +2958,16 @@ void commandAction(char *umsg_text, bool ble)
         if(meshcom_settings.node_owgpio <= 2)
         {
             printfdeb("GPIO 0-2 not supported on RAK4630 (reserved)");
+            meshcom_settings.node_owgpio = iowold;
             return;
         }
         #endif
+
+        if(pinSetterRefuses(PIN_FN_ONEWIRE, "onewire", meshcom_settings.node_owgpio))
+        {
+            meshcom_settings.node_owgpio = iowold;
+            return;
+        }
 
         if(ble)
         {
