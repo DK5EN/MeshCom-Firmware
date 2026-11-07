@@ -67,20 +67,20 @@
 <body>
 <h1>MeshCom fork: campaigns since September 2026, and the backlog ahead</h1>
 <ul class="meta">
-  <li>State: 2026-11-07; branch <code>fork-dev</code></li>
+  <li>State: 2026-11-07 evening; branch <code>fork-dev</code> at <code>f30c6f3c</code></li>
   <li>Tokens and cost: local Claude Code transcripts at API list prices (method in the foot)</li>
   <li>Sources: commit dates on <code>fork-dev</code>, release tags, <code>docs/campaign-*.md</code>, <code>docs/BACKLOG.md</code>, <code>docs/RESUME.md</code></li>
 </ul>
 
 <div class="bluf">
-  <p>Ten weeks of fork work: 18 numbered releases, about 30 upstream PRs merged, CI releases since v4.40a.10.11. GPIO-01 (pins page, free GPIO control, RM1 pins/gpio) is implemented and running on the bench; next up are AU-24, the GPIO-01 field test, GPSV4-01 and TD-THEME-01.</p>
+  <p>Ten weeks of fork work: 18 numbered releases, about 30 upstream PRs merged, CI releases since v4.40a.10.11. GPIO-01 (pins page, free GPIO control, RM1 pins/gpio) is implemented and running on the bench. Two campaigns started today and run in parallel: the Heltec V4 GNSS fix (GPSV4-01) is implemented on <code>fork-dev</code> and goes upstream next, untested on hardware; the T-Deck light/dark theme (TD-THEME-01) has its core and <code>--theme</code> command, the display wiring, keyboard-lock glyph and brightness slider are next.</p>
 </div>
 
 <h2>Key facts</h2>
 <ul class="facts">
   <li><b>September, foundation:</b> KISS mode v2, RAM diet, Safeboot OTA session, PN retry.</li>
   <li><b>October, platform:</b> fork consolidated on <code>fork-dev</code>; Auto Update AU-01..21; RM1 remote management; web flasher autodetect; TX pool; web login.</li>
-  <li><b>November so far:</b> national characters, battery charge state, release gate, v4.40a.11.06; GPIO-01 waves W0-W5 plus follow-ups GPIO-02..04 in one day.</li>
+  <li><b>November so far:</b> national characters, battery charge state, release gate, v4.40a.11.06; GPIO-01 waves W0-W5 plus follow-ups GPIO-02..04 in one day; on the same day GPSV4-01 W1 and TD-THEME-01 W1, each through an Opus advisor gate.</li>
   <li><b>Claude usage so far:</b> <span id="kf-usage"></span></li>
   <li><b>Ahead:</b> <span id="kf-ahead"></span> backlog items scheduled as estimates through mid-December; dates after today are not commitments.</li>
 </ul>
@@ -109,8 +109,8 @@
   <div>
     <h2>Ahead</h2>
     <ul>
-      <li><b>Next:</b> GPIO-05/06 decisions, AU-24 T-Beam auto update heap, GPIO-07 field test after the next release.</li>
-      <li><b>Planned:</b> GPSV4-01 Heltec V4 GNSS (<code>docs/plan-heltec-v4-gps-20261107.md</code>), TD-THEME-01 T-Deck light/dark theme.</li>
+      <li><b>Running:</b> GPSV4-01 W2 upstream PR (German body for the operator first), then the groups.io reply; TD-THEME-01 W2a-W2d (98 colour sites, keyboard-lock glyph, brightness slider, boot logo), W3 web toggle, W4 bench on DK5EN-14.</li>
+      <li><b>Next:</b> GPIO-06 fix, AU-24 T-Beam auto update heap, GPIO-07 field test after the next release (which also carries the V4 I2C move to GPIO 4/3).</li>
       <li><b>Then:</b> AU-14 watchdog, CSMA slot sizing, nRF52 BLE DFU, RM-EXT, build parallelism.</li>
     </ul>
   </div>
@@ -163,6 +163,13 @@ const rows = [
  {p:"Mesh and LoRa",n:"LRF ping/beacon RX silence, logreport",id:"LRF",st:"done",s:"11-01",e:"11-01",tok:260920026,usd:102.86,note:"Upstream #1247 merged 11-02"},
  {p:"Pin control GPIO-01",n:"GPIO-01 W0-W5: pin table, policy, Pins page, RM1 pins/gpio",id:"GPIO-01",st:"done",s:"11-07",e:"11-07",tok:102534793,usd:44.61,note:"Host gate green, all build targets green"},
  {p:"Pin control GPIO-01",n:"Follow-ups GPIO-02..04, web GPIO switch, button GPIO 0",id:"GPIO-01",st:"run",s:"11-07",e:"11-08",tok:102534793,usd:44.61,note:"On the bench (DK5EN-1); not released"},
+ {p:"Heltec V4 GNSS GPSV4-01",n:"W0 recon, W1 pins, GNSS power, I2C to 4/3, deep-sleep hold",id:"GPSV4-01",st:"done",s:"11-07",e:"11-07",note:"88efc017; advisor two rounds; R2 only, no R8 guard; untested on hardware"},
+ {p:"Heltec V4 GNSS GPSV4-01",n:"W2 upstream PR (submit-pr, German body)",id:"GPSV4-01",st:"plan",s:"11-08",e:"11-09",note:"Body shown to the operator before gh pr create; marked untested on hardware"},
+ {p:"Heltec V4 GNSS GPSV4-01",n:"W3 field follow-up (groups.io #1557, testers)",id:"GPSV4-01",st:"plan",s:"11-09",e:"11-21",note:"Reply draft for the operator; optional ci-proof build"},
+ {p:"T-Deck theme TD-THEME-01",n:"W0 recon, W1 palette, styles, --theme, setting",id:"TD-THEME-01",st:"done",s:"11-07",e:"11-07",note:"f30c6f3c; host contrast test; one advisor rework round"},
+ {p:"T-Deck theme TD-THEME-01",n:"W2a-W2d display wiring, lock glyph, brightness slider, boot logo",id:"TD-THEME-01",st:"plan",s:"11-08",e:"11-10",note:"98 colour sites in four serial waves on lv_obj_functions.cpp; scope added 11-07"},
+ {p:"T-Deck theme TD-THEME-01",n:"W3 web GUI theme toggle",id:"TD-THEME-01",st:"plan",s:"11-10",e:"11-11",note:"Three-state control, T-Deck nodes only"},
+ {p:"T-Deck theme TD-THEME-01",n:"W4 bench screenshots on DK5EN-14",id:"TD-THEME-01",st:"plan",s:"11-11",e:"11-12",note:"Both themes, every screen, contact sheet for sign-off"},
  {p:"Releases",n:"v4.40a.10.02",id:"",st:"rel",s:"10-02",e:"10-02",note:"Tags v4.40a and v4.40a.10.02"},
  {p:"Releases",n:"v4.40a.10.05, .10.06",id:"",st:"rel",s:"10-05",e:"10-05",note:"Two tags"},
  {p:"Releases",n:"v4.40a.10.11 (first CI release)",id:"",st:"rel",s:"10-11",e:"10-11",note:"CI builds and publishes from this tag"},
@@ -184,14 +191,12 @@ const rows = [
  {p:"Upstream PRs merged",n:"#1240, #1243 to #1245 (E290, web login)",id:"",st:"rel",s:"10-31",e:"10-31",note:""},
  {p:"Upstream PRs merged",n:"#1246 to #1251 (LRF, characters, battery)",id:"",st:"rel",s:"11-02",e:"11-02",note:""},
  {p:"Upstream PRs merged",n:"#1257 (store-node echo)",id:"",st:"rel",s:"11-07",e:"11-07",note:""},
- {p:"Backlog ahead",n:"RM button pin over RM1 (decision)",id:"GPIO-05",st:"plan",s:"11-09",e:"11-11",note:"pins btn answers err blocked; keep or allow with a pull-up check"},
- {p:"Backlog ahead",n:"T-Deck Pro pin 46 double definition",id:"GPIO-06",st:"plan",s:"11-09",e:"11-10",note:"Keyboard INT and radio enable both 46; check schematic"},
+ {p:"Backlog ahead",n:"T-Deck Pro pin 46 double definition",id:"GPIO-06",st:"plan",s:"11-12",e:"11-13",note:"Decided: keyboard INT is GPIO 15, fix pending"},
+ {p:"Backlog ahead",n:"Stale variant-macros-effective golden",id:"GOLDEN-MACROS-01",st:"plan",s:"11-13",e:"11-13",note:"Regenerate in its own commit; decide whether selftest checks it"},
  {p:"Backlog ahead",n:"T-Beam auto update heap",id:"AU-24",st:"plan",s:"11-10",e:"11-14",note:"Download refused (TLS low heap) after hours of uptime with BLE on"},
  {p:"Backlog ahead",n:"GPIO-01 field test after the next release",id:"GPIO-07",st:"plan",s:"11-14",e:"11-21",note:"Never run on hardware by decision; OMs test in the field"},
- {p:"Backlog ahead",n:"Heltec V4 GNSS fix (W0-W3, upstream PR)",id:"GPSV4-01",st:"plan",s:"11-16",e:"11-27",note:"UART swapped, GNSS never powered, I2C on GNSS lines"},
  {p:"Backlog ahead",n:"AU download watchdog reboot",id:"AU-14",st:"plan",s:"11-17",e:"11-20",note:"Classic ESP32 reboot in download, cause unknown"},
  {p:"Backlog ahead",n:"E22 NVS-full RM password store",id:"RM-NVS-01",st:"plan",s:"11-18",e:"11-20",note:"Waiting for reporter --info and log"},
- {p:"Backlog ahead",n:"T-Deck light/dark theme",id:"TD-THEME-01",st:"plan",s:"11-23",e:"11-30",note:"--theme dark|light|auto, web palette, logo on boot screen"},
  {p:"Backlog ahead",n:"Gateway RX count-mode night on DK5EN-98",id:"GWRX-01",st:"plan",s:"11-24",e:"11-26",note:"Needs operator OK"},
  {p:"Backlog ahead",n:"Boot screen version text",id:"BOOT-01",st:"plan",s:"11-30",e:"12-02",note:"Boot screen still says MeshCom 4.0"},
  {p:"Backlog ahead",n:"CSMA slot sizing and CAD measurement",id:"CSMA-02",st:"plan",s:"12-01",e:"12-06",note:"CSMA-02/03/04"},
