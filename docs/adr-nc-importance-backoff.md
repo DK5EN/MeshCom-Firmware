@@ -1,6 +1,6 @@
 # ADR 02: Netzwichtigkeits-basierter Relay-Backoff (NC-Importance)
 
-**Status:** Draft (Rev. 3)
+**Status:** Draft (Rev. 3), superseded 2026-11-07 by nbr-wichtigkeit-konzept.md (Stufe 2); kept as data reference.
 
 **Datum:** 2026-03-16, ueberarbeitet 2026-08-22 (Rev. 2 und Rev. 3)
 
