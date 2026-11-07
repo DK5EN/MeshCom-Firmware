@@ -2190,9 +2190,9 @@ void commandAction(char *umsg_text, bool ble)
 
         bReturn = true;
 
-        iButtonPin = ibt;
-
-        init_onebutton();
+        // GPIO-02: OneButton reads iButtonPin once at boot; the running button stays on its pin,
+        // the new pin applies after a restart (/pinassign shows restart=1).
+        printlndeb("BUTTON GPIO stored, restart needed to apply");
     }
     #endif
     else

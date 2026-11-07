@@ -275,6 +275,32 @@ constexpr int kHard[] = {
     #if defined(BOARD_LORA_IRQ)
     WX_RES(BOARD_LORA_IRQ)
     #endif
+    // GPIO-03: the rest of the T5 e-paper SX1262 (src/t5-epaper/utilities.h:34-40; SPI shared with the SD card).
+    #if defined(BOARD_T5_EPAPER)
+    #if defined(BOARD_LORA_CS)
+    WX_RES(BOARD_LORA_CS)
+    #endif
+    #if defined(BOARD_LORA_RST)
+    WX_RES(BOARD_LORA_RST)
+    #endif
+    #if defined(BOARD_LORA_BUSY)
+    WX_RES(BOARD_LORA_BUSY)
+    #endif
+    #if defined(BOARD_LORA_SCLK)
+    WX_RES(BOARD_LORA_SCLK)
+    #endif
+    #if defined(BOARD_LORA_MOSI)
+    WX_RES(BOARD_LORA_MOSI)
+    #endif
+    #if defined(BOARD_LORA_MISO)
+    WX_RES(BOARD_LORA_MISO)
+    #endif
+    #endif // BOARD_T5_EPAPER
+    #if defined(BOARD_RAK4630) && !defined(BOARD_T_ECHO) && !defined(BOARD_HELTEC_T114)
+    // GPIO-03: RAK4631 SX1262, hard-wired in lora_rak4630_meshcom_init() (src/nrf52/api_functions.cpp, copy of the SX126x-Arduino one), no variant macros:
+    // RXEN (antenna-switch power) 37, RESET 38, NSS 42, SCLK 43, MOSI 44, MISO 45, BUSY 46, DIO1 47. Pin 17 (WB_IO1) stays free.
+    , 37, 38, 42, 43, 44, 45, 46, 47
+    #endif
     #if defined(BOARD_HELTEC_T114)
     // T114 SX1262, hard-wired in lora_t114_init() (src/nrf52/api_functions.cpp, USE_HELTEC_T114), no variant macros:
     // BUSY 17, SCLK 19, DIO1 20, MOSI 22, MISO 23, NSS 24, RESET 25
@@ -371,6 +397,19 @@ static_assert((kSoftMask & (1ULL << 17)) == 0, "RAK4631: pin 17 (WB_IO1) is rese
 static_assert((kHardMask & ((1ULL << 17) | (1ULL << 19) | (1ULL << 20) | (1ULL << 22) | (1ULL << 23) | (1ULL << 24) | (1ULL << 25))) ==
                   ((1ULL << 17) | (1ULL << 19) | (1ULL << 20) | (1ULL << 22) | (1ULL << 23) | (1ULL << 24) | (1ULL << 25)),
               "T114: SX1262 pins (17, 19, 20, 22-25) are not reserved HARD");
+#endif
+// GPIO-03: the T5 e-paper SX1262 (BOARD_LORA_*, src/t5-epaper/utilities.h:34-40) must be HARD in full, not only its DIO1.
+#if defined(BOARD_T5_EPAPER)
+static_assert((kHardMask & ((1ULL << 46) | (1ULL << 1) | (1ULL << 47) | (1ULL << 14) | (1ULL << 13) | (1ULL << 21))) ==
+                  ((1ULL << 46) | (1ULL << 1) | (1ULL << 47) | (1ULL << 14) | (1ULL << 13) | (1ULL << 21)),
+              "T5 e-paper: SX1262 CS 46, RST 1, BUSY 47, SCLK 14, MOSI 13, MISO 21 are not reserved HARD");
+#endif
+// GPIO-03: the RAK4631 radio is hard-wired in lora_rak4630_meshcom_init() (src/nrf52/api_functions.cpp), no variant macros:
+// RESET 38, NSS 42, SCLK 43, MOSI 44, MISO 45, BUSY 46, DIO1 47, antenna-switch power (RXEN) 37. Pin 17 stays free.
+#if defined(BOARD_RAK4630) && !defined(BOARD_T_ECHO) && !defined(BOARD_HELTEC_T114)
+static_assert((kHardMask & ((1ULL << 37) | (1ULL << 38) | (1ULL << 42) | (1ULL << 43) | (1ULL << 44) | (1ULL << 45) | (1ULL << 46) | (1ULL << 47))) ==
+                  ((1ULL << 37) | (1ULL << 38) | (1ULL << 42) | (1ULL << 43) | (1ULL << 44) | (1ULL << 45) | (1ULL << 46) | (1ULL << 47)),
+              "RAK4631: SX1262 pins (37, 38, 42-47) are not reserved HARD");
 #endif
 
 uint64_t pinBoardReservedHard() { return kHardMask; }

@@ -871,8 +871,8 @@ inline bool webGuardHasChainedCommand(const char *text, const char *tok)
 // - the update names (webGuardIsUpdParam),
 // - the free-GPIO switch names gpio<N> (webGuardIsGpioParam), and
 // - an update command or a --gpio command (prefix match "gpio": "--gpio 13 on", "--gpio13") in the value of ANY
-//   name: every setparam branch pastes the value into "--<cmd> %s" and commandAction() splits on each "--" ("&&" in
-//   the web), so setcall=X%20--update%20install runs --update install too and setcall=X%20--gpio%2013%20on would
+//   name: every setparam branch pastes the value into "--<cmd> %s" and commandAction() splits on each "--" (the web
+//   translates only a leading "&&" of manualcommand into "--", web_setup.cpp), so setcall=X%20--update%20install runs --update install too and setcall=X%20--gpio%2013%20on would
 //   drive a pin.
 // Everything else is unchanged (no "--"/"&&" in the value: untouched).
 inline bool webGuardSetparamAllowed(const char *name, const char *value, const char *header, size_t len)

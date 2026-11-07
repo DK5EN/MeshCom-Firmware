@@ -261,10 +261,10 @@ function pinsLeave(){pnOn=false;pnG++;clearTimeout(pnT);pnT=0;pnBusy=false;pnRow
 function pnSet(param,val,refuse){
 fetch('/setparam/?'+param+'='+encodeURIComponent(val)).then(function(r){if(r.status==401)return null;return r.json();}).then(function(j){
 if(!j){pnTxt('pn_msg',pnLoginNote);return;}
-pnTxt('pn_msg',j.returncode===0?'':(j.returncode==2?'The node does not know this setting.':'The node refused the change.'));
+pnTxt('pn_msg',(j.returncode===0||refuse)?'':(j.returncode==2?'The node does not know this setting.':'The node refused the change.'));
 if(refuse)refuse(j.returncode===0?'Saved.':(j.returncode==2?'The node does not know this setting.':'Refused by pin policy.'));
 if(pnOn){clearTimeout(pnT);pnT=0;pnPoll();}
-}).catch(function(){pnTxt('pn_msg','The request failed.');if(refuse)refuse('The request failed.');});
+}).catch(function(){if(!refuse)pnTxt('pn_msg','The request failed.');if(refuse)refuse('The request failed.');});
 }
 // "No switchable outputs" only when there is neither an LED / MCP pin nor an assignment row; undecided until /pinassign answered once.
 function pnNone(){var e=pnEl('pn_none');if(e)e.hidden=!pnAsgKnown||!pnGpKnown||pnHw||pnAsgAny||pnGpAny;}
@@ -306,7 +306,8 @@ for(var i=0;i<fs.length;i++){
 var f=fs[i],r=pnAsgRow(f);pnAsgOk[f.id]=f.ok;
 if(!f.avail){r.inp.value='';r.inp.disabled=true;r.sb.hidden=true;r.def.textContent='';r.eff.textContent='';r.note.textContent='not on this board';r.hint.textContent='';continue;}
 r.inp.disabled=false;r.sb.hidden=false;
-if(!r.inp.getAttribute('data-dirty')&&document.activeElement!==r.inp)r.inp.value=f.pin;
+var un=f.id=='an'&&(f.pin==0||f.pin>=99);r.inp.placeholder=un?'unset':'';
+if(!r.inp.getAttribute('data-dirty')&&document.activeElement!==r.inp)r.inp.value=un?'':f.pin;
 r.def.textContent=f.def?f.def:'none';
 r.eff.textContent=f.eff?f.eff:'none';
 r.note.textContent=(f.on?'on':'off')+', '+(f.restart?'a change applies after a restart':'a change applies at once');

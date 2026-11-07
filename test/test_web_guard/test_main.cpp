@@ -973,6 +973,21 @@ void test_setparam_value_chained_gpiocontrol_always_refused(void)
     }
 }
 
+// manualcommand carries the token at offset 0 ("--gpio 13 on", "&&gpio 13 on": web_setup.cpp turns a leading "&&" into "--")
+void test_setparam_manualcommand_token_at_offset_zero(void)
+{
+    std::string with = req("GET /setparam/?setcall=X HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
+    std::string without = req("GET /setparam/?setcall=X HTTP/1.1", {"Host: 192.168.68.71"});
+    const char *master[] = {"--gpiocontrol on", "&&gpiocontrol on"};
+    for (size_t i = 0; i < sizeof(master) / sizeof(master[0]); i++)
+    {
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed("manualcommand", master[i], without.c_str(), without.size()), master[i]);
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed("manualcommand", master[i], with.c_str(), with.size()), master[i]);
+    }
+    TEST_ASSERT_FALSE(webGuardSetparamAllowed("manualcommand", "--gpio 13 on", without.c_str(), without.size()));
+    TEST_ASSERT_TRUE(webGuardSetparamAllowed("manualcommand", "--gpio 13 on", with.c_str(), with.size()));
+}
+
 void test_setparam_value_chained_gpio_needs_xmc(void)
 {
     std::string with = req("GET /setparam/?setcall=X HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
@@ -1063,5 +1078,6 @@ int main(int, char **)
     RUN_TEST(test_setparam_gpio_lookalikes_are_not_gpio_params);
     RUN_TEST(test_setparam_value_chained_gpiocontrol_always_refused);
     RUN_TEST(test_setparam_value_chained_gpio_needs_xmc);
+    RUN_TEST(test_setparam_manualcommand_token_at_offset_zero);
     return UNITY_END();
 }

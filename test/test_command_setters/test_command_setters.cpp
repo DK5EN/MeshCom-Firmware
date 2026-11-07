@@ -2334,6 +2334,18 @@ static void test_gpio_exact_tokens_and_button_release()
     TEST_ASSERT_TRUE_MESSAGE(fw.find("pinBoardEffective(f)") != std::string::npos, "gpioFnWins does not release the stored pin");
 }
 
+// GPIO-02: --button gpio <n> only stores the pin; OneButton reads iButtonPin once at boot, so the setter must neither
+// touch iButtonPin (it used to take the OLD stored value, e.g. 0) nor re-init OneButton. A restart applies the pin.
+static void test_button_gpio_setter_does_not_reinit()
+{
+    const std::string src = read_repo_file("src/command_functions.cpp");
+    const size_t from = pin_find(src, "commandCheck(msg_text+2, (char*)\"button gpio \") == 0", 0, "no button gpio branch");
+    const size_t to = pin_find(src, "commandCheck(msg_text+2, (char*)\"analog gpio \") == 0", from, "no analog gpio branch after button gpio");
+    const std::string br = src.substr(from, to - from);
+    TEST_ASSERT_TRUE_MESSAGE(br.find("iButtonPin = ibt") == std::string::npos, "button gpio setter assigns iButtonPin = ibt");
+    TEST_ASSERT_TRUE_MESSAGE(br.find("init_onebutton()") == std::string::npos, "button gpio setter calls init_onebutton()");
+    TEST_ASSERT_TRUE_MESSAGE(br.find("gpioFnWins(PIN_FN_BUTTON)") != std::string::npos, "button gpio setter lost gpioFnWins");
+}
 
 // GPIO-01 W4 rework: source pin for the /setparam gpio<N> rung in web_setup.cpp (ESP32-only code, no host harness).
 // The rung hands the value to gpioCtlCommand() as an enum, never through a console line, so a value cannot chain a
@@ -2423,6 +2435,7 @@ int main(int, char **)
     RUN_TEST(test_wx_ble_keys_live_in_s1_and_fit_the_budget);
     RUN_TEST(test_wx_settings_rows_and_defaults);
     RUN_TEST(test_gpio_exact_tokens_and_button_release);
+    RUN_TEST(test_button_gpio_setter_does_not_reinit);
     RUN_TEST(test_web_setup_gpio_rung_source_pins);
     RUN_TEST(test_a_non_numeric_argument_is_zero_not_leftover);
     RUN_TEST(test_leading_space_is_skipped);

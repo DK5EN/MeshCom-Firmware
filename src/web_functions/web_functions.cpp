@@ -4441,7 +4441,7 @@ void sub_page_pins()
     web_client.println("<table class=\"table mw-600\" id=\"pn_gpio\" hidden><caption class=\"font-small\">Free GPIO</caption>");
     web_client.println("<thead><tr class=\"font-bold\"><th scope=\"col\">Pin</th><th scope=\"col\">Owner</th><th scope=\"col\">Direction</th><th scope=\"col\">Level</th><th scope=\"col\">Switch</th></tr></thead>");
     web_client.println("<tbody id=\"pn_gpio_body\"></tbody></table>");
-    web_client.println("<p class=\"font-small\" id=\"pn_gpio_off\" hidden>GPIO control is off (console: --gpiocontrol on).</p>");
+    web_client.println("<p class=\"font-small\" id=\"pn_gpio_off\" hidden>GPIO control is off (serial or telnet console: --gpiocontrol on).</p>");
     web_client.println("<p id=\"pn_none\" hidden>No switchable outputs on this node.</p>");
     web_client.println("<table class=\"table mw-600\" id=\"pn_mcp\" hidden><caption class=\"font-small\">MCP23017 pins</caption>");
     web_client.println("<thead><tr class=\"font-bold\"><th scope=\"col\">Pin</th><th scope=\"col\">Name</th><th scope=\"col\">In/Out</th><th scope=\"col\">Level</th></tr></thead>");

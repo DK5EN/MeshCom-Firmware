@@ -303,8 +303,8 @@ GET /pinassign
 	param		the /setparam/ name that writes the assignment (the Setup page uses the same)
 	avail		0 = this build cannot change it (function not compiled in, or read-only on the board)
 	pin		stored setting, 0 = board default (button: 99 = no button; analog: 99 = unset reads as 0)
-	def		board default, 0 = none (the anemometer has none)
-	eff		pin in use, 0 = none: the stored pin, or the default when the stored one is 0. The button reports the pin read
+	def		board default, 0 = no pin (the board has no default; the anemometer never has one)
+	eff		pin in use, 0 = no pin (board has no default and none stored): the stored pin, or the default when the stored one is 0. The button reports the pin read
 			at boot (a newly stored value counts after a restart), 0 when it is 99 = no button
 	on		the function is switched on
 	restart		1 = a change takes effect after a restart (button); 0 = applies at once (1-Wire, analog, anemometer)
@@ -341,4 +341,4 @@ GET /gpiostatus
 	refused (403, even with X-MC), a chained "--gpio" / "&&gpio" in any value needs X-MC like the update commands.
 	Levels live in RAM only: nothing is stored, after a reboot every pin is an untouched input. The Pins page shows the
 	table ("Free GPIO") only when the board offers a free pin, polls /gpiostatus after /pinassign every 5 s and, with
-	master 0, lists the rows read-only with the note "GPIO control is off (console: --gpiocontrol on).".
+	master 0, lists the rows read-only with the note "GPIO control is off (serial or telnet console: --gpiocontrol on).".
