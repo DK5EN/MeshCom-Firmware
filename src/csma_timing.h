@@ -163,3 +163,11 @@ static inline bool csmaCadFreeNeedsRecheck(uint32_t age_us, bool recheck_used)
 {
     return !recheck_used && age_us > (uint32_t)CSMA_CAD_MAX_AGE_US;
 }
+
+/* CSMA-03 (2026-11-08): nrf52loop() slept a fixed 100 ms per pass, so a finished CAD result sat
+ * 60-97 ms before the TX arm consumed it. While a CAD runs or its result is pending the loop
+ * polls at 1 ms; otherwise the usual 100 ms. */
+static inline unsigned long csmaLoopDelayMs(bool cadInProgress, bool cadDone)
+{
+    return (cadInProgress || cadDone) ? 1UL : 100UL;
+}

@@ -280,7 +280,7 @@ void test_sendDisplayTime_call_site_ungated(void)
     TEST_ASSERT_TRUE_MESSAGE(code.find("node_ping") == std::string::npos, "call gated on ping");
     // the hold is an input of the clock-line decision
     const std::string body = func_body(src, "static void sendDisplayClockLine()\n{");
-    const size_t hold = body.find("dcIn.holdActive   = dispClkHeldFrame(DisplayOffWait, bHeldFrameDrawn);");
+    const size_t hold = body.find("dcIn.holdActive   = dispClkHeldFrame(DisplayOffWait, bHeldFrameDrawn, millis(), heldFrameUntilMs);");
     const size_t dec = body.find("dispClkDecide(dcIn)");
     TEST_ASSERT_TRUE_MESSAGE(hold != std::string::npos && dec != std::string::npos && hold < dec,
                              "dcIn.holdActive not fed from dispClkHeldFrame() before dispClkDecide()");
@@ -344,6 +344,69 @@ void test_held_frame_flag_set_where_frames_are_drawn(void)
     TEST_ASSERT_TRUE_MESSAGE(hset != std::string::npos && hset - hold < 200, "hold-text frame does not mark its drawn frame");
 }
 
+// PING-HOLD-01: ping/pong/fail frames are held 10 s, then the clock returns while DisplayOffWait runs on.
+static bool clockSkips(unsigned long off, bool &drawn, unsigned long now, unsigned long &until)
+{
+    DispClkInputs in = base(7);
+    in.holdActive = dispClkHeldFrame(off, drawn, now, until);
+    return dispClkDecide(in) == DispClkDecision::SkipHold;
+}
+
+void test_ping_frame_held_10s_then_clock(void)
+{
+    bool drawn = true;
+    const unsigned long pingMs = 30000UL;
+    unsigned long until = dispClkFrameDeadline(0UL, dispClkPingHoldMs(30UL));
+    const unsigned long off = 0UL + pingMs;   // DisplayOffWait keeps the full pingtime
+    TEST_ASSERT_TRUE_MESSAGE(clockSkips(off, drawn, 5000UL, until), "ping frame not held at t=5 s");
+    TEST_ASSERT_FALSE_MESSAGE(clockSkips(off, drawn, 11000UL, until), "clock still skipped at t=11 s");
+    // PONG drawn at t=6 s -> held until 16 s
+    drawn = true;
+    until = dispClkFrameDeadline(6000UL, dispClkPingHoldMs(30UL));
+    TEST_ASSERT_TRUE_MESSAGE(clockSkips(6000UL + pingMs, drawn, 15999UL, until), "PONG not held until 16 s");
+    TEST_ASSERT_FALSE_MESSAGE(clockSkips(6000UL + pingMs, drawn, 16000UL, until), "PONG held beyond 16 s");
+    // FAILED frame: same
+    drawn = true;
+    until = dispClkFrameDeadline(40000UL, dispClkPingHoldMs(30UL));
+    TEST_ASSERT_TRUE(clockSkips(70000UL, drawn, 49999UL, until));
+    TEST_ASSERT_FALSE(clockSkips(70000UL, drawn, 50000UL, until));
+    // pingtime shorter than 10 s: that wins
+    TEST_ASSERT_EQUAL_UINT32(4000UL, dispClkPingHoldMs(4UL));
+    TEST_ASSERT_EQUAL_UINT32(10000UL, dispClkPingHoldMs(30UL));
+    // millis() wrap: frame drawn 2 s before the wrap
+    drawn = true;
+    until = dispClkFrameDeadline(0xFFFFFFFFUL - 1999UL, 10000UL);
+    TEST_ASSERT_TRUE(clockSkips(0xFFFFFFFFUL, drawn, 3000UL, until));
+    TEST_ASSERT_FALSE(clockSkips(0xFFFFFFFFUL, drawn, 9000UL, until));
+}
+
+// setdisplay hold text: no deadline (0), keeps its own hold_s duration (DisplayOffWait) as before.
+void test_holdtext_keeps_its_duration(void)
+{
+    bool drawn = true;
+    unsigned long until = 0UL;
+    TEST_ASSERT_TRUE(clockSkips(120000UL, drawn, 100000UL, until));
+    TEST_ASSERT_TRUE_MESSAGE(drawn, "hold text flag cleared");
+    TEST_ASSERT_FALSE(clockSkips(0UL, drawn, 100000UL, until));
+    const std::string src = read_repo_file("src/loop_functions.cpp");
+    const size_t hold = src.find("DisplayOffWait = millis() + (unsigned long)hold_s * 1000UL;");
+    TEST_ASSERT_TRUE(hold != std::string::npos);
+    const size_t h = src.find("bHeldFrameDrawn = true;", hold);
+    const size_t u = src.find("heldFrameUntilMs = 0;", hold);
+    TEST_ASSERT_TRUE_MESSAGE(u != std::string::npos && h != std::string::npos && u - hold < 300, "hold text does not clear the deadline");
+}
+
+// the ping/pong frame sets the deadline in DisplayPong; the three callers keep DisplayOffWait = pingtime
+void test_pingframe_deadline_wiring(void)
+{
+    const std::string src = read_repo_file("src/loop_functions.cpp");
+    const std::string pong = code_only(func_body(src, "void DisplayPong(char line1[20], char line2[20], char line3[20], char line4[20])\n{"));
+    TEST_ASSERT_TRUE_MESSAGE(pong.find("heldFrameUntilMs = dispClkFrameDeadline(millis(), dispClkPingHoldMs(meshcom_settings.node_pingtime));") != std::string::npos,
+                             "DisplayPong does not set the deadline");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("dispClkHeldFrame(DisplayOffWait, bHeldFrameDrawn, millis(), heldFrameUntilMs)") != std::string::npos,
+                             "clock pass not fed with the deadline");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -364,5 +427,8 @@ int main(int, char **)
     RUN_TEST(test_fix_F2_every_second_draws);
     RUN_TEST(test_held_frame_needs_a_drawn_frame);
     RUN_TEST(test_held_frame_flag_set_where_frames_are_drawn);
+    RUN_TEST(test_ping_frame_held_10s_then_clock);
+    RUN_TEST(test_holdtext_keeps_its_duration);
+    RUN_TEST(test_pingframe_deadline_wiring);
     return UNITY_END();
 }

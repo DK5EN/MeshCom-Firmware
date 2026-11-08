@@ -11,6 +11,9 @@
 //   pio test -e native -f test_csma_timing
 
 #include <unity.h>
+#include <fstream>
+#include <sstream>
+#include <string>
 
 #include <csma_timing.h>
 
@@ -269,6 +272,28 @@ void test_csma03_alter_ist_micros_wrap_sicher()
     TEST_ASSERT_FALSE(csmaCadFreeNeedsRecheck(csmaCadResultAgeUs(0xFFFFFF00UL, 0x0000002CUL), false));
 }
 
+static void test_csma03_loop_delay_1ms_waehrend_cad(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(100, csmaLoopDelayMs(false, false));
+    TEST_ASSERT_EQUAL_UINT32(1, csmaLoopDelayMs(true, false));
+    TEST_ASSERT_EQUAL_UINT32(1, csmaLoopDelayMs(false, true));
+    TEST_ASSERT_EQUAL_UINT32(1, csmaLoopDelayMs(true, true));
+}
+
+static void test_csma03_nrf52loop_delay_nutzt_helper(void)
+{
+    std::string file(__FILE__);
+    const std::string suffix = "test/test_csma_timing/test_csma_timing.cpp";
+    std::string path = file.substr(0, file.size() - suffix.size()) + "src/nrf52/nrf52_main.cpp";
+    std::ifstream f(path.c_str(), std::ios::binary);
+    TEST_ASSERT_TRUE(f.good());
+    std::stringstream ss;
+    ss << f.rdbuf();
+    std::string s = ss.str();
+    TEST_ASSERT_TRUE(s.find("delay(csmaLoopDelayMs(") != std::string::npos);
+    TEST_ASSERT_TRUE(s.find("    delay(100);\n\n    yield();") == std::string::npos);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -295,6 +320,8 @@ int main(int, char **)
     RUN_TEST(test_csma05_idle_ceiling_deckt_jede_klasse_ab);
     RUN_TEST(test_csma03_frisches_ergebnis_sendet_veraltetes_wird_neu_gescannt);
     RUN_TEST(test_csma03_alter_ist_micros_wrap_sicher);
+    RUN_TEST(test_csma03_loop_delay_1ms_waehrend_cad);
+    RUN_TEST(test_csma03_nrf52loop_delay_nutzt_helper);
     RUN_TEST(test_csma05_nach_idle_erbt_niedrige_prio_keine_kurze_wartezeit);
     return UNITY_END();
 }

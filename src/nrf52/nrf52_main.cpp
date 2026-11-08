@@ -472,6 +472,7 @@ void blinkLED2();                                    // blink RED
 #include "gateway_service.h"
 #include "gw_reg_runtime.h"
 #include "csma_timing.h"   // CSMA-05: csmaIdleCeilingMs()
+#include "ping_budget.h"   // PING-NRF-01: pingBudgetOpen(), pingCountAfterSend()
 
 
 #if defined(ENABLE_RTC)
@@ -2883,25 +2884,32 @@ void nrf52loop()
     if (resendPing == 0)
         resendPing = millis();
 
-    if(meshcom_settings.node_pingtime > 29)
+    if(pingBudgetOpen(meshcom_settings.node_pingtime, meshcom_settings.node_pingcall, meshcom_settings.node_pingcount))
     {
         if((int32_t)(millis() - (resendPing + meshcom_settings.node_pingtime * 1000)) > 0)
         {
+            // PING-NRF-01: previous ping got no pong -> same fail path as ESP32
+            if(bPingSend)
+            {
+                printfdeb("[PONG]...fail from %s\n", meshcom_settings.node_pingcall);
+                PongFail(meshcom_settings.node_pingcall);
+            }
+
             resendPing = millis();
 
             if(bDisplayInfo)
                 printfdeb("[PING]...send Ping to %s\n", meshcom_settings.node_pingcall);
 
-            if(meshcom_settings.node_pingcall[0] != 0x00)
-            {
-                PingResult pingResult = sendPing(meshcom_settings.node_pingcall);
+            PingResult pingResult = sendPing(meshcom_settings.node_pingcall);
 
-                // Fehlschlag außerhalb von bDisplayInfo sichtbar machen, sonst verstummt
-                // der Knoten für jeden, der mit Info aus läuft, ohne jede Meldung.
-                // LRF W1a: PING_INVALID_TARGET logs its own notice in sendPing().
-                if(pingResult != PING_QUEUED && pingResult != PING_INVALID_TARGET)
-                    printfdeb("[PING]...FAILED Ping to %s\n", meshcom_settings.node_pingcall);
-            }
+            // Fehlschlag außerhalb von bDisplayInfo sichtbar machen, sonst verstummt
+            // der Knoten für jeden, der mit Info aus läuft, ohne jede Meldung.
+            // LRF W1a: PING_INVALID_TARGET logs its own notice in sendPing().
+            if(pingResult != PING_QUEUED && pingResult != PING_INVALID_TARGET)
+                printfdeb("[PING]...FAILED Ping to %s\n", meshcom_settings.node_pingcall);
+
+            // TRACK / INVALID_TARGET are no send attempt: budget untouched (as ESP32).
+            meshcom_settings.node_pingcount = pingCountAfterSend(meshcom_settings.node_pingcount, pingResult == PING_SUPPRESSED_TRACK, pingResult == PING_INVALID_TARGET);
         }
     }
 
@@ -2911,7 +2919,15 @@ void nrf52loop()
     #endif
 
     //  We are on FreeRTOS, give other tasks a chance to run
-    delay(100);
+    // CSMA-03: while a CAD runs or its result waits to be consumed, poll fast so the
+    // result is not 60-97 ms old when TX uses it.
+    {
+        taskENTER_CRITICAL();
+        bool _dl_ip = cad_in_progress;
+        bool _dl_df = cad_done_flag;
+        taskEXIT_CRITICAL();
+        delay(csmaLoopDelayMs(_dl_ip, _dl_df));
+    }
 
     yield();
 }

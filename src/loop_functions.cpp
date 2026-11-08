@@ -402,6 +402,7 @@ char LogCallsign[10] = {0};
 
 bool bDisplayRetx = false;
 unsigned long DisplayOffWait = 0;
+unsigned long heldFrameUntilMs = 0;   // PING-HOLD-01: clock-skip deadline of a ping/pong frame (0 = none)
 bool bHeldFrameDrawn = false;   // CLK-PING-01: a held full-screen frame was drawn (DisplayPong, hold text)
 bool bDisplayTrack = false;
 bool bOneButton = false;
@@ -2147,7 +2148,7 @@ static void sendDisplayClockLine()
     dcIn.second       = meshcom_settings.node_date_second;
     dcIn.oneButton    = bOneButton;
     dcIn.displayDirty = bDisplayDirty;
-    dcIn.holdActive   = dispClkHeldFrame(DisplayOffWait, bHeldFrameDrawn);   // CLK-PING-01: drawn held frame, no clock line
+    dcIn.holdActive   = dispClkHeldFrame(DisplayOffWait, bHeldFrameDrawn, millis(), heldFrameUntilMs);   // CLK-PING-01: drawn held frame, no clock line
 
     const DispClkDecision dcDecision = dispClkDecide(dcIn);
     if(dcDecision != DispClkDecision::Draw)
@@ -3976,7 +3977,8 @@ void DisplayPong(char line1[20], char line2[20], char line3[20], char line4[20])
             u8g2->drawStr(5, 60, line4);
         #endif
     } while (u8g2->nextPage());
-    bHeldFrameDrawn = true;   // CLK-PING-01: the clock line keeps off this frame while DisplayOffWait runs
+    bHeldFrameDrawn = true;   // CLK-PING-01: the clock line keeps off this frame for PING_FRAME_HOLD_MS
+    heldFrameUntilMs = dispClkFrameDeadline(millis(), dispClkPingHoldMs(meshcom_settings.node_pingtime));
 
     #endif
 }
@@ -4062,6 +4064,7 @@ int oledTextTest(const char *utf8, int font, int hold_s)
     if(hold_s > 600) hold_s = 600;
     DisplayOffWait = millis() + (unsigned long)hold_s * 1000UL;
     bHeldFrameDrawn = true;   // CLK-PING-01
+    heldFrameUntilMs = 0;     // PING-HOLD-01: hold text keeps its own duration (DisplayOffWait)
     if(DisplayOffWait == 0) DisplayOffWait = 1;
     bDisplayIsOff = false;
     return 0;
