@@ -74,6 +74,35 @@ void test_light_bubbles_stand_out(void)
     TEST_ASSERT_EQUAL_HEX32(tdeck_rgb565(0x15171A), tdeck_rgb565(tdeck_palette(true).chat_bg));
 }
 
+// DISP-PAT-01 panel photos (2026-11-08): near white only every third RGB565 step is visible, received and sent
+// bubbles (white vs pale pink) were 1.02:1 on the panel, and 0x181818 did not read as black. Operator decision:
+// light text and outline pure black, muted much darker, every chat fill >= 3 steps from every other.
+void test_light_panel_measured(void)
+{
+    const TdeckPalette& p = tdeck_palette(false);
+    TEST_ASSERT_EQUAL_HEX32(0x000000, p.text);
+    TEST_ASSERT_EQUAL_HEX32(0x000000, p.bubble_border);
+    check_pair("light", "muted/bubble_in", p.muted, p.bubble_in, 7.0);
+    check_pair("light", "muted/chat_bg", p.muted, p.chat_bg, 7.0);
+    const uint32_t fills[] = {p.chat_bg, p.bubble_in, p.bubble_out, p.bubble_sys};
+    const char* names[] = {"chat_bg", "bubble_in", "bubble_out", "bubble_sys"};
+    for(int i = 0; i < 4; i++)
+        for(int j = i + 1; j < 4; j++)
+        {
+            char msg[64];
+            const double st = tdeck_rgb565_steps(fills[i], fills[j]);
+            snprintf(msg, sizeof(msg), "%s/%s %.1f steps < 3", names[i], names[j], st);
+            TEST_ASSERT_TRUE_MESSAGE(st >= 3.0, msg);
+        }
+}
+
+void test_rgb565_steps(void)
+{
+    TEST_ASSERT_TRUE(tdeck_rgb565_steps(0xFFFFFF, 0xFFFFFF) == 0.0);
+    TEST_ASSERT_TRUE(tdeck_rgb565_steps(0xFFFFFF, 0x000000) == 31.5 || tdeck_rgb565_steps(0xFFFFFF, 0x000000) == 31.0);
+    TEST_ASSERT_TRUE(tdeck_rgb565_steps(0xFFFFFF, 0xE7FFFF) == 3.0); // red 31 -> 28
+}
+
 // Operator decision 2026-11-08 (photo IMG_9963): light bubbles get a near-black outline, dark ones none.
 void test_bubble_border(void)
 {
@@ -181,6 +210,8 @@ int main(int, char**)
     RUN_TEST(test_light_bubbles_stand_out);
     RUN_TEST(test_rgb565_quantise);
     RUN_TEST(test_bubble_border);
+    RUN_TEST(test_light_panel_measured);
+    RUN_TEST(test_rgb565_steps);
     RUN_TEST(test_chatfont);
     RUN_TEST(test_resolve_table);
     RUN_TEST(test_resolve_out_of_range_is_auto);

@@ -71,17 +71,17 @@ Target bench node: T-Deck Plus **DK5EN-14**. Repo: `MeshCom-Firmware-DEV-Main`, 
 | `tab_sel`       | `#B3203A`       | `#A2182F`       | selected tab, focus outline                                    |
 | `bg`            | `#14161A`       | `#FFFFFF`       | screen background                                              |
 | `surface`       | `#1B1E23`       | `#F9F9F9`       | panels, lists, message area                                    |
-| `text`          | `#E8E8E8`       | `#181818`       | body text (light: RGB565 grid, 2026-11-08)                     |
-| `muted`         | `#A8ADB5`       | `#4A494A`       | secondary text, hints (light: 2026-11-08)                      |
+| `text`          | `#E8E8E8`       | `#000000`       | body text (light: pure black, panel photos 2026-11-08)         |
+| `muted`         | `#A8ADB5`       | `#212021`       | secondary text, hints (light: panel photos 2026-11-08)         |
 | `border`        | `#8A8F98`       | `#767676`       | input and panel borders                                        |
 | `btn_on`        | `#B3203A`       | `#A2182F`       | active/primary button                                          |
 | `btn_off`       | `#3A1D24`       | `#FCEDF0`       | inactive button                                                |
 | `btn_fg_off`    | `#E8E8E8`       | `#252323`       | text on inactive button                                        |
 | `ok`            | `#3FB950`       | `#1A7F37`       | on/ok states (replaces `#00a300`)                              |
 | `bubble_in`     | `#22262C`       | `#FFFFFF`       | received message bubble                                        |
-| `bubble_out`    | `#3A1D24`       | `#FFEBEF`       | sent message bubble                                            |
-| `bubble_sys`    | `#2A2F36`       | `#EFF7FF`       | system message bubble                                          |
-| `bubble_border` | `#2A2F36`, 0 px | `#181818`, 3 px | bubble and group-button outline, light only                    |
+| `bubble_out`    | `#3A1D24`       | `#CEF3CE`       | sent message bubble (light green)                              |
+| `bubble_sys`    | `#2A2F36`       | `#FFF3C6`       | system message bubble (pale yellow)                            |
+| `bubble_border` | `#2A2F36`, 0 px | `#000000`, 3 px | bubble and group-button outline, light only                    |
 | `chat_bg`       | `#14161A`       | `#CED7DE`       | chat area (`msg_list` and tab page t2); dark = `bg`, as before |
 | `accent`        | `#FF8A9B`       | `#A2182F`       | red as text on background (`--mcred`)                          |
 
@@ -90,6 +90,11 @@ Chat text size S/M/L = 12/14/16 px (`mc_font_latin_12/14/16`), setting `node_tde
 Light bubbles changed 2026-11-08 after the operator's T-Deck photos: the old fills (`#F0F0F0`, `#FCEDF0`) sat one or
 two RGB565 steps off the white chat area and vanished on the panel. Light text, muted and bubble fills now deviate from
 `mc.css` on purpose; the host test judges every pair after RGB565 quantisation.
+
+Panel photos 2026-11-08 (DISP-PAT-01, `--tdpattern`, 24 shots at backlight 16/8/4/1): near white the panel
+separates only about every third RGB565 step, shadows are lifted, and `#181818` does not read as black. Light text and
+outline are therefore pure black, muted is `#212021`, and every light chat fill is at least 3 RGB565 steps from every
+other (host test `test_light_panel_measured`). Verification shoot with locked exposure and RAW follows.
 
 Contrast requirement: at least 4.5:1 for every text-on-background pair, at least 3:1 for borders and state
 indicators. The W1 host test enforces this. If a pair fails, adjust the T-Deck token and note it in the campaign
