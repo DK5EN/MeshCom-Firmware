@@ -67,7 +67,7 @@
 <body>
 <h1>MeshCom fork: campaigns since September 2026, and the backlog ahead</h1>
 <ul class="meta">
-  <li>State: 2026-11-07 late evening; branch <code>fork-dev</code> at <code>83bf116f</code>; release-train implementation W1-W4 done, bench flash next</li>
+  <li>State: 2026-11-08 afternoon; branch <code>fork-dev</code> at <code>b37b800b</code> plus T-Deck setup rework in its gate; upstream v4.40a.11.07 merged; CLK-01 fix and the bulk bench next</li>
   <li>Tokens and cost: local Claude Code transcripts at API list prices (method in the foot)</li>
   <li>Sources: commit dates on <code>fork-dev</code>, release tags, <code>docs/campaign-*.md</code>, <code>docs/BACKLOG.md</code>, <code>docs/RESUME.md</code></li>
 </ul>
@@ -109,7 +109,7 @@
   <div>
     <h2>Ahead</h2>
     <ul>
-      <li><b>Release train (to ~11-14):</b> implement 11 rows in waves W1-W4 (BL-01, SENS-04, SB-06, CSMA-01, BLE-SET-01, GPIO-06, IDEE-04 hop clamp, RM-NOANS-01, CLK-01 W0, two tooling rows; plan in <code>campaign-impl-train-20261107.md</code>), bulk build, bulk flash, bulk bench (28 rows incl. TD-THEME-01 W4), docs, release.</li>
+      <li><b>Release train (to ~11-14):</b> W1-W4 done 11-08, T-Deck chat and setup reworked, upstream v4.40a.11.07 merged; open: CLK-01 fix, bulk build, bulk flash incl. DK5EN-90, bulk bench. Original plan: 11 rows in waves W1-W4 (BL-01, SENS-04, SB-06, CSMA-01, BLE-SET-01, GPIO-06, IDEE-04 hop clamp, RM-NOANS-01, CLK-01 W0, two tooling rows; plan in <code>campaign-impl-train-20261107.md</code>), bulk build, bulk flash, bulk bench (28 rows incl. TD-THEME-01 W4), docs, release.</li>
       <li><b>After the release:</b> DK5EN-98 soak with OK (AU-24, GWRX-01), GPSV4-01 upstream PR, field checks, studies.</li>
       <li><b>Waiting:</b> 11 rows on reporters, maintainers and the OE1KBC/OE1KFR talk; 18 ideas, none committed.</li>
     </ul>
@@ -196,6 +196,14 @@ const rows = [
  {p:"Release train",n:"Impl W2: SENS-04, CSMA-01, CLK-01 core",id:"IMPL-TRAIN",st:"done",s:"11-08",e:"11-08",note:"2ade9625; DHT type as new keyed setting; CSMA re-arm shorten-only; clock tick and display-gate helpers, tests deactivated until the fix"},
  {p:"Release train",n:"Impl W3: CLK-01 instrumentation",id:"CLK-01",st:"done",s:"11-08",e:"11-08",note:"244cd0c6; [CLOCK], [DISPCLK], --timesrc, --clockstat, --oledshot, --tdshot; INSTRUMENT builds only"},
  {p:"Release train",n:"Impl W4: GOLDEN-MACROS-01",id:"IMPL-TRAIN",st:"done",s:"11-08",e:"11-08",note:"84eed6d5; golden regenerated, no gate (operator). CSMA-03 not in this train (operator)"},
+ {p:"Release train",n:"INSTRUMENT flash DK5EN-1, -14, -92",id:"",st:"done",s:"11-08",e:"11-08",note:"USB, identity guard before and after"},
+ {p:"Release train",n:"CLK-01 W1: S1 and S5 measured",id:"CLK-01",st:"done",s:"11-08",e:"11-08",note:"e49407a8; free clock loses 11-17 s/h (lost ticks), OLED clock not redrawn for 6-8 min on non-clock pages"},
+ {p:"Release train",n:"T-Deck readable chat, S-M-L, contrast pattern",id:"TD-CHAT-01",st:"done",s:"11-08",e:"11-08",note:"9ca52108, b37b800b; slate chat background, outlined bubbles and group buttons, --chatfont, --tdpattern (DISP-PAT-01)"},
+ {p:"Release train",n:"Panel contrast photos: JPEG round, RAW round",id:"DISP-PAT-01",st:"done",s:"11-08",e:"11-08",note:"panel merges grey 29-31; light palette from the RAW numbers; docs/screenshots/tdeck-panel-20261108"},
+ {p:"Upstream PRs merged",n:"Official v4.40a.11.07 (our PRs up to #1257, L76K #1259)",id:"",st:"rel",s:"11-08",e:"11-08",note:"merged into fork-dev da76033b; L76K improvements on top dec799a6"},
+ {p:"Release train",n:"T-Deck setup: font size, theme, display, slider",id:"TD-CHAT-01",st:"run",s:"11-08",e:"11-08",note:"segmented Auto/Light/Dark switches, --bl mode, input page follows font size; gate and flash running"},
+ {p:"Release train",n:"CLK-01 W1 rest: S2, S3 (2 h), S4",id:"CLK-01",st:"plan",s:"11-09",e:"11-09",note:"message page, CET-only, WLAN off"},
+ {p:"Release train",n:"CLK-01 W2: fix F1 redraw, F3 tick loss",id:"CLK-01",st:"plan",s:"11-09",e:"11-10",note:"red tests go green; then W3 after-measurement in the bulk bench"},
  {p:"Release train",n:"Bulk build: host gate and every board env",id:"",st:"plan",s:"11-11",e:"11-11",note:"regression.sh --stage 1,2, then each env once, sequential"},
  {p:"Release train",n:"Bulk flash DK5EN-1, -14, -90, -92",id:"",st:"plan",s:"11-11",e:"11-11",note:"Not DK5EN-98"},
  {p:"Release train",n:"Bulk bench: 28 bench rows plus campaign checks",id:"",st:"plan",s:"11-12",e:"11-13",note:"TD-THEME-01 W4, TD-22/23/27-34, CSMA-02/04, AU-14, BOOT-01, NRF-BLEDFU, web rows; list in BACKLOG 3.2"},
