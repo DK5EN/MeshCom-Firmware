@@ -110,8 +110,9 @@ Relay-Kante `A,M` mehr ein -- ein anderes Gateway kann meinen hochgeladenen Text
   Beobachtete Kante gewinnt immer; ein Knoten, der den Frame nur per Annahme hat, versorgt
   niemanden (hoechstens eine Annahme je Entscheidung, Advisor-Fund).
 - Settings-Bit `node_sset4` 0x0080 = `--nbrsym off` (invertiert wie `--mesh`; seit 25.09. 0x2000, siehe Bit layout).
-- Settings-Bits `node_sset4` 0x0100 = `--nbrreport off`, 0x0200 = `--nbrreport on`, keins = auto
-  (Default; sendet nur bei Mesh aus UND Gateway aus).
+- Settings-Bits `node_sset4` 0x0100 = `--nbrreport off`, 0x0200 = `--nbrreport on` (damals; Schalter und
+  Bits seit BL-01, 2026-11-07, **ausser Dienst**, siehe `docs/nbr-logformat.md`). Verhalten seitdem fest `auto`
+  (sendet nur bei Mesh aus UND Gateway aus).
 - Schwelle `LORA_SNR_STABLE_MIN_DB` (-16) steht in `src/configuration_default.h` direkt bei
   SF/BW/CR, weil sie an der Modulation haengt; `NBR_SYM_MIN_SNR` ist nur noch ein Alias.
 - Abbruch unter `on` darf auf beobachteter, gemeldeter UND angenommener Deckung ruhen
@@ -138,16 +139,16 @@ KISS-Build startete KISS von selbst mit erlaubtem TX auf einem Knoten, der die N
 gesetzt hatte). Betreiberentscheidung: die vier kollidierenden Bits sechs Stellen nach oben
 verschieben, in den Bereich, den `--setlog off`s and_mask (0x00007FFB) bereits ausschliesst
 (loescht alles >= 0x8000; `node_sset`/`2`/`3` haben keine freien Bits mehr, nutzbar bleiben
-nur 0x0400..0x4000). `--nbrreport` (0x0100/0x0200) kollidiert nicht und bleibt stehen.
+nur 0x0400..0x4000). `--nbrreport` (0x0100/0x0200) kollidierte nicht und blieb damals stehen (seit BL-01 ausser Dienst).
 
-| Schalter                                  | Bit alt (bis 2026-09-24) | Bit neu (ab 2026-09-25) |
-| ----------------------------------------- | ------------------------ | ----------------------- |
-| `--nbrdebug`                              | 0x0010                   | 0x0400                  |
-| `--nbrrelay` count                        | 0x0020                   | 0x0800                  |
-| `--nbrrelay` on (zusaetzlich, bNBRCANCEL) | 0x0040                   | 0x1000                  |
-| `--nbrrelay` on (beide Bits)              | 0x0060                   | 0x1800                  |
-| `--nbrsym off` (invertiert)               | 0x0080                   | 0x2000                  |
-| `--nbrreport off`/`on` (unveraendert)     | 0x0100/0x0200            | 0x0100/0x0200           |
+| Schalter                                                        | Bit alt (bis 2026-09-24) | Bit neu (ab 2026-09-25) |
+| --------------------------------------------------------------- | ------------------------ | ----------------------- |
+| `--nbrdebug`                                                    | 0x0010                   | 0x0400                  |
+| `--nbrrelay` count                                              | 0x0020                   | 0x0800                  |
+| `--nbrrelay` on (zusaetzlich, bNBRCANCEL)                       | 0x0040                   | 0x1000                  |
+| `--nbrrelay` on (beide Bits)                                    | 0x0060                   | 0x1800                  |
+| `--nbrsym off` (invertiert)                                     | 0x0080                   | 0x2000                  |
+| `--nbrreport off`/`on` (unveraendert; seit BL-01 ausser Dienst) | 0x0100/0x0200            | 0x0100/0x0200           |
 
 0x4000 bleibt frei. Bestandsknoten (DK5EN-1, DK5EN-98) tragen die alten Bits noch im Flash;
 `settings_sanitize.h::nbr_sset4_migrate_legacy_bits()` verschiebt sie beim Laden einmalig

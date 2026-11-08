@@ -292,7 +292,7 @@ Knoten einmalig und nie redundant zu einem anderen Sender.
 Der Schalter `--nbrreport off|auto|on` wurde entfernt (BL-01, 2026-11-07); das Verhalten ist
 dauerhaft `auto`: Die Meldung wird nur gesendet, wenn Mesh AUS UND Gateway AUS sind -- genau die
 Situation, in der der Knoten sonst unsichtbar bliebe. Die frueheren Bits `0x0100`/`0x0200` in
-`node_sset4` werden nicht mehr gelesen; ein dort gespeicherter Wert bleibt ohne Wirkung.
+`node_sset4` sind ausser Dienst (retired) und werden nicht mehr gelesen; ein dort gespeicherter Wert bleibt ohne Wirkung.
 
 ### Empfaenger: gelistete Eintraege werden zu Kanten
 

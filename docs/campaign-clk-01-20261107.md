@@ -97,13 +97,13 @@ E-ink boards (Wireless Paper, T5, E290) refresh the clock every 10 s by design (
 
 ## Acceptance criteria
 
-| Id  | Criterion                                                                                                    | Measured by                                                   |
-| --- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| A1  | On OLED and T-Deck the displayed second advances every second on every page, message page included.          | `[DISPCLK];draw` lines: no gap > 1 s over 30 min; screenshots |
-| A2  | Free-running clock (`--timesrc cet`) stays within 2 s of host time over 2 h, before each `{CET}` correction. | `[CLOCK];stat` vs host timestamp; `[CLOCK];set` delta         |
-| A3  | A `{CET}` correction moves the clock by at most 2 s (beyond the beacon's own transit age).                   | `[CLOCK];set;src;CET;delta_ms`                                |
-| A4  | Per-second OLED redraw costs no more than 5 % loop time and no LoRa RX loss.                                 | `--oledlog` frame time, `--instr` loop sections               |
-| A5  | No regression on NTP, GPS and RTC paths; `--stage 1,2` green.                                                | regression gate                                               |
+| Id  | Criterion                                                                                                                                                                                                                                                                                                 | Measured by                                                                                                |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| A1  | On OLED and TFT the displayed second advances every second on every page that has a clock line (info, position, track, WX). The message page and the ping pages keep their content (sender header, ping text); the clock is drawn again when the next clock page is built (operator decision 2026-11-08). | `[DISPCLK];draw` lines: no gap > 1 s over 30 min outside `skip;type0` / `skip;ping` stretches; screenshots |
+| A2  | Free-running clock (`--timesrc cet`) stays within 2 s of host time over 2 h, before each `{CET}` correction.                                                                                                                                                                                              | `[CLOCK];stat` vs host timestamp; `[CLOCK];set` delta                                                      |
+| A3  | A `{CET}` correction moves the clock by at most 2 s (beyond the beacon's own transit age).                                                                                                                                                                                                                | `[CLOCK];set;src;CET;delta_ms`                                                                             |
+| A4  | Per-second OLED redraw costs no more than 5 % loop time and no LoRa RX loss.                                                                                                                                                                                                                              | `--oledlog` frame time, `--instr` loop sections                                                            |
+| A5  | No regression on NTP, GPS and RTC paths; `--stage 1,2` green.                                                                                                                                                                                                                                             | regression gate                                                                                            |
 
 ## Instrumentation (W0)
 
@@ -206,11 +206,14 @@ Raw `*.log` stays gitignored. The wave commit carries only the cited files.
 
   Day/hour events and the TZ-01 minute re-anchor keep working because they compare the old and new `struct tm`.
 
-- **F1:** on the message page redraw only the top line (clock, battery) every second, leave the message body
-  untouched; `pageHold` and `bSetDisplay` keep blocking the full page, not the clock line.
+- **F1 (decided 2026-11-08, replaces the first design):** the message page keeps its sender header. `pageText[0]`
+  (OLED) and the header bar (TFT, `displayTFT(msg_text)`) hold `GM<grp> <CALL> <rssi>` there, so a per-second clock line
+  would overwrite it. The clock stays frozen while `iDisplayType == 0` (also during button browsing) and is drawn again
+  when the next clock page is built.
 - **F2:** drop the 0/15/30/45 gate in both places; keep the frame CRC skip. If A4 fails, draw the clock line into a
   partial buffer update (`u8g2.updateDisplayArea`) instead of a full frame.
-- **Ping gate:** the ping display shares the top line; decide in W2 whether it keeps priority.
+- **Ping gate (decided 2026-11-08):** the ping/pong pages (`DisplayPong`) are full-screen text without a clock line.
+  They are treated like the message page: no clock draw, no overwrite.
 
 ## W1 results (2026-11-08, partial: S1 and S5)
 
@@ -250,3 +253,39 @@ INSTRUMENT builds of `fork-dev` `d9bd847f` on DK5EN-1 (Heltec V3), DK5EN-92 (T-B
 - Confirm with the tester that the stale time is on the OLED and coincides with a message page (F1 vs F3).
 - `{CET}` transit age: a beacon relayed over several hops arrives late (age gate 150 s). A3 must subtract the
   payload age, or the "after" run blames the clock for the network.
+
+## W2 result (2026-11-08)
+
+- **F3:** `Clock::CheckEvent()` counts the real elapsed whole seconds (`clockTickSeconds(start, now)`) and carries the
+  remainder in one pure step (`clockTickStep()`, `src/clock_tick.h`; call site `src/clock.cpp`). A 3 s block now counts 3 s.
+- **F2:** `dispClkDecide()` no longer returns `SkipGate15`; `sendDisplayClockLine()` (called by `sendDisplayTime()`)
+  draws every second on pages with a clock line. It replaces `pageText[0]` and re-transfers the page buffer via `"#N"`
+  (no appended duplicate line); the OLED frame CRC skip stays. `pageHold` never blocked the clock line.
+- **F1 (final behaviour):** an earlier W2 draft also drew on the message page and re-transferred `pageText[0]`, which
+  replaced the sender header (OLED) and the header bar (TFT: T114, Tracker, T-Connect-Pro) with the time. Operator
+  decision: the message page stays frozen. `dispClkDecide()` returns `SkipType0` again for `iDisplayType == 0`, also
+  while browsing (`pageHold > 0`); `[DISPCLK];skip;type0` is a real reason once more. The clock is current again on the
+  page change back: `sendDisplayHead/Position/Track/WX` all call `sendDisplayMainline()`, which draws the time at once.
+  Pinned by `test_f1_message_page_never_draws_clock`, `test_f1_message_header_survives_clock_pass` and
+  `test_clockline_decides_before_touching_pagetext`.
+- **Track page (A1 "every page"):** `sendDisplayTrack()` rebuilds the page every 15 s (data, e-paper refresh cost) and
+  on the other seconds only calls `sendDisplayClockLine()` (swap `pageText[0]`, re-transfer the cached page buffer, no
+  re-formatting). `iDisplayType = 9` is set only in the rebuild, so a browsed message page keeps its header in track
+  mode. WP_DISP/e-paper boards have no clock line there (unchanged, 10 s refresh). Pinned by
+  `test_display_track_clock_every_second_page_every_15s` (replaces `test_display_track_keeps_its_15s_gate`).
+- **Ping pages:** a configured ping (`dispClkPingActive()`: call set, interval and count > 0) keeps skipping the clock
+  (`ping` reason). `DisplayPong` draws four full-screen text lines with no clock line, so there is nothing to advance and
+  nothing may be overwritten; kept like the message page. The ESP32 call site (`esp32_main.cpp`, gate before
+  `mainStartTimeLoop()`) is a second, unchanged copy of the same condition.
+- **Kept:** WP_DISP e-paper keeps its 10 s refresh (`gate15` skip reason).
+- **Open (ping):** with a configured ping the ESP32 loop does not call `mainStartTimeLoop()` at all and the nRF52 path
+  skips `sendDisplayTime()`, so the head page clock also stays frozen between pings, not only on the ping text. Gating on
+  `DisplayOffWait > 0` (ping text on screen) instead would need an `esp32_main.cpp` change; operator decision.
+- **Instrument contract:** `[DISPCLK];skip` reasons now seen on U8g2 boards: `off`, `type0`, `setdisplay`, `ping`;
+  `gate15` remains only as a legacy string (still emitted by WP_DISP). `[CLOCK];stat` `lost_ms` is now the carried
+  remainder (< 1 s), not an accumulating loss.
+- **Tests:** `test_fix_F2` and the F3 tests are live; `test_gate15_seconds` changed to "every second draws";
+  `test_exhaustive_differs_from_old_logic_only_by_gate15` keeps the real pre-W2 logic as oracle. `clockTickStep()`
+  (`clock_tick.h`) is the call `CheckEvent()` makes (pinned), with a 70 s block across the `millis()` wrap. The old
+  "current behaviour" F3 tests are renamed `test_prefix_model_*`.
+- W3 must measure A4 (frame time at 1 Hz, `--oledlog on`).

@@ -43,8 +43,40 @@ Every `pio` call goes through the scratchpad lock wrapper; each writer runs only
 group. Bench parts (CLK-01 W1 rest and W3 after-run, CSMA-03 on DK5EN-90, GPIO-06/08 on a T-Deck Pro) join the bulk
 bench.
 
-## Status
+## Status (2026-11-08, wave 1)
 
-| Writer | Status  |
-| ------ | ------- |
-| all    | planned |
+Wave 1 implemented by five writers, first advisor pass REWORK (blocking: F1 overwrote the message-page sender
+header), operator decisions taken, rework by two fresh writers at high effort; second advisor pass and final gate at
+the wave commit. Goldens regenerated with `MC_AU_DEV_CHANNEL=1` (only the two T-Deck Pro lines change).
+
+Second advisor pass: all first-pass items fixed; two new findings. (1) The web clock re-sync fetched the current
+page, so on the spectrum page it would start a radio scan: now always `?page=info`, pinned in `webgui_look_test.js`
+(failed before, passes after). (2) "Track mode overwrites a pong page" rejected by the orchestrator: every
+`DisplayPong()` caller sets `DisplayOffWait` (`loop_functions.cpp` ~:2828, :4192, :4207) and the track branch runs
+only at `DisplayOffWait == 0` (~:2718).
+
+Operator decisions during the wave:
+
+- Message page: the clock stays frozen (type0 skip back); redraw on the page change.
+- Track page: clock every second, page rebuild every 15 s. Ping: the clock must stay current (see next wave).
+- Web colours lifted to the stray-light targets: light `--mcok` `#1A7733` (5.63:1), dark `--mcredbtn` `#AB1F36`
+  (7.04:1); no KNOWN-LOW exemptions left.
+- Web extras: ticking page clock (synced at render, re-sync after laptop sleep, PC clock only detects), lighter
+  toggle OFF state (`#C8C8C8` track with `#767676` outline).
+
+## Next wave (resume here)
+
+1. **CLK-PING-01:** with a ping configured the ESP32 head-page clock freezes: `esp32_main.cpp` ~:5177 skips
+   `mainStartTimeLoop()` and `loop_functions.cpp` ~:2747 skips the clock draw whenever a ping is configured. Both
+   must test "pong page shown" (`DisplayOffWait` set at `loop_functions.cpp` ~:4196/:4210) instead. One writer, both
+   files, host test. Operator wants the clock current on every page.
+2. **GPIO-09 (interview the operator):** further T-Deck copies in `variants/t_deck_pro/configuration.h` that are
+   wrong for the Pro: ES7210 audio pins (MCLK 48 = SD CS, LRCK 21, SCK 47, DIN 14), TFT CS 12 / DC 11 (the Pro has
+   e-paper), backlight 42 (= keyboard LED), POWERON 10 (= A7682E RXD).
+3. **Open questions for the operator:** CSMA-03 staleness threshold `CSMA_CAD_MAX_AGE_US` 5 ms is a guess (bench on
+   DK5EN-90 decides, log marker `CAD_STALE_RECHECK`); SENS-05 schema range 11..22 lets 15 through (sanitiser
+   catches it on load); `clock_drift.py` now reboots each node twice per run (identity guard).
+4. **Bench (bulk bench):** CLK-01 W1 rest (S2, S3, S4) and W3 after-run incl. A4 OLED frame time with
+   `--oledlog on`; CSMA-03 on DK5EN-90; GPIO-06/08 on a T-Deck Pro; web GUI look in Safari (T-Deck controls, page
+   clock, toggles, theme/font switch); T-Deck green and setup page on DK5EN-14.
+5. Release only after the backlog is complete (operator); upstream PRs later as a bundle.
