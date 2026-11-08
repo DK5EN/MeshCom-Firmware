@@ -109,16 +109,32 @@ E-ink boards (Wireless Paper, T5, E290) refresh the clock every 10 s by design (
 
 All of it under `-D INSTRUMENT_ENABLED=1`, RAM-only, absent from a normal board build (same rule as `--airgap`).
 
-| Item                             | Output / behaviour                                                                                                                                                           |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `[CLOCK];stat` every 60 s        | `epoch;<tsClock_m>;ms;<millis>;ticks;<n>;late_sum_ms;<sum>;late_max_ms;<max>;lost_ms;<real elapsed - counted>;src;<cTimeSource>` - the drift of F3 measured inside the node  |
-| `[CLOCK];set` on every clock set | `src;<NTP\|GPS\|RTC\|CET\|PHONE\|CMD>;old;<epoch>;new;<epoch>;delta_ms`. NTP/GPS/RTC set every loop pass, so log only when `\|delta\| >= 1 s` or once per 60 s               |
-| `--clockstat`                    | the `[CLOCK];stat` line on demand                                                                                                                                            |
-| `--timesrc all\|cet\|none`       | gate in `setCurrentTime()` callers: `cet` accepts only `{CET}` (NTP, GPS, RTC, phone ignored, `{CET}` accepted even with RTC), `none` lets the clock run free. Default `all` |
-| `[DISPCLK];draw`                 | per draw of the clock line: `hms;<hh:mm:ss>;type;<iDisplayType>`                                                                                                             |
-| `[DISPCLK];skip`                 | per second without a draw, with the reason: `type0`, `hold`, `setdisplay`, `off`, `ping`, `gate15`                                                                           |
-| `--oledshot` (serial)            | the u8g2 frame buffer (1 KiB at 128x64) as one base64 line `[OLEDSHOT];<w>x<h>;<b64>`, same layout as `GET /screen.oled` (`src/oled_shot.h`), for runs without WLAN          |
-| `--tdshot` (serial, T-Deck)      | the PSRAM shadow frame (320x240 RGB565, 150 KiB) as base64 in chunks; about 15 s at 115200 baud, so only on demand                                                           |
+| Item                             | Output / behaviour                                                                                                                                                          |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[CLOCK];stat` every 60 s        | `epoch;<tsClock_m>;ms;<millis>;ticks;<n>;late_sum_ms;<sum>;late_max_ms;<max>;lost_ms;<real elapsed - counted>;src;<cTimeSource>` - the drift of F3 measured inside the node |
+| `[CLOCK];set` on every clock set | `src;<NTP\|GPS\|RTC\|CET\|PHONE\|CMD>;old;<epoch>;new;<epoch>;delta_ms`. NTP/GPS/RTC set every loop pass, so log only when `\|delta\| >= 1 s` or once per 60 s              |
+| `--clockstat`                    | the `[CLOCK];stat` line on demand                                                                                                                                           |
+| `--timesrc all\|cet\|none`       | gate in `Clock::setCurrentTime()`: `cet` accepts only `{CET}` (NTP, GPS, RTC, phone ignored, `{CET}` accepted even with RTC), `none` lets the clock run free. Default `all` |
+| `[DISPCLK];draw`                 | per draw of the clock line: `hms;<hh:mm:ss>;type;<iDisplayType>`                                                                                                            |
+| `[DISPCLK];skip`                 | per second without a draw, with the reason: `type0`, `setdisplay`, `off`, `ping`, `gate15`                                                                                  |
+| `--oledshot` (serial)            | the u8g2 frame buffer (1 KiB at 128x64) as one base64 line `[OLEDSHOT];<w>x<h>;<b64>`, same layout as `GET /screen.oled` (`src/oled_shot.h`), for runs without WLAN         |
+| `--tdshot` (serial, T-Deck)      | the PSRAM shadow frame (320x240 RGB565, 150 KiB) as base64 in chunks; about 15 s at 115200 baud, so only on demand                                                          |
+
+Implemented (W0 part 2) - final command set and line formats. Code: `src/clock_instrument.{h,cpp}`, hooks in
+`Clock::SetClock/CheckEvent/setCurrentTime`, `sendDisplayTime()` and the WP_DISP clock branches, short arms in
+`commandAction()`. Pure helpers: `src/clock_tick.h` (`clockTickLateMs`, `clockLostMs`), `src/b64enc.h` (base64, host test in
+`test_oled_shot`).
+
+| Command / line                                                                         | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[CLOCK];set;src;<S>;old;<epoch>;new;<epoch>;delta_ms;<signed>`                        | S = NTP, GPS, RTC, CET, PHONE, CMD, SER, OTHER (boot restore, TZ re-anchor, topo restore, offset change). `delta_ms` = new time minus the node's time at that instant (tick epoch + ms into the second). Logged if `\|delta\| >= 1 s`, else the first set per source and then once per 60 s per source                                                                                                                                        |
+| `[CLOCK];stat;epoch;..;ms;..;ticks;..;late_sum_ms;..;late_max_ms;..;lost_ms;..;src;..` | every 60 s from `CheckEvent()` and on `--clockstat`. `ticks`, `late_*` count since boot; `lost_ms` = real ms since the last set minus counted seconds x 1000, taken at the last tick (reset by every set). `src` = last accepted named source (not `cTimeSource`, which callers set even when `--timesrc` ignored the set)                                                                                                                    |
+| `--clockstat`                                                                          | the stat line on demand                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `--timesrc all\|cet\|none`                                                             | gate in `Clock::setCurrentTime()`; prints `[CLOCK];timesrc;<mode>`. `cet` accepts only the `{CET}` frame (also with an RTC fitted), `none` ignores all. Internal `SetClock()` calls (boot restore in `time_functions.cpp`, TZ re-anchor, topo restore) are NOT gated: they happen without a time source and keep the offset consistent. RAM only, default `all`. Callers still run their own bookkeeping (`cTimeSource`, `bNTPDateTimeValid`) |
+| `[DISPCLK];draw;hms;<hh:mm:ss>;type;<iDisplayType>`                                    | at the clock-line draw in `sendDisplayTime()`; WP_DISP: at each `wpRefreshClock()` call (every 10 s). At most one line per second                                                                                                                                                                                                                                                                                                             |
+| `[DISPCLK];skip;<reason>`                                                              | reason from `dispClkReason()`: type0, off, setdisplay, gate15, plus `ping` from the caller (ping configured, `sendDisplayTime()` not called). WP_DISP: `off` or `gate15` (the 10 s gate). `hold` is never emitted (`pageHold` is not consulted by the gate) and `nodisplay` (no u8g2, e-paper, T-Deck: no clock line in `sendDisplayTime()`) is suppressed in the caller. At most one line per second                                         |
+| `--oledshot`                                                                           | `[OLEDSHOT];<w>x<h>;<base64 of the u8g2 buffer>` (one line, 1368 chars at 128x64) or `[OLEDSHOT];err;<no display\|display off\|not a full frame>`                                                                                                                                                                                                                                                                                             |
+| `--tdshot` (T-Deck, T-Deck Plus)                                                       | `[TDSHOT];begin;320x240;153600;200`, 200 x `[TDSHOT];chunk;<idx>;<base64 of 768 bytes>`, `[TDSHOT];end`; raw RGB565 big endian as `/screen.rgb565`. First use switches the PSRAM shadow on, forces a redraw and prints `[TDSHOT];err;shadow was off, now on - repeat ...`; repeat after the redraw. `Serial.flush()`, `meshcom_wdt_feed()` and `yield()` per chunk                                                                            |
 
 Host side:
 
@@ -164,6 +180,12 @@ DK5EN-98 stays untouched; it is the gateway whose `{CET}` beacons the bench node
 | S5  | Free run, no source         | `--timesrc none`, 30 min                                                                         | pure F3 drift, no correction                                 | drift within crystal tolerance        |
 
 S4 changes stored settings on DK5EN-1; restore the SSID afterwards and check the start page.
+
+`--tdshot` blocks the loop for its whole duration (about 15 s at 115200 baud, 200 chunks), so `CheckEvent()` ticks are
+missed and the clock loses that time under the current scheme (F3). Take `[CLOCK];stat` readings away from the shots
+(not within about 20 s after a `--tdshot`) or discount the step in the F3 drift curve; with `--oledshot` the effect is
+negligible (one 1368-character line). While `--timesrc` is not `all`, the instrument build also skips the hardware RTC
+write-back and forces the free-running clock path on RTC boards, so the gate really leaves the clock alone.
 
 ### Evidence kept
 

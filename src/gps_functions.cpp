@@ -1101,6 +1101,7 @@ int WZ_GPS_Loop() {
                && gpsDatePlausible((int)gpsData.year, (int)gpsData.month, (int)gpsData.day)
                && gpsTimePlausible((int)gpsData.hour, (int)gpsData.minute, (int)gpsData.second))
             {
+                CLK_SRC("GPS");
                 MyClock.setCurrentTime(meshcom_settings.node_utcoff, gpsData.year, gpsData.month, gpsData.day, gpsData.hour, gpsData.minute, gpsData.second);
                 snprintf(cTimeSource, sizeof(cTimeSource), (char*)"GPS");
             }
@@ -1241,6 +1242,7 @@ int WZ_GPS_Loop() {
                && gpsDatePlausible((int)gpsData.year, (int)gpsData.month, (int)gpsData.day)
                && gpsTimePlausible((int)gpsData.hour, (int)gpsData.minute, (int)gpsData.second))
             {
+                CLK_SRC("GPS");
                 MyClock.setCurrentTime(meshcom_settings.node_utcoff, gpsData.year, gpsData.month, gpsData.day, gpsData.hour, gpsData.minute, gpsData.second);
                 snprintf(cTimeSource, sizeof(cTimeSource), (char*)"GPS");
                 

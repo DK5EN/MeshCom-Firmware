@@ -26,6 +26,8 @@
 
 #pragma once
 
+#include "clock_instrument.h"   // CLK-01 W0: CLK_SRC() (no-op outside INSTRUMENT builds)
+
 class Clock {
 public:
 	// events
@@ -122,6 +124,11 @@ public:
 	// @return true on day, false on night
 	inline bool IsDay() { return ((suClock_m.tm_hour >= 6) && (suClock_m.tm_hour <= 18)); }
 	
+#if INSTRUMENT_ENABLED
+	// CLK-01 W0: epoch for [CLOCK];stat (tsClock_m, node-local convention)
+	inline time_t Epoch() const { return tsClock_m; }
+#endif
+
 	// loop operation - either call Loop() or CheckEvent() in order to keep the clock synchronized
 	inline void Loop() { CheckEvent(); }
 	

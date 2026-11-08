@@ -2,6 +2,7 @@
 #include <unity.h>
 #include <string.h>
 #include "../../src/oled_shot.h"
+#include "../../src/b64enc.h"   // CLK-01: --oledshot / --tdshot line encoder
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -70,6 +71,39 @@ static void test_known_pattern_8bpp(void)
     TEST_ASSERT_EQUAL_INT(64, lit);
 }
 
+// RFC 4648 section 10 test vectors
+static void test_b64_rfc4648(void)
+{
+    static const char *const in[] = {"", "f", "fo", "foo", "foob", "fooba", "foobar"};
+    static const char *const ex[] = {"", "Zg==", "Zm8=", "Zm9v", "Zm9vYg==", "Zm9vYmE=", "Zm9vYmFy"};
+    char out[16];
+    for (int i = 0; i < 7; i++)
+    {
+        size_t n = b64Encode((const uint8_t *)in[i], strlen(in[i]), out, sizeof(out));
+        TEST_ASSERT_EQUAL_UINT32(strlen(ex[i]), n);
+        TEST_ASSERT_EQUAL_STRING(ex[i], out);
+    }
+}
+
+static void test_b64_capacity(void)
+{
+    char out[8];
+    // "foo" needs 4 chars + NUL = 5; cap 4 is too small -> 0, out terminated
+    TEST_ASSERT_EQUAL_UINT32(0, b64Encode((const uint8_t *)"foo", 3, out, 4));
+    TEST_ASSERT_EQUAL_UINT32(4, b64Encode((const uint8_t *)"foo", 3, out, 5));
+    TEST_ASSERT_EQUAL_UINT32(0, b64Encode((const uint8_t *)"foo", 3, out, 0));
+    TEST_ASSERT_EQUAL_UINT32(4, b64EncodedLen(1));
+    TEST_ASSERT_EQUAL_UINT32(8, b64EncodedLen(4));
+}
+
+static void test_b64_binary(void)
+{
+    const uint8_t v[] = {0x00, 0xFF, 0xFE, 0x80, 0x01};
+    char out[16];
+    b64Encode(v, sizeof(v), out, sizeof(out));
+    TEST_ASSERT_EQUAL_STRING("AP/+gAE=", out);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -78,5 +112,8 @@ int main(int, char **)
     RUN_TEST(test_page_boundary);
     RUN_TEST(test_lsb_is_top);
     RUN_TEST(test_known_pattern_8bpp);
+    RUN_TEST(test_b64_rfc4648);
+    RUN_TEST(test_b64_capacity);
+    RUN_TEST(test_b64_binary);
     return UNITY_END();
 }

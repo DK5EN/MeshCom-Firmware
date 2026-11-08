@@ -23,7 +23,7 @@ bench step stays an open `bench` row for the bulk bench later.
 | ---- | ------------------------------------------------------------------------------------------ | ------ |
 | W1   | BL-01, IDEE-04, BLE-SET-01, GPIO-06, RM-NOANS-01, TEST-OTA-01, SB-06, CLK-01 host tool     | done   |
 | W2   | SENS-04, CSMA-01, CLK-01 core (tick and display-gate helpers, deactivated tests)           | done   |
-| W3   | CLK-01 instrumentation (`[CLOCK]`, `[DISPCLK]`, `--timesrc`, `--clockstat`, shots)         | open   |
+| W3   | CLK-01 instrumentation (`[CLOCK]`, `[DISPCLK]`, `--timesrc`, `--clockstat`, shots)         | done   |
 | W4   | GOLDEN-MACROS-01 (orchestrator: regenerate golden, add check to `test/golden/selftest.sh`) | open   |
 
 Per wave: `ls` of expected files, diff read, `tools/regression.sh --stage 1,2`, every touched board env built
@@ -75,3 +75,12 @@ run green. Follow-ups found by the advisor are backlog rows CSMA-05 and SENS-05.
 
 Plan deviation: SENS-04 stores the DHT type in a new keyed member (`node_dht`) instead of a spare byte, because none
 exists; the keyed nRF52 store and ESP32 NVS are layout-independent and the frozen BLE v1 blob is untouched.
+
+## W3 result (2026-11-08)
+
+CLK-01 W0 part 2, INSTRUMENT builds only (normal builds unchanged; RAM identical, flash within the known ESP32
+non-reproducibility). Advisor first pass REWORK: `--timesrc cet` never applied `{CET}` (RTC/NTP flags blocked it),
+`delta_ms` overflowed a 32-bit print, `--tdshot` did not feed the task watchdog, skip-reason doc mismatch. A fresh
+writer at high effort fixed these plus three bench-relevant points (no RTC write-back while the gate is active,
+free-running clock forced on RTC boards with GPS fix, info lines not counted as malformed by `clock_drift.py`).
+Second pass APPROVED. Build INSTRUMENT images with `PLATFORMIO_BUILD_FLAGS="-DINSTRUMENT_ENABLED=1"`.

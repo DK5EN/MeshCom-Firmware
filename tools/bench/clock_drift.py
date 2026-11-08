@@ -30,6 +30,9 @@ whitespace separated, so printfdeb's space form parses too):
   [DISPCLK];skip;<reason>        reason: type0|hold|setdisplay|off|ping|gate15
                                  (also accepted: [DISPCLK];skip;reason;<reason>)
   [OLEDSHOT];<w>x<h>;<base64>    u8g2 buffer, layout of GET /screen.oled (oled_screenshot.unpack)
+  Info lines (recorded under "info_events" in the summary, not malformed):
+  [CLOCK];timesrc;<all|cet|none>   [CLOCK];timesrc;err;<text>;now;<mode>
+  [OLEDSHOT];err;<text>            [TDSHOT];err;<text>
 
   epoch / old / new are unix seconds (tsClock_m), integer or decimal.
 
@@ -69,6 +72,9 @@ import tdeck_screenshot  # noqa: E402  (rgb565be_to_rgb888, WIDTH, HEIGHT)
 
 OUT_DIR = HERE / "runs" / "harness"
 OLED_SCALE = 4
+# (tag, kind) pairs the firmware prints as plain information: recorded in the summary, not parsed
+# further and never counted as malformed.
+INFO_KINDS = (("CLOCK", "timesrc"), ("OLEDSHOT", "err"), ("TDSHOT", "err"))
 SKIP_REASONS = ("type0", "hold", "setdisplay", "off", "ping", "gate15")
 TIMESRC_VALUES = ("all", "cet", "none")
 STAMP_ISO_RE = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?)\s{1,2}(.*)$")
@@ -122,7 +128,8 @@ def _pairs(tokens: List[str]) -> Dict[str, str]:
 def parse_event(text: str) -> Optional[Tuple[str, str, Dict[str, Any]]]:
     """Parse one text line into (tag, kind, fields), or None if it is not a well-formed event.
 
-    Tags: CLOCK (stat|set), DISPCLK (draw|skip), OLEDSHOT (shot), TDSHOT (begin|chunk|end).
+    Tags: CLOCK (stat|set|timesrc), DISPCLK (draw|skip), OLEDSHOT (shot|err), TDSHOT (begin|chunk|end|err).
+    timesrc and the shot err lines are info events (INFO_KINDS): recorded, never malformed.
     """
     m = EVENT_RE.search(text)
     if not m:
@@ -132,6 +139,8 @@ def parse_event(text: str) -> Optional[Tuple[str, str, Dict[str, Any]]]:
     if not tok:
         return None
     if tag == "OLEDSHOT":
+        if tok[0] == "err":
+            return tag, "err", {"msg": " ".join(tok[1:])}
         dm = DIM_RE.match(tok[0])
         if not dm or len(tok) != 2:
             return None
@@ -148,6 +157,15 @@ def parse_event(text: str) -> Optional[Tuple[str, str, Dict[str, Any]]]:
             if v is not None:
                 f[k] = int(v)
         return tag, kind, f
+    if tag == "CLOCK" and kind == "timesrc":
+        if args and args[0] in TIMESRC_VALUES and len(args) == 1:
+            return tag, kind, {"mode": args[0]}
+        if args and args[0] == "err":
+            now = args[args.index("now") + 1] if "now" in args[:-1] else ""
+            return tag, kind, {"err": " ".join(args[1:]), "now": now}
+        return None
+    if tag == "TDSHOT" and kind == "err":
+        return tag, "err", {"msg": " ".join(args)}
     if tag == "CLOCK" and kind == "set":
         kv = _pairs(args)
         old, new = _num(kv.get("old", "")), _num(kv.get("new", ""))
@@ -263,6 +281,10 @@ class NodeStats:
     malformed: int = 0
     shot_errors: int = 0
     shots: List[str] = field(default_factory=list)
+    info: List[Dict[str, Any]] = field(default_factory=list)
+
+    def add_info(self, t: float, tag: str, kind: str, f: Dict[str, Any]) -> None:
+        self.info.append({"t": round(t, 3), "tag": tag, "kind": kind, **f})
 
     def add(self, t: float, tag: str, kind: str, f: Dict[str, Any]) -> None:
         if tag == "CLOCK" and kind == "stat":
@@ -276,7 +298,8 @@ class NodeStats:
 
     def summary(self, gap_threshold_s: float = 1.5) -> Dict[str, Any]:
         out: Dict[str, Any] = {"node": self.node, "malformed_lines": self.malformed,
-                               "shot_errors": self.shot_errors, "shots": self.shots}
+                               "shot_errors": self.shot_errors, "shots": self.shots,
+                               "info_events": self.info}
         # Drift curve: node epoch advance minus host time advance, relative to the first stat.
         curve: List[Dict[str, float]] = []
         if self.stats:
@@ -343,7 +366,10 @@ class NodeSink:
                 self.stats.malformed += 1
                 return
             tag, kind, f = ev
-            if tag == "OLEDSHOT":
+            if (tag, kind) in INFO_KINDS:
+                self.stats.add_info(t, tag, kind, f)
+                self._emit({"t": round(t, 3), "node": self.stats.node, "tag": tag, "kind": kind, **f})
+            elif tag == "OLEDSHOT":
                 self._oled(t, f)
             elif tag == "TDSHOT":
                 self._tdshot(t, kind, f)

@@ -50,6 +50,7 @@
 #include "configuration_global.h"
 #if INSTRUMENT_ENABLED && MC_HAS_U8G2
 #include "oled_shot.h"   // oledTextTest()
+#include "clock_instrument.h"   // CLK-01 W0: --clockstat / --timesrc / --oledshot / --tdshot
 #endif
 #include "regex_functions.h"
 #include "ping_target.h"   // LRF 2.1: one ping-target rule
@@ -1373,6 +1374,7 @@ void commandAction(char *umsg_text, bool ble)
 
             if(Year > 2023)
             {
+                CLK_SRC("CMD");
                 MyClock.setCurrentTime(meshcom_settings.node_utcoff, Year, Month, Day, Hour, Minute, Second);
                 snprintf(cTimeSource, sizeof(cTimeSource), (char*)"HAND");
             }
@@ -1850,6 +1852,7 @@ void commandAction(char *umsg_text, bool ble)
             #if MC_HAS_U8G2
             printdeb("--oledtext [-10] [-t<s>] <text>  show UTF-8 test text on the OLED (fold + fonts as messages; -10 = 10x20; held 60 s or -t<s>), no TX\n");
             #endif
+            printdeb("--clockstat, --timesrc all|cet|none, --oledshot, --tdshot  CLK-01 display-clock instrumentation (RAM only; --tdshot T-Deck only)\n");
             printdeb("(bench/instrument commands -- this is an INSTRUMENT_ENABLED=1 measurement build, see src/instrument.h -- not listed individually here)\n");
             delay(100);
             #endif
@@ -6630,6 +6633,33 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"udphold") == 0)
     {
         udpHoldBenchCommand(msg_text+2+7);
+        return;
+    }
+    else
+    // CLK-01 W0 (docs/campaign-clk-01-20261107.md): display-clock lag instrumentation, RAM only.
+    // --clockstat prints one [CLOCK];stat line; --timesrc all|cet|none gates the clock sources;
+    // --oledshot / --tdshot print the screen as base64 on the serial line. Nothing is transmitted.
+    if(commandCheck(msg_text+2, (char*)"clockstat") == 0)
+    {
+        clockInstrCmdClockstat();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"timesrc") == 0)
+    {
+        clockInstrCmdTimesrc(msg_text+2+7);
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"oledshot") == 0)
+    {
+        clockInstrCmdOledshot();
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"tdshot") == 0)
+    {
+        clockInstrCmdTdshot();
         return;
     }
     #if MC_HAS_U8G2

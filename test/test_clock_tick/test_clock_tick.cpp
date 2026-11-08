@@ -97,6 +97,30 @@ void test_fix_F3_3s_block_counts_3s(void)
     TEST_ASSERT_EQUAL_UINT32(3u, clockTickSeconds(start, now));  // helper must account real time
 }
 
+// CLK-01 W0 instrument helpers
+static void test_instrument_late_and_lost(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(40u, clockTickLateMs(1040u, 1000u));
+    TEST_ASSERT_EQUAL_UINT32(5u, clockTickLateMs(3u, 0xFFFFFFFEu));   // across the millis rollover
+    TEST_ASSERT_EQUAL_INT32(0, clockLostMs(1000u, 0u, 1u));
+    TEST_ASSERT_EQUAL_INT32(40, clockLostMs(1040u, 0u, 1u));
+    // 100 ticks, each handled 40 ms late with the old scheme: 100 s counted, 104 s elapsed
+    TEST_ASSERT_EQUAL_INT32(4000, clockLostMs(104000u, 0u, 100u));
+    TEST_ASSERT_EQUAL_INT32(0, clockLostMs(984u, 0xFFFFFFF0u, 1u));   // set before the rollover: 1000 ms elapsed
+}
+
+static void test_delta_clamp_ms(void)
+{
+    TEST_ASSERT_EQUAL_INT32(0, clockDeltaClampMs(0));
+    TEST_ASSERT_EQUAL_INT32(-1500, clockDeltaClampMs(-1500));
+    TEST_ASSERT_EQUAL_INT32(2147483647, clockDeltaClampMs((int64_t)2147483647));
+    TEST_ASSERT_EQUAL_INT32(-2147483647 - 1, clockDeltaClampMs((int64_t)-2147483647 - 1));
+    // first set after boot: new epoch ~1.78e9 s minus old epoch 0 = ~1.78e12 ms
+    TEST_ASSERT_EQUAL_INT32(2147483647, clockDeltaClampMs((int64_t)1780000000 * 1000));
+    TEST_ASSERT_EQUAL_INT32(2147483647, clockDeltaClampMs((int64_t)2147483648LL));
+    TEST_ASSERT_EQUAL_INT32(-2147483647 - 1, clockDeltaClampMs(-(int64_t)1780000000 * 1000));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -107,5 +131,7 @@ int main(int, char **)
     RUN_TEST(test_current_3600_late_ticks_lose_time);
     RUN_TEST(test_fix_F3_3600_late_ticks_count_3600s);
     RUN_TEST(test_fix_F3_3s_block_counts_3s);
+    RUN_TEST(test_instrument_late_and_lost);
+    RUN_TEST(test_delta_clamp_ms);
     return UNITY_END();
 }

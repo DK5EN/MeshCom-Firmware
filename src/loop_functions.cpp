@@ -10,6 +10,7 @@
 
 #include "loop_functions.h"
 #include "display_clock_gate.h"   // CLK-01: sendDisplayTime() redraw decision (test_display_clock)
+#include "clock_instrument.h"    // CLK-01 W0: [DISPCLK] lines (INSTRUMENT builds only)
 #include "gfx_charmap.h"   // national characters on the GFXfont displays (E290, WP, E213)
 #include "text_fold.h"     // CHARS-01: fold what the display font lacks
 #include "ack_attribution.h"
@@ -2124,8 +2125,16 @@ void sendDisplayTime()
     dcIn.oneButton    = bOneButton;
     dcIn.displayDirty = bDisplayDirty;
 
-    if(dispClkDecide(dcIn) != DispClkDecision::Draw)
+    const DispClkDecision dcDecision = dispClkDecide(dcIn);
+    if(dcDecision != DispClkDecision::Draw)
+    {
+        #if INSTRUMENT_ENABLED
+        // "nodisplay" (no u8g2 / e-paper / T-Deck: no clock line here) would only be noise once a second
+        if(dcDecision != DispClkDecision::SkipNoDisplay)
+            clockInstrDispSkip(dispClkReason(dcDecision));
+        #endif
         return;
+    }
 
     bSetDisplay = true;
 
@@ -2182,6 +2191,10 @@ void sendDisplayTime()
         snprintf(msg_text, sizeof(msg_text), "%02i:%02i:%02i   %s", meshcom_settings.node_date_hour, meshcom_settings.node_date_minute, meshcom_settings.node_date_second, cbatt);
         #else
         snprintf(msg_text, sizeof(msg_text), "%s%02i:%02i:%02i%s", cstatus, meshcom_settings.node_date_hour, meshcom_settings.node_date_minute, meshcom_settings.node_date_second, cbatt);
+        #endif
+
+        #if INSTRUMENT_ENABLED
+        clockInstrDispDraw(meshcom_settings.node_date_hour, meshcom_settings.node_date_minute, meshcom_settings.node_date_second, iDisplayType);
         #endif
 
         memcpy(pageText[0], msg_text, 20);
@@ -2669,6 +2682,9 @@ void mainStartTimeLoop()
                     {
                         // weder neues Update noch faellige Rueckblende -> Normalansicht stehen lassen,
                         // nur die Uhr in der Statuszeile auffrischen.
+                        #if INSTRUMENT_ENABLED
+                        clockInstrDispDraw(meshcom_settings.node_date_hour, meshcom_settings.node_date_minute, meshcom_settings.node_date_second, iDisplayType);
+                        #endif
                         wpRefreshClock();
                     }
                     #else
@@ -2688,10 +2704,23 @@ void mainStartTimeLoop()
                     // der Statuszeile), statt sekuendlich. sendDisplayTime() ist fuer E-Paper
                     // ohnehin deaktiviert. Im aus-Zustand (--display off) NICHT refreshen.
                     if(!bDisplayIsOff && meshcom_settings.node_date_second % 10 == 0)
+                    {
+                        #if INSTRUMENT_ENABLED
+                        clockInstrDispDraw(meshcom_settings.node_date_hour, meshcom_settings.node_date_minute, meshcom_settings.node_date_second, iDisplayType);
+                        #endif
                         wpRefreshClock();
+                    }
+                    #if INSTRUMENT_ENABLED
+                    else
+                        clockInstrDispSkip(bDisplayIsOff ? "off" : "gate15");   // WP_DISP: 10 s gate
+                    #endif
                     #else
                     if(meshcom_settings.node_pingcall[0] == 0x00 || meshcom_settings.node_pingtime == 0 || meshcom_settings.node_pingcount == 0)
                         sendDisplayTime(); // Time only
+                    #if INSTRUMENT_ENABLED
+                    else
+                        clockInstrDispSkip(dispClkReason(DispClkDecision::SkipPing));
+                    #endif
                     #endif
                 }
 
@@ -2906,7 +2935,13 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
     if(mcStartsWith(aprsmsg.msg_payload, "{CET}") > 0)
     {
         // CET Meldungen nur annehmen wenn nichr GPS, RTC oder Handyverbindung vorhanden ist
-        if(!bRTCON && !posinfo_fix && !bNTPDateTimeValid) // !!!! erst aktivieren wenn PHone regelmässig zeit liefert  && !bPhoneTimeValid)
+        // !!!! erst aktivieren wenn PHone regelmässig zeit liefert  && !bPhoneTimeValid
+        #if INSTRUMENT_ENABLED
+        // CLK-01 W0: --timesrc cet takes {CET} even with RTC/GPS/NTP state
+        if((!bRTCON && !posinfo_fix && !bNTPDateTimeValid) || clockInstrCetOnly())
+        #else
+        if(!bRTCON && !posinfo_fix && !bNTPDateTimeValid)
+        #endif
         {
             uint16_t Year=2000;
             uint16_t Month=1;
@@ -2929,6 +2964,7 @@ void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)
 
             if(Year > 2023)
             {
+                CLK_SRC("CET");
                 MyClock.setCurrentTime(meshcom_settings.node_utcoff, Year, Month, Day, Hour, Minute, Second);
                 snprintf(cTimeSource, sizeof(cTimeSource), (char*)"{CET}");
             }

@@ -4258,6 +4258,16 @@ void esp32loop()
     // get RTC Now
     // RTC hat Vorrang zu Zeit via MeshCom-Server
     bool bMyClock = true;
+    // CLK-01 W0 (INSTRUMENT only): while --timesrc is not "all" the clock must run free and alone.
+    // bClkGated keeps the RTC write-backs below from storing that free-running clock into the
+    // hardware RTC, and forces the CheckEvent() path even on RTC boards with a GPS fix (where
+    // bMyClock is false and nothing would advance the clock, because the gated GPS/RTC sets are ignored).
+    #if INSTRUMENT_ENABLED
+    const bool bClkGated = clockInstrGated();
+    #else
+    const bool bClkGated = false;
+    #endif
+    (void)bClkGated;   // boards without RTC / normal builds do not read it
 
     // !posinfo_fix && !bNTPDateTimeValid
     // Time NTP
@@ -4298,6 +4308,7 @@ void esp32loop()
             // check valid Date & Time
             if(Year > 2023 && strTime.compareTo("none") != 0)
             {
+                CLK_SRC("NTP");
                 MyClock.setCurrentTime(meshcom_settings.node_utcoff, Year, Month, Day, Hour, Minute, Second);
                 bNTPDateTimeValid = true;
 
@@ -4323,7 +4334,7 @@ void esp32loop()
 
         if(posinfo_fix) // GPS hat Vorang zur RTC und setzt RTC
         {
-            if(meshcom_settings.node_date_year > 2023 && rtcRefreshDue(millis(), rtc_refresh_timer))
+            if(!bClkGated && meshcom_settings.node_date_year > 2023 && rtcRefreshDue(millis(), rtc_refresh_timer))
             {
                 //only every minute
                 // RTC haelt UTC, node_date_* sind Knotenzeit (RTC-1)
@@ -4352,6 +4363,7 @@ void esp32loop()
             // check valid Date & Time
             if(Year > 2013)
             {
+                CLK_SRC("RTC");
                 MyClock.setCurrentTime(0.0, Year, Month, Day, Hour, Minute, Second);
                 snprintf(cTimeSource, sizeof(cTimeSource), (char*)"RTC");
 
@@ -4365,6 +4377,11 @@ void esp32loop()
         bNTPDateTimeValid = false;
     }
     
+    #if INSTRUMENT_ENABLED
+    if(bClkGated)
+        bMyClock = true;
+    #endif
+
     if(bMyClock)
     {
         MyClock.CheckEvent();
@@ -4401,7 +4418,7 @@ void esp32loop()
         #if defined(ENABLE_RTC)
         // Ausserhalb des Einmal-pro-Boot-Blocks: gueltige NTP-Zeit frischt den RTC
         // einmal pro Minute auf (RTC-3), und zwar in UTC (RTC-1).
-        if(bRTCON && bNTPDateTimeValid && meshcom_settings.node_date_year > 2023) // NTP hat Vorang zur RTC und setzt RTC
+        if(!bClkGated && bRTCON && bNTPDateTimeValid && meshcom_settings.node_date_year > 2023) // NTP hat Vorang zur RTC und setzt RTC
         {
             if(rtcRefreshDue(millis(), rtc_refresh_timer))
             {

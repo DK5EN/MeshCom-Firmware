@@ -55,6 +55,7 @@
 #include "tz_rule.h"      // TZ-01: POSIX TZ rule from node_tz
 #include "tz_anchor.h"    // TZ-01: tzReanchor() (test_tz_anchor)
 #include "rtc_offset.h"   // rtcOffsetSec(), rtcEpochFromFields()
+#include "clock_instrument.h"   // CLK-01 W0 (INSTRUMENT builds only)
 
 //----------------------------------------------------------------------------
 // TZ-01: parse cache. node_tz is re-parsed only when it differs from the copy
@@ -104,6 +105,9 @@ Clock::EEvent Clock::CheckEvent()
 		u8Day      = suClock_m.tm_mday;
 		u8Hour     = suClock_m.tm_hour;
 		u32Diff    = clockTickSeconds(u32Start_m, u32Next_m);
+#if INSTRUMENT_ENABLED
+		clockInstrOnTick(millis(), u32Next_m, u32Diff);
+#endif
 		tsClock_m += u32Diff;
 		localtime_r(&tsClock_m, &suClock_m);
 #if defined(TEST)
@@ -164,6 +168,10 @@ Clock::EEvent Clock::CheckEvent()
 			tzApplyNow();
 		}
 	}
+
+#if INSTRUMENT_ENABLED
+	clockInstrStatPoll(tsClock_m, millis());
+#endif
 
 	// return event
 	return eEvent;
@@ -407,6 +415,15 @@ bool Clock::SetClock(/*const*/ time_t tsNow, /*const*/ bool boUseUTC /*= true*/)
 		}
 	}
 
+#if INSTRUMENT_ENABLED
+	{
+		const time_t   tsOld  = tsClock_m;
+		const uint32_t u32Now = millis();
+		// ms already elapsed in the current clock second (0 before the first set)
+		const uint32_t u32Into = (u32Start_m == 0ul) ? 0ul : (u32Now - u32Start_m);
+		clockInstrOnSet(tsOld, tsNow, u32Into, u32Now);
+	}
+#endif
 	tsClock_m = tsNow;
 	(boUseUTC) ? gmtime_r(&tsClock_m, &suClock_m)
 	           : localtime_r(&tsClock_m, &suClock_m);
@@ -528,6 +545,12 @@ void Clock::setCurrentTime(float fUTC, uint16_t Year, uint16_t Month, uint16_t D
 {
 
 	//Serial.printf("Date %i-%i-%i %02i:%02i:%02i\n", Year, Month, Day, Hour, Minute, Second);
+
+#if INSTRUMENT_ENABLED
+	// CLK-01 W0: --timesrc gate (RAM only, default all)
+	if (!clockInstrAccept())
+		return;
+#endif
 
 	struct tm suNow;
 

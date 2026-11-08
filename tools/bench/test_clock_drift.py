@@ -100,6 +100,34 @@ class ClockDriftTest(unittest.TestCase):
         self.assertEqual(summ["shot_errors"], 1)
         self.assertEqual(summ["draw_count"], 0)
 
+    def test_info_lines_are_not_malformed(self) -> None:
+        lines = [
+            "1800000000.0  [CLOCK];timesrc;cet",
+            "1800000001.0  [CLOCK];timesrc;err;usage --timesrc all|cet|none;now;cet",
+            "1800000002.0  [OLEDSHOT];err;no display",
+            "1800000003.0  [TDSHOT];err;shadow was off, now on - repeat --tdshot after the next redraw",
+            "1800000004.0  [TDSHOT];err;T-Deck only",
+            "1800000005.0  [CLOCK];timesrc;bogus",       # unknown mode stays malformed
+            stat(1800000010.0, 1800000010),
+        ]
+        summ, _ = run(lines, self.tmp)
+        self.assertEqual(summ["malformed_lines"], 1)
+        self.assertEqual(summ["stat_count"], 1)
+        self.assertEqual(summ["shot_errors"], 0)
+        info = summ["info_events"]
+        self.assertEqual([(i["tag"], i["kind"]) for i in info],
+                         [("CLOCK", "timesrc"), ("CLOCK", "timesrc"), ("OLEDSHOT", "err"),
+                          ("TDSHOT", "err"), ("TDSHOT", "err")])
+        self.assertEqual(info[0]["mode"], "cet")
+        self.assertEqual(info[1]["now"], "cet")
+        self.assertEqual(info[2]["msg"], "no display")
+        self.assertTrue(info[3]["msg"].startswith("shadow was off"))
+
+    def test_info_parse_event(self) -> None:
+        self.assertEqual(cd.parse_event("[CLOCK];timesrc;none"), ("CLOCK", "timesrc", {"mode": "none"}))
+        self.assertEqual(cd.parse_event("[OLEDSHOT];err;display off"), ("OLEDSHOT", "err", {"msg": "display off"}))
+        self.assertEqual(cd.parse_event("[TDSHOT];err;no memory"), ("TDSHOT", "err", {"msg": "no memory"}))
+
     def test_oled_roundtrip(self) -> None:
         w, h = 16, 8
         buf = bytearray(w * h // 8)

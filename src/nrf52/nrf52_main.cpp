@@ -1394,6 +1394,16 @@ void nrf52loop()
     // get RTC Now
     // RTC hat Vorrang zu Zeit via MeshCom-Server
     bool bMyClock = true;
+    // CLK-01 W0 (INSTRUMENT only): while --timesrc is not "all" the clock must run free and alone.
+    // bClkGated keeps the RTC write-backs below from storing that free-running clock into the
+    // hardware RTC, and forces the CheckEvent() path even on RTC boards with a GPS fix (where
+    // bMyClock is false and nothing would advance the clock, because the gated GPS/RTC sets are ignored).
+    #if INSTRUMENT_ENABLED
+    const bool bClkGated = clockInstrGated();
+    #else
+    const bool bClkGated = false;
+    #endif
+    (void)bClkGated;   // boards without RTC / normal builds do not read it
 
     #if defined(ENABLE_RTC)
     if(bRTCON)
@@ -1404,7 +1414,7 @@ void nrf52loop()
 
         if(posinfo_fix) // GPS hat Vorang zur RTC und setzt RTC
         {
-            if(MyClock.Year() > 2023 && rtcRefreshDue(millis(), rtc_refresh_timer))
+            if(!bClkGated && MyClock.Year() > 2023 && rtcRefreshDue(millis(), rtc_refresh_timer))
             {
                 //only every minute
                 // RTC haelt UTC, MyClock haelt Knotenzeit (RTC-1). Nicht node_date_*:
@@ -1435,6 +1445,7 @@ void nrf52loop()
             // check valid Date & Time
             if(Year > 2023)
             {
+                CLK_SRC("RTC");
                 MyClock.setCurrentTime(0.0, Year, Month, Day, Hour, Minute, Second);
                 snprintf(cTimeSource, sizeof(cTimeSource), (char*)"RTC");
                 bMyClock = true;
@@ -1476,6 +1487,7 @@ void nrf52loop()
             // check valid Date & Time
             if(Year > 2023 && strTime.compareTo("none") != 0)
             {
+                CLK_SRC("NTP");
                 MyClock.setCurrentTime(meshcom_settings.node_utcoff, Year, Month, Day, Hour, Minute, Second);
                 bNTPDateTimeValid = true;
 
@@ -1485,7 +1497,7 @@ void nrf52loop()
                 // gueltige NTP-Zeit frischt den RTC einmal pro Minute auf, in UTC.
                 // Direkt aus MyClock (Knotenzeit), node_date_* wird erst weiter
                 // unten nachgezogen.
-                if(bRTCON && rtcRefreshDue(millis(), rtc_refresh_timer))
+                if(!bClkGated && bRTCON && rtcRefreshDue(millis(), rtc_refresh_timer))
                 {
                     DateTime wutc((uint32_t)rtcUtcFromLocalFields(MyClock.Year(), MyClock.Month(), MyClock.Day(), MyClock.Hour(), MyClock.Minute(), MyClock.Second(), meshcom_settings.node_utcoff));
                     setRTCNow(wutc.year(), wutc.month(), wutc.day(), wutc.hour(), wutc.minute(), wutc.second());
@@ -1503,6 +1515,11 @@ void nrf52loop()
         bNTPDateTimeValid = false;
     }
 
+
+    #if INSTRUMENT_ENABLED
+    if(bClkGated)
+        bMyClock = true;
+    #endif
 
     if(bMyClock)
     {
@@ -3149,6 +3166,7 @@ unsigned int getGPS(void)
 
         meshcom_settings.node_alt = ((meshcom_settings.node_alt * 10) + (int)tinyGPSPlus.altitude.meters()) / 11;
 
+        CLK_SRC("GPS");
         MyClock.setCurrentTime(meshcom_settings.node_utcoff, tinyGPSPlus.date.year(), tinyGPSPlus.date.month(), tinyGPSPlus.date.day(), tinyGPSPlus.time.hour(), tinyGPSPlus.time.minute(), tinyGPSPlus.time.second());
         snprintf(cTimeSource, sizeof(cTimeSource), (char*)"GPS");
 
