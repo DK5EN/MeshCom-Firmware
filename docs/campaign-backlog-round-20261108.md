@@ -83,6 +83,35 @@ Two Sonnet writers, advisor REWORK twice (pageHold countdown frozen by a call-si
 draws nothing), first rework by two fresh writers at high, second by the orchestrator. Every fix has a test that fails
 before and passes after.
 
+## Wave 3: bulk bench (2026-11-08, running)
+
+INSTRUMENT builds of `90ece48c` on DK5EN-1, -92, -14 (OTA) and DK5EN-90 (`-DCSMA_CAD_MAX_AGE_US=0`). Operator
+decisions: W1 "before" S2-S4 skipped; T-Deck clock run over USB after CSMA-03 (RAK unplugged); GPIO-06/08/09 stay
+open (no T-Deck Pro); S4 runs with a new explicit `--offline-ok` waiver (`identity_guard.py`, `clock_drift.py`:
+WiFi/web/clock waived, callsign and TX power still checked, `identity_waiver` in the summary).
+
+| Run                                      | Result                                                                                                                                                                                |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B2 S1+S2 Heltec/T-Beam (`145740`)        | Clock drawn every second, no `gate15`; message page frozen by design (`type0`, ~150 s), redrawn on page change; drift < 0.5 s                                                         |
+| A4 T-Beam                                | OLED frame 37.6 ms at 1 Hz = 3.8 % loop time (limit 5 %)                                                                                                                              |
+| CLK-PING (`151342`)                      | Pongs arrived (4/4 shown); 5th ping dropped by DK5EN-90 as `RX_DEDUP_DUP` -> PONG FAILED. Clock frozen 158 s because ping/pong frames are held `pingtime` and repeat every `pingtime` |
+| CSMA-03 (`csma03-rak90-20261108-151137`) | Free CAD result always 60-97 ms old; cause `delay(100)` per nRF52 loop pass, see `docs/rca-csma03-cad-age-20261108.md`                                                                |
+| Web (DK5EN-14)                           | Operator review: segments one row auto-light-dark on the label line, green selection/slider, toggles keep outline, short T-Deck labels; advisor rework (pins page) applied            |
+| S3 T-Beam / T-Deck, S4 Heltec            | running                                                                                                                                                                               |
+
+Rejected: CLK-PING-02 (clear hold on a ping without redraw) -- on ESP32 that ping follows `PongFail()`'s fresh
+FAILED frame; diff kept out of the tree. RCA `docs/rca-pong-rx-01-20261108.md`: pong premise false.
+
+Operator decisions after the bench findings: ping/pong frames held 10 s then clock (PING-HOLD-01); nRF52 ping budget
+(`--ping stop`, `--pingmax`, PongFail; PING-NRF-01); CSMA-03 loop `delay(1)` while a CAD is pending, then re-bench
+DK5EN-90 with threshold 0 and set the threshold from the new p99; dedup of ping id ...803: bench check
+(`--msgid` across a reboot on DK5EN-1).
+
+Wave 4 writers (running): PING-HOLD-01 (`loop_functions.cpp` ping/pong display, `display_clock_gate.h`,
+`test_display_clock`); PING-NRF-01 + CSMA-03 delay (`ping_budget.h`, `esp32_main.cpp` ping scheduler,
+`nrf52_main.cpp` ping section and final delay, `csma_timing.h`, `test_ping_budget`, `test_csma_timing`).
+Orchestrator: `platformio.ini` (`test_ping_budget` registered), web files, tools, docs.
+
 ## Next wave (resume here)
 
 1. **Bench (bulk bench):** CLK-01 W1 rest (S2, S3, S4) and W3 after-run incl. A4 OLED frame time with

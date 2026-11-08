@@ -1,6 +1,6 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261106`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261108`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
@@ -8,6 +8,56 @@ Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `releas
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
 
 ---
+
+## Release v4.40a.11.08 (Sonntag, 2026-11-08)
+
+Gebaut und veroeffentlicht von GitHub CI (`MeshCom CI`, Tag `v4.40a.11.08`, `MC_BUILD_TAG` und `MC_AU_DEV_CHANNEL=1` gesetzt), 68 Assets, Struktur wie `v4.40a.11.06`.
+`FLASH_VERSION` 20261108, `FLASH_STRUCT_VERSION` 20260724 unveraendert -- die Einstellungen bleiben erhalten. Safeboot bleibt Faehigkeit v3, der Check eines Update-Images ist strenger (SB-06).
+Basis ist das offizielle `v4.40a.11.07` (2026-11-08, `upstream/dev` 5d76238b), gemerged als `da76033b`. Das Release ist **nicht** byte-gleich mit einem offiziellen Release, auch nicht mit `v4.40a.11.07`.
+
+Inhalt: Uhr (CET-AGE-01: veraltete `{CET}`-Baken setzen die Uhr nicht mehr zurueck; CLK-01: Uhr jede Sekunde, keine verlorenen Ticks; CLK-PING-01), Ping-Anzeige (PING-HOLD-01 und -02, PING-STOP-01),
+nRF52-Ping-Budget (PING-NRF-01, Handlungsbedarf fuer RAK4631, T114 und T-Echo), CSMA-03 (nRF52-Schleife 1 ms bei offener Kanalabfrage), CSMA-01 und CSMA-05, Hop-Begrenzung im Relay (IDEE-04),
+T-Deck-Theme Auto, Hell, Dunkel (TD-THEME-01), lesbarer Hell-Modus und Chat-Textgroesse (TD-CHAT-01, DISP-PAT-01), T-Deck-Einstellungen auf Geraet und Web-Seite (WEB-TD-01), Web-Setup-Seite neu geordnet,
+Pins-Seite mit Pin-Zuweisung und freiem GPIO-Schalter (GPIO-01 bis GPIO-04, `--gpiocontrol`, `--gpio`, RM1 `pins` und `gpio`), T-Deck-Pro-Pins (GPIO-06, GPIO-08, GPIO-09), Heltec-V4-GNSS (GPSV4-01),
+RAK4631-L76K-Erkennung (OE1KBC #1259, verbessert), DHT22 (SENS-04, SENS-05), `--nbrreport` entfernt (BL-01), totes nRF52-BLE-Settings-Characteristic entfernt (BLE-SET-01), Safeboot-Checks (SB-06, SB-07),
+RM-Queues-Karte je Zeile (RM-Q-01), INSTRUMENT-Uhrmessung und `clock_drift.py` mit `--offline-ok`.
+Die Store-Knoten-Korrektur SNF-ECHO-01 war schon in `v4.40a.11.06` und kommt hier ueber das offizielle `v4.40a.11.07` (PR #1257) noch einmal an.
+Kampagnen: `docs/campaign-backlog-round-20261108.md`, `docs/campaign-impl-train-20261107.md`, `docs/campaign-tdeck-theme.md`, `docs/campaign-gpio-01-20261107.md`, `docs/campaign-gpsv4-01-20261107.md`, `docs/campaign-clk-01-20261107.md`.
+
+Handlungsbedarf: nRF52 pingt nur noch nach `--ping start`, das Budget wird nicht gespeichert. Heltec V4: I2C liegt jetzt auf SDA 4 und SCL 3 statt 41/42 (die GNSS-Leitungen).
+
+Betreiber-Entscheidung 2026-11-08: Release mit reduziertem Umfang. Auf das Backlog verschoben: DEDUP-LAP-01, TRACK-PING-01 (PONG-Frame bleibt im TRACK-Modus die volle Ping-Zeit), Bench der T-Deck-Pro-Pins, die uebrigen Bulk-Bench-Zeilen des Release Trains,
+der CLK-01-Upstream-PR und die CSMA-03-Schwelle, falls der Re-Bench nichts Eindeutiges ergibt. Das Web-Label auf Gruen im hellen Theme liegt bei 5,08:1 (Ziel 7:1 fuer Fliesstext), der Betreiber ist informiert.
+
+### Was fuer dieses Release auf Hardware geprueft wurde
+
+- Bench 2026-11-08 auf INSTRUMENT-Builds von `fork-dev`-Staenden desselben Tages (nicht auf den Release-Images): DK5EN-1 (Heltec V3), DK5EN-92 (T-Beam), DK5EN-14 (T-Deck Plus), DK5EN-90 (RAK4631).
+- Uhr: Anzeige jede Sekunde, frei laufende Uhr stabil (+0,1 s in 2 h), ein OLED-Frame 37,6 ms, 3,8 % der Schleifenzeit (Grenze 5 %).
+- Veraltete `{CET}`-Baken: Rueckspruenge auf drei Knoten gesehen, bis -116 s, jeder gleich dem Alter einer Bake des zweiten Server-Stroms (`docs/rca-cet-age-01-20261108.md`).
+- Ping-Frames 10 s gehalten: laengste Luecke der Uhr 16 s auf DK5EN-1, vorher 158 s.
+- CSMA-03: Ursache auf DK5EN-90 gemessen, jedes freie CAD-Ergebnis war 60 bis 97 ms alt, weil die nRF52-Schleife 100 ms schlaeft (`docs/rca-csma03-cad-age-20261108.md`).
+- T-Deck-Theme dunkel, hell und auto von der Web-Seite umgeschaltet und am Geraet gesehen; gruene Sendeblase mit ACK am DK5EN-14.
+- Web-Setup-Seite vom Betreiber in Chrome geprueft.
+- Re-Bench CET-Guard (Heltec V3 + T-Beam, 1 h, nur `{CET}`): jeder Set innerhalb 0,8 s, kein Rueckwaertssprung (vorher 3-4 pro Stunde, bis 116 s).
+- Re-Bench CSMA-03 auf DK5EN-90: CAD-Ergebnis 1-2 ms alt (vorher 60-97 ms), CAD bis Senden 2-3 ms (vorher 63,5 ms); Schwelle 5 ms bleibt als Sicherheitsnetz.
+- Safari-Sichtpruefung (Operator, Dark Mode): Setup-Seite eine Zeile pro Steuerelement an der Haken-Kante, Auswahl und Slider gruen, Seitenuhr tickt; Nachrichten- und Nachbarseite in Ordnung.
+- Idle-Heap Release-Image T-Beam DK5EN-92: 65024 B frei nach 600 s mit BLE, 1008 B ueber der Basis 64016 B (Toleranz 3072 B).
+- Host-Gate `tools/regression.sh --stage 1,2`: PASS, 3765 Unity-Testfaelle in 107 Envs, 1593 pytest; Release-Check (CI-Run, 68 Assets, 28 .autoupdate) und Web-Flasher folgen nach dem Tag.
+
+### Was ausdruecklich NICHT geprueft wurde
+
+- GPSV4-01: kein Heltec V4 auf der Bench. Pins, Stromversorgung und I2C-Umzug nur per Build und Test, der vor der Korrektur rot war.
+- RAK4631-L76K-Erkennung: kein L76K-Modul auf der Bench. Vier Quelltext-Pin-Tests, Builds fuer RAK4631, T114 und T-Echo.
+- GPIO-01 bis GPIO-04 (Pins-Seite, Pin-Policy, freier GPIO-Schalter, RM1 `pins` und `gpio`): nur Host-Tests und Builds, ohne Jumper-Test (Betreiber-Entscheidung, Feldtest nach dem Release, GPIO-07).
+- GPIO-06, GPIO-08, GPIO-09: kein T-Deck Pro auf der Bench, Tastatur, SD-Karte und Touch nicht am Geraet probiert.
+- PING-NRF-01: nRF52-Ping-Budget nur Host-Test und Build, nicht auf einem RAK4631 mit `--ping start`, `--ping stop`, `--pingmax`.
+- CSMA-01, CSMA-05, IDEE-04: nur Host-Tests, nicht auf der Luft wiederholt. CSMA-03-Schwelle `CSMA_CAD_MAX_AGE_US` bleibt bei 5 ms bis zum Re-Bench.
+- SENS-04: kein DHT22 auf der Bench. SB-06 und SB-07: nur Host-Tests und Builds, ein falsches Image auf einem Board nicht probiert.
+- T-Deck: Chat-Textgroesse, fester Nacht-Pegel und Helligkeits-Schieber ohne eigenes Bench-Protokoll. Uhr jede Sekunde nur auf den OLEDs von Heltec V3 und T-Beam gemessen, nicht auf T-Deck, E-Paper, T114 und T-Echo.
+- RM-Q-01 (Queues-Karte) nur Web-Test, nicht ueber die Luft.
+- Offen aus dem Backlog: DEDUP-LAP-01 (Nachrichten-ID wiederholt sich bei haeufigen Neustarts im Dedup-Ring der Nachbarn), TRACK-PING-01, HV4-VEXT-01 (keine Strommessung im Deep Sleep).
+- Web-Kontrast: Label auf Gruen im hellen Theme 5,08:1, unter dem Ziel von 7:1.
+- Aus `v4.40a.11.06` weiter offen: AU-24 (T-Beam-Download), UV, Wind und Ladezustand nicht wiederholt, E290, Wireless Paper, E213, T-Echo und T114 nicht auf der Bench.
 
 ## Release v4.40a.11.06 (Freitag, 2026-11-06)
 

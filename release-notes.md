@@ -3,9 +3,148 @@
 
 ## What this release is
 
-**`v4.40a.11.06` brings national characters on every display, UV and wind sensors, the battery charge state, a web password you can manage on the page, a live Pins page, a message hold during server outages, and fixes that stop a T-Beam refusing updates and a RAK being bricked by a pin setting.** Your configuration survives the update. Only scripts that reboot a node over HTTP must act (below).
+**`v4.40a.11.08` keeps the display clock right and stops ping frames from hiding it, gives the T-Deck a light and dark theme with a readable light mode, adds a GPIO section to the Pins page, and builds on the official `v4.40a.11.07`.** Your configuration survives the update. nRF52 users who ping, and Heltec V4 owners with sensors on GPIO 41/42, must act (below).
 
 ### Action needed
+
+> [!WARNING]
+> **RAK4631, T114 and T-Echo: a ping no longer runs forever** (PING-NRF-01).
+>
+> - Without `--ping start` nothing is pinged. `--ping stop` and `--pingmax` now work on nRF52 as they do on ESP32.
+> - The ping budget is not stored. After a reboot, start the ping again.
+> - A ping that gets no answer now shows PONG FAILED.
+
+> [!WARNING]
+> **Heltec V4: the I2C bus moved from GPIO 41/42 to SDA 4 and SCL 3** (GPSV4-01). Pins 41 and 42 belong to the GNSS kit. A sensor wired to 41/42 must be moved. The GNSS fix itself is not tested on hardware (no V4 on our bench).
+
+> [!WARNING]
+> **T-Beam 1W and T-Deck Pro:** run the [web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/) once if you skipped it with `v4.40a.10.20` (1W) or `v4.40a.10.21` (Pro). Details: "Known gaps" below.
+
+**Everyone else:** update as usual (web flasher, `.bin` over USB, `tools/webflash.py`, or Auto Update on the `dev` channel). Scripts that call `?otaupdate` or `?reboot` already needed the header `X-MC: 1` since `v4.40a.11.06`.
+
+### Key facts
+
+- **Base:** the official `v4.40a.11.07` (2026-11-08, `upstream/dev` 5d76238b), merged into this tree on 2026-11-08. It carries our upstream PRs through #1257 and OE1KBC's RAK4631 L76K GPS probe (#1259).
+- **Fork-only firmware:** everything under "New in" below and the `dev` Auto Update channel. The release is **not** byte-identical to any official release, including `v4.40a.11.07`.
+- **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings are kept. New settings (DHT type, T-Deck theme, chat text size, fixed night backlight, GPIO control) start at their defaults.
+- **Removed setting:** `--nbrreport` is gone. The neighbour report is automatic and goes out only when neither `--mesh` nor `--gateway` is on (BL-01).
+- **How to tell builds apart:** the version on the air still reads `4.40a`.
+  - `--info` prints `...AU env=<board> tag=v4.40a.11.08` and `FLASH_VERSION 20261108`.
+  - `--id` prints `MCBOARD:v1:<hwid>:<hwid>:<board>:v4.40a.11.08`.
+- **Safeboot** stays at capability v3 and checks the new image more strictly (SB-06). It reaches a node only through the web flasher.
+- **Auto Update channels:** `prod` reads the latest icssw-org release, `dev` (`--updchan dev`) the **Latest** release of this fork, which is this one. The mode is always `notify`.
+- **Bench status:** the clock, ping and T-Deck theme work ran on our bench on 2026-11-08. The Heltec V4 GNSS, the Pins page, the T-Deck Pro pins and the nRF52 ping budget did not. "Verification" and "Known gaps" below say which is which.
+- **Assets (68):** 28 ESP32 application `.bin` plus 28 `.autoupdate` files, the three nRF52 boards as `.uf2` and DFU `.zip`, and six support files.
+
+## New in `v4.40a.11.08`
+
+**Clock**
+
+- **The display clock no longer jumps back by 1-2 minutes** (CET-AGE-01, CLK-01).
+  - Cause: a second server stream delivers `{CET}` time beacons that are 20-115 s old, and each one stepped the clock back. Seen before the fix on three bench nodes, up to -116 s.
+  - Now: a beacon more than 5 s behind, within 30 min of the last accepted one, is ignored (log `[CET];skip;back_s`). Forward steps, small steps and the first beacon after boot are accepted as before.
+  - Bench: stale steps of up to 116 s seen on three nodes before the fix; with the guard every `{CET}` set over 1 h stayed within 0.8 s (Heltec V3 and T-Beam).
+  - Background: [`docs/rca-cet-age-01-20261108.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.11.08/docs/rca-cet-age-01-20261108.md).
+- **The clock is drawn every second** on all clock pages, including the track page (CLK-01).
+  - Cause: the free-running clock lost ticks (CLK-01 F3), and the OLED clock line stayed frozen on pages other than the main page (F1).
+  - Measured 2026-11-08 on DK5EN-1 and DK5EN-92: the clock is drawn every second, a free-running clock drifted +0.1 s over 2 h, one OLED frame takes 37.6 ms, 3.8 % of loop time.
+  - By decision the message page keeps its sender header: the clock is frozen there and redrawn when the page changes.
+- **A configured ping no longer freezes the head-page clock** on ESP32 (CLK-PING-01).
+
+**Ping display and ping budget**
+
+- **Ping and pong frames stay for 10 s, then the clock returns** (PING-HOLD-01). DK5EN-1 bench: longest clock gap 16 s, was 158 s.
+- **The message page is redrawn after a ping frame** (PING-HOLD-02).
+- **`--ping start` and `--ping stop` no longer cause a false PONG FAILED** (PING-STOP-01).
+- **nRF52 honours the ping budget** (PING-NRF-01). See the warning above.
+
+**T-Deck display and theme**
+
+- **Theme: Auto, Dark or Light** (TD-THEME-01), console `--theme auto|dark|light`, kept across reboots.
+  - Auto follows the day and night period of the backlight. Header icons, tab bar, bubbles, toggles and the boot logo follow the theme live.
+  - A keyboard-lock glyph shows in the header while the lock is on. Map colours are unchanged.
+  - Bench: theme dark, light and auto switched from the web page and seen on the device (DK5EN-14).
+- **Readable light mode** (TD-CHAT-01, DISP-PAT-01): black text and outline, 3 px outlined bubbles, distinct fills.
+  - Cause: on the T-Deck panel the light bubbles vanished (operator photos, 2026-11-08).
+  - The sent bubble is green, and was seen with its ACK on the device. Header red is unchanged.
+  - The palette comes from operator photos of the panel, with host tests on the RGB565 steps between fills.
+- **Setup page: font size, theme, display mode and brightness** on the device (WEB-TD-01).
+  - Chat text S, M or L (`--chatfont s|m|l`), also applied to the compose box.
+  - Display: Auto (day and night switching), Light (fixed day level) or Dark (fixed night level), `--bl mode auto|day|night`. The slider edits the level the mode selects.
+- **Test pattern for panel photos** `--tdpattern` in INSTRUMENT builds only.
+
+**Web GUI**
+
+- **Setup page: label and control share one line,** with automatic light and dark mode and a green selection and slider.
+  - The T-Deck theme, font size, display and brightness are also set on this page (WEB-TD-01). Toggles keep their outline; T-Deck labels are shorter. Operator reviewed the page in Chrome on 2026-11-08.
+- **The web GUI has its own theme and text size,** kept in the browser. It shows a ticking clock, synced at page load and again after a laptop sleep.
+- **Contrast lifted to stray-light targets** for panels in sunlight: two colours changed (light `--mcok`, dark `--mcredbtn`); body text 7:1, secondary 5.5:1, controls 3:1.
+- **Board LED control lives on the Pins page only;** the Setup page keeps the charge LED switch.
+- **Menu order:** Pins right after Weather, Remote right after Position.
+
+**Pins and GPIO**
+
+- **Pin assignments on the Pins page** (GPIO-01): see which pin has which function, and set it where the board allows.
+  - A pin policy refuses radio, flash, display, GPS and similar pins in the four pin setters (1-Wire, button, analog, wind) and at load, with the reason.
+  - A button on GPIO 0 (Heltec V3 PRG) is shown as a pin, not "none". `--button gpio` takes effect after a restart (GPIO-02).
+- **Free GPIO control, off by default** (GPIO-01 Part B): `--gpiocontrol on|off` (console and a switch on the Pins page) and `--gpio list|<n> on|off|in|release`.
+  - Only reviewed boards offer free pins: T-Beam (13, 25) and Heltec V3 (2, 4, 5, 6). Others refuse, nRF52 answers "not on this board".
+  - A pin used by an enabled function is not offered. A config import or remote management cannot switch the master on.
+  - Over web, `/pinassign` and `/gpiostatus` report the state; a write needs the `X-MC` header.
+- **Remote management reads and sets pins** (RM1 `pins` and `gpio`, RM page). The button pin is read-only over RM: a remote move needs a restart and a pin held low could strand the node.
+- **T-Deck Pro pins** (GPIO-06, GPIO-04, GPIO-08, GPIO-09): keyboard IRQ moved from 46 to 15, radio power enable 46 reserved, SD CS 48 and touch INT 12 set, eight T-Deck copies removed from the Pro variant.
+  - Not tested: no T-Deck Pro on our bench.
+- **T5 and RAK4631 radio pins are reserved** (GPIO-03).
+
+**Heltec V4 GNSS**
+
+- **GNSS pins, power and I2C corrected** (GPSV4-01): RX/TX were swapped; the kit gets its enable (GPIO 34, active low), wake and reset lines. Deep sleep and `--gps off` release the TX and reset lines and keep the kit off.
+  - I2C moved to SDA 4 and SCL 3 (see the warning). R2 PSRAM only: no runtime guard against an R8 module.
+  - Not tested on hardware: no Heltec V4 on our bench. A regression block in `pin_board.cpp` fails on the old pins.
+
+**RAK4631 GPS**
+
+- **L76K detection works at 38400 and falls back to u-blox** (OE1KBC #1259, improved here).
+  - Now: the baud loop closes the port before the next try so the 38400 probe runs; with no answer the u-blox setup at 9600 runs as before; `--setublox` and `--setl76k` survive a reboot on nRF52.
+  - Not tested: no L76K module on our bench. Four source-pin tests fail before and pass after.
+
+**nRF52 and radio**
+
+- **The nRF52 loop polls every 1 ms while a channel check (CAD) is pending** (CSMA-03).
+  - Cause: the loop paused 100 ms per pass, so every free CAD result was 60-97 ms old when used.
+  - Now: the loop polls at 1 ms while a CAD runs or its result waits. A stale result is rechecked once before sending (threshold 5 ms until the re-bench).
+  - Bench on `DK5EN-90`: the CAD result is now 1-2 ms old when the send uses it (was 60-97 ms); CAD to send 2-3 ms (was 63.5 ms). The 5 ms recheck threshold stays as a safety net and did not fire.
+  - Background: [`docs/rca-csma03-cad-age-20261108.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.11.08/docs/rca-csma03-cad-age-20261108.md).
+- **A higher-priority frame shortens a running CSMA wait** (CSMA-01), and the idle re-anchor, relay jitter, busy back-off timeout and ACK retry were tightened (CSMA-05). Host tests only.
+- **A relay clamps a hop counter of 8 to 15 to the maximum before it decrements** (IDEE-04), so frames of old firmware stop circling. Host test only.
+
+**Settings, sensors and safeboot**
+
+- **DHT22 works** (SENS-04, SENS-05): `--dht 11|22`, kept across reboots, default 11. The sensor now uses the pin set with `--owgpio`; before it ran on the compile-time pin. A bad stored type decodes to 11.
+- **Safeboot checks an update image more strictly** (SB-06): header, chip id, segment count and app-descriptor magic after the image check. No SHA-256 and no project name check, by decision. A dead boot-partition path was removed (SB-07).
+- **The dead nRF52 BLE settings characteristic `0xF0A1` is gone** (BLE-SET-01, BLE-SET-01-FU). It never appeared on the air.
+
+**Mesh and remote management**
+
+- **A mailbox node no longer re-sends a direct message for hours** (SNF-ECHO-01, upstream #1257). Already in `v4.40a.11.06`; it arrives here again through the official `v4.40a.11.07`.
+- **The RM page Queues card reads per row** (RM-Q-01): each row (TX queue, mailbox, max hop) has its own Read, and the next command goes out only after the previous answer arrived (report from DB0AAT-3). Tests only.
+- **RM page texts match the real timeout:** no answer after 171 s, waiting text "up to 3 minutes" (RM-NOANS-01, RM-TXT-02).
+
+**Tools and diagnostics**
+
+- **INSTRUMENT builds log the clock** (`[CLOCK]`, `[DISPCLK]`, `--timesrc all|cet|none`, `--clockstat`, `--oledshot`, `--tdshot`). Release images are unchanged.
+- **Bench scripts:** `clock_drift.py` (clock drift over time), `--offline-ok` for `identity_guard` and `clock_drift` on a node without server link, and a corrected fake in the OTA abort test (TEST-OTA-01).
+
+## Earlier fork releases
+
+Everything below is already in `v4.40a.11.06` and older, and therefore in this release too. Open a section for details.
+
+<details>
+<summary><strong><code>v4.40a.11.06</code></strong> — national characters, UV and wind, web password, live Pins page, message hold, T-Beam update gate, RAK pin guard</summary>
+
+**`v4.40a.11.06` brings national characters on every display, UV and wind sensors, the battery charge state, a web password you can manage on the page, a live Pins page, a message hold during server outages, and fixes that stop a T-Beam refusing updates and a RAK being bricked by a pin setting.** Your configuration survives the update. Only scripts that reboot a node over HTTP must act (below).
+
+**Action needed**
 
 > [!WARNING]
 > **Scripts that call `/callfunction/?otaupdate` or `?reboot` must send the header `X-MC: 1`** (web guard).
@@ -21,7 +160,7 @@
 
 **Everyone else:** update as usual (web flasher, `.bin` over USB, `tools/webflash.py`, or Auto Update on the `dev` channel).
 
-### Key facts
+**Key facts**
 
 - **Base:** the official `v4.40a.10.28` (2026-10-28) plus upstream `dev` up to our merged [#1251](https://github.com/icssw-org/MeshCom-Firmware/pull/1251) (4f60051c, 2026-11-02). National characters, the charge state and UV and wind sensors are upstream through #1249, #1250 and #1251.
 - **Fork-only firmware:** everything else below and the `dev` Auto Update channel. The release is **not** byte-identical to any official release.
@@ -34,7 +173,7 @@
 - **T-Beam idle memory is lower:** 64.0 KB against 68.7 KB on `v4.40a.11.01`, accepted by the operator. It holds flat, so this is a lower level and not a leak. Details: "Known gaps".
 - **Assets (68):** 28 ESP32 application `.bin` plus 28 `.autoupdate` files, the three nRF52 boards as `.uf2` and DFU `.zip`, and six support files.
 
-## New in `v4.40a.11.06`
+**New in `v4.40a.11.06`**
 
 **Displays and characters**
 
@@ -99,9 +238,7 @@
 - **Smaller builds:** no exceptions, debug level 0, unused T-Deck widgets and fonts dropped, table-driven web settings, shared code for hashing and clock sync.
 - **Also:** BMP390 guard fixed, battery and queue details (BAT-05, TXP-02), time zone and sensor fixes (TZ-02, SENS-03), CAD timing log (CSMA-04), OLED and T-Deck bench screenshots.
 
-## Earlier fork releases
-
-Everything below is already in `v4.40a.11.01` and older, and therefore in this release too. Open a section for details.
+</details>
 
 <details>
 <summary><strong><code>v4.40a.11.01</code></strong> — remote Auto Update channel switch, ping target lock, own beacons at priority 2, receive-silence logging</summary>
@@ -388,18 +525,30 @@ Everything below is already in `v4.40a.11.01` and older, and therefore in this r
 
 </details>
 
-Full list of differences from upstream: [`docs/fork-dev-vs-upstream-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.10.25/docs/fork-dev-vs-upstream-20261018.md).
+Full list of differences from upstream: [`docs/fork-dev-vs-upstream-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.11.08/docs/fork-dev-vs-upstream-20261018.md) (state of 2026-10-18).
 
 ## What changes on the air
 
-With default settings, compared with the official `v4.40a.10.28`:
+With default settings, compared with the official `v4.40a.11.07`:
+
+- **A higher-priority frame shortens a CSMA wait that is already running** (CSMA-01). Expect a reply to a received frame to go out earlier at a busy node. Not benched.
+- **nRF52 nodes check the channel with a shorter blind window** (CSMA-03, CSMA-05): the loop polls every 1 ms while a CAD is pending. Frame format and length are unchanged.
+- **A relay clamps a hop counter of 8 to 15 to 7 before it decrements** (IDEE-04): frames of old firmware with such a counter stop circling.
+- **nRF52 nodes ping only after `--ping start`** and stop at `--pingmax`: fewer pings than before on RAK4631, T114 and T-Echo.
+- **The neighbour report is automatic** (BL-01): sent only when neither `--mesh` nor `--gateway` is on; the `--nbrreport` setting is gone.
+- **Auto Update `dev` channel:** fork builds can follow this fork's releases (`--updchan dev`, also by remote management); official builds know `prod` only.
+- **Nothing else new on LoRa by default.** The clock, ping display, T-Deck theme and Pins page are local. Free GPIO control is off until the master switch is turned on at the console or on the Pins page.
+
+<details>
+<summary>Shared with the official <code>v4.40a.11.07</code>: fork behaviour merged upstream in #1247 and #1257</summary>
 
 - **Own position, weather and HEY reports leave the queue sooner** at a busy node: priority 2 instead of 4/5. Expect these beacons to win against relayed traffic; expiry times are unchanged.
 - **No more pings to groups or special targets:** a stored non-callsign ping target is cleared at boot. Fewer ACK floods from gateways answering group pings.
-- **Nothing else new on LoRa by default.** The receive-silence logging reads the radio chip only under `--loradebug`; the channel switch and `--gateway lab` are remote-management and console features.
+- **Receive-silence logging** reads the radio chip only under `--loradebug`.
 - **Since `v4.40a.10.30`:** gateways upload HEY reports with their own call (server side, not LoRa), and a relay skips a frame whose path is already too long for its own call (more than 119 characters, log `pathfull`).
-- **Auto Update `dev` channel:** fork builds can follow this fork's releases (`--updchan dev`, now also by remote management); official builds know `prod` only.
 - **Mailbox nodes send less** (mailbox switched on, off by default): the node's own returning delivery no longer restarts its delivery. Frame format and length are unchanged.
+
+</details>
 
 <details>
 <summary>Shared with the official <code>v4.40a.10.28</code>: fork behaviour merged upstream in #1238 (compared with <code>v4.40a.spserver</code>)</summary>
@@ -425,6 +574,26 @@ With default settings, compared with the official `v4.40a.10.28`:
 
 ### Verification for this release
 
+- **Host suite:** 3765 Unity test cases in 107 host envs and 1593 pytest cases, all green, plus the golden selftest, nRF52 board links and the host tool suites (pytest, web GUI, web flasher). Every fix of this release has a test that fails on the old code.
+- **Build:** CI builds all environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download.
+- **Bench 2026-11-08** on INSTRUMENT builds of `fork-dev` commits of that day (not the release images), on `DK5EN-1` (Heltec V3), `DK5EN-92` (T-Beam), `DK5EN-14` (T-Deck Plus) and `DK5EN-90` (RAK4631):
+  - **Clock:** drawn every second; a free-running clock held +0.1 s over 2 h; one OLED frame takes 3.8 % of loop time (limit 5 %).
+  - **Stale `{CET}` beacons:** backward steps seen on three nodes before the fix, up to -116 s; each equals the age of one beacon of the second server stream.
+  - **Ping frames:** held 10 s; longest clock gap 16 s on `DK5EN-1`, was 158 s.
+  - **nRF52 CAD age:** every free channel-check result was 60-97 ms old on `DK5EN-90`; the cause is the 100 ms loop pass.
+  - **T-Deck theme:** dark, light and auto switched from the web page and seen on the device; the green sent bubble seen with its ACK.
+  - **Web setup page:** reviewed by the operator in Chrome.
+- **Still pending, to be filled in before the release:**
+  - **CET guard re-bench** (Heltec V3 and T-Beam, 1 h, `{CET}` only): every set within 0.8 s, offset to host time -0.4 to -1.4 s, no backward step (before the fix: 3-4 per hour, up to 116 s).
+  - **CSMA-03 re-bench** on `DK5EN-90` (30 DMs to an own node, 2 dBm): CAD result age p50 0.98 ms, p99 1.95 ms (was 60-97 ms); CAD to send 2-3 ms (was 63.5 ms).
+  - **Safari look check** (operator, dark mode): setup page one row per control on the check-button edge, green selection and slider, ticking page clock; messages and neighbours pages fine.
+  - **Idle heap on the T-Beam release image:** 65024 B free at 600 s with BLE up, 1008 B above the baseline (64016 B; the gate allows 3072 B below).
+
+<details>
+<summary>Bench results of earlier releases (unchanged code since)</summary>
+
+**`v4.40a.11.06`:**
+
 - **Host suite:** 3607 test cases in 101 native environments, all green, plus the golden selftest, nRF52 board links and the host tool suites (pytest 1503, web GUI, web flasher).
 - **Build:** CI builds all environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download.
 - **Test image:** the bench and soak below ran on the CI build of `44075ef3`. The release adds a one-line Setup layout fix, the mailbox fix (SNF-ECHO-01) and the `FLASH_VERSION` stamp; the release images get a smoke test on the four nodes. The soak did not cover the mailbox fix.
@@ -439,9 +608,6 @@ With default settings, compared with the official `v4.40a.10.28`:
   - Ethernet on a RAK4631: 20 inbound EXTUDP datagrams at 0.5 s and 1.2 s, no reset.
   - Phone (operator): DM and ACK on T-Beam and RAK4631, reconnect without pairing; with a phone held the T-Beam offers "Pause Bluetooth and check", the check ends well and BLE returns.
 - **Benched on earlier images the same day:** reserved RAK pin refused, hold ring with one simulated outage, 60 of 60 T-Beam pages complete, OLED screenshots, 0 % RX loss on a T-Beam under web load.
-
-<details>
-<summary>Bench results of earlier releases (unchanged code since)</summary>
 
 **`v4.40a.11.01`:**
 
@@ -510,8 +676,13 @@ With default settings, compared with the official `v4.40a.10.28`:
 
 ### Built and shipped, not on our bench
 
+- **Heltec V4 GNSS (GPSV4-01):** no Heltec V4 on our bench. Pins, power lines and the I2C move are checked by the build and a failing-before test only.
+- **RAK4631 L76K detection:** no L76K module on our bench. The probe and the saved module choice are source-pin tests and builds only.
+- **Pins page, pin policy and free GPIO control (GPIO-01 to GPIO-04):** host tests and builds only, no jumper tests. OMs test it in the field after the release (GPIO-07).
+- **T-Deck Pro pins (GPIO-06, GPIO-08, GPIO-09):** no T-Deck Pro on our bench; keyboard, SD card and touch pins are not tried on the device.
+- **nRF52 ping budget (PING-NRF-01):** host tests and builds only; not run on a RAK4631 with `--ping start`, `--ping stop` or `--pingmax`.
 - **T-Beam 1W:** none on our bench. A field operator confirmed on 2026-10-19 that a 1W with the QIO bootloader completed an Auto Update. Marker and flash read not tried on a 1W.
-- **T-Deck Pro:** none on our bench. The new partition table is checked by the build only (Safeboot at 0x10000, application at 0xC0000, NVS unchanged at 0x9000).
+- **T-Deck Pro (partition table):** none on our bench. The new partition table is checked by the build only (Safeboot at 0x10000, application at 0xC0000, NVS unchanged at 0x9000).
 - **New LED pins** on T-Echo, T114, T-ETH-Elite, Heltec V4 and the S3 DevKitC come from board documentation; no LED was watched blinking.
 - **GPS filter:** benched stationary on one board only; T-Beam, T-Beam Supreme, T-Deck and other GPS boards run the same code untested.
 - **Web firmware column:** host tests only.
@@ -534,27 +705,39 @@ With default settings, compared with the official `v4.40a.10.28`:
 - **Any device on the LAN can lock the login for a minute** with five wrong guesses; open sessions stay valid.
 - **A login page cached by the browser from older firmware** sends the old plain-text login and gets an error; reload the page.
 
-**New in this release**
+**New in this release (not benched, or limits found)**
+
+- **Heltec V4 GNSS, RAK4631 L76K, Pins page, T-Deck Pro pins and the nRF52 ping budget** are built and host-tested only: see "Built and shipped, not on our bench".
+- **CET guard and CSMA-03:** the fixes are in; their re-bench results are pending (see "Verification").
+  - **CSMA-03 threshold:** `CSMA_CAD_MAX_AGE_US` stays at 5 ms. It is set from the re-bench; if that is inconclusive the decision moves to the backlog.
+- **CSMA-01, CSMA-05 and the relay hop clamp (IDEE-04):** host tests only; the shorter CSMA wait was not repeated on air.
+- **DHT22 (SENS-04):** no DHT22 on our bench; the pin and type handling is host-tested.
+- **Safeboot checks (SB-06, SB-07):** host tests and builds only; a wrong image on a board was not tried.
+- **RM1 `pins` and `gpio`, RM Queues card (RM-Q-01):** host tests and the web test only, not over the air.
+- **Clock every second:** measured on Heltec V3 and T-Beam OLEDs. No separate record for the T-Deck, e-paper, T114 and T-Echo displays, which run the same logic.
+- **T-Deck setup controls:** theme benched. Chat text size, the fixed night level and the brightness slider have no separate bench record.
+- **Web contrast:** the light-theme label on green is 5.08:1, below the 7:1 body-text target (operator informed). The Safari look check is pending.
+- **BLE settings characteristic removed** (BLE-SET-01): it never appeared on the air; the secret masking of `v4.40a.11.06` for that path is gone with it.
+
+**Open since `v4.40a.11.06`**
 
 - **Less memory on classic ESP32:** T-Beam idle heap 64.0 KB against 68.7 KB on `v4.40a.11.01` (measured 2026-11-06).
   - About 2.5 KB are new static buffers (hold ring, web settings table, register query); the rest is not itemised. Measured with about 1 KB of the drop possibly caused by the first web request after boot.
   - Check now passed 20 of 20 on a T-Beam. Accepted by the operator.
-- **BLE settings characteristic does not exist on the air** (BLE-SET-01): the RAK shows service `0xF0A0` empty. No secret can leak this way, and the phone app uses Nordic UART. Likely cause, from the source: its 2001 bytes exceed the 510 byte limit. The masking in this release therefore runs only in host tests.
 - **Web password:** no prompt for the current one, so an open session can change or clear it. It crosses the network in plain text.
 - **Auto Update restart on a split heap with a phone held:** the phone path works, but this run may not have hit a split heap (AU-23).
 - **Message hold:** one simulated outage on the bench, no real server failure. A single lost `BEAT` may replay the few held frames (about 1 per 4 h, measured), by decision.
 - **MCP23017 pins on the Pins page:** host tests only, no expander on our bench.
-- **T-Beam Auto Update download can still fail (AU-24, open):** seen on DK5EN-92 on 2026-11-07 on the last image before this release, cause not established.
+- **T-Beam Auto Update download can still fail (AU-24, open):** seen on DK5EN-92 on 2026-11-07 on the last image before `v4.40a.11.06`, cause not established.
   - **What happens:** Download is refused with "Not enough free memory", or in one case of two the node restarts by watchdog during the first Download after a reboot.
   - **What to do:** reboot the node and try again; the web flasher and `tools/webflash.py` do not use this path.
 - **Mailbox echo fix (SNF-ECHO-01):** benched on one Heltec V3 with injected copies, not with a real second gateway and the server, and not on nRF52 (built only). The counters of the node from the field report were not read, so the link to that report rests on timing and code.
   - **Still open:** two mailbox nodes serving the same call can re-open a slot after it expires, about one run per hold time and node. A node that keeps hearing the recipient without an ack can therefore start over.
   - **Accepted:** after the first pause a message gets one frame per pause instead of nine. This differs from the concept but keeps airtime down (about 30 instead of up to 216 frames in 24 hours).
-- **UV and wind sensors, charge state over BLE:** see the upstream PRs; not repeated on the bench for this release.
+- **UV and wind sensors, charge state over BLE:** see the upstream PRs; not repeated on the bench since `v4.40a.11.06`.
 - **Display fixes on E290, Wireless Paper, E213, T-Echo and T114:** no such board on our bench unless listed under "Verification".
-- **Safeboot page and upload tests** ran with the Safeboot already on those nodes; the refreshed image was not confirmed on them.
+- **Safeboot page and upload tests** ran with the Safeboot already on those nodes; the refreshed `v4.40a.11.06` image was not confirmed on them.
 - **T-Deck `--disptest`** in INSTRUMENT builds can reboot (TD-34), not in release images.
-- **RM1 pins:** `setout` reaches MCP23017 bits only. ESP32 hardware pins are planned for a later release (GPIO-01).
 
 **Not benched (host tests or builds only)**
 
@@ -589,12 +772,20 @@ With default settings, compared with the official `v4.40a.10.28`:
 - **One T-Beam reboot during an Auto Update download** (AU-14, `TASK_WDT` 13 s in, classic ESP32); the retry passed. Open.
 - **Auto Update fix on the reporting T-Deck Plus** (AU-13): field confirmation pending.
 - **No marker check in CI:** only the web flasher publish step refuses an image without a marker.
+- **Ping id repeats after reboots** (DEDUP-LAP-01): the message id grows by 100 per boot, so frequent reboots can repeat an id inside a neighbour's duplicate ring. One bench ping was dropped as a duplicate; no replay after a reboot was seen.
+- **TRACK display mode keeps a PONG frame for the full ping time** (TRACK-PING-01): the 10 s hold does not apply there.
+- **Heltec V4 Vext in deep sleep** (HV4-VEXT-01): the pad hold should keep it off; no current measurement yet.
+
+**Moved to the backlog after this release (operator, 2026-11-08)**
+
+- DEDUP-LAP-01, TRACK-PING-01, the T-Deck Pro pin bench, the remaining bulk-bench rows of the release train, the CLK-01 upstream PR, and the CSMA-03 threshold if the re-bench is inconclusive.
 
 **Accepted behaviour**
 
 - **T-Deck under memory pressure:** the oldest messages of an inactive tab disappear from the display, and a 17th conversation closes the least recently used tab.
 - **WiFi round trip of 80-100 ms** on ESP32 nodes with Bluetooth on: WiFi modem sleep, not a memory problem (WIFI-PS-01). Switching modem sleep off needs Bluetooth off.
 - **T-Beams first booted on V4.21 or later keep TRACK on** if the old default set it. Not migrated: a TRACK the owner wanted cannot be told apart. Use `--track off` / `--gps on`.
+- **The message page shows no clock line:** it is frozen by design and redrawn when the page changes (CLK-01).
 - **Wireless Tracker:** a message page held on the display returns to the main page after an update check.
 - **Slow browser links get truncated pages** (2 s without progress or 15 s total; at 1.2 s reply delay the 94 kB main page is cut at about 73-87 kB). Not checked in Chrome on the bench. On the RAK4631 the send library can still wait without a timeout for a chip acknowledgement; no hang seen.
 - **Web message history is empty** after each update check on classic ESP32 (phone rings freed during the BLE pause).
@@ -637,10 +828,11 @@ With default settings, compared with the official `v4.40a.10.28`:
 
 ## Upstream
 
-- **In the official release `v4.40a.10.28`** (2026-10-28): all fork firmware up to `v4.40a.10.25` as one commit ([#1238](https://github.com/icssw-org/MeshCom-Firmware/pull/1238): transmit queue pool, Auto Update, Safeboot v3, remote management, store-and-forward, call blocklist and the fixes of `v4.40a.10.11` to `10.25`), `.autoupdate` assets in the official CI ([#1239](https://github.com/icssw-org/MeshCom-Firmware/pull/1239)), and the E290 OTP image with 9-message browse ([#1240](https://github.com/icssw-org/MeshCom-Firmware/pull/1240), sp2ong).
-- **Earlier official releases:** `v4.40a.spserver` (2026-10-22) with the gateway server table, network mode and RAK4631 static IP ([#1213](https://github.com/icssw-org/MeshCom-Firmware/pull/1213)) T-Deck reply button and web firmware column (#1214), web send buffer (#1224) and the gateway server-link warning fix (#1233). #1235-#1237 came with `v4.40a.10.28`.
-- **Merged upstream 2026-10-31** (squash, in upstream `dev` 147812e0, shipped here since `v4.40a.10.30`): HEY upload names the gateway and path cap ([#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243)), Extern-UDP sends in the web chat ([#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244)), web login without plain-text password ([#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245)). The next official release will carry them.
-- **Open upstream** ([#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247), 2026-11-01): ping target lock, own beacons at priority 2, receive-silence logging.
-- **Fork-only, no PR yet:** remote channel switch (`upd chan`), `--gateway lab`, E290 refresh default.
+- **In the official release `v4.40a.11.07`** (2026-11-08, `upstream/dev` 5d76238b): our PRs [#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247) to #1251 (ping target lock, own beacons at priority 2, receive-silence logging, national characters, charge state, UV and wind) and [#1257](https://github.com/icssw-org/MeshCom-Firmware/pull/1257) (mailbox echo), plus OE1KBC's RAK4631 L76K GPS probe (#1259) and the T-Deck Pro / T3 S3 bootloader mapping in `tools/download_meshcom.py` (#1260 to #1262). Merged into this tree as `da76033b`.
+- **Not byte-identical:** this release adds the fork-only firmware listed under "New in" to that base.
+- **Open upstream:** no PR of ours is open. A bundle PR (CLK-01 fix, web and T-Deck controls) is decided later.
+- **Earlier official releases:** `v4.40a.10.28` (2026-10-28) with all fork firmware up to `v4.40a.10.25` as one commit ([#1238](https://github.com/icssw-org/MeshCom-Firmware/pull/1238)), `.autoupdate` assets in the official CI ([#1239](https://github.com/icssw-org/MeshCom-Firmware/pull/1239)) and the E290 OTP image ([#1240](https://github.com/icssw-org/MeshCom-Firmware/pull/1240), sp2ong). Before it `v4.40a.spserver` (2026-10-22) with the gateway server table, network mode and RAK4631 static IP ([#1213](https://github.com/icssw-org/MeshCom-Firmware/pull/1213)), T-Deck reply button and web firmware column (#1214), web send buffer (#1224) and the gateway server-link warning fix (#1233).
+- **Merged upstream 2026-10-31** (shipped here since `v4.40a.10.30`, in the official `v4.40a.11.07`): HEY upload names the gateway and path cap ([#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243)), Extern-UDP sends in the web chat ([#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244)), web login without plain-text password ([#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245)).
+- **Fork-only, no PR yet:** everything under "New in `v4.40a.11.08`", remote channel switch (`upd chan`), `--gateway lab`, E290 refresh default.
 - **Fork-only by design:** the `dev` Auto Update channel (built only with `MC_AU_DEV_CHANNEL`) and the INSTRUMENT bench diagnostics (not in release images).
 - Please report bugs that also exist in the official firmware to [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware) directly.

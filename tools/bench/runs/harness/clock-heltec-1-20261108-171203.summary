@@ -1,0 +1,494 @@
+{
+  "node": "heltec-1",
+  "malformed_lines": 0,
+  "shot_errors": 0,
+  "shots": [
+    "clock-heltec-1-20261108-171203-oled-001.png",
+    "clock-heltec-1-20261108-171203-oled-002.png",
+    "clock-heltec-1-20261108-171203-oled-003.png",
+    "clock-heltec-1-20261108-171203-oled-004.png",
+    "clock-heltec-1-20261108-171203-oled-005.png",
+    "clock-heltec-1-20261108-171203-oled-006.png",
+    "clock-heltec-1-20261108-171203-oled-007.png",
+    "clock-heltec-1-20261108-171203-oled-008.png",
+    "clock-heltec-1-20261108-171203-oled-009.png",
+    "clock-heltec-1-20261108-171203-oled-010.png",
+    "clock-heltec-1-20261108-171203-oled-011.png",
+    "clock-heltec-1-20261108-171203-oled-012.png",
+    "clock-heltec-1-20261108-171203-oled-013.png",
+    "clock-heltec-1-20261108-171203-oled-014.png",
+    "clock-heltec-1-20261108-171203-oled-015.png",
+    "clock-heltec-1-20261108-171203-oled-016.png",
+    "clock-heltec-1-20261108-171203-oled-017.png",
+    "clock-heltec-1-20261108-171203-oled-018.png",
+    "clock-heltec-1-20261108-171203-oled-019.png",
+    "clock-heltec-1-20261108-171203-oled-020.png",
+    "clock-heltec-1-20261108-171203-oled-021.png",
+    "clock-heltec-1-20261108-171203-oled-022.png",
+    "clock-heltec-1-20261108-171203-oled-023.png",
+    "clock-heltec-1-20261108-171203-oled-024.png",
+    "clock-heltec-1-20261108-171203-oled-025.png",
+    "clock-heltec-1-20261108-171203-oled-026.png",
+    "clock-heltec-1-20261108-171203-oled-027.png",
+    "clock-heltec-1-20261108-171203-oled-028.png",
+    "clock-heltec-1-20261108-171203-oled-029.png",
+    "clock-heltec-1-20261108-171203-oled-030.png",
+    "clock-heltec-1-20261108-171203-oled-031.png",
+    "clock-heltec-1-20261108-171203-oled-032.png",
+    "clock-heltec-1-20261108-171203-oled-033.png",
+    "clock-heltec-1-20261108-171203-oled-034.png",
+    "clock-heltec-1-20261108-171203-oled-035.png",
+    "clock-heltec-1-20261108-171203-oled-036.png",
+    "clock-heltec-1-20261108-171203-oled-037.png",
+    "clock-heltec-1-20261108-171203-oled-038.png",
+    "clock-heltec-1-20261108-171203-oled-039.png",
+    "clock-heltec-1-20261108-171203-oled-040.png",
+    "clock-heltec-1-20261108-171203-oled-041.png",
+    "clock-heltec-1-20261108-171203-oled-042.png",
+    "clock-heltec-1-20261108-171203-oled-043.png",
+    "clock-heltec-1-20261108-171203-oled-044.png",
+    "clock-heltec-1-20261108-171203-oled-045.png",
+    "clock-heltec-1-20261108-171203-oled-046.png",
+    "clock-heltec-1-20261108-171203-oled-047.png",
+    "clock-heltec-1-20261108-171203-oled-048.png",
+    "clock-heltec-1-20261108-171203-oled-049.png",
+    "clock-heltec-1-20261108-171203-oled-050.png",
+    "clock-heltec-1-20261108-171203-oled-051.png",
+    "clock-heltec-1-20261108-171203-oled-052.png",
+    "clock-heltec-1-20261108-171203-oled-053.png",
+    "clock-heltec-1-20261108-171203-oled-054.png",
+    "clock-heltec-1-20261108-171203-oled-055.png",
+    "clock-heltec-1-20261108-171203-oled-056.png",
+    "clock-heltec-1-20261108-171203-oled-057.png",
+    "clock-heltec-1-20261108-171203-oled-058.png",
+    "clock-heltec-1-20261108-171203-oled-059.png",
+    "clock-heltec-1-20261108-171203-oled-060.png",
+    "clock-heltec-1-20261108-171203-oled-061.png",
+    "clock-heltec-1-20261108-171203-oled-062.png",
+    "clock-heltec-1-20261108-171203-oled-063.png",
+    "clock-heltec-1-20261108-171203-oled-064.png",
+    "clock-heltec-1-20261108-171203-oled-065.png",
+    "clock-heltec-1-20261108-171203-oled-066.png",
+    "clock-heltec-1-20261108-171203-oled-067.png",
+    "clock-heltec-1-20261108-171203-oled-068.png",
+    "clock-heltec-1-20261108-171203-oled-069.png",
+    "clock-heltec-1-20261108-171203-oled-070.png",
+    "clock-heltec-1-20261108-171203-oled-071.png",
+    "clock-heltec-1-20261108-171203-oled-072.png",
+    "clock-heltec-1-20261108-171203-oled-073.png",
+    "clock-heltec-1-20261108-171203-oled-074.png",
+    "clock-heltec-1-20261108-171203-oled-075.png",
+    "clock-heltec-1-20261108-171203-oled-076.png",
+    "clock-heltec-1-20261108-171203-oled-077.png",
+    "clock-heltec-1-20261108-171203-oled-078.png",
+    "clock-heltec-1-20261108-171203-oled-079.png",
+    "clock-heltec-1-20261108-171203-oled-080.png",
+    "clock-heltec-1-20261108-171203-oled-081.png",
+    "clock-heltec-1-20261108-171203-oled-082.png",
+    "clock-heltec-1-20261108-171203-oled-083.png",
+    "clock-heltec-1-20261108-171203-oled-084.png",
+    "clock-heltec-1-20261108-171203-oled-085.png",
+    "clock-heltec-1-20261108-171203-oled-086.png",
+    "clock-heltec-1-20261108-171203-oled-087.png",
+    "clock-heltec-1-20261108-171203-oled-088.png",
+    "clock-heltec-1-20261108-171203-oled-089.png",
+    "clock-heltec-1-20261108-171203-oled-090.png",
+    "clock-heltec-1-20261108-171203-oled-091.png",
+    "clock-heltec-1-20261108-171203-oled-092.png",
+    "clock-heltec-1-20261108-171203-oled-093.png",
+    "clock-heltec-1-20261108-171203-oled-094.png",
+    "clock-heltec-1-20261108-171203-oled-095.png",
+    "clock-heltec-1-20261108-171203-oled-096.png",
+    "clock-heltec-1-20261108-171203-oled-097.png",
+    "clock-heltec-1-20261108-171203-oled-098.png",
+    "clock-heltec-1-20261108-171203-oled-099.png",
+    "clock-heltec-1-20261108-171203-oled-100.png",
+    "clock-heltec-1-20261108-171203-oled-101.png",
+    "clock-heltec-1-20261108-171203-oled-102.png",
+    "clock-heltec-1-20261108-171203-oled-103.png",
+    "clock-heltec-1-20261108-171203-oled-104.png",
+    "clock-heltec-1-20261108-171203-oled-105.png",
+    "clock-heltec-1-20261108-171203-oled-106.png",
+    "clock-heltec-1-20261108-171203-oled-107.png",
+    "clock-heltec-1-20261108-171203-oled-108.png",
+    "clock-heltec-1-20261108-171203-oled-109.png",
+    "clock-heltec-1-20261108-171203-oled-110.png",
+    "clock-heltec-1-20261108-171203-oled-111.png",
+    "clock-heltec-1-20261108-171203-oled-112.png",
+    "clock-heltec-1-20261108-171203-oled-113.png",
+    "clock-heltec-1-20261108-171203-oled-114.png",
+    "clock-heltec-1-20261108-171203-oled-115.png",
+    "clock-heltec-1-20261108-171203-oled-116.png",
+    "clock-heltec-1-20261108-171203-oled-117.png",
+    "clock-heltec-1-20261108-171203-oled-118.png",
+    "clock-heltec-1-20261108-171203-oled-119.png",
+    "clock-heltec-1-20261108-171203-oled-120.png",
+    "clock-heltec-1-20261108-171203-oled-121.png"
+  ],
+  "info_events": [
+    {
+      "t": 1794154352.324,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794154357.353,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794154362.361,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794154367.366,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794154371.867,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794154376.869,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794154381.882,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794154992.083,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794154997.354,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794155002.106,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794155007.373,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794155012.111,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794155017.125,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794155022.128,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794155027.121,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794155032.086,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794155037.013,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794155041.87,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794155047.119,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794155052.171,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    },
+    {
+      "t": 1794155057.169,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    }
+  ],
+  "stat_count": 19,
+  "drift_curve": [
+    {
+      "t": 1794154399.305,
+      "elapsed_s": 0.0,
+      "drift_s": 0.0,
+      "offset_s": 3598.695
+    },
+    {
+      "t": 1794154407.173,
+      "elapsed_s": 7.868,
+      "drift_s": 0.132,
+      "offset_s": 3598.827
+    },
+    {
+      "t": 1794154467.239,
+      "elapsed_s": 67.933,
+      "drift_s": 0.067,
+      "offset_s": 3598.761
+    },
+    {
+      "t": 1794154467.239,
+      "elapsed_s": 67.933,
+      "drift_s": 0.067,
+      "offset_s": 3598.761
+    },
+    {
+      "t": 1794154527.285,
+      "elapsed_s": 127.98,
+      "drift_s": 0.02,
+      "offset_s": 3598.715
+    },
+    {
+      "t": 1794154527.285,
+      "elapsed_s": 127.98,
+      "drift_s": 0.02,
+      "offset_s": 3598.715
+    },
+    {
+      "t": 1794154587.381,
+      "elapsed_s": 188.076,
+      "drift_s": -0.076,
+      "offset_s": 3598.619
+    },
+    {
+      "t": 1794154587.381,
+      "elapsed_s": 188.076,
+      "drift_s": -0.076,
+      "offset_s": 3598.619
+    },
+    {
+      "t": 1794154647.431,
+      "elapsed_s": 248.126,
+      "drift_s": -0.126,
+      "offset_s": 3598.569
+    },
+    {
+      "t": 1794154647.431,
+      "elapsed_s": 248.126,
+      "drift_s": -0.126,
+      "offset_s": 3598.569
+    },
+    {
+      "t": 1794154707.504,
+      "elapsed_s": 308.198,
+      "drift_s": -0.198,
+      "offset_s": 3598.496
+    },
+    {
+      "t": 1794154707.504,
+      "elapsed_s": 308.199,
+      "drift_s": -0.199,
+      "offset_s": 3598.496
+    },
+    {
+      "t": 1794154767.485,
+      "elapsed_s": 368.18,
+      "drift_s": -0.18,
+      "offset_s": 3598.515
+    },
+    {
+      "t": 1794154827.143,
+      "elapsed_s": 427.838,
+      "drift_s": 0.162,
+      "offset_s": 3598.857
+    },
+    {
+      "t": 1794154887.228,
+      "elapsed_s": 487.923,
+      "drift_s": 0.077,
+      "offset_s": 3598.772
+    },
+    {
+      "t": 1794154887.229,
+      "elapsed_s": 487.923,
+      "drift_s": 0.077,
+      "offset_s": 3598.771
+    },
+    {
+      "t": 1794154947.094,
+      "elapsed_s": 547.789,
+      "drift_s": 0.211,
+      "offset_s": 3598.906
+    },
+    {
+      "t": 1794155007.365,
+      "elapsed_s": 608.06,
+      "drift_s": -0.06,
+      "offset_s": 3598.635
+    },
+    {
+      "t": 1794155007.365,
+      "elapsed_s": 608.06,
+      "drift_s": -0.06,
+      "offset_s": 3598.635
+    }
+  ],
+  "drift_total_s": -0.06,
+  "drift_max_abs_s": 0.211,
+  "drift_ppm": -98.7,
+  "lost_ms_last": 3,
+  "late_max_ms_max": 1587,
+  "sets": [
+    {
+      "t": 1794154340.44,
+      "src": "OTHER",
+      "delta_ms": 2147483647
+    },
+    {
+      "t": 1794154344.571,
+      "src": "GPS",
+      "delta_ms": 438730
+    },
+    {
+      "t": 1794154404.657,
+      "src": "GPS",
+      "delta_ms": -1
+    },
+    {
+      "t": 1794154464.73,
+      "src": "GPS",
+      "delta_ms": -5
+    },
+    {
+      "t": 1794154524.815,
+      "src": "GPS",
+      "delta_ms": -1
+    },
+    {
+      "t": 1794154584.871,
+      "src": "GPS",
+      "delta_ms": -2
+    },
+    {
+      "t": 1794154627.15,
+      "src": "NTP",
+      "delta_ms": -68
+    },
+    {
+      "t": 1794154644.928,
+      "src": "GPS",
+      "delta_ms": -2
+    },
+    {
+      "t": 1794154704.995,
+      "src": "GPS",
+      "delta_ms": -6
+    },
+    {
+      "t": 1794154765.055,
+      "src": "GPS",
+      "delta_ms": -1
+    },
+    {
+      "t": 1794154765.097,
+      "src": "NTP",
+      "delta_ms": -42
+    },
+    {
+      "t": 1794154825.131,
+      "src": "GPS",
+      "delta_ms": -6
+    },
+    {
+      "t": 1794154870.219,
+      "src": "NTP",
+      "delta_ms": -1042
+    },
+    {
+      "t": 1794154873.224,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794154885.202,
+      "src": "GPS",
+      "delta_ms": -4
+    },
+    {
+      "t": 1794154945.265,
+      "src": "GPS",
+      "delta_ms": -5
+    },
+    {
+      "t": 1794155005.355,
+      "src": "GPS",
+      "delta_ms": -1
+    }
+  ],
+  "set_by_src": {
+    "OTHER": {
+      "count": 1,
+      "max_abs_delta_ms": 2147483647
+    },
+    "GPS": {
+      "count": 12,
+      "max_abs_delta_ms": 438730
+    },
+    "NTP": {
+      "count": 4,
+      "max_abs_delta_ms": 1042
+    }
+  },
+  "max_abs_set_delta_ms": 2147483647,
+  "draw_count": 532,
+  "display_gap_max_s": 16.265,
+  "display_gap_at": {
+    "t": 1794154415.669,
+    "from_hms": "17:13:35",
+    "to_hms": "17:13:51"
+  },
+  "display_gaps_over_threshold": 12,
+  "display_gap_threshold_s": 1.5,
+  "skip_reasons": {
+    "hold": 72,
+    "off": 103
+  },
+  "identity_waiver": []
+}

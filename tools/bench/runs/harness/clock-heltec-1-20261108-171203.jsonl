@@ -1,0 +1,885 @@
+{"t": 1794154340.44, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "OTHER", "old": 1672531200.0, "new": 1794157500.0, "delta_ms": 2147483647}
+{"t": 1794154344.571, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794157502.0, "new": 1794157944.0, "delta_ms": 438730}
+{"t": 1794154350.626, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154351.584, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154352.324, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794154352.586, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154353.588, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154354.591, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154355.592, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154356.595, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154357.353, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794154357.597, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154358.598, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154359.6, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154360.602, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154361.603, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154362.361, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794154362.606, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154363.608, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154364.609, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154365.611, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154366.614, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154367.366, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794154367.616, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154368.612, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154369.615, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154370.617, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154371.861, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154371.867, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794154372.621, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154373.622, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154374.618, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154375.619, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154376.862, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154376.869, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794154377.62, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154378.622, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154379.623, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154380.625, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154381.874, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154381.882, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794154382.626, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154383.628, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154384.631, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:04", "type": 9}
+{"t": 1794154385.634, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:05", "type": 9}
+{"t": 1794154386.877, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154387.006, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-001.png"}
+{"t": 1794154387.63, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154388.631, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154389.635, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154390.637, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154391.879, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154392.004, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-002.png"}
+{"t": 1794154392.64, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154393.642, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154394.643, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154395.647, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154396.892, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154397.015, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-003.png"}
+{"t": 1794154397.649, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154398.651, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154399.305, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794157998.0, "src": "GPS", "ms": 60002, "ticks": 55, "late_sum_ms": 1801, "late_max_ms": 1587, "lost_ms": 0}
+{"t": 1794154399.653, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154400.657, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:20", "type": 9}
+{"t": 1794154401.902, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:21", "type": 9}
+{"t": 1794154402.027, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-004.png"}
+{"t": 1794154402.66, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:22", "type": 9}
+{"t": 1794154403.66, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:23", "type": 9}
+{"t": 1794154404.657, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794158004.0, "new": 1794158004.0, "delta_ms": -1}
+{"t": 1794154404.66, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:24", "type": 9}
+{"t": 1794154405.66, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:25", "type": 9}
+{"t": 1794154407.173, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:26", "type": 9}
+{"t": 1794154407.173, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158006.0, "src": "GPS", "ms": 67631, "ticks": 63, "late_sum_ms": 1834, "late_max_ms": 1587, "lost_ms": 4}
+{"t": 1794154407.3, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-005.png"}
+{"t": 1794154407.662, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:27", "type": 9}
+{"t": 1794154408.663, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:28", "type": 9}
+{"t": 1794154409.665, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:29", "type": 9}
+{"t": 1794154410.665, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:30", "type": 9}
+{"t": 1794154411.9, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:31", "type": 9}
+{"t": 1794154412.025, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-006.png"}
+{"t": 1794154412.668, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:32", "type": 9}
+{"t": 1794154413.668, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:33", "type": 9}
+{"t": 1794154414.668, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:34", "type": 9}
+{"t": 1794154415.669, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:35", "type": 9}
+{"t": 1794154416.914, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154417.155, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-007.png"}
+{"t": 1794154417.677, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154418.672, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154419.674, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154420.676, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154421.919, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154422.044, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-008.png"}
+{"t": 1794154422.68, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154423.681, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154424.681, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154425.684, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154426.931, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154427.059, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-009.png"}
+{"t": 1794154427.688, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154428.69, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154429.692, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154430.693, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154431.934, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:51", "type": 9}
+{"t": 1794154432.057, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-010.png"}
+{"t": 1794154432.7, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:52", "type": 9}
+{"t": 1794154433.7, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:53", "type": 9}
+{"t": 1794154434.701, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:54", "type": 9}
+{"t": 1794154435.701, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:55", "type": 9}
+{"t": 1794154436.952, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:56", "type": 9}
+{"t": 1794154437.076, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-011.png"}
+{"t": 1794154437.702, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:57", "type": 9}
+{"t": 1794154438.704, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:58", "type": 9}
+{"t": 1794154439.704, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:13:59", "type": 9}
+{"t": 1794154440.705, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:00", "type": 9}
+{"t": 1794154441.95, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:01", "type": 9}
+{"t": 1794154442.077, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-012.png"}
+{"t": 1794154442.707, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:02", "type": 9}
+{"t": 1794154443.707, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:03", "type": 9}
+{"t": 1794154444.709, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:04", "type": 9}
+{"t": 1794154445.709, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:05", "type": 9}
+{"t": 1794154446.941, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154447.069, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-013.png"}
+{"t": 1794154447.715, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154448.706, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154449.709, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154450.71, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154451.946, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154452.074, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-014.png"}
+{"t": 1794154452.711, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154453.712, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154454.714, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154455.717, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154456.958, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154457.088, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-015.png"}
+{"t": 1794154457.716, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154458.719, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154459.719, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154460.72, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154461.962, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:21", "type": 9}
+{"t": 1794154462.09, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-016.png"}
+{"t": 1794154462.729, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:22", "type": 9}
+{"t": 1794154463.726, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:23", "type": 9}
+{"t": 1794154464.73, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794158064.0, "new": 1794158064.0, "delta_ms": -5}
+{"t": 1794154464.733, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:24", "type": 9}
+{"t": 1794154465.731, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:25", "type": 9}
+{"t": 1794154467.238, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:26", "type": 9}
+{"t": 1794154467.239, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158066.0, "src": "GPS", "ms": 127635, "ticks": 123, "late_sum_ms": 2038, "late_max_ms": 1587, "lost_ms": 3}
+{"t": 1794154467.239, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158066.0, "src": "GPS", "ms": 127708, "ticks": 123, "late_sum_ms": 2038, "late_max_ms": 1587, "lost_ms": 3}
+{"t": 1794154467.365, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-017.png"}
+{"t": 1794154467.736, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:27", "type": 9}
+{"t": 1794154468.737, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:28", "type": 9}
+{"t": 1794154469.737, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:29", "type": 9}
+{"t": 1794154470.738, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:30", "type": 9}
+{"t": 1794154471.986, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:31", "type": 9}
+{"t": 1794154472.115, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-018.png"}
+{"t": 1794154472.741, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:32", "type": 9}
+{"t": 1794154473.742, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:33", "type": 9}
+{"t": 1794154474.743, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:34", "type": 9}
+{"t": 1794154475.743, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:35", "type": 9}
+{"t": 1794154476.989, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154477.114, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-019.png"}
+{"t": 1794154477.749, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154478.75, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154479.752, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154480.754, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154481.997, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154482.122, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-020.png"}
+{"t": 1794154482.758, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154483.76, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154484.761, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154485.764, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154487.008, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154487.133, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-021.png"}
+{"t": 1794154487.768, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154488.77, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154489.771, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154490.773, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:50", "type": 9}
+{"t": 1794154491.877, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:51", "type": 9}
+{"t": 1794154492.003, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-022.png"}
+{"t": 1794154492.78, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:52", "type": 9}
+{"t": 1794154493.781, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:53", "type": 9}
+{"t": 1794154494.777, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:54", "type": 9}
+{"t": 1794154495.777, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:55", "type": 9}
+{"t": 1794154497.021, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:56", "type": 9}
+{"t": 1794154497.15, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-023.png"}
+{"t": 1794154497.782, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:57", "type": 9}
+{"t": 1794154498.781, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:58", "type": 9}
+{"t": 1794154499.781, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:14:59", "type": 9}
+{"t": 1794154500.788, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:00", "type": 9}
+{"t": 1794154502.033, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:01", "type": 9}
+{"t": 1794154502.158, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-024.png"}
+{"t": 1794154502.788, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:02", "type": 9}
+{"t": 1794154503.791, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:03", "type": 9}
+{"t": 1794154504.792, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:04", "type": 9}
+{"t": 1794154505.793, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:05", "type": 9}
+{"t": 1794154506.935, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154507.059, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-025.png"}
+{"t": 1794154507.796, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154508.797, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154509.799, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154510.802, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154512.042, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154512.17, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-026.png"}
+{"t": 1794154512.8, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154513.801, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154514.802, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154515.805, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154517.056, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154517.18, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-027.png"}
+{"t": 1794154517.809, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154518.807, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154519.808, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "hold"}
+{"t": 1794154520.81, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:20", "type": 9}
+{"t": 1794154522.053, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:21", "type": 9}
+{"t": 1794154522.178, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-028.png"}
+{"t": 1794154522.817, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:22", "type": 9}
+{"t": 1794154523.812, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:23", "type": 9}
+{"t": 1794154524.815, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794158124.0, "new": 1794158124.0, "delta_ms": -1}
+{"t": 1794154524.818, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:24", "type": 9}
+{"t": 1794154525.817, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:25", "type": 9}
+{"t": 1794154527.285, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:26", "type": 9}
+{"t": 1794154527.285, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158126.0, "src": "GPS", "ms": 187711, "ticks": 183, "late_sum_ms": 2256, "late_max_ms": 1587, "lost_ms": 6}
+{"t": 1794154527.285, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158126.0, "src": "GPS", "ms": 187760, "ticks": 183, "late_sum_ms": 2256, "late_max_ms": 1587, "lost_ms": 6}
+{"t": 1794154527.411, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-029.png"}
+{"t": 1794154527.816, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:27", "type": 9}
+{"t": 1794154528.817, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:28", "type": 9}
+{"t": 1794154529.817, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:29", "type": 9}
+{"t": 1794154530.819, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:30", "type": 9}
+{"t": 1794154532.05, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:31", "type": 9}
+{"t": 1794154532.173, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-030.png"}
+{"t": 1794154532.823, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:32", "type": 9}
+{"t": 1794154533.825, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:33", "type": 9}
+{"t": 1794154534.824, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:34", "type": 9}
+{"t": 1794154535.824, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:35", "type": 9}
+{"t": 1794154537.046, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:36", "type": 9}
+{"t": 1794154537.173, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-031.png"}
+{"t": 1794154537.827, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:37", "type": 9}
+{"t": 1794154538.827, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:38", "type": 9}
+{"t": 1794154539.828, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:39", "type": 9}
+{"t": 1794154540.828, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:40", "type": 9}
+{"t": 1794154542.056, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:41", "type": 9}
+{"t": 1794154542.18, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-032.png"}
+{"t": 1794154542.83, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:42", "type": 9}
+{"t": 1794154543.829, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:43", "type": 9}
+{"t": 1794154544.829, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:44", "type": 9}
+{"t": 1794154545.83, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:45", "type": 9}
+{"t": 1794154547.07, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:46", "type": 9}
+{"t": 1794154547.197, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-033.png"}
+{"t": 1794154547.831, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:47", "type": 9}
+{"t": 1794154548.832, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:48", "type": 9}
+{"t": 1794154549.837, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:49", "type": 9}
+{"t": 1794154550.837, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:50", "type": 9}
+{"t": 1794154552.079, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:51", "type": 9}
+{"t": 1794154552.207, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-034.png"}
+{"t": 1794154552.843, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:52", "type": 9}
+{"t": 1794154553.843, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:53", "type": 9}
+{"t": 1794154554.844, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:54", "type": 9}
+{"t": 1794154555.848, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:55", "type": 9}
+{"t": 1794154557.086, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:56", "type": 9}
+{"t": 1794154557.212, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-035.png"}
+{"t": 1794154557.846, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:57", "type": 9}
+{"t": 1794154558.846, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:58", "type": 9}
+{"t": 1794154559.846, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:15:59", "type": 9}
+{"t": 1794154560.848, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:00", "type": 9}
+{"t": 1794154562.099, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:01", "type": 9}
+{"t": 1794154562.225, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-036.png"}
+{"t": 1794154562.853, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:02", "type": 9}
+{"t": 1794154563.849, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:03", "type": 9}
+{"t": 1794154564.85, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:04", "type": 9}
+{"t": 1794154565.854, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:05", "type": 1}
+{"t": 1794154567.092, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:06", "type": 1}
+{"t": 1794154567.22, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-037.png"}
+{"t": 1794154567.858, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:07", "type": 1}
+{"t": 1794154568.858, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:08", "type": 1}
+{"t": 1794154569.859, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:09", "type": 1}
+{"t": 1794154570.86, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:10", "type": 1}
+{"t": 1794154572.101, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:11", "type": 1}
+{"t": 1794154572.23, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-038.png"}
+{"t": 1794154572.863, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:12", "type": 1}
+{"t": 1794154573.864, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:13", "type": 1}
+{"t": 1794154574.864, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:14", "type": 1}
+{"t": 1794154575.865, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:15", "type": 1}
+{"t": 1794154577.102, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:16", "type": 1}
+{"t": 1794154577.229, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-039.png"}
+{"t": 1794154577.866, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:17", "type": 1}
+{"t": 1794154578.867, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:18", "type": 1}
+{"t": 1794154579.871, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:19", "type": 1}
+{"t": 1794154580.868, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:20", "type": 1}
+{"t": 1794154582.11, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:21", "type": 1}
+{"t": 1794154582.237, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-040.png"}
+{"t": 1794154582.868, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:22", "type": 1}
+{"t": 1794154583.868, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:23", "type": 1}
+{"t": 1794154584.871, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794158184.0, "new": 1794158184.0, "delta_ms": -2}
+{"t": 1794154584.874, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:24", "type": 1}
+{"t": 1794154585.874, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:25", "type": 1}
+{"t": 1794154587.381, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:26", "type": 1}
+{"t": 1794154587.381, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158186.0, "src": "GPS", "ms": 247761, "ticks": 243, "late_sum_ms": 2436, "late_max_ms": 1587, "lost_ms": 5}
+{"t": 1794154587.381, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158186.0, "src": "GPS", "ms": 247845, "ticks": 243, "late_sum_ms": 2436, "late_max_ms": 1587, "lost_ms": 5}
+{"t": 1794154587.506, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-041.png"}
+{"t": 1794154587.875, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:27", "type": 1}
+{"t": 1794154588.876, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:28", "type": 1}
+{"t": 1794154589.877, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:29", "type": 1}
+{"t": 1794154590.879, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:30", "type": 1}
+{"t": 1794154592.107, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:31", "type": 1}
+{"t": 1794154592.23, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-042.png"}
+{"t": 1794154592.879, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:32", "type": 1}
+{"t": 1794154593.882, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:33", "type": 1}
+{"t": 1794154594.883, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:34", "type": 1}
+{"t": 1794154595.882, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:35", "type": 1}
+{"t": 1794154597.118, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:36", "type": 1}
+{"t": 1794154597.242, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-043.png"}
+{"t": 1794154597.885, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:37", "type": 1}
+{"t": 1794154598.886, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:38", "type": 1}
+{"t": 1794154599.888, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:39", "type": 1}
+{"t": 1794154600.888, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:40", "type": 1}
+{"t": 1794154602.118, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:41", "type": 1}
+{"t": 1794154602.245, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-044.png"}
+{"t": 1794154602.89, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:42", "type": 1}
+{"t": 1794154603.889, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:43", "type": 1}
+{"t": 1794154604.891, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:44", "type": 1}
+{"t": 1794154605.891, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:45", "type": 1}
+{"t": 1794154607.135, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:46", "type": 1}
+{"t": 1794154607.261, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-045.png"}
+{"t": 1794154607.893, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:47", "type": 1}
+{"t": 1794154608.892, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:48", "type": 1}
+{"t": 1794154609.897, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:49", "type": 1}
+{"t": 1794154610.897, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:50", "type": 1}
+{"t": 1794154612.142, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:51", "type": 1}
+{"t": 1794154612.269, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-046.png"}
+{"t": 1794154612.903, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:52", "type": 1}
+{"t": 1794154613.903, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:53", "type": 1}
+{"t": 1794154614.9, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:54", "type": 1}
+{"t": 1794154615.9, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:55", "type": 1}
+{"t": 1794154617.145, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:56", "type": 1}
+{"t": 1794154617.269, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-047.png"}
+{"t": 1794154617.901, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:57", "type": 1}
+{"t": 1794154618.901, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:58", "type": 1}
+{"t": 1794154619.907, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:16:59", "type": 1}
+{"t": 1794154620.902, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:00", "type": 1}
+{"t": 1794154622.138, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:01", "type": 1}
+{"t": 1794154622.266, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-048.png"}
+{"t": 1794154622.905, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:02", "type": 1}
+{"t": 1794154623.905, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:03", "type": 1}
+{"t": 1794154624.905, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:04", "type": 1}
+{"t": 1794154625.905, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:05", "type": 1}
+{"t": 1794154627.15, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:06", "type": 1}
+{"t": 1794154627.15, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794158226.0, "new": 1794158226.0, "delta_ms": -68}
+{"t": 1794154627.276, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-049.png"}
+{"t": 1794154627.97, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:07", "type": 1}
+{"t": 1794154628.971, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:08", "type": 1}
+{"t": 1794154629.91, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:09", "type": 1}
+{"t": 1794154630.911, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:10", "type": 1}
+{"t": 1794154632.144, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:11", "type": 1}
+{"t": 1794154632.269, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-050.png"}
+{"t": 1794154632.914, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:12", "type": 1}
+{"t": 1794154633.915, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:13", "type": 1}
+{"t": 1794154634.915, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:14", "type": 1}
+{"t": 1794154635.916, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:15", "type": 1}
+{"t": 1794154637.148, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:16", "type": 1}
+{"t": 1794154637.274, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-051.png"}
+{"t": 1794154637.917, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:17", "type": 1}
+{"t": 1794154638.919, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:18", "type": 1}
+{"t": 1794154639.924, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:19", "type": 1}
+{"t": 1794154640.924, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:20", "type": 1}
+{"t": 1794154642.158, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:21", "type": 1}
+{"t": 1794154642.284, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-052.png"}
+{"t": 1794154642.93, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:22", "type": 1}
+{"t": 1794154643.93, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:23", "type": 1}
+{"t": 1794154644.928, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794158244.0, "new": 1794158244.0, "delta_ms": -2}
+{"t": 1794154644.931, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:24", "type": 1}
+{"t": 1794154645.928, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:25", "type": 1}
+{"t": 1794154647.431, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:26", "type": 1}
+{"t": 1794154647.431, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158246.0, "src": "GPS", "ms": 307849, "ticks": 300, "late_sum_ms": 2590, "late_max_ms": 1587, "lost_ms": 2}
+{"t": 1794154647.431, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158246.0, "src": "GPS", "ms": 307898, "ticks": 300, "late_sum_ms": 2590, "late_max_ms": 1587, "lost_ms": 2}
+{"t": 1794154647.558, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-053.png"}
+{"t": 1794154647.932, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:27", "type": 1}
+{"t": 1794154648.937, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:28", "type": 1}
+{"t": 1794154649.934, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:29", "type": 1}
+{"t": 1794154650.937, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:30", "type": 1}
+{"t": 1794154652.18, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:31", "type": 1}
+{"t": 1794154652.306, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-054.png"}
+{"t": 1794154652.938, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:32", "type": 1}
+{"t": 1794154653.939, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:33", "type": 1}
+{"t": 1794154654.939, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:34", "type": 1}
+{"t": 1794154655.94, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:35", "type": 1}
+{"t": 1794154657.179, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:36", "type": 1}
+{"t": 1794154657.305, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-055.png"}
+{"t": 1794154657.943, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:37", "type": 1}
+{"t": 1794154658.943, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:38", "type": 1}
+{"t": 1794154659.944, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:39", "type": 1}
+{"t": 1794154660.945, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:40", "type": 1}
+{"t": 1794154661.95, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:41", "type": 1}
+{"t": 1794154662.101, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-056.png"}
+{"t": 1794154662.948, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:42", "type": 1}
+{"t": 1794154663.948, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:43", "type": 1}
+{"t": 1794154664.949, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:44", "type": 1}
+{"t": 1794154665.95, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:45", "type": 1}
+{"t": 1794154667.193, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:46", "type": 1}
+{"t": 1794154667.319, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-057.png"}
+{"t": 1794154667.952, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:47", "type": 1}
+{"t": 1794154668.954, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:48", "type": 1}
+{"t": 1794154669.958, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:49", "type": 1}
+{"t": 1794154670.957, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:50", "type": 1}
+{"t": 1794154672.194, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:51", "type": 1}
+{"t": 1794154672.317, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-058.png"}
+{"t": 1794154672.963, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:52", "type": 1}
+{"t": 1794154673.959, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:53", "type": 1}
+{"t": 1794154674.96, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:54", "type": 1}
+{"t": 1794154675.961, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:55", "type": 1}
+{"t": 1794154677.202, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:56", "type": 1}
+{"t": 1794154677.331, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-059.png"}
+{"t": 1794154677.965, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:57", "type": 1}
+{"t": 1794154678.964, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:58", "type": 1}
+{"t": 1794154679.969, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:17:59", "type": 1}
+{"t": 1794154680.971, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:00", "type": 1}
+{"t": 1794154682.21, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:01", "type": 1}
+{"t": 1794154682.339, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-060.png"}
+{"t": 1794154682.97, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:02", "type": 1}
+{"t": 1794154683.973, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:03", "type": 1}
+{"t": 1794154684.977, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:04", "type": 1}
+{"t": 1794154685.972, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:05", "type": 1}
+{"t": 1794154687.219, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:06", "type": 1}
+{"t": 1794154687.344, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-061.png"}
+{"t": 1794154687.975, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:07", "type": 1}
+{"t": 1794154688.977, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:08", "type": 1}
+{"t": 1794154689.979, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:09", "type": 1}
+{"t": 1794154690.979, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:10", "type": 1}
+{"t": 1794154692.228, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:11", "type": 1}
+{"t": 1794154692.355, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-062.png"}
+{"t": 1794154692.982, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:12", "type": 1}
+{"t": 1794154693.981, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:13", "type": 1}
+{"t": 1794154694.982, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:14", "type": 1}
+{"t": 1794154695.984, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:15", "type": 1}
+{"t": 1794154697.229, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:16", "type": 1}
+{"t": 1794154697.354, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-063.png"}
+{"t": 1794154697.985, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:17", "type": 1}
+{"t": 1794154698.987, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:18", "type": 1}
+{"t": 1794154699.986, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:19", "type": 1}
+{"t": 1794154700.986, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:20", "type": 1}
+{"t": 1794154702.234, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:21", "type": 1}
+{"t": 1794154702.363, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-064.png"}
+{"t": 1794154702.991, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:22", "type": 1}
+{"t": 1794154703.991, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:23", "type": 1}
+{"t": 1794154704.995, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794158304.0, "new": 1794158304.0, "delta_ms": -6}
+{"t": 1794154704.998, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:24", "type": 1}
+{"t": 1794154705.995, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:25", "type": 1}
+{"t": 1794154707.503, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:26", "type": 1}
+{"t": 1794154707.504, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158306.0, "src": "GPS", "ms": 367900, "ticks": 360, "late_sum_ms": 2768, "late_max_ms": 1587, "lost_ms": 3}
+{"t": 1794154707.504, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158306.0, "src": "GPS", "ms": 367967, "ticks": 360, "late_sum_ms": 2768, "late_max_ms": 1587, "lost_ms": 3}
+{"t": 1794154707.631, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-065.png"}
+{"t": 1794154708.0, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:27", "type": 1}
+{"t": 1794154709.0, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:28", "type": 1}
+{"t": 1794154710.001, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:29", "type": 1}
+{"t": 1794154711.002, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:30", "type": 1}
+{"t": 1794154712.246, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:31", "type": 1}
+{"t": 1794154712.375, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-066.png"}
+{"t": 1794154713.006, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:32", "type": 1}
+{"t": 1794154714.003, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:33", "type": 1}
+{"t": 1794154715.004, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:34", "type": 1}
+{"t": 1794154716.003, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:35", "type": 1}
+{"t": 1794154717.156, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:36", "type": 1}
+{"t": 1794154717.28, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-067.png"}
+{"t": 1794154718.007, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:37", "type": 1}
+{"t": 1794154719.006, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:38", "type": 1}
+{"t": 1794154720.008, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:39", "type": 1}
+{"t": 1794154721.006, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:40", "type": 1}
+{"t": 1794154722.24, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:41", "type": 1}
+{"t": 1794154722.364, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-068.png"}
+{"t": 1794154723.01, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:42", "type": 1}
+{"t": 1794154724.01, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:43", "type": 1}
+{"t": 1794154725.01, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:44", "type": 1}
+{"t": 1794154726.012, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:45", "type": 1}
+{"t": 1794154727.255, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:46", "type": 1}
+{"t": 1794154727.382, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-069.png"}
+{"t": 1794154728.014, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:47", "type": 1}
+{"t": 1794154729.015, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:48", "type": 1}
+{"t": 1794154730.02, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:49", "type": 1}
+{"t": 1794154731.061, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:50", "type": 1}
+{"t": 1794154732.254, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:51", "type": 1}
+{"t": 1794154732.381, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-070.png"}
+{"t": 1794154733.021, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:52", "type": 1}
+{"t": 1794154734.022, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:53", "type": 1}
+{"t": 1794154735.022, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:54", "type": 1}
+{"t": 1794154736.024, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:55", "type": 1}
+{"t": 1794154737.264, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:56", "type": 1}
+{"t": 1794154737.388, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-071.png"}
+{"t": 1794154738.026, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:57", "type": 1}
+{"t": 1794154739.027, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:58", "type": 1}
+{"t": 1794154740.028, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:18:59", "type": 1}
+{"t": 1794154741.028, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:00", "type": 1}
+{"t": 1794154742.259, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:01", "type": 1}
+{"t": 1794154742.383, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-072.png"}
+{"t": 1794154743.033, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:02", "type": 1}
+{"t": 1794154744.034, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:03", "type": 1}
+{"t": 1794154745.034, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:04", "type": 1}
+{"t": 1794154746.038, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:05", "type": 1}
+{"t": 1794154747.265, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:06", "type": 1}
+{"t": 1794154747.39, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-073.png"}
+{"t": 1794154748.041, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:07", "type": 1}
+{"t": 1794154749.039, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:08", "type": 1}
+{"t": 1794154750.041, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:09", "type": 1}
+{"t": 1794154751.042, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:10", "type": 1}
+{"t": 1794154752.289, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:11", "type": 1}
+{"t": 1794154752.416, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-074.png"}
+{"t": 1794154753.042, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:12", "type": 1}
+{"t": 1794154754.043, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:13", "type": 1}
+{"t": 1794154755.048, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:14", "type": 1}
+{"t": 1794154756.047, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:15", "type": 1}
+{"t": 1794154757.284, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:16", "type": 1}
+{"t": 1794154757.41, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-075.png"}
+{"t": 1794154758.048, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:17", "type": 1}
+{"t": 1794154759.053, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:18", "type": 1}
+{"t": 1794154760.057, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:19", "type": 1}
+{"t": 1794154761.054, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:20", "type": 1}
+{"t": 1794154762.29, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:21", "type": 1}
+{"t": 1794154762.417, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-076.png"}
+{"t": 1794154763.056, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:22", "type": 1}
+{"t": 1794154764.054, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:23", "type": 1}
+{"t": 1794154765.055, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794158364.0, "new": 1794158364.0, "delta_ms": -1}
+{"t": 1794154765.058, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:24", "type": 1}
+{"t": 1794154765.097, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794158364.0, "new": 1794158364.0, "delta_ms": -42}
+{"t": 1794154765.973, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:25", "type": 1}
+{"t": 1794154767.485, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:26", "type": 1}
+{"t": 1794154767.485, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158366.0, "src": "NTP", "ms": 427944, "ticks": 418, "late_sum_ms": 2941, "late_max_ms": 1587, "lost_ms": 0}
+{"t": 1794154767.614, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-077.png"}
+{"t": 1794154767.971, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:27", "type": 1}
+{"t": 1794154769.058, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:28", "type": 1}
+{"t": 1794154770.061, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:29", "type": 1}
+{"t": 1794154771.061, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:30", "type": 1}
+{"t": 1794154772.269, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:31", "type": 1}
+{"t": 1794154772.393, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-078.png"}
+{"t": 1794154773.061, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:32", "type": 1}
+{"t": 1794154774.063, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:33", "type": 1}
+{"t": 1794154775.068, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:34", "type": 1}
+{"t": 1794154776.067, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:35", "type": 1}
+{"t": 1794154777.315, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:36", "type": 1}
+{"t": 1794154777.443, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-079.png"}
+{"t": 1794154778.069, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:37", "type": 1}
+{"t": 1794154779.069, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:38", "type": 1}
+{"t": 1794154780.074, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:39", "type": 1}
+{"t": 1794154781.083, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:40", "type": 1}
+{"t": 1794154782.319, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:41", "type": 1}
+{"t": 1794154782.446, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-080.png"}
+{"t": 1794154783.08, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:42", "type": 1}
+{"t": 1794154784.081, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:43", "type": 1}
+{"t": 1794154785.087, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:44", "type": 1}
+{"t": 1794154786.086, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:46", "type": 1}
+{"t": 1794154787.332, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:47", "type": 1}
+{"t": 1794154787.46, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-081.png"}
+{"t": 1794154788.088, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:48", "type": 1}
+{"t": 1794154789.091, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:49", "type": 1}
+{"t": 1794154790.094, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:50", "type": 1}
+{"t": 1794154791.094, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:51", "type": 1}
+{"t": 1794154792.336, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:52", "type": 1}
+{"t": 1794154792.462, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-082.png"}
+{"t": 1794154793.1, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:53", "type": 1}
+{"t": 1794154794.101, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:54", "type": 1}
+{"t": 1794154795.096, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:55", "type": 1}
+{"t": 1794154796.097, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:56", "type": 1}
+{"t": 1794154797.337, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:57", "type": 1}
+{"t": 1794154797.463, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-083.png"}
+{"t": 1794154798.099, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:58", "type": 1}
+{"t": 1794154799.101, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:19:59", "type": 1}
+{"t": 1794154800.101, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:00", "type": 1}
+{"t": 1794154801.104, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:01", "type": 1}
+{"t": 1794154802.347, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:02", "type": 1}
+{"t": 1794154802.471, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-084.png"}
+{"t": 1794154803.107, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:03", "type": 1}
+{"t": 1794154804.108, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:04", "type": 1}
+{"t": 1794154805.109, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:05", "type": 1}
+{"t": 1794154806.109, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:06", "type": 1}
+{"t": 1794154807.015, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-085.png"}
+{"t": 1794154807.112, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:07", "type": 1}
+{"t": 1794154808.113, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:08", "type": 1}
+{"t": 1794154809.112, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:09", "type": 1}
+{"t": 1794154810.115, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:10", "type": 1}
+{"t": 1794154811.117, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:11", "type": 1}
+{"t": 1794154811.992, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-086.png"}
+{"t": 1794154812.118, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:12", "type": 1}
+{"t": 1794154813.118, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:13", "type": 1}
+{"t": 1794154814.12, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:14", "type": 1}
+{"t": 1794154815.12, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:15", "type": 1}
+{"t": 1794154816.121, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:16", "type": 1}
+{"t": 1794154816.996, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-087.png"}
+{"t": 1794154817.122, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:17", "type": 1}
+{"t": 1794154818.121, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:18", "type": 1}
+{"t": 1794154819.122, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:19", "type": 1}
+{"t": 1794154820.127, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:20", "type": 1}
+{"t": 1794154821.127, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:21", "type": 1}
+{"t": 1794154822.074, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-088.png"}
+{"t": 1794154822.124, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:22", "type": 1}
+{"t": 1794154823.128, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:23", "type": 1}
+{"t": 1794154824.128, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:24", "type": 1}
+{"t": 1794154825.131, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794158425.0, "new": 1794158425.0, "delta_ms": -6}
+{"t": 1794154825.134, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:25", "type": 1}
+{"t": 1794154826.131, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:26", "type": 1}
+{"t": 1794154827.143, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158426.0, "src": "GPS", "ms": 487612, "ticks": 475, "late_sum_ms": 3134, "late_max_ms": 1587, "lost_ms": 2}
+{"t": 1794154827.144, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:27", "type": 1}
+{"t": 1794154827.288, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-089.png"}
+{"t": 1794154828.136, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:28", "type": 1}
+{"t": 1794154829.137, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:29", "type": 1}
+{"t": 1794154830.137, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:30", "type": 1}
+{"t": 1794154831.138, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:31", "type": 1}
+{"t": 1794154832.013, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-090.png"}
+{"t": 1794154832.14, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:32", "type": 1}
+{"t": 1794154833.14, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:33", "type": 1}
+{"t": 1794154834.142, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:34", "type": 1}
+{"t": 1794154835.142, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:35", "type": 1}
+{"t": 1794154836.146, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:36", "type": 1}
+{"t": 1794154837.026, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-091.png"}
+{"t": 1794154837.148, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:37", "type": 1}
+{"t": 1794154838.149, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:38", "type": 1}
+{"t": 1794154839.149, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:39", "type": 1}
+{"t": 1794154840.149, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:40", "type": 1}
+{"t": 1794154841.15, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:41", "type": 1}
+{"t": 1794154842.024, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-092.png"}
+{"t": 1794154842.152, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:42", "type": 1}
+{"t": 1794154843.152, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:43", "type": 1}
+{"t": 1794154844.153, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:44", "type": 1}
+{"t": 1794154845.153, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:45", "type": 1}
+{"t": 1794154846.154, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:46", "type": 1}
+{"t": 1794154847.029, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-093.png"}
+{"t": 1794154847.155, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:47", "type": 1}
+{"t": 1794154848.155, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:48", "type": 1}
+{"t": 1794154849.157, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:49", "type": 1}
+{"t": 1794154850.162, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:50", "type": 1}
+{"t": 1794154851.157, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:51", "type": 1}
+{"t": 1794154852.031, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-094.png"}
+{"t": 1794154852.159, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:52", "type": 1}
+{"t": 1794154853.163, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:53", "type": 1}
+{"t": 1794154854.163, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:54", "type": 1}
+{"t": 1794154855.164, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:55", "type": 1}
+{"t": 1794154856.166, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:56", "type": 1}
+{"t": 1794154857.228, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-095.png"}
+{"t": 1794154857.234, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:57", "type": 1}
+{"t": 1794154858.166, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:58", "type": 1}
+{"t": 1794154859.164, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:20:59", "type": 1}
+{"t": 1794154860.165, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:00", "type": 1}
+{"t": 1794154861.172, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:01", "type": 1}
+{"t": 1794154862.051, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-096.png"}
+{"t": 1794154862.172, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:02", "type": 1}
+{"t": 1794154863.173, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:03", "type": 1}
+{"t": 1794154864.174, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:04", "type": 1}
+{"t": 1794154865.173, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:05", "type": 1}
+{"t": 1794154866.172, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:06", "type": 1}
+{"t": 1794154867.047, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-097.png"}
+{"t": 1794154867.175, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:07", "type": 1}
+{"t": 1794154868.175, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:08", "type": 1}
+{"t": 1794154869.175, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:09", "type": 1}
+{"t": 1794154870.176, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:10", "type": 1}
+{"t": 1794154870.219, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794158470.0, "new": 1794158469.0, "delta_ms": -1042}
+{"t": 1794154871.975, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:11", "type": 1}
+{"t": 1794154872.129, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-098.png"}
+{"t": 1794154872.97, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:12", "type": 1}
+{"t": 1794154873.224, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794158473.0, "new": 1794158472.0, "delta_ms": -1041}
+{"t": 1794154873.97, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:13", "type": 1}
+{"t": 1794154874.972, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:14", "type": 1}
+{"t": 1794154875.972, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:15", "type": 1}
+{"t": 1794154877.224, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:17", "type": 1}
+{"t": 1794154877.35, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-099.png"}
+{"t": 1794154878.184, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:18", "type": 1}
+{"t": 1794154879.191, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:19", "type": 1}
+{"t": 1794154880.195, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:20", "type": 1}
+{"t": 1794154881.193, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:21", "type": 1}
+{"t": 1794154882.069, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-100.png"}
+{"t": 1794154882.197, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:22", "type": 1}
+{"t": 1794154883.199, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:23", "type": 1}
+{"t": 1794154884.199, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:24", "type": 1}
+{"t": 1794154885.202, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794158485.0, "new": 1794158485.0, "delta_ms": -4}
+{"t": 1794154885.205, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:25", "type": 1}
+{"t": 1794154886.201, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:26", "type": 1}
+{"t": 1794154887.228, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158486.0, "src": "GPS", "ms": 547615, "ticks": 529, "late_sum_ms": 3293, "late_max_ms": 1587, "lost_ms": 2}
+{"t": 1794154887.229, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158486.0, "src": "GPS", "ms": 547688, "ticks": 529, "late_sum_ms": 3293, "late_max_ms": 1587, "lost_ms": 2}
+{"t": 1794154887.229, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:27", "type": 1}
+{"t": 1794154887.363, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-101.png"}
+{"t": 1794154888.204, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:28", "type": 1}
+{"t": 1794154889.203, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:29", "type": 1}
+{"t": 1794154890.204, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:30", "type": 1}
+{"t": 1794154891.206, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:31", "type": 1}
+{"t": 1794154892.051, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-102.png"}
+{"t": 1794154892.207, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:32", "type": 1}
+{"t": 1794154893.206, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:33", "type": 1}
+{"t": 1794154894.208, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:34", "type": 1}
+{"t": 1794154895.207, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:35", "type": 1}
+{"t": 1794154896.208, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:36", "type": 1}
+{"t": 1794154897.084, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-103.png"}
+{"t": 1794154897.212, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:37", "type": 1}
+{"t": 1794154898.216, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:38", "type": 1}
+{"t": 1794154899.216, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:39", "type": 1}
+{"t": 1794154900.217, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:40", "type": 1}
+{"t": 1794154901.216, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:41", "type": 1}
+{"t": 1794154902.091, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-104.png"}
+{"t": 1794154902.216, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:42", "type": 1}
+{"t": 1794154903.218, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:43", "type": 1}
+{"t": 1794154904.219, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:44", "type": 1}
+{"t": 1794154905.219, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:45", "type": 1}
+{"t": 1794154906.221, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:46", "type": 1}
+{"t": 1794154907.084, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-105.png"}
+{"t": 1794154907.222, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:47", "type": 1}
+{"t": 1794154908.223, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:48", "type": 1}
+{"t": 1794154909.225, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:49", "type": 1}
+{"t": 1794154910.229, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:50", "type": 1}
+{"t": 1794154911.229, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:51", "type": 1}
+{"t": 1794154912.104, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-106.png"}
+{"t": 1794154912.226, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:52", "type": 1}
+{"t": 1794154913.229, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:53", "type": 1}
+{"t": 1794154914.228, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:54", "type": 1}
+{"t": 1794154915.23, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:55", "type": 1}
+{"t": 1794154916.23, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:56", "type": 1}
+{"t": 1794154917.105, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-107.png"}
+{"t": 1794154917.23, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:57", "type": 1}
+{"t": 1794154918.232, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:58", "type": 1}
+{"t": 1794154919.232, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:21:59", "type": 1}
+{"t": 1794154920.232, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:00", "type": 1}
+{"t": 1794154921.234, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:01", "type": 1}
+{"t": 1794154922.115, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-108.png"}
+{"t": 1794154922.235, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:02", "type": 1}
+{"t": 1794154923.236, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:03", "type": 1}
+{"t": 1794154924.238, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:04", "type": 1}
+{"t": 1794154925.238, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:05", "type": 1}
+{"t": 1794154926.238, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:06", "type": 1}
+{"t": 1794154927.108, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-109.png"}
+{"t": 1794154927.241, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:07", "type": 1}
+{"t": 1794154928.243, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:08", "type": 1}
+{"t": 1794154929.243, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:09", "type": 1}
+{"t": 1794154930.245, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:10", "type": 1}
+{"t": 1794154931.246, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:11", "type": 1}
+{"t": 1794154932.121, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-110.png"}
+{"t": 1794154932.256, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:12", "type": 1}
+{"t": 1794154933.25, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:13", "type": 1}
+{"t": 1794154934.249, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:14", "type": 1}
+{"t": 1794154935.254, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:15", "type": 1}
+{"t": 1794154936.255, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:16", "type": 1}
+{"t": 1794154937.131, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-111.png"}
+{"t": 1794154937.257, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:17", "type": 1}
+{"t": 1794154938.256, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:18", "type": 1}
+{"t": 1794154939.258, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:19", "type": 1}
+{"t": 1794154940.263, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:20", "type": 1}
+{"t": 1794154941.263, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:21", "type": 1}
+{"t": 1794154942.126, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-112.png"}
+{"t": 1794154942.259, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:22", "type": 1}
+{"t": 1794154943.262, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:23", "type": 1}
+{"t": 1794154944.262, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:24", "type": 1}
+{"t": 1794154945.265, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794158545.0, "new": 1794158545.0, "delta_ms": -5}
+{"t": 1794154945.269, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:25", "type": 1}
+{"t": 1794154946.269, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:26", "type": 1}
+{"t": 1794154947.094, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158546.0, "src": "GPS", "ms": 607581, "ticks": 589, "late_sum_ms": 3482, "late_max_ms": 1587, "lost_ms": 6}
+{"t": 1794154947.222, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-113.png"}
+{"t": 1794154947.269, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:27", "type": 1}
+{"t": 1794154948.272, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:28", "type": 1}
+{"t": 1794154949.271, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:29", "type": 1}
+{"t": 1794154950.27, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:30", "type": 1}
+{"t": 1794154951.274, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:31", "type": 1}
+{"t": 1794154952.165, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-114.png"}
+{"t": 1794154952.279, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:32", "type": 1}
+{"t": 1794154953.279, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:33", "type": 1}
+{"t": 1794154954.28, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:34", "type": 1}
+{"t": 1794154955.281, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:35", "type": 1}
+{"t": 1794154956.284, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:36", "type": 1}
+{"t": 1794154957.129, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-115.png"}
+{"t": 1794154957.286, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:37", "type": 1}
+{"t": 1794154958.287, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:38", "type": 1}
+{"t": 1794154959.287, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:39", "type": 1}
+{"t": 1794154960.291, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:40", "type": 1}
+{"t": 1794154961.292, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:41", "type": 1}
+{"t": 1794154962.173, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-116.png"}
+{"t": 1794154962.293, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:42", "type": 1}
+{"t": 1794154963.293, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:43", "type": 1}
+{"t": 1794154964.293, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:44", "type": 1}
+{"t": 1794154965.293, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:45", "type": 1}
+{"t": 1794154966.295, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:46", "type": 1}
+{"t": 1794154967.134, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-117.png"}
+{"t": 1794154967.296, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:47", "type": 1}
+{"t": 1794154968.296, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:48", "type": 1}
+{"t": 1794154969.299, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:49", "type": 1}
+{"t": 1794154970.303, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:50", "type": 1}
+{"t": 1794154971.303, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:51", "type": 1}
+{"t": 1794154972.16, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-118.png"}
+{"t": 1794154972.305, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:52", "type": 1}
+{"t": 1794154973.309, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:53", "type": 1}
+{"t": 1794154974.309, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:54", "type": 1}
+{"t": 1794154975.309, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:55", "type": 1}
+{"t": 1794154976.309, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:56", "type": 1}
+{"t": 1794154977.19, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-119.png"}
+{"t": 1794154977.31, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:57", "type": 1}
+{"t": 1794154978.311, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:58", "type": 1}
+{"t": 1794154979.312, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:22:59", "type": 1}
+{"t": 1794154980.312, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:23:00", "type": 1}
+{"t": 1794154981.312, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:23:01", "type": 1}
+{"t": 1794154982.187, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-120.png"}
+{"t": 1794154982.313, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:23:02", "type": 1}
+{"t": 1794154983.313, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:23:03", "type": 1}
+{"t": 1794154984.314, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:23:04", "type": 1}
+{"t": 1794154985.315, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:23:05", "type": 1}
+{"t": 1794154986.315, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:23:06", "type": 1}
+{"t": 1794154987.178, "node": "heltec-1", "tag": "SHOT", "kind": "oled", "file": "clock-heltec-1-20261108-171203-oled-121.png"}
+{"t": 1794154987.317, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:23:07", "type": 1}
+{"t": 1794154988.317, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:23:08", "type": 1}
+{"t": 1794154989.318, "node": "heltec-1", "tag": "DISPCLK", "kind": "draw", "hms": "17:23:09", "type": 1}
+{"t": 1794154990.343, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154991.344, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154992.083, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794154992.342, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154993.344, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154994.348, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154995.349, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154996.345, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154997.349, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154997.354, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794154998.345, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794154999.347, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155000.347, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155001.348, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155002.106, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794155002.352, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155003.351, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155004.351, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155005.355, "node": "heltec-1", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794158605.0, "new": 1794158605.0, "delta_ms": -1}
+{"t": 1794155005.359, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155006.354, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155007.365, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158606.0, "src": "GPS", "ms": 667585, "ticks": 649, "late_sum_ms": 3679, "late_max_ms": 1587, "lost_ms": 3}
+{"t": 1794155007.365, "node": "heltec-1", "tag": "CLOCK", "kind": "stat", "epoch": 1794158606.0, "src": "GPS", "ms": 667831, "ticks": 649, "late_sum_ms": 3679, "late_max_ms": 1587, "lost_ms": 3}
+{"t": 1794155007.365, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155007.373, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794155008.354, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155009.355, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155010.356, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155011.358, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155012.111, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794155012.362, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155013.362, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155014.359, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155015.36, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155016.361, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155017.125, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794155017.364, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155018.366, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155019.367, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155020.365, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155021.367, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155022.128, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794155022.366, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155023.368, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155024.37, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155025.371, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155026.374, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155027.121, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794155027.377, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155028.379, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155029.398, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155030.387, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155031.383, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155032.086, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794155032.386, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155033.391, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155034.386, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155035.39, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155036.391, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155037.013, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794155037.394, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155038.39, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155039.392, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155040.393, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155041.395, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155041.87, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794155042.396, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155043.398, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155044.4, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155045.401, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155046.402, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155047.119, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794155047.4, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155048.402, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155049.404, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155050.405, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155051.407, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155052.171, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794155052.409, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155053.411, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155054.413, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155055.415, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155056.416, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155057.169, "node": "heltec-1", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794155057.419, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794155058.42, "node": "heltec-1", "tag": "DISPCLK", "kind": "skip", "reason": "off"}

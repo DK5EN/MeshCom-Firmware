@@ -1,0 +1,569 @@
+{
+  "node": "heltec-1",
+  "malformed_lines": 0,
+  "shot_errors": 0,
+  "shots": [
+    "clock-heltec-1-20261108-151342-oled-001.png",
+    "clock-heltec-1-20261108-151342-oled-002.png",
+    "clock-heltec-1-20261108-151342-oled-003.png",
+    "clock-heltec-1-20261108-151342-oled-004.png",
+    "clock-heltec-1-20261108-151342-oled-005.png",
+    "clock-heltec-1-20261108-151342-oled-006.png",
+    "clock-heltec-1-20261108-151342-oled-007.png",
+    "clock-heltec-1-20261108-151342-oled-008.png",
+    "clock-heltec-1-20261108-151342-oled-009.png",
+    "clock-heltec-1-20261108-151342-oled-010.png",
+    "clock-heltec-1-20261108-151342-oled-011.png",
+    "clock-heltec-1-20261108-151342-oled-012.png",
+    "clock-heltec-1-20261108-151342-oled-013.png",
+    "clock-heltec-1-20261108-151342-oled-014.png",
+    "clock-heltec-1-20261108-151342-oled-015.png",
+    "clock-heltec-1-20261108-151342-oled-016.png",
+    "clock-heltec-1-20261108-151342-oled-017.png",
+    "clock-heltec-1-20261108-151342-oled-018.png",
+    "clock-heltec-1-20261108-151342-oled-019.png",
+    "clock-heltec-1-20261108-151342-oled-020.png",
+    "clock-heltec-1-20261108-151342-oled-021.png",
+    "clock-heltec-1-20261108-151342-oled-022.png",
+    "clock-heltec-1-20261108-151342-oled-023.png",
+    "clock-heltec-1-20261108-151342-oled-024.png",
+    "clock-heltec-1-20261108-151342-oled-025.png",
+    "clock-heltec-1-20261108-151342-oled-026.png",
+    "clock-heltec-1-20261108-151342-oled-027.png",
+    "clock-heltec-1-20261108-151342-oled-028.png",
+    "clock-heltec-1-20261108-151342-oled-029.png",
+    "clock-heltec-1-20261108-151342-oled-030.png",
+    "clock-heltec-1-20261108-151342-oled-031.png",
+    "clock-heltec-1-20261108-151342-oled-032.png",
+    "clock-heltec-1-20261108-151342-oled-033.png",
+    "clock-heltec-1-20261108-151342-oled-034.png",
+    "clock-heltec-1-20261108-151342-oled-035.png",
+    "clock-heltec-1-20261108-151342-oled-036.png",
+    "clock-heltec-1-20261108-151342-oled-037.png",
+    "clock-heltec-1-20261108-151342-oled-038.png",
+    "clock-heltec-1-20261108-151342-oled-039.png",
+    "clock-heltec-1-20261108-151342-oled-040.png",
+    "clock-heltec-1-20261108-151342-oled-041.png",
+    "clock-heltec-1-20261108-151342-oled-042.png",
+    "clock-heltec-1-20261108-151342-oled-043.png",
+    "clock-heltec-1-20261108-151342-oled-044.png",
+    "clock-heltec-1-20261108-151342-oled-045.png",
+    "clock-heltec-1-20261108-151342-oled-046.png",
+    "clock-heltec-1-20261108-151342-oled-047.png",
+    "clock-heltec-1-20261108-151342-oled-048.png",
+    "clock-heltec-1-20261108-151342-oled-049.png",
+    "clock-heltec-1-20261108-151342-oled-050.png",
+    "clock-heltec-1-20261108-151342-oled-051.png",
+    "clock-heltec-1-20261108-151342-oled-052.png",
+    "clock-heltec-1-20261108-151342-oled-053.png",
+    "clock-heltec-1-20261108-151342-oled-054.png",
+    "clock-heltec-1-20261108-151342-oled-055.png",
+    "clock-heltec-1-20261108-151342-oled-056.png",
+    "clock-heltec-1-20261108-151342-oled-057.png",
+    "clock-heltec-1-20261108-151342-oled-058.png",
+    "clock-heltec-1-20261108-151342-oled-059.png",
+    "clock-heltec-1-20261108-151342-oled-060.png",
+    "clock-heltec-1-20261108-151342-oled-061.png",
+    "clock-heltec-1-20261108-151342-oled-062.png",
+    "clock-heltec-1-20261108-151342-oled-063.png",
+    "clock-heltec-1-20261108-151342-oled-064.png",
+    "clock-heltec-1-20261108-151342-oled-065.png",
+    "clock-heltec-1-20261108-151342-oled-066.png",
+    "clock-heltec-1-20261108-151342-oled-067.png",
+    "clock-heltec-1-20261108-151342-oled-068.png",
+    "clock-heltec-1-20261108-151342-oled-069.png",
+    "clock-heltec-1-20261108-151342-oled-070.png",
+    "clock-heltec-1-20261108-151342-oled-071.png"
+  ],
+  "info_events": [],
+  "stat_count": 18,
+  "drift_curve": [
+    {
+      "t": 1794147298.25,
+      "elapsed_s": 0.0,
+      "drift_s": 0.0,
+      "offset_s": 3598.75
+    },
+    {
+      "t": 1794147306.219,
+      "elapsed_s": 7.97,
+      "drift_s": 0.03,
+      "offset_s": 3598.781
+    },
+    {
+      "t": 1794147366.312,
+      "elapsed_s": 68.063,
+      "drift_s": -0.063,
+      "offset_s": 3598.688
+    },
+    {
+      "t": 1794147366.312,
+      "elapsed_s": 68.063,
+      "drift_s": -0.063,
+      "offset_s": 3598.688
+    },
+    {
+      "t": 1794147426.166,
+      "elapsed_s": 127.916,
+      "drift_s": 0.084,
+      "offset_s": 3598.834
+    },
+    {
+      "t": 1794147486.159,
+      "elapsed_s": 187.91,
+      "drift_s": 0.09,
+      "offset_s": 3598.841
+    },
+    {
+      "t": 1794147486.159,
+      "elapsed_s": 187.91,
+      "drift_s": 0.09,
+      "offset_s": 3598.841
+    },
+    {
+      "t": 1794147546.164,
+      "elapsed_s": 247.915,
+      "drift_s": 0.085,
+      "offset_s": 3598.836
+    },
+    {
+      "t": 1794147546.164,
+      "elapsed_s": 247.915,
+      "drift_s": 0.085,
+      "offset_s": 3598.836
+    },
+    {
+      "t": 1794147606.373,
+      "elapsed_s": 308.123,
+      "drift_s": -0.123,
+      "offset_s": 3598.627
+    },
+    {
+      "t": 1794147606.373,
+      "elapsed_s": 308.124,
+      "drift_s": 0.876,
+      "offset_s": 3599.627
+    },
+    {
+      "t": 1794147666.192,
+      "elapsed_s": 367.942,
+      "drift_s": 0.058,
+      "offset_s": 3598.808
+    },
+    {
+      "t": 1794147726.16,
+      "elapsed_s": 427.91,
+      "drift_s": 0.09,
+      "offset_s": 3598.84
+    },
+    {
+      "t": 1794147786.157,
+      "elapsed_s": 487.907,
+      "drift_s": 0.093,
+      "offset_s": 3598.843
+    },
+    {
+      "t": 1794147786.157,
+      "elapsed_s": 487.907,
+      "drift_s": 0.093,
+      "offset_s": 3598.843
+    },
+    {
+      "t": 1794147846.386,
+      "elapsed_s": 548.136,
+      "drift_s": -0.136,
+      "offset_s": 3598.614
+    },
+    {
+      "t": 1794147846.386,
+      "elapsed_s": 548.136,
+      "drift_s": -0.136,
+      "offset_s": 3598.614
+    },
+    {
+      "t": 1794147906.167,
+      "elapsed_s": 607.917,
+      "drift_s": 0.083,
+      "offset_s": 3598.833
+    }
+  ],
+  "drift_total_s": 0.083,
+  "drift_max_abs_s": 0.876,
+  "drift_ppm": 136.5,
+  "lost_ms_last": 0,
+  "late_max_ms_max": 1587,
+  "sets": [
+    {
+      "t": 1794147239.383,
+      "src": "OTHER",
+      "delta_ms": 2147483647
+    },
+    {
+      "t": 1794147243.58,
+      "src": "GPS",
+      "delta_ms": 1179662
+    },
+    {
+      "t": 1794147246.659,
+      "src": "NTP",
+      "delta_ms": -68
+    },
+    {
+      "t": 1794147249.603,
+      "src": "NTP",
+      "delta_ms": -1006
+    },
+    {
+      "t": 1794147252.643,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147255.891,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147264.621,
+      "src": "GPS",
+      "delta_ms": 1000
+    },
+    {
+      "t": 1794147318.751,
+      "src": "NTP",
+      "delta_ms": -7
+    },
+    {
+      "t": 1794147324.751,
+      "src": "GPS",
+      "delta_ms": -3
+    },
+    {
+      "t": 1794147381.829,
+      "src": "NTP",
+      "delta_ms": -7
+    },
+    {
+      "t": 1794147384.823,
+      "src": "GPS",
+      "delta_ms": -1
+    },
+    {
+      "t": 1794147441.835,
+      "src": "NTP",
+      "delta_ms": -7
+    },
+    {
+      "t": 1794147444.885,
+      "src": "GPS",
+      "delta_ms": -1
+    },
+    {
+      "t": 1794147504.956,
+      "src": "GPS",
+      "delta_ms": -6
+    },
+    {
+      "t": 1794147504.998,
+      "src": "NTP",
+      "delta_ms": -42
+    },
+    {
+      "t": 1794147565.0,
+      "src": "NTP",
+      "delta_ms": -6
+    },
+    {
+      "t": 1794147565.035,
+      "src": "GPS",
+      "delta_ms": -1
+    },
+    {
+      "t": 1794147625.126,
+      "src": "GPS",
+      "delta_ms": -6
+    },
+    {
+      "t": 1794147658.202,
+      "src": "NTP",
+      "delta_ms": -1042
+    },
+    {
+      "t": 1794147661.203,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147685.19,
+      "src": "GPS",
+      "delta_ms": -1
+    },
+    {
+      "t": 1794147691.24,
+      "src": "NTP",
+      "delta_ms": -1042
+    },
+    {
+      "t": 1794147694.241,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147697.244,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147703.252,
+      "src": "NTP",
+      "delta_ms": -1042
+    },
+    {
+      "t": 1794147706.252,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147709.253,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147712.254,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147715.256,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147718.26,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147724.266,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147727.272,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147730.277,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147733.278,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147736.285,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147739.29,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147742.292,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147745.253,
+      "src": "GPS",
+      "delta_ms": 999
+    },
+    {
+      "t": 1794147745.295,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147748.299,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147751.303,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147754.308,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147757.311,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147760.312,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147763.317,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147766.322,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147769.323,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147772.325,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147775.331,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147778.333,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147781.338,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147784.359,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147787.349,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147790.354,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147793.356,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147796.358,
+      "src": "NTP",
+      "delta_ms": -1043
+    },
+    {
+      "t": 1794147799.361,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147805.324,
+      "src": "GPS",
+      "delta_ms": 0
+    },
+    {
+      "t": 1794147862.467,
+      "src": "NTP",
+      "delta_ms": -1042
+    },
+    {
+      "t": 1794147865.427,
+      "src": "GPS",
+      "delta_ms": 999
+    },
+    {
+      "t": 1794147865.469,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147868.431,
+      "src": "GPS",
+      "delta_ms": 1000
+    },
+    {
+      "t": 1794147868.473,
+      "src": "NTP",
+      "delta_ms": -1042
+    },
+    {
+      "t": 1794147871.476,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147874.482,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147877.487,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147880.492,
+      "src": "NTP",
+      "delta_ms": -1041
+    },
+    {
+      "t": 1794147930.065,
+      "src": "GPS",
+      "delta_ms": -1
+    },
+    {
+      "t": 1794147940.494,
+      "src": "NTP",
+      "delta_ms": -7
+    }
+  ],
+  "set_by_src": {
+    "OTHER": {
+      "count": 1,
+      "max_abs_delta_ms": 2147483647
+    },
+    "GPS": {
+      "count": 14,
+      "max_abs_delta_ms": 1179662
+    },
+    "NTP": {
+      "count": 54,
+      "max_abs_delta_ms": 1043
+    }
+  },
+  "max_abs_set_delta_ms": 2147483647,
+  "draw_count": 537,
+  "display_gap_max_s": 157.994,
+  "display_gap_at": {
+    "t": 1794147282.658,
+    "from_hms": "15:14:42",
+    "to_hms": "15:17:20"
+  },
+  "display_gaps_over_threshold": 19,
+  "display_gap_threshold_s": 1.5,
+  "skip_reasons": {
+    "hold": 154
+  }
+}

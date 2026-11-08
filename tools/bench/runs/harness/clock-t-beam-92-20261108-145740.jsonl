@@ -1,0 +1,802 @@
+{"t": 1794146292.608, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "OTHER", "old": 1672531200.0, "new": 1794149658.0, "delta_ms": 2147483647}
+{"t": 1794146296.583, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794149660.0, "new": 1794149896.0, "delta_ms": 233291}
+{"t": 1794146298.959, "node": "t-beam-92", "tag": "CLOCK", "kind": "timesrc", "mode": "all"}
+{"t": 1794146302.651, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146303.599, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146304.606, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146305.605, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146306.605, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146307.607, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146308.612, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146309.614, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146310.613, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146311.619, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146312.622, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146313.622, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146314.379, "node": "t-beam-92", "tag": "OLEDSHOT", "kind": "err", "msg": "display off"}
+{"t": 1794146314.627, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146315.625, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146316.628, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146317.634, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146318.636, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146319.638, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146320.631, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146321.644, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146322.641, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146323.641, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "off"}
+{"t": 1794146324.656, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:44", "type": 9}
+{"t": 1794146325.653, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:45", "type": 9}
+{"t": 1794146326.654, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:46", "type": 9}
+{"t": 1794146327.705, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:47", "type": 9}
+{"t": 1794146328.957, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:48", "type": 9}
+{"t": 1794146329.086, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-001.png"}
+{"t": 1794146329.712, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:49", "type": 9}
+{"t": 1794146330.714, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:50", "type": 9}
+{"t": 1794146331.714, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:51", "type": 9}
+{"t": 1794146332.719, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:52", "type": 9}
+{"t": 1794146333.72, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:53", "type": 9}
+{"t": 1794146334.718, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:54", "type": 9}
+{"t": 1794146335.725, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:55", "type": 9}
+{"t": 1794146336.727, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:56", "type": 9}
+{"t": 1794146337.725, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:57", "type": 9}
+{"t": 1794146338.731, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:58", "type": 9}
+{"t": 1794146339.732, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:58:59", "type": 9}
+{"t": 1794146340.731, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:00", "type": 9}
+{"t": 1794146341.728, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:01", "type": 9}
+{"t": 1794146342.781, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:02", "type": 9}
+{"t": 1794146344.017, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:03", "type": 9}
+{"t": 1794146344.143, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-002.png"}
+{"t": 1794146344.784, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:04", "type": 9}
+{"t": 1794146345.787, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:05", "type": 9}
+{"t": 1794146346.788, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:06", "type": 9}
+{"t": 1794146347.789, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:07", "type": 9}
+{"t": 1794146348.791, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:08", "type": 9}
+{"t": 1794146349.791, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:09", "type": 9}
+{"t": 1794146350.795, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:10", "type": 9}
+{"t": 1794146351.797, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:11", "type": 9}
+{"t": 1794146351.879, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794149951.0, "src": "GPS", "ms": 60000, "ticks": 56, "late_sum_ms": 1609, "late_max_ms": 1365, "lost_ms": 5}
+{"t": 1794146352.797, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:12", "type": 9}
+{"t": 1794146353.802, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:13", "type": 9}
+{"t": 1794146354.801, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:14", "type": 9}
+{"t": 1794146355.803, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:15", "type": 9}
+{"t": 1794146356.805, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794149956.0, "new": 1794149956.0, "delta_ms": -5}
+{"t": 1794146356.808, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:16", "type": 9}
+{"t": 1794146357.808, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:17", "type": 9}
+{"t": 1794146359.32, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:18", "type": 9}
+{"t": 1794146359.32, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794149958.0, "src": "GPS", "ms": 67221, "ticks": 63, "late_sum_ms": 1637, "late_max_ms": 1365, "lost_ms": 5}
+{"t": 1794146359.45, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-003.png"}
+{"t": 1794146359.812, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:19", "type": 9}
+{"t": 1794146360.813, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:20", "type": 9}
+{"t": 1794146361.812, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:21", "type": 1}
+{"t": 1794146362.82, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:22", "type": 1}
+{"t": 1794146363.821, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:23", "type": 1}
+{"t": 1794146364.818, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:24", "type": 1}
+{"t": 1794146365.828, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:25", "type": 1}
+{"t": 1794146366.83, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:26", "type": 1}
+{"t": 1794146367.831, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:27", "type": 1}
+{"t": 1794146368.836, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:28", "type": 1}
+{"t": 1794146369.837, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:29", "type": 1}
+{"t": 1794146370.839, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:30", "type": 1}
+{"t": 1794146371.835, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:31", "type": 1}
+{"t": 1794146372.883, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:32", "type": 1}
+{"t": 1794146374.133, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:33", "type": 1}
+{"t": 1794146374.258, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-004.png"}
+{"t": 1794146374.89, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:34", "type": 1}
+{"t": 1794146375.889, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:35", "type": 1}
+{"t": 1794146376.892, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:36", "type": 1}
+{"t": 1794146377.897, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:37", "type": 1}
+{"t": 1794146378.898, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:38", "type": 1}
+{"t": 1794146379.9, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:39", "type": 1}
+{"t": 1794146380.896, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:40", "type": 1}
+{"t": 1794146381.95, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:41", "type": 1}
+{"t": 1794146382.945, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:42", "type": 1}
+{"t": 1794146383.954, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:43", "type": 1}
+{"t": 1794146384.957, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:44", "type": 1}
+{"t": 1794146385.957, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:45", "type": 1}
+{"t": 1794146386.953, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:46", "type": 1}
+{"t": 1794146388.003, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:47", "type": 1}
+{"t": 1794146389.03, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:48", "type": 1}
+{"t": 1794146389.17, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-005.png"}
+{"t": 1794146390.009, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:49", "type": 1}
+{"t": 1794146391.011, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:50", "type": 1}
+{"t": 1794146392.009, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:51", "type": 1}
+{"t": 1794146393.013, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:52", "type": 1}
+{"t": 1794146394.011, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:53", "type": 1}
+{"t": 1794146395.015, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:54", "type": 1}
+{"t": 1794146396.012, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:55", "type": 1}
+{"t": 1794146397.065, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:56", "type": 1}
+{"t": 1794146398.065, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:57", "type": 1}
+{"t": 1794146399.062, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "14:59:58", "type": 1}
+{"t": 1794146400.117, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:00", "type": 1}
+{"t": 1794146401.123, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:01", "type": 1}
+{"t": 1794146402.125, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:02", "type": 1}
+{"t": 1794146403.127, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:03", "type": 1}
+{"t": 1794146404.054, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-006.png"}
+{"t": 1794146404.124, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:04", "type": 1}
+{"t": 1794146405.129, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:05", "type": 1}
+{"t": 1794146406.128, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:06", "type": 1}
+{"t": 1794146407.133, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:07", "type": 1}
+{"t": 1794146408.136, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:08", "type": 1}
+{"t": 1794146409.139, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:09", "type": 1}
+{"t": 1794146410.14, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:10", "type": 1}
+{"t": 1794146411.143, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:11", "type": 1}
+{"t": 1794146412.143, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:12", "type": 1}
+{"t": 1794146413.144, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:13", "type": 1}
+{"t": 1794146414.141, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:14", "type": 1}
+{"t": 1794146415.195, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:15", "type": 1}
+{"t": 1794146416.195, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:16", "type": 1}
+{"t": 1794146417.197, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794150017.0, "new": 1794150017.0, "delta_ms": -6}
+{"t": 1794146417.2, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:17", "type": 1}
+{"t": 1794146418.201, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:18", "type": 1}
+{"t": 1794146419.249, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150018.0, "src": "GPS", "ms": 127145, "ticks": 122, "late_sum_ms": 1892, "late_max_ms": 1365, "lost_ms": 6}
+{"t": 1794146419.249, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:19", "type": 1}
+{"t": 1794146419.376, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-007.png"}
+{"t": 1794146420.207, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:20", "type": 1}
+{"t": 1794146421.21, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:21", "type": 1}
+{"t": 1794146422.208, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:22", "type": 1}
+{"t": 1794146423.213, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:23", "type": 1}
+{"t": 1794146424.213, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:24", "type": 1}
+{"t": 1794146425.213, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:25", "type": 1}
+{"t": 1794146426.218, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:26", "type": 1}
+{"t": 1794146427.222, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:27", "type": 1}
+{"t": 1794146428.219, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:28", "type": 1}
+{"t": 1794146429.226, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:29", "type": 1}
+{"t": 1794146430.23, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:30", "type": 1}
+{"t": 1794146431.227, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:31", "type": 1}
+{"t": 1794146432.233, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:32", "type": 1}
+{"t": 1794146433.233, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:33", "type": 1}
+{"t": 1794146434.144, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-008.png"}
+{"t": 1794146434.235, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:34", "type": 1}
+{"t": 1794146435.231, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:35", "type": 1}
+{"t": 1794146436.282, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:36", "type": 1}
+{"t": 1794146437.28, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:37", "type": 1}
+{"t": 1794146438.29, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:38", "type": 1}
+{"t": 1794146439.288, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:39", "type": 1}
+{"t": 1794146440.291, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:40", "type": 1}
+{"t": 1794146441.297, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:41", "type": 1}
+{"t": 1794146442.296, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:42", "type": 1}
+{"t": 1794146443.298, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:43", "type": 1}
+{"t": 1794146444.296, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:44", "type": 1}
+{"t": 1794146445.346, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:45", "type": 1}
+{"t": 1794146446.347, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:46", "type": 1}
+{"t": 1794146447.346, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:47", "type": 1}
+{"t": 1794146448.395, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:48", "type": 1}
+{"t": 1794146449.312, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-009.png"}
+{"t": 1794146449.395, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:49", "type": 1}
+{"t": 1794146450.394, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:50", "type": 1}
+{"t": 1794146451.446, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:51", "type": 1}
+{"t": 1794146452.448, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:52", "type": 1}
+{"t": 1794146453.443, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:53", "type": 1}
+{"t": 1794146454.492, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:54", "type": 1}
+{"t": 1794146455.492, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:55", "type": 1}
+{"t": 1794146456.501, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:56", "type": 1}
+{"t": 1794146457.5, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:57", "type": 1}
+{"t": 1794146458.503, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:58", "type": 1}
+{"t": 1794146459.507, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:00:59", "type": 1}
+{"t": 1794146460.507, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:00", "type": 1}
+{"t": 1794146461.51, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:01", "type": 1}
+{"t": 1794146462.505, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:02", "type": 1}
+{"t": 1794146463.556, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:03", "type": 1}
+{"t": 1794146464.479, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-010.png"}
+{"t": 1794146464.553, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:04", "type": 1}
+{"t": 1794146465.553, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:05", "type": 1}
+{"t": 1794146466.603, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:06", "type": 1}
+{"t": 1794146467.601, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:07", "type": 1}
+{"t": 1794146468.603, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:08", "type": 1}
+{"t": 1794146469.656, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:09", "type": 1}
+{"t": 1794146470.657, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:10", "type": 1}
+{"t": 1794146471.658, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:11", "type": 1}
+{"t": 1794146471.774, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150071.0, "new": 1794150071.0, "delta_ms": -115}
+{"t": 1794146472.767, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:12", "type": 1}
+{"t": 1794146473.767, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:13", "type": 1}
+{"t": 1794146474.717, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150074.0, "new": 1794150073.0, "delta_ms": -1049}
+{"t": 1794146474.717, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:13", "type": 1}
+{"t": 1794146475.768, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:15", "type": 1}
+{"t": 1794146476.771, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:16", "type": 1}
+{"t": 1794146477.666, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794150076.0, "new": 1794150077.0, "delta_ms": 999}
+{"t": 1794146477.716, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150077.0, "new": 1794150076.0, "delta_ms": -1046}
+{"t": 1794146477.716, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:16", "type": 1}
+{"t": 1794146479.269, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:18", "type": 1}
+{"t": 1794146479.269, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150078.0, "src": "NTP", "ms": 187152, "ticks": 175, "late_sum_ms": 2093, "late_max_ms": 1365, "lost_ms": 0}
+{"t": 1794146479.27, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150078.0, "src": "NTP", "ms": 187173, "ticks": 175, "late_sum_ms": 2093, "late_max_ms": 1365, "lost_ms": 0}
+{"t": 1794146479.396, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-011.png"}
+{"t": 1794146479.773, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:19", "type": 1}
+{"t": 1794146480.719, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150080.0, "new": 1794150079.0, "delta_ms": -1047}
+{"t": 1794146480.719, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:19", "type": 1}
+{"t": 1794146481.772, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:21", "type": 1}
+{"t": 1794146482.772, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:22", "type": 1}
+{"t": 1794146483.673, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:23", "type": 1}
+{"t": 1794146483.721, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150083.0, "new": 1794150082.0, "delta_ms": -1047}
+{"t": 1794146484.773, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:24", "type": 1}
+{"t": 1794146485.766, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:25", "type": 1}
+{"t": 1794146486.674, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:26", "type": 1}
+{"t": 1794146486.723, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150086.0, "new": 1794150085.0, "delta_ms": -1046}
+{"t": 1794146487.766, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:27", "type": 1}
+{"t": 1794146488.773, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:28", "type": 1}
+{"t": 1794146489.68, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794150088.0, "new": 1794150089.0, "delta_ms": 1000}
+{"t": 1794146489.683, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:29", "type": 1}
+{"t": 1794146489.727, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150089.0, "new": 1794150088.0, "delta_ms": -1046}
+{"t": 1794146490.768, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:30", "type": 1}
+{"t": 1794146491.767, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:31", "type": 1}
+{"t": 1794146492.681, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:32", "type": 1}
+{"t": 1794146492.73, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150092.0, "new": 1794150091.0, "delta_ms": -1047}
+{"t": 1794146494.017, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:33", "type": 1}
+{"t": 1794146494.143, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-012.png"}
+{"t": 1794146494.768, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:34", "type": 1}
+{"t": 1794146495.686, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:35", "type": 1}
+{"t": 1794146495.735, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150095.0, "new": 1794150094.0, "delta_ms": -1046}
+{"t": 1794146496.773, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:36", "type": 1}
+{"t": 1794146497.771, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:37", "type": 1}
+{"t": 1794146498.693, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:38", "type": 1}
+{"t": 1794146498.744, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150098.0, "new": 1794150097.0, "delta_ms": -1049}
+{"t": 1794146499.773, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:39", "type": 1}
+{"t": 1794146500.77, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:40", "type": 1}
+{"t": 1794146501.705, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794150100.0, "new": 1794150101.0, "delta_ms": 1000}
+{"t": 1794146501.708, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:41", "type": 1}
+{"t": 1794146501.752, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150101.0, "new": 1794150100.0, "delta_ms": -1046}
+{"t": 1794146502.771, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:42", "type": 1}
+{"t": 1794146503.767, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:43", "type": 1}
+{"t": 1794146504.709, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:44", "type": 1}
+{"t": 1794146504.758, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150104.0, "new": 1794150103.0, "delta_ms": -1046}
+{"t": 1794146505.767, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:45", "type": 1}
+{"t": 1794146506.773, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:46", "type": 1}
+{"t": 1794146507.716, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:47", "type": 1}
+{"t": 1794146507.765, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150107.0, "new": 1794150106.0, "delta_ms": -1046}
+{"t": 1794146509.012, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:48", "type": 1}
+{"t": 1794146509.144, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-013.png"}
+{"t": 1794146509.768, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:49", "type": 1}
+{"t": 1794146510.717, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:50", "type": 1}
+{"t": 1794146510.767, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150110.0, "new": 1794150109.0, "delta_ms": -1048}
+{"t": 1794146511.773, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:51", "type": 1}
+{"t": 1794146512.768, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:52", "type": 1}
+{"t": 1794146513.72, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:53", "type": 1}
+{"t": 1794146514.77, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:54", "type": 1}
+{"t": 1794146515.767, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:55", "type": 1}
+{"t": 1794146516.727, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:56", "type": 1}
+{"t": 1794146517.767, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:57", "type": 1}
+{"t": 1794146518.77, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:58", "type": 1}
+{"t": 1794146519.737, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:01:59", "type": 1}
+{"t": 1794146520.74, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:00", "type": 1}
+{"t": 1794146521.741, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:01", "type": 1}
+{"t": 1794146522.742, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:02", "type": 1}
+{"t": 1794146523.97, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:03", "type": 1}
+{"t": 1794146524.096, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-014.png"}
+{"t": 1794146524.744, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:04", "type": 1}
+{"t": 1794146525.74, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:05", "type": 1}
+{"t": 1794146526.793, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:06", "type": 1}
+{"t": 1794146527.795, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:07", "type": 1}
+{"t": 1794146528.795, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:08", "type": 1}
+{"t": 1794146529.769, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:09", "type": 1}
+{"t": 1794146530.766, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:10", "type": 1}
+{"t": 1794146531.768, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:11", "type": 1}
+{"t": 1794146532.767, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:12", "type": 1}
+{"t": 1794146533.767, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:13", "type": 1}
+{"t": 1794146534.767, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:14", "type": 1}
+{"t": 1794146535.766, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:15", "type": 1}
+{"t": 1794146536.766, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:16", "type": 1}
+{"t": 1794146537.767, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:17", "type": 1}
+{"t": 1794146539.253, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:18", "type": 1}
+{"t": 1794146539.253, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150138.0, "src": "NTP", "ms": 247167, "ticks": 184, "late_sum_ms": 2133, "late_max_ms": 1365, "lost_ms": 0}
+{"t": 1794146539.38, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-015.png"}
+{"t": 1794146539.766, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:19", "type": 1}
+{"t": 1794146540.765, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:20", "type": 1}
+{"t": 1794146541.824, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:21", "type": 1}
+{"t": 1794146542.828, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:22", "type": 1}
+{"t": 1794146543.832, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:23", "type": 1}
+{"t": 1794146544.833, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:24", "type": 1}
+{"t": 1794146545.832, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:25", "type": 1}
+{"t": 1794146546.837, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:26", "type": 1}
+{"t": 1794146547.839, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:27", "type": 1}
+{"t": 1794146548.837, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:28", "type": 1}
+{"t": 1794146549.845, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:29", "type": 1}
+{"t": 1794146550.848, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:30", "type": 1}
+{"t": 1794146551.848, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:31", "type": 1}
+{"t": 1794146552.853, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:32", "type": 1}
+{"t": 1794146554.103, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:33", "type": 1}
+{"t": 1794146554.233, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-016.png"}
+{"t": 1794146554.858, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:34", "type": 1}
+{"t": 1794146555.858, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:35", "type": 1}
+{"t": 1794146556.856, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:36", "type": 1}
+{"t": 1794146557.857, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:37", "type": 1}
+{"t": 1794146558.865, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:38", "type": 1}
+{"t": 1794146559.867, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:39", "type": 1}
+{"t": 1794146560.866, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:40", "type": 1}
+{"t": 1794146561.863, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:41", "type": 1}
+{"t": 1794146561.927, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794150161.0, "new": 1794150161.0, "delta_ms": -52}
+{"t": 1794146562.921, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:42", "type": 1}
+{"t": 1794146563.922, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:43", "type": 1}
+{"t": 1794146564.925, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:44", "type": 1}
+{"t": 1794146565.923, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:45", "type": 1}
+{"t": 1794146566.929, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:46", "type": 1}
+{"t": 1794146567.923, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:47", "type": 1}
+{"t": 1794146569.052, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-017.png"}
+{"t": 1794146569.058, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:02:48", "type": 1}
+{"t": 1794146569.974, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146570.97, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146571.981, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146572.987, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146573.99, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146574.994, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146575.988, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146576.995, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146577.996, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146578.994, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146580.003, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146581.005, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146582.002, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146583.001, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146584.25, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146584.38, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-018.png"}
+{"t": 1794146585.013, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146586.019, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146587.021, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146588.02, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146589.025, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146590.025, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146591.024, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146592.032, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146593.035, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146594.031, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146595.041, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146596.043, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146597.04, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146598.04, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146599.554, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150197.0, "src": "GPS", "ms": 307170, "ticks": 241, "late_sum_ms": 2383, "late_max_ms": 1365, "lost_ms": 0}
+{"t": 1794146599.554, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146599.554, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150198.0, "src": "GPS", "ms": 307454, "ticks": 242, "late_sum_ms": 2387, "late_max_ms": 1365, "lost_ms": 4}
+{"t": 1794146599.682, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-019.png"}
+{"t": 1794146600.05, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146601.051, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146602.063, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146603.065, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146604.068, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146605.071, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146606.072, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146607.065, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146608.079, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146609.081, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146610.085, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146611.087, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146612.089, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146613.094, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146614.339, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146614.468, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-020.png"}
+{"t": 1794146615.095, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146616.103, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146617.105, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146618.107, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146619.107, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146620.109, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146621.105, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146622.112, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794150222.0, "new": 1794150222.0, "delta_ms": -5}
+{"t": 1794146622.113, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146623.111, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146624.112, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146625.112, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146626.125, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146627.127, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146628.127, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146629.378, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146629.503, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-021.png"}
+{"t": 1794146630.129, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146631.133, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146632.133, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146633.137, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146634.132, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146635.142, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146636.141, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146637.149, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146638.151, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146639.15, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146640.16, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146641.153, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146642.15, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146643.156, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146644.038, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-022.png"}
+{"t": 1794146644.155, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146645.16, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146646.154, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146647.165, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146648.166, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146649.17, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146650.172, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146651.173, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146652.175, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146653.179, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146654.175, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146655.179, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146656.182, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146657.183, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146658.185, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146659.206, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150258.0, "src": "GPS", "ms": 367102, "ticks": 301, "late_sum_ms": 2627, "late_max_ms": 1365, "lost_ms": 0}
+{"t": 1794146659.206, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146659.336, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-023.png"}
+{"t": 1794146660.186, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146661.191, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146662.188, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146663.193, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146664.198, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146665.2, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146666.2, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146667.203, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146668.204, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146669.202, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146670.208, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146671.208, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146672.209, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146673.216, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146674.085, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-024.png"}
+{"t": 1794146674.217, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146675.215, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146676.215, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146677.228, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146678.229, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146679.233, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146680.234, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146681.231, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146682.238, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794150282.0, "new": 1794150282.0, "delta_ms": -5}
+{"t": 1794146682.24, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146683.238, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146684.238, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146685.238, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146686.251, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146687.252, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146688.255, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146689.124, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-025.png"}
+{"t": 1794146689.254, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146690.258, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146691.263, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146692.264, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146693.266, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146694.261, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146695.272, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146696.272, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146697.272, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146698.288, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146699.284, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146700.285, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146701.287, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146702.286, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146703.292, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146704.163, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-026.png"}
+{"t": 1794146704.291, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146705.292, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146706.301, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146707.303, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146708.305, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146709.308, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146710.313, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146711.313, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146712.312, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146713.315, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146714.315, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146715.316, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146716.321, "node": "t-beam-92", "tag": "DISPCLK", "kind": "skip", "reason": "type0"}
+{"t": 1794146717.317, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:17", "type": 1}
+{"t": 1794146718.317, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:18", "type": 1}
+{"t": 1794146719.373, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150318.0, "src": "GPS", "ms": 427103, "ticks": 361, "late_sum_ms": 2850, "late_max_ms": 1365, "lost_ms": 0}
+{"t": 1794146719.373, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150318.0, "src": "GPS", "ms": 427275, "ticks": 361, "late_sum_ms": 2850, "late_max_ms": 1365, "lost_ms": 0}
+{"t": 1794146719.373, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:19", "type": 1}
+{"t": 1794146719.531, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-027.png"}
+{"t": 1794146720.366, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:20", "type": 1}
+{"t": 1794146721.393, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:21", "type": 1}
+{"t": 1794146722.388, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:22", "type": 1}
+{"t": 1794146723.386, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:23", "type": 1}
+{"t": 1794146724.386, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:24", "type": 1}
+{"t": 1794146725.388, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:25", "type": 1}
+{"t": 1794146726.386, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:26", "type": 1}
+{"t": 1794146727.393, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:27", "type": 1}
+{"t": 1794146728.395, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:28", "type": 1}
+{"t": 1794146729.397, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:29", "type": 1}
+{"t": 1794146730.392, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:30", "type": 1}
+{"t": 1794146731.446, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:31", "type": 1}
+{"t": 1794146732.441, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:32", "type": 1}
+{"t": 1794146733.448, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:33", "type": 1}
+{"t": 1794146734.354, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-028.png"}
+{"t": 1794146734.448, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:34", "type": 1}
+{"t": 1794146735.447, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:35", "type": 1}
+{"t": 1794146736.447, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:36", "type": 1}
+{"t": 1794146737.497, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:37", "type": 1}
+{"t": 1794146738.501, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:38", "type": 1}
+{"t": 1794146739.501, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:39", "type": 1}
+{"t": 1794146740.504, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:40", "type": 1}
+{"t": 1794146741.505, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:41", "type": 1}
+{"t": 1794146742.505, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794150342.0, "new": 1794150342.0, "delta_ms": -5}
+{"t": 1794146742.508, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:42", "type": 1}
+{"t": 1794146743.507, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:43", "type": 1}
+{"t": 1794146744.509, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:44", "type": 1}
+{"t": 1794146745.512, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:45", "type": 1}
+{"t": 1794146746.517, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:46", "type": 1}
+{"t": 1794146747.513, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:47", "type": 1}
+{"t": 1794146748.518, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:48", "type": 1}
+{"t": 1794146749.434, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-029.png"}
+{"t": 1794146749.521, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:49", "type": 1}
+{"t": 1794146750.519, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:50", "type": 1}
+{"t": 1794146751.52, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:51", "type": 1}
+{"t": 1794146752.521, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:52", "type": 1}
+{"t": 1794146753.525, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:53", "type": 1}
+{"t": 1794146754.525, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:54", "type": 1}
+{"t": 1794146755.527, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:55", "type": 1}
+{"t": 1794146756.525, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:56", "type": 1}
+{"t": 1794146757.53, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:57", "type": 1}
+{"t": 1794146758.531, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:58", "type": 1}
+{"t": 1794146759.534, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:05:59", "type": 1}
+{"t": 1794146760.536, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:00", "type": 1}
+{"t": 1794146761.54, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:01", "type": 1}
+{"t": 1794146762.537, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:02", "type": 1}
+{"t": 1794146763.536, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:03", "type": 1}
+{"t": 1794146764.449, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-030.png"}
+{"t": 1794146764.585, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:04", "type": 1}
+{"t": 1794146765.588, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:05", "type": 1}
+{"t": 1794146766.591, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:06", "type": 1}
+{"t": 1794146767.593, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:07", "type": 1}
+{"t": 1794146768.593, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:08", "type": 1}
+{"t": 1794146769.594, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:09", "type": 1}
+{"t": 1794146770.6, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:10", "type": 1}
+{"t": 1794146771.597, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:11", "type": 1}
+{"t": 1794146772.599, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:12", "type": 1}
+{"t": 1794146773.598, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:13", "type": 1}
+{"t": 1794146774.603, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:14", "type": 1}
+{"t": 1794146775.607, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:15", "type": 1}
+{"t": 1794146776.608, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:16", "type": 1}
+{"t": 1794146777.611, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:17", "type": 1}
+{"t": 1794146778.611, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:18", "type": 1}
+{"t": 1794146779.14, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150378.0, "src": "GPS", "ms": 487047, "ticks": 421, "late_sum_ms": 3098, "late_max_ms": 1365, "lost_ms": 0}
+{"t": 1794146779.268, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-031.png"}
+{"t": 1794146779.613, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:19", "type": 1}
+{"t": 1794146780.616, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:20", "type": 1}
+{"t": 1794146781.613, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:21", "type": 1}
+{"t": 1794146781.664, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150381.0, "new": 1794150380.0, "delta_ms": -1050}
+{"t": 1794146782.765, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:22", "type": 1}
+{"t": 1794146783.771, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:23", "type": 1}
+{"t": 1794146784.665, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150384.0, "new": 1794150383.0, "delta_ms": -1045}
+{"t": 1794146784.769, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:24", "type": 1}
+{"t": 1794146785.767, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:25", "type": 1}
+{"t": 1794146786.766, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:26", "type": 1}
+{"t": 1794146788.632, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:28", "type": 1}
+{"t": 1794146789.629, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:29", "type": 1}
+{"t": 1794146790.636, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:30", "type": 1}
+{"t": 1794146791.643, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:31", "type": 1}
+{"t": 1794146792.637, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:32", "type": 1}
+{"t": 1794146793.888, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:33", "type": 1}
+{"t": 1794146794.014, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-032.png"}
+{"t": 1794146794.645, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:34", "type": 1}
+{"t": 1794146795.649, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:35", "type": 1}
+{"t": 1794146796.655, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:36", "type": 1}
+{"t": 1794146797.658, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:37", "type": 1}
+{"t": 1794146798.658, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:38", "type": 1}
+{"t": 1794146799.658, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:39", "type": 1}
+{"t": 1794146799.709, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150399.0, "new": 1794150398.0, "delta_ms": -1049}
+{"t": 1794146800.766, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:40", "type": 1}
+{"t": 1794146801.769, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:41", "type": 1}
+{"t": 1794146802.661, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794150401.0, "new": 1794150402.0, "delta_ms": 1000}
+{"t": 1794146802.713, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "NTP", "old": 1794150402.0, "new": 1794150401.0, "delta_ms": -1047}
+{"t": 1794146802.713, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:41", "type": 1}
+{"t": 1794146803.763, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:43", "type": 1}
+{"t": 1794146804.764, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:44", "type": 1}
+{"t": 1794146805.668, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:45", "type": 1}
+{"t": 1794146806.667, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:46", "type": 1}
+{"t": 1794146807.667, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:47", "type": 1}
+{"t": 1794146808.92, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:48", "type": 1}
+{"t": 1794146809.049, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-033.png"}
+{"t": 1794146809.716, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:49", "type": 1}
+{"t": 1794146810.721, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:50", "type": 1}
+{"t": 1794146811.723, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:51", "type": 1}
+{"t": 1794146812.726, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:52", "type": 1}
+{"t": 1794146813.725, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:53", "type": 1}
+{"t": 1794146814.731, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:54", "type": 1}
+{"t": 1794146815.735, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:55", "type": 1}
+{"t": 1794146816.734, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:56", "type": 1}
+{"t": 1794146817.735, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:57", "type": 1}
+{"t": 1794146818.738, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:58", "type": 1}
+{"t": 1794146819.74, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:06:59", "type": 1}
+{"t": 1794146820.742, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:00", "type": 1}
+{"t": 1794146821.746, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:01", "type": 1}
+{"t": 1794146822.747, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:02", "type": 1}
+{"t": 1794146823.99, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:03", "type": 1}
+{"t": 1794146824.12, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-034.png"}
+{"t": 1794146824.754, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:04", "type": 1}
+{"t": 1794146825.751, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:05", "type": 1}
+{"t": 1794146826.748, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:06", "type": 1}
+{"t": 1794146827.796, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:07", "type": 1}
+{"t": 1794146828.796, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:08", "type": 1}
+{"t": 1794146829.798, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:09", "type": 1}
+{"t": 1794146830.764, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:10", "type": 1}
+{"t": 1794146831.769, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:11", "type": 1}
+{"t": 1794146832.769, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:12", "type": 1}
+{"t": 1794146833.823, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:13", "type": 1}
+{"t": 1794146834.822, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:14", "type": 1}
+{"t": 1794146835.823, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:15", "type": 1}
+{"t": 1794146836.828, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:16", "type": 1}
+{"t": 1794146837.827, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:17", "type": 1}
+{"t": 1794146839.324, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:18", "type": 1}
+{"t": 1794146839.325, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150438.0, "src": "GPS", "ms": 547049, "ticks": 466, "late_sum_ms": 3318, "late_max_ms": 1365, "lost_ms": 0}
+{"t": 1794146839.325, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150438.0, "src": "GPS", "ms": 547234, "ticks": 466, "late_sum_ms": 3318, "late_max_ms": 1365, "lost_ms": 0}
+{"t": 1794146839.455, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-035.png"}
+{"t": 1794146839.831, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:19", "type": 1}
+{"t": 1794146840.831, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:20", "type": 1}
+{"t": 1794146841.835, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:21", "type": 1}
+{"t": 1794146842.834, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:22", "type": 1}
+{"t": 1794146843.838, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:23", "type": 1}
+{"t": 1794146844.838, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:24", "type": 1}
+{"t": 1794146845.841, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:25", "type": 1}
+{"t": 1794146846.842, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:26", "type": 1}
+{"t": 1794146847.844, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:27", "type": 1}
+{"t": 1794146848.843, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:28", "type": 1}
+{"t": 1794146849.847, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:29", "type": 1}
+{"t": 1794146850.849, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:30", "type": 1}
+{"t": 1794146851.848, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:31", "type": 1}
+{"t": 1794146852.853, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:32", "type": 1}
+{"t": 1794146854.098, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:33", "type": 1}
+{"t": 1794146854.227, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-036.png"}
+{"t": 1794146854.85, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:34", "type": 1}
+{"t": 1794146855.852, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:35", "type": 1}
+{"t": 1794146856.85, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:36", "type": 1}
+{"t": 1794146857.902, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:37", "type": 1}
+{"t": 1794146858.905, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:38", "type": 1}
+{"t": 1794146859.905, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:39", "type": 1}
+{"t": 1794146860.909, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:40", "type": 1}
+{"t": 1794146861.908, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:41", "type": 1}
+{"t": 1794146862.913, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794150462.0, "new": 1794150462.0, "delta_ms": -8}
+{"t": 1794146862.916, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:42", "type": 1}
+{"t": 1794146863.918, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:43", "type": 1}
+{"t": 1794146864.919, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:44", "type": 1}
+{"t": 1794146865.922, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:45", "type": 1}
+{"t": 1794146866.921, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:46", "type": 1}
+{"t": 1794146867.924, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:47", "type": 1}
+{"t": 1794146869.169, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:48", "type": 1}
+{"t": 1794146869.302, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-037.png"}
+{"t": 1794146869.932, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:49", "type": 1}
+{"t": 1794146870.932, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:50", "type": 1}
+{"t": 1794146871.934, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:51", "type": 1}
+{"t": 1794146872.937, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:52", "type": 1}
+{"t": 1794146873.935, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:53", "type": 1}
+{"t": 1794146874.933, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:54", "type": 1}
+{"t": 1794146875.98, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:55", "type": 1}
+{"t": 1794146876.984, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:56", "type": 1}
+{"t": 1794146877.982, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:57", "type": 1}
+{"t": 1794146879.029, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:58", "type": 1}
+{"t": 1794146880.035, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:07:59", "type": 1}
+{"t": 1794146881.037, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:00", "type": 1}
+{"t": 1794146882.04, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:01", "type": 1}
+{"t": 1794146883.037, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:02", "type": 1}
+{"t": 1794146884.282, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:03", "type": 1}
+{"t": 1794146884.408, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-038.png"}
+{"t": 1794146885.043, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:04", "type": 1}
+{"t": 1794146886.046, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:05", "type": 1}
+{"t": 1794146887.054, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:06", "type": 1}
+{"t": 1794146888.055, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:07", "type": 1}
+{"t": 1794146889.057, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:08", "type": 1}
+{"t": 1794146890.059, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:09", "type": 1}
+{"t": 1794146891.057, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:10", "type": 1}
+{"t": 1794146892.062, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:11", "type": 1}
+{"t": 1794146893.059, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:12", "type": 1}
+{"t": 1794146894.115, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:14", "type": 1}
+{"t": 1794146895.118, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:15", "type": 1}
+{"t": 1794146896.113, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:16", "type": 1}
+{"t": 1794146897.159, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:17", "type": 1}
+{"t": 1794146898.161, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:18", "type": 1}
+{"t": 1794146899.221, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150498.0, "src": "GPS", "ms": 607116, "ticks": 525, "late_sum_ms": 3553, "late_max_ms": 1365, "lost_ms": 3}
+{"t": 1794146899.221, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:19", "type": 1}
+{"t": 1794146899.346, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-039.png"}
+{"t": 1794146900.174, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:20", "type": 1}
+{"t": 1794146901.172, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:21", "type": 1}
+{"t": 1794146902.169, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:22", "type": 1}
+{"t": 1794146903.259, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:23", "type": 1}
+{"t": 1794146904.26, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:24", "type": 1}
+{"t": 1794146905.264, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:25", "type": 1}
+{"t": 1794146906.317, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:26", "type": 1}
+{"t": 1794146907.32, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:27", "type": 1}
+{"t": 1794146908.323, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:28", "type": 1}
+{"t": 1794146909.325, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:29", "type": 1}
+{"t": 1794146910.321, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:30", "type": 1}
+{"t": 1794146911.332, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:31", "type": 1}
+{"t": 1794146912.334, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:32", "type": 1}
+{"t": 1794146913.331, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:33", "type": 1}
+{"t": 1794146914.252, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-040.png"}
+{"t": 1794146914.331, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:34", "type": 1}
+{"t": 1794146915.381, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:35", "type": 1}
+{"t": 1794146916.384, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:36", "type": 1}
+{"t": 1794146917.381, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:37", "type": 1}
+{"t": 1794146918.431, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:38", "type": 1}
+{"t": 1794146919.429, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:39", "type": 1}
+{"t": 1794146920.436, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:40", "type": 1}
+{"t": 1794146921.44, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:41", "type": 1}
+{"t": 1794146922.433, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:42", "type": 1}
+{"t": 1794146923.433, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:43", "type": 1}
+{"t": 1794146923.481, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794150523.0, "new": 1794150523.0, "delta_ms": -48}
+{"t": 1794146924.485, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:44", "type": 1}
+{"t": 1794146925.481, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:45", "type": 1}
+{"t": 1794146926.49, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:46", "type": 1}
+{"t": 1794146927.492, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:47", "type": 1}
+{"t": 1794146928.492, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:48", "type": 1}
+{"t": 1794146929.407, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-041.png"}
+{"t": 1794146929.497, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:49", "type": 1}
+{"t": 1794146930.497, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:50", "type": 1}
+{"t": 1794146931.5, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:51", "type": 1}
+{"t": 1794146932.496, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:52", "type": 1}
+{"t": 1794146933.547, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:53", "type": 1}
+{"t": 1794146934.547, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:54", "type": 1}
+{"t": 1794146935.544, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:55", "type": 1}
+{"t": 1794146936.593, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:56", "type": 1}
+{"t": 1794146937.597, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:57", "type": 1}
+{"t": 1794146938.593, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:58", "type": 1}
+{"t": 1794146939.643, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:08:59", "type": 1}
+{"t": 1794146940.644, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:00", "type": 1}
+{"t": 1794146941.644, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:01", "type": 1}
+{"t": 1794146942.699, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:02", "type": 1}
+{"t": 1794146943.933, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:03", "type": 1}
+{"t": 1794146944.06, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-042.png"}
+{"t": 1794146944.703, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:04", "type": 1}
+{"t": 1794146945.705, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:05", "type": 1}
+{"t": 1794146946.704, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:06", "type": 1}
+{"t": 1794146947.712, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:07", "type": 1}
+{"t": 1794146948.712, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:08", "type": 1}
+{"t": 1794146949.714, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:09", "type": 1}
+{"t": 1794146950.712, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:10", "type": 1}
+{"t": 1794146951.763, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:11", "type": 1}
+{"t": 1794146952.761, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:12", "type": 1}
+{"t": 1794146953.766, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:13", "type": 1}
+{"t": 1794146954.763, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:14", "type": 1}
+{"t": 1794146955.766, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:15", "type": 1}
+{"t": 1794146956.764, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:16", "type": 1}
+{"t": 1794146957.814, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:17", "type": 1}
+{"t": 1794146959.332, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:18", "type": 1}
+{"t": 1794146959.333, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150558.0, "src": "GPS", "ms": 667117, "ticks": 585, "late_sum_ms": 3793, "late_max_ms": 1365, "lost_ms": 7}
+{"t": 1794146959.333, "node": "t-beam-92", "tag": "CLOCK", "kind": "stat", "epoch": 1794150558.0, "src": "GPS", "ms": 667232, "ticks": 585, "late_sum_ms": 3793, "late_max_ms": 1365, "lost_ms": 7}
+{"t": 1794146959.462, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-043.png"}
+{"t": 1794146959.822, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:19", "type": 1}
+{"t": 1794146960.821, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:20", "type": 1}
+{"t": 1794146961.825, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:21", "type": 1}
+{"t": 1794146962.826, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:22", "type": 1}
+{"t": 1794146963.83, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:23", "type": 1}
+{"t": 1794146964.827, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:24", "type": 1}
+{"t": 1794146965.824, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:25", "type": 1}
+{"t": 1794146966.876, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:26", "type": 1}
+{"t": 1794146967.873, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:27", "type": 1}
+{"t": 1794146968.88, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:28", "type": 1}
+{"t": 1794146969.881, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:29", "type": 1}
+{"t": 1794146970.878, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:30", "type": 1}
+{"t": 1794146971.885, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:31", "type": 1}
+{"t": 1794146972.888, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:32", "type": 1}
+{"t": 1794146974.131, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:33", "type": 1}
+{"t": 1794146974.258, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-044.png"}
+{"t": 1794146974.891, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:34", "type": 1}
+{"t": 1794146975.891, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:35", "type": 1}
+{"t": 1794146976.894, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:36", "type": 1}
+{"t": 1794146977.89, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:37", "type": 1}
+{"t": 1794146978.941, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:38", "type": 1}
+{"t": 1794146979.939, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:39", "type": 1}
+{"t": 1794146980.938, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:40", "type": 1}
+{"t": 1794146981.986, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:41", "type": 1}
+{"t": 1794146982.985, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:42", "type": 1}
+{"t": 1794146983.993, "node": "t-beam-92", "tag": "CLOCK", "kind": "set", "src": "GPS", "old": 1794150583.0, "new": 1794150583.0, "delta_ms": -7}
+{"t": 1794146983.996, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:43", "type": 1}
+{"t": 1794146984.994, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:44", "type": 1}
+{"t": 1794146985.998, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:45", "type": 1}
+{"t": 1794146987.002, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:46", "type": 1}
+{"t": 1794146988.001, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:47", "type": 1}
+{"t": 1794146989.251, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:48", "type": 1}
+{"t": 1794146989.378, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-045.png"}
+{"t": 1794146990.008, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:49", "type": 1}
+{"t": 1794146991.006, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:50", "type": 1}
+{"t": 1794146992.01, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:51", "type": 1}
+{"t": 1794146993.014, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:52", "type": 1}
+{"t": 1794146994.012, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:53", "type": 1}
+{"t": 1794146995.017, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:54", "type": 1}
+{"t": 1794146996.018, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:55", "type": 1}
+{"t": 1794146997.016, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:56", "type": 1}
+{"t": 1794146998.017, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:57", "type": 1}
+{"t": 1794146999.023, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:58", "type": 1}
+{"t": 1794147000.02, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:09:59", "type": 1}
+{"t": 1794147001.025, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:10:00", "type": 1}
+{"t": 1794147002.027, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:10:01", "type": 1}
+{"t": 1794147003.026, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:10:02", "type": 1}
+{"t": 1794147004.269, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:10:03", "type": 1}
+{"t": 1794147004.399, "node": "t-beam-92", "tag": "SHOT", "kind": "oled", "file": "clock-t-beam-92-20261108-145740-oled-046.png"}
+{"t": 1794147005.027, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:10:04", "type": 1}
+{"t": 1794147006.08, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:10:05", "type": 1}
+{"t": 1794147007.08, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:10:06", "type": 1}
+{"t": 1794147008.079, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:10:07", "type": 1}
+{"t": 1794147009.137, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:10:09", "type": 1}
+{"t": 1794147010.13, "node": "t-beam-92", "tag": "DISPCLK", "kind": "draw", "hms": "15:10:10", "type": 1}

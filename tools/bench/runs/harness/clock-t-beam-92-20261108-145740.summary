@@ -1,0 +1,372 @@
+{
+  "node": "t-beam-92",
+  "malformed_lines": 0,
+  "shot_errors": 0,
+  "shots": [
+    "clock-t-beam-92-20261108-145740-oled-001.png",
+    "clock-t-beam-92-20261108-145740-oled-002.png",
+    "clock-t-beam-92-20261108-145740-oled-003.png",
+    "clock-t-beam-92-20261108-145740-oled-004.png",
+    "clock-t-beam-92-20261108-145740-oled-005.png",
+    "clock-t-beam-92-20261108-145740-oled-006.png",
+    "clock-t-beam-92-20261108-145740-oled-007.png",
+    "clock-t-beam-92-20261108-145740-oled-008.png",
+    "clock-t-beam-92-20261108-145740-oled-009.png",
+    "clock-t-beam-92-20261108-145740-oled-010.png",
+    "clock-t-beam-92-20261108-145740-oled-011.png",
+    "clock-t-beam-92-20261108-145740-oled-012.png",
+    "clock-t-beam-92-20261108-145740-oled-013.png",
+    "clock-t-beam-92-20261108-145740-oled-014.png",
+    "clock-t-beam-92-20261108-145740-oled-015.png",
+    "clock-t-beam-92-20261108-145740-oled-016.png",
+    "clock-t-beam-92-20261108-145740-oled-017.png",
+    "clock-t-beam-92-20261108-145740-oled-018.png",
+    "clock-t-beam-92-20261108-145740-oled-019.png",
+    "clock-t-beam-92-20261108-145740-oled-020.png",
+    "clock-t-beam-92-20261108-145740-oled-021.png",
+    "clock-t-beam-92-20261108-145740-oled-022.png",
+    "clock-t-beam-92-20261108-145740-oled-023.png",
+    "clock-t-beam-92-20261108-145740-oled-024.png",
+    "clock-t-beam-92-20261108-145740-oled-025.png",
+    "clock-t-beam-92-20261108-145740-oled-026.png",
+    "clock-t-beam-92-20261108-145740-oled-027.png",
+    "clock-t-beam-92-20261108-145740-oled-028.png",
+    "clock-t-beam-92-20261108-145740-oled-029.png",
+    "clock-t-beam-92-20261108-145740-oled-030.png",
+    "clock-t-beam-92-20261108-145740-oled-031.png",
+    "clock-t-beam-92-20261108-145740-oled-032.png",
+    "clock-t-beam-92-20261108-145740-oled-033.png",
+    "clock-t-beam-92-20261108-145740-oled-034.png",
+    "clock-t-beam-92-20261108-145740-oled-035.png",
+    "clock-t-beam-92-20261108-145740-oled-036.png",
+    "clock-t-beam-92-20261108-145740-oled-037.png",
+    "clock-t-beam-92-20261108-145740-oled-038.png",
+    "clock-t-beam-92-20261108-145740-oled-039.png",
+    "clock-t-beam-92-20261108-145740-oled-040.png",
+    "clock-t-beam-92-20261108-145740-oled-041.png",
+    "clock-t-beam-92-20261108-145740-oled-042.png",
+    "clock-t-beam-92-20261108-145740-oled-043.png",
+    "clock-t-beam-92-20261108-145740-oled-044.png",
+    "clock-t-beam-92-20261108-145740-oled-045.png",
+    "clock-t-beam-92-20261108-145740-oled-046.png"
+  ],
+  "info_events": [
+    {
+      "t": 1794146298.959,
+      "tag": "CLOCK",
+      "kind": "timesrc",
+      "mode": "all"
+    },
+    {
+      "t": 1794146314.379,
+      "tag": "OLEDSHOT",
+      "kind": "err",
+      "msg": "display off"
+    }
+  ],
+  "stat_count": 17,
+  "drift_curve": [
+    {
+      "t": 1794146351.879,
+      "elapsed_s": 0.0,
+      "drift_s": 0.0,
+      "offset_s": 3599.121
+    },
+    {
+      "t": 1794146359.32,
+      "elapsed_s": 7.441,
+      "drift_s": -0.441,
+      "offset_s": 3598.68
+    },
+    {
+      "t": 1794146419.249,
+      "elapsed_s": 67.37,
+      "drift_s": -0.37,
+      "offset_s": 3598.751
+    },
+    {
+      "t": 1794146479.269,
+      "elapsed_s": 127.39,
+      "drift_s": -0.39,
+      "offset_s": 3598.731
+    },
+    {
+      "t": 1794146479.27,
+      "elapsed_s": 127.39,
+      "drift_s": -0.39,
+      "offset_s": 3598.73
+    },
+    {
+      "t": 1794146539.253,
+      "elapsed_s": 187.374,
+      "drift_s": -0.374,
+      "offset_s": 3598.747
+    },
+    {
+      "t": 1794146599.554,
+      "elapsed_s": 247.675,
+      "drift_s": -1.675,
+      "offset_s": 3597.446
+    },
+    {
+      "t": 1794146599.554,
+      "elapsed_s": 247.675,
+      "drift_s": -0.675,
+      "offset_s": 3598.446
+    },
+    {
+      "t": 1794146659.206,
+      "elapsed_s": 307.327,
+      "drift_s": -0.327,
+      "offset_s": 3598.794
+    },
+    {
+      "t": 1794146719.373,
+      "elapsed_s": 367.493,
+      "drift_s": -0.493,
+      "offset_s": 3598.627
+    },
+    {
+      "t": 1794146719.373,
+      "elapsed_s": 367.494,
+      "drift_s": -0.494,
+      "offset_s": 3598.627
+    },
+    {
+      "t": 1794146779.14,
+      "elapsed_s": 427.261,
+      "drift_s": -0.261,
+      "offset_s": 3598.86
+    },
+    {
+      "t": 1794146839.325,
+      "elapsed_s": 487.446,
+      "drift_s": -0.446,
+      "offset_s": 3598.675
+    },
+    {
+      "t": 1794146839.325,
+      "elapsed_s": 487.446,
+      "drift_s": -0.446,
+      "offset_s": 3598.675
+    },
+    {
+      "t": 1794146899.221,
+      "elapsed_s": 547.341,
+      "drift_s": -0.341,
+      "offset_s": 3598.779
+    },
+    {
+      "t": 1794146959.333,
+      "elapsed_s": 607.454,
+      "drift_s": -0.454,
+      "offset_s": 3598.667
+    },
+    {
+      "t": 1794146959.333,
+      "elapsed_s": 607.454,
+      "drift_s": -0.454,
+      "offset_s": 3598.667
+    }
+  ],
+  "drift_total_s": -0.454,
+  "drift_max_abs_s": 1.675,
+  "drift_ppm": -747.4,
+  "lost_ms_last": 7,
+  "late_max_ms_max": 1365,
+  "sets": [
+    {
+      "t": 1794146292.608,
+      "src": "OTHER",
+      "delta_ms": 2147483647
+    },
+    {
+      "t": 1794146296.583,
+      "src": "GPS",
+      "delta_ms": 233291
+    },
+    {
+      "t": 1794146356.805,
+      "src": "GPS",
+      "delta_ms": -5
+    },
+    {
+      "t": 1794146417.197,
+      "src": "GPS",
+      "delta_ms": -6
+    },
+    {
+      "t": 1794146471.774,
+      "src": "NTP",
+      "delta_ms": -115
+    },
+    {
+      "t": 1794146474.717,
+      "src": "NTP",
+      "delta_ms": -1049
+    },
+    {
+      "t": 1794146477.666,
+      "src": "GPS",
+      "delta_ms": 999
+    },
+    {
+      "t": 1794146477.716,
+      "src": "NTP",
+      "delta_ms": -1046
+    },
+    {
+      "t": 1794146480.719,
+      "src": "NTP",
+      "delta_ms": -1047
+    },
+    {
+      "t": 1794146483.721,
+      "src": "NTP",
+      "delta_ms": -1047
+    },
+    {
+      "t": 1794146486.723,
+      "src": "NTP",
+      "delta_ms": -1046
+    },
+    {
+      "t": 1794146489.68,
+      "src": "GPS",
+      "delta_ms": 1000
+    },
+    {
+      "t": 1794146489.727,
+      "src": "NTP",
+      "delta_ms": -1046
+    },
+    {
+      "t": 1794146492.73,
+      "src": "NTP",
+      "delta_ms": -1047
+    },
+    {
+      "t": 1794146495.735,
+      "src": "NTP",
+      "delta_ms": -1046
+    },
+    {
+      "t": 1794146498.744,
+      "src": "NTP",
+      "delta_ms": -1049
+    },
+    {
+      "t": 1794146501.705,
+      "src": "GPS",
+      "delta_ms": 1000
+    },
+    {
+      "t": 1794146501.752,
+      "src": "NTP",
+      "delta_ms": -1046
+    },
+    {
+      "t": 1794146504.758,
+      "src": "NTP",
+      "delta_ms": -1046
+    },
+    {
+      "t": 1794146507.765,
+      "src": "NTP",
+      "delta_ms": -1046
+    },
+    {
+      "t": 1794146510.767,
+      "src": "NTP",
+      "delta_ms": -1048
+    },
+    {
+      "t": 1794146561.927,
+      "src": "GPS",
+      "delta_ms": -52
+    },
+    {
+      "t": 1794146622.112,
+      "src": "GPS",
+      "delta_ms": -5
+    },
+    {
+      "t": 1794146682.238,
+      "src": "GPS",
+      "delta_ms": -5
+    },
+    {
+      "t": 1794146742.505,
+      "src": "GPS",
+      "delta_ms": -5
+    },
+    {
+      "t": 1794146781.664,
+      "src": "NTP",
+      "delta_ms": -1050
+    },
+    {
+      "t": 1794146784.665,
+      "src": "NTP",
+      "delta_ms": -1045
+    },
+    {
+      "t": 1794146799.709,
+      "src": "NTP",
+      "delta_ms": -1049
+    },
+    {
+      "t": 1794146802.661,
+      "src": "GPS",
+      "delta_ms": 1000
+    },
+    {
+      "t": 1794146802.713,
+      "src": "NTP",
+      "delta_ms": -1047
+    },
+    {
+      "t": 1794146862.913,
+      "src": "GPS",
+      "delta_ms": -8
+    },
+    {
+      "t": 1794146923.481,
+      "src": "GPS",
+      "delta_ms": -48
+    },
+    {
+      "t": 1794146983.993,
+      "src": "GPS",
+      "delta_ms": -7
+    }
+  ],
+  "set_by_src": {
+    "OTHER": {
+      "count": 1,
+      "max_abs_delta_ms": 2147483647
+    },
+    "GPS": {
+      "count": 14,
+      "max_abs_delta_ms": 233291
+    },
+    "NTP": {
+      "count": 18,
+      "max_abs_delta_ms": 1050
+    }
+  },
+  "max_abs_set_delta_ms": 2147483647,
+  "draw_count": 535,
+  "display_gap_max_s": 148.259,
+  "display_gap_at": {
+    "t": 1794146569.058,
+    "from_hms": "15:02:48",
+    "to_hms": "15:05:17"
+  },
+  "display_gaps_over_threshold": 5,
+  "display_gap_threshold_s": 1.5,
+  "skip_reasons": {
+    "off": 22,
+    "type0": 147
+  }
+}

@@ -1,0 +1,218 @@
+{"t": 1794149887.856, "node": "t-deck-14", "tag": "CLOCK", "kind": "timesrc", "mode": "cet"}
+{"t": 1794149943.731, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794153543.0, "src": "GPS", "ms": 1620074, "ticks": 1606, "late_sum_ms": 9172, "late_max_ms": 1395, "lost_ms": 10}
+{"t": 1794149948.081, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794153547.0, "src": "GPS", "ms": 1624423, "ticks": 1610, "late_sum_ms": 9182, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794150008.087, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794153607.0, "src": "GPS", "ms": 1684429, "ticks": 1670, "late_sum_ms": 9767, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794150008.089, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794153607.0, "src": "GPS", "ms": 1684431, "ticks": 1670, "late_sum_ms": 9767, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794150068.101, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794153667.0, "src": "GPS", "ms": 1744433, "ticks": 1730, "late_sum_ms": 9986, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794150068.108, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794153667.0, "src": "GPS", "ms": 1744449, "ticks": 1730, "late_sum_ms": 9986, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794150128.124, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794153727.0, "src": "GPS", "ms": 1804455, "ticks": 1790, "late_sum_ms": 10209, "late_max_ms": 1395, "lost_ms": 1}
+{"t": 1794150128.129, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794153727.0, "src": "GPS", "ms": 1804470, "ticks": 1790, "late_sum_ms": 10209, "late_max_ms": 1395, "lost_ms": 1}
+{"t": 1794150184.316, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794153783.0, "new": 1794153780.0, "delta_ms": -3652}
+{"t": 1794150188.114, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794153783.0, "src": "CET", "ms": 1864454, "ticks": 1849, "late_sum_ms": 10419, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794150248.116, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794153843.0, "src": "CET", "ms": 1924456, "ticks": 1909, "late_sum_ms": 10623, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794150248.118, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794153843.0, "src": "CET", "ms": 1924457, "ticks": 1909, "late_sum_ms": 10623, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794150308.108, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794153903.0, "src": "CET", "ms": 1984447, "ticks": 1969, "late_sum_ms": 11090, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794150368.13, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794153963.0, "src": "CET", "ms": 2044450, "ticks": 2029, "late_sum_ms": 11311, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794150368.131, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794153963.0, "src": "CET", "ms": 2044470, "ticks": 2029, "late_sum_ms": 11311, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794150428.142, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154023.0, "src": "CET", "ms": 2104473, "ticks": 2089, "late_sum_ms": 11524, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794150428.148, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154023.0, "src": "CET", "ms": 2104486, "ticks": 2089, "late_sum_ms": 11524, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794150488.148, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154083.0, "src": "CET", "ms": 2164486, "ticks": 2149, "late_sum_ms": 12066, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794150488.15, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154083.0, "src": "CET", "ms": 2164488, "ticks": 2149, "late_sum_ms": 12066, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794150548.142, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154143.0, "src": "CET", "ms": 2224479, "ticks": 2209, "late_sum_ms": 12290, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794150608.152, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154203.0, "src": "CET", "ms": 2284480, "ticks": 2269, "late_sum_ms": 12496, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794150608.157, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154203.0, "src": "CET", "ms": 2284494, "ticks": 2269, "late_sum_ms": 12496, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794150668.165, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154263.0, "src": "CET", "ms": 2344499, "ticks": 2329, "late_sum_ms": 12723, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794150668.17, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154263.0, "src": "CET", "ms": 2344506, "ticks": 2329, "late_sum_ms": 12723, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794150728.176, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154323.0, "src": "CET", "ms": 2404507, "ticks": 2389, "late_sum_ms": 12962, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794150728.178, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154323.0, "src": "CET", "ms": 2404514, "ticks": 2389, "late_sum_ms": 12962, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794150788.195, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154383.0, "src": "CET", "ms": 2464519, "ticks": 2449, "late_sum_ms": 13188, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794150788.198, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154383.0, "src": "CET", "ms": 2464533, "ticks": 2449, "late_sum_ms": 13188, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794150793.14, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794154388.0, "new": 1794154387.0, "delta_ms": -1819}
+{"t": 1794150848.2, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154442.0, "src": "CET", "ms": 2524535, "ticks": 2509, "late_sum_ms": 13390, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794150848.201, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154442.0, "src": "CET", "ms": 2524536, "ticks": 2509, "late_sum_ms": 13390, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794150908.081, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154501.0, "src": "CET", "ms": 2584416, "ticks": 2568, "late_sum_ms": 13601, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794150968.176, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154561.0, "src": "CET", "ms": 2644419, "ticks": 2628, "late_sum_ms": 13815, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794150968.181, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154562.0, "src": "CET", "ms": 2644515, "ticks": 2629, "late_sum_ms": 13816, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794151028.211, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154622.0, "src": "CET", "ms": 2704520, "ticks": 2689, "late_sum_ms": 14009, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794151028.213, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154622.0, "src": "CET", "ms": 2704547, "ticks": 2689, "late_sum_ms": 14009, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794151088.403, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154682.0, "src": "CET", "ms": 2764547, "ticks": 2749, "late_sum_ms": 14217, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794151088.412, "node": "t-deck-14", "tag": "TDSHOT", "kind": "err", "msg": "shadow was off, now on - repeat --tdshot after the next redraw"}
+{"t": 1794151148.171, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154742.0, "src": "CET", "ms": 2824504, "ticks": 2809, "late_sum_ms": 14434, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794151208.227, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154802.0, "src": "CET", "ms": 2884506, "ticks": 2869, "late_sum_ms": 14640, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794151208.23, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154802.0, "src": "CET", "ms": 2884563, "ticks": 2869, "late_sum_ms": 14640, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794151268.234, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154862.0, "src": "CET", "ms": 2944566, "ticks": 2929, "late_sum_ms": 14857, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794151268.241, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154862.0, "src": "CET", "ms": 2944573, "ticks": 2929, "late_sum_ms": 14857, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794151328.241, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154922.0, "src": "CET", "ms": 3004574, "ticks": 2989, "late_sum_ms": 15069, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794151328.243, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154922.0, "src": "CET", "ms": 3004575, "ticks": 2989, "late_sum_ms": 15069, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794151388.237, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794154982.0, "src": "CET", "ms": 3064569, "ticks": 3049, "late_sum_ms": 15420, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794151402.559, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794154991.0, "new": 1794154994.0, "delta_ms": 2674}
+{"t": 1794151445.441, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794155041.0, "new": 1794155021.0, "delta_ms": -20968}
+{"t": 1794151448.217, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155023.0, "src": "CET", "ms": 3124548, "ticks": 3107, "late_sum_ms": 15799, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794151508.207, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155083.0, "src": "CET", "ms": 3184535, "ticks": 3167, "late_sum_ms": 16011, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794151568.241, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155143.0, "src": "CET", "ms": 3244540, "ticks": 3227, "late_sum_ms": 16222, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794151568.248, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155143.0, "src": "CET", "ms": 3244578, "ticks": 3227, "late_sum_ms": 16222, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794151628.249, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155203.0, "src": "CET", "ms": 3304578, "ticks": 3287, "late_sum_ms": 16420, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794151688.244, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155263.0, "src": "CET", "ms": 3364573, "ticks": 3347, "late_sum_ms": 16621, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794151748.228, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155323.0, "src": "CET", "ms": 3424557, "ticks": 3407, "late_sum_ms": 17319, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794151808.228, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155383.0, "src": "CET", "ms": 3484556, "ticks": 3467, "late_sum_ms": 17538, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794151868.249, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155443.0, "src": "CET", "ms": 3544556, "ticks": 3527, "late_sum_ms": 17753, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794151868.254, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155443.0, "src": "CET", "ms": 3544582, "ticks": 3527, "late_sum_ms": 17753, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794151928.273, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155503.0, "src": "CET", "ms": 3604584, "ticks": 3587, "late_sum_ms": 17968, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794151928.276, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155503.0, "src": "CET", "ms": 3604603, "ticks": 3587, "late_sum_ms": 17968, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794151988.227, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155563.0, "src": "CET", "ms": 3664554, "ticks": 3647, "late_sum_ms": 18179, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794152005.271, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794155580.0, "new": 1794155602.0, "delta_ms": 21175}
+{"t": 1794152048.254, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155644.0, "src": "CET", "ms": 3724555, "ticks": 3706, "late_sum_ms": 18389, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794152048.26, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155644.0, "src": "CET", "ms": 3724587, "ticks": 3706, "late_sum_ms": 18389, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794152108.27, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155704.0, "src": "CET", "ms": 3784590, "ticks": 3766, "late_sum_ms": 18595, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794152108.277, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155705.0, "src": "CET", "ms": 3784604, "ticks": 3767, "late_sum_ms": 18598, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794152168.286, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155765.0, "src": "CET", "ms": 3844611, "ticks": 3827, "late_sum_ms": 18818, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794152168.293, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155765.0, "src": "CET", "ms": 3844619, "ticks": 3827, "late_sum_ms": 18818, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794152228.281, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155825.0, "src": "CET", "ms": 3904607, "ticks": 3887, "late_sum_ms": 19036, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794152288.335, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155884.0, "src": "CET", "ms": 3964484, "ticks": 3946, "late_sum_ms": 19241, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794152289.339, "node": "t-deck-14", "tag": "SHOT", "kind": "tdeck", "file": "clock-t-deck-14-20261108-155756-tdeck-001.png"}
+{"t": 1794152348.291, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155944.0, "src": "CET", "ms": 4024488, "ticks": 4006, "late_sum_ms": 19519, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794152348.293, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794155945.0, "src": "CET", "ms": 4024618, "ticks": 4007, "late_sum_ms": 19520, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794152408.294, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156005.0, "src": "CET", "ms": 4084618, "ticks": 4067, "late_sum_ms": 19719, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794152408.3, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156005.0, "src": "CET", "ms": 4084625, "ticks": 4067, "late_sum_ms": 19719, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794152467.807, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156064.0, "src": "CET", "ms": 4144131, "ticks": 4126, "late_sum_ms": 19918, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794152527.808, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156124.0, "src": "CET", "ms": 4204131, "ticks": 4186, "late_sum_ms": 20124, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794152527.814, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156124.0, "src": "CET", "ms": 4204138, "ticks": 4186, "late_sum_ms": 20124, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794152587.795, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156184.0, "src": "CET", "ms": 4264118, "ticks": 4246, "late_sum_ms": 20337, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794152647.81, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156244.0, "src": "CET", "ms": 4324121, "ticks": 4306, "late_sum_ms": 20543, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794152647.817, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156244.0, "src": "CET", "ms": 4324140, "ticks": 4306, "late_sum_ms": 20543, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794152671.327, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794156268.0, "new": 1794156236.0, "delta_ms": -32051}
+{"t": 1794152707.826, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156272.0, "src": "CET", "ms": 4384141, "ticks": 4366, "late_sum_ms": 20759, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794152707.831, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156272.0, "src": "CET", "ms": 4384154, "ticks": 4366, "late_sum_ms": 20759, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794152767.832, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156332.0, "src": "CET", "ms": 4444154, "ticks": 4426, "late_sum_ms": 21000, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794152767.839, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156332.0, "src": "CET", "ms": 4444161, "ticks": 4426, "late_sum_ms": 21000, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794152827.839, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156392.0, "src": "CET", "ms": 4504161, "ticks": 4486, "late_sum_ms": 21213, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794152827.84, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156392.0, "src": "CET", "ms": 4504162, "ticks": 4486, "late_sum_ms": 21213, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794152887.835, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156452.0, "src": "CET", "ms": 4564156, "ticks": 4546, "late_sum_ms": 21422, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794152947.84, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156512.0, "src": "CET", "ms": 4624157, "ticks": 4606, "late_sum_ms": 21630, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794152947.843, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156512.0, "src": "CET", "ms": 4624164, "ticks": 4606, "late_sum_ms": 21630, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794153007.848, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156572.0, "src": "CET", "ms": 4684169, "ticks": 4666, "late_sum_ms": 21828, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794153007.85, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156572.0, "src": "CET", "ms": 4684170, "ticks": 4666, "late_sum_ms": 21828, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794153067.851, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156632.0, "src": "CET", "ms": 4744172, "ticks": 4726, "late_sum_ms": 22035, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794153067.853, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156632.0, "src": "CET", "ms": 4744173, "ticks": 4726, "late_sum_ms": 22035, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794153127.854, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156692.0, "src": "CET", "ms": 4804172, "ticks": 4786, "late_sum_ms": 22227, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794153187.864, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156752.0, "src": "CET", "ms": 4864173, "ticks": 4846, "late_sum_ms": 22452, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794153187.869, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156752.0, "src": "CET", "ms": 4864186, "ticks": 4846, "late_sum_ms": 22452, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794153222.282, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794156786.0, "new": 1794156817.0, "delta_ms": 30052}
+{"t": 1794153247.845, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156842.0, "src": "CET", "ms": 4924161, "ticks": 4905, "late_sum_ms": 22682, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794153307.86, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156902.0, "src": "CET", "ms": 4984164, "ticks": 4965, "late_sum_ms": 22910, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794153307.868, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156902.0, "src": "CET", "ms": 4984184, "ticks": 4965, "late_sum_ms": 22910, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794153367.883, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156962.0, "src": "CET", "ms": 5044186, "ticks": 5025, "late_sum_ms": 23123, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794153367.89, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794156962.0, "src": "CET", "ms": 5044205, "ticks": 5025, "late_sum_ms": 23123, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794153427.895, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157022.0, "src": "CET", "ms": 5104209, "ticks": 5085, "late_sum_ms": 23328, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794153427.901, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157022.0, "src": "CET", "ms": 5104216, "ticks": 5085, "late_sum_ms": 23328, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794153488.095, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157082.0, "src": "CET", "ms": 5164220, "ticks": 5145, "late_sum_ms": 23521, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794153488.095, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157082.0, "src": "CET", "ms": 5164221, "ticks": 5145, "late_sum_ms": 23521, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794153489.101, "node": "t-deck-14", "tag": "SHOT", "kind": "tdeck", "file": "clock-t-deck-14-20261108-155756-tdeck-002.png"}
+{"t": 1794153547.908, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157142.0, "src": "CET", "ms": 5224221, "ticks": 5205, "late_sum_ms": 24547, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794153607.912, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157202.0, "src": "CET", "ms": 5284224, "ticks": 5265, "late_sum_ms": 24764, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794153607.918, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157202.0, "src": "CET", "ms": 5284231, "ticks": 5265, "late_sum_ms": 24764, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794153667.924, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157262.0, "src": "CET", "ms": 5344233, "ticks": 5325, "late_sum_ms": 24963, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794153667.929, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157262.0, "src": "CET", "ms": 5344241, "ticks": 5325, "late_sum_ms": 24963, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794153727.929, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157322.0, "src": "CET", "ms": 5404241, "ticks": 5385, "late_sum_ms": 25159, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794153727.931, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157322.0, "src": "CET", "ms": 5404242, "ticks": 5385, "late_sum_ms": 25159, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794153787.93, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157382.0, "src": "CET", "ms": 5464241, "ticks": 5445, "late_sum_ms": 25365, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794153836.159, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794157422.0, "new": 1794157424.0, "delta_ms": 1050}
+{"t": 1794153847.935, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157443.0, "src": "CET", "ms": 5524246, "ticks": 5504, "late_sum_ms": 25581, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794153847.937, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157443.0, "src": "CET", "ms": 5524247, "ticks": 5504, "late_sum_ms": 25581, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794153907.938, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157503.0, "src": "CET", "ms": 5584248, "ticks": 5564, "late_sum_ms": 25800, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794153907.946, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157503.0, "src": "CET", "ms": 5584256, "ticks": 5564, "late_sum_ms": 25800, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794153967.953, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157563.0, "src": "CET", "ms": 5644257, "ticks": 5624, "late_sum_ms": 26018, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794153967.961, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157563.0, "src": "CET", "ms": 5644270, "ticks": 5624, "late_sum_ms": 26018, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794154027.96, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157623.0, "src": "CET", "ms": 5704269, "ticks": 5684, "late_sum_ms": 26224, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794154087.959, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157683.0, "src": "CET", "ms": 5764267, "ticks": 5744, "late_sum_ms": 26430, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794154148.222, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157743.0, "src": "CET", "ms": 5824267, "ticks": 5804, "late_sum_ms": 26630, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794154148.227, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157743.0, "src": "CET", "ms": 5824535, "ticks": 5804, "late_sum_ms": 26630, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794154207.95, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157803.0, "src": "CET", "ms": 5884257, "ticks": 5864, "late_sum_ms": 26848, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794154267.965, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157863.0, "src": "CET", "ms": 5944257, "ticks": 5924, "late_sum_ms": 27068, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794154267.969, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157863.0, "src": "CET", "ms": 5944276, "ticks": 5924, "late_sum_ms": 27068, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794154327.986, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157923.0, "src": "CET", "ms": 6004276, "ticks": 5984, "late_sum_ms": 27277, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794154327.99, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157923.0, "src": "CET", "ms": 6004296, "ticks": 5984, "late_sum_ms": 27277, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794154388.261, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157983.0, "src": "CET", "ms": 6064299, "ticks": 6044, "late_sum_ms": 27503, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794154388.268, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794157984.0, "src": "CET", "ms": 6064574, "ticks": 6045, "late_sum_ms": 27508, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794154443.705, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794158029.0, "new": 1794158032.0, "delta_ms": 2839}
+{"t": 1794154447.971, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158046.0, "src": "CET", "ms": 6124276, "ticks": 6104, "late_sum_ms": 27716, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794154472.6, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794158071.0, "new": 1794158059.0, "delta_ms": -12192}
+{"t": 1794154507.988, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158094.0, "src": "CET", "ms": 6184280, "ticks": 6164, "late_sum_ms": 27933, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794154507.994, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158094.0, "src": "CET", "ms": 6184299, "ticks": 6164, "late_sum_ms": 27933, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794154568.077, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158154.0, "src": "CET", "ms": 6244300, "ticks": 6224, "late_sum_ms": 28168, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794154568.081, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158154.0, "src": "CET", "ms": 6244385, "ticks": 6224, "late_sum_ms": 28168, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794154628.017, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158214.0, "src": "CET", "ms": 6304321, "ticks": 6284, "late_sum_ms": 28369, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794154688.211, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158274.0, "src": "CET", "ms": 6364318, "ticks": 6344, "late_sum_ms": 28573, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794154689.215, "node": "t-deck-14", "tag": "SHOT", "kind": "tdeck", "file": "clock-t-deck-14-20261108-155756-tdeck-003.png"}
+{"t": 1794154748.016, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158334.0, "src": "CET", "ms": 6424319, "ticks": 6404, "late_sum_ms": 29400, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794154748.018, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158334.0, "src": "CET", "ms": 6424320, "ticks": 6404, "late_sum_ms": 29400, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794154808.031, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158394.0, "src": "CET", "ms": 6484325, "ticks": 6464, "late_sum_ms": 29609, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794154808.037, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158394.0, "src": "CET", "ms": 6484339, "ticks": 6464, "late_sum_ms": 29609, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794154868.034, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158454.0, "src": "CET", "ms": 6544335, "ticks": 6524, "late_sum_ms": 29822, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794154928.048, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158514.0, "src": "CET", "ms": 6604339, "ticks": 6584, "late_sum_ms": 30028, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794154928.052, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158514.0, "src": "CET", "ms": 6604353, "ticks": 6584, "late_sum_ms": 30028, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794154988.038, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158574.0, "src": "CET", "ms": 6664337, "ticks": 6644, "late_sum_ms": 30238, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794155042.376, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794158628.0, "new": 1794158639.0, "delta_ms": 10230}
+{"t": 1794155048.057, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158644.0, "src": "CET", "ms": 6724338, "ticks": 6703, "late_sum_ms": 30456, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794155048.064, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158644.0, "src": "CET", "ms": 6724364, "ticks": 6703, "late_sum_ms": 30456, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794155108.068, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158704.0, "src": "CET", "ms": 6784366, "ticks": 6763, "late_sum_ms": 30661, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794155108.076, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158704.0, "src": "CET", "ms": 6784375, "ticks": 6763, "late_sum_ms": 30661, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794155123.126, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794158719.0, "new": 1794158667.0, "delta_ms": -52748}
+{"t": 1794155168.081, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158711.0, "src": "CET", "ms": 6844380, "ticks": 6822, "late_sum_ms": 30871, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794155168.083, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158711.0, "src": "CET", "ms": 6844382, "ticks": 6822, "late_sum_ms": 30871, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794155228.094, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158771.0, "src": "CET", "ms": 6904388, "ticks": 6882, "late_sum_ms": 31082, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794155228.098, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158771.0, "src": "CET", "ms": 6904397, "ticks": 6882, "late_sum_ms": 31082, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794155288.08, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158831.0, "src": "CET", "ms": 6964378, "ticks": 6942, "late_sum_ms": 31324, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794155348.096, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158891.0, "src": "CET", "ms": 7024384, "ticks": 7002, "late_sum_ms": 31537, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794155348.102, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158891.0, "src": "CET", "ms": 7024399, "ticks": 7002, "late_sum_ms": 31537, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794155408.09, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794158951.0, "src": "CET", "ms": 7084387, "ticks": 7062, "late_sum_ms": 31740, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794155468.099, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159011.0, "src": "CET", "ms": 7144391, "ticks": 7122, "late_sum_ms": 31948, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794155468.103, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159011.0, "src": "CET", "ms": 7144400, "ticks": 7122, "late_sum_ms": 31948, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794155528.114, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159071.0, "src": "CET", "ms": 7204404, "ticks": 7182, "late_sum_ms": 32163, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794155528.116, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159071.0, "src": "CET", "ms": 7204412, "ticks": 7182, "late_sum_ms": 32163, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794155588.123, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159131.0, "src": "CET", "ms": 7264418, "ticks": 7242, "late_sum_ms": 32387, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794155588.13, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159131.0, "src": "CET", "ms": 7264426, "ticks": 7242, "late_sum_ms": 32387, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794155648.108, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159191.0, "src": "CET", "ms": 7324403, "ticks": 7302, "late_sum_ms": 32603, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794155648.714, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794159192.0, "new": 1794159247.0, "delta_ms": 54417}
+{"t": 1794155708.095, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159306.0, "src": "CET", "ms": 7384390, "ticks": 7362, "late_sum_ms": 32814, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794155768.145, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159366.0, "src": "CET", "ms": 7444395, "ticks": 7422, "late_sum_ms": 33017, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794155768.148, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159366.0, "src": "CET", "ms": 7444442, "ticks": 7422, "late_sum_ms": 33017, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794155828.138, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159426.0, "src": "CET", "ms": 7504432, "ticks": 7482, "late_sum_ms": 33223, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794155888.333, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159486.0, "src": "CET", "ms": 7564434, "ticks": 7542, "late_sum_ms": 33444, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794155888.334, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159486.0, "src": "CET", "ms": 7564442, "ticks": 7542, "late_sum_ms": 33444, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794155889.337, "node": "t-deck-14", "tag": "SHOT", "kind": "tdeck", "file": "clock-t-deck-14-20261108-155756-tdeck-004.png"}
+{"t": 1794155948.15, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159546.0, "src": "CET", "ms": 7624443, "ticks": 7602, "late_sum_ms": 34250, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794155948.157, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159546.0, "src": "CET", "ms": 7624450, "ticks": 7602, "late_sum_ms": 34250, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794156008.145, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159606.0, "src": "CET", "ms": 7684437, "ticks": 7662, "late_sum_ms": 34456, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794156068.168, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159666.0, "src": "CET", "ms": 7744442, "ticks": 7722, "late_sum_ms": 34682, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794156068.17, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159666.0, "src": "CET", "ms": 7744462, "ticks": 7722, "late_sum_ms": 34682, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794156128.171, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159726.0, "src": "CET", "ms": 7804463, "ticks": 7782, "late_sum_ms": 34890, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794156128.173, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159726.0, "src": "CET", "ms": 7804464, "ticks": 7782, "late_sum_ms": 34890, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794156188.18, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159786.0, "src": "CET", "ms": 7864465, "ticks": 7842, "late_sum_ms": 35110, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794156188.188, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159786.0, "src": "CET", "ms": 7864479, "ticks": 7842, "late_sum_ms": 35110, "late_max_ms": 1395, "lost_ms": 7}
+{"t": 1794156248.189, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159846.0, "src": "CET", "ms": 7924480, "ticks": 7902, "late_sum_ms": 35321, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794156248.191, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159846.0, "src": "CET", "ms": 7924481, "ticks": 7902, "late_sum_ms": 35321, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794156255.752, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794159854.0, "new": 1794159854.0, "delta_ms": -32}
+{"t": 1794156308.193, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159906.0, "src": "CET", "ms": 7984483, "ticks": 7962, "late_sum_ms": 35541, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794156308.195, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159906.0, "src": "CET", "ms": 7984484, "ticks": 7962, "late_sum_ms": 35541, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794156368.199, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159966.0, "src": "CET", "ms": 8044488, "ticks": 8022, "late_sum_ms": 35750, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794156368.207, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794159966.0, "src": "CET", "ms": 8044497, "ticks": 8022, "late_sum_ms": 35750, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794156428.191, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160026.0, "src": "CET", "ms": 8104480, "ticks": 8082, "late_sum_ms": 35967, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794156488.219, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160086.0, "src": "CET", "ms": 8164483, "ticks": 8142, "late_sum_ms": 36186, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794156488.222, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160086.0, "src": "CET", "ms": 8164510, "ticks": 8142, "late_sum_ms": 36186, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794156548.221, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160146.0, "src": "CET", "ms": 8224508, "ticks": 8202, "late_sum_ms": 36391, "late_max_ms": 1395, "lost_ms": 2}
+{"t": 1794156608.229, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160206.0, "src": "CET", "ms": 8284510, "ticks": 8262, "late_sum_ms": 36602, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794156608.237, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160206.0, "src": "CET", "ms": 8284523, "ticks": 8262, "late_sum_ms": 36602, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794156668.22, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160266.0, "src": "CET", "ms": 8344506, "ticks": 8322, "late_sum_ms": 36814, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794156728.24, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160326.0, "src": "CET", "ms": 8404508, "ticks": 8382, "late_sum_ms": 37043, "late_max_ms": 1395, "lost_ms": 1}
+{"t": 1794156728.242, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160326.0, "src": "CET", "ms": 8404527, "ticks": 8382, "late_sum_ms": 37043, "late_max_ms": 1395, "lost_ms": 1}
+{"t": 1794156788.243, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160386.0, "src": "CET", "ms": 8464528, "ticks": 8442, "late_sum_ms": 37240, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794156788.244, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160386.0, "src": "CET", "ms": 8464529, "ticks": 8442, "late_sum_ms": 37240, "late_max_ms": 1395, "lost_ms": 5}
+{"t": 1794156848.233, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160446.0, "src": "CET", "ms": 8524517, "ticks": 8502, "late_sum_ms": 37440, "late_max_ms": 1395, "lost_ms": 3}
+{"t": 1794156866.701, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794160461.0, "new": 1794160461.0, "delta_ms": -855}
+{"t": 1794156908.241, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160505.0, "src": "CET", "ms": 8584517, "ticks": 8561, "late_sum_ms": 37647, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794156908.246, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160505.0, "src": "CET", "ms": 8584530, "ticks": 8561, "late_sum_ms": 37647, "late_max_ms": 1395, "lost_ms": 6}
+{"t": 1794156968.3, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160565.0, "src": "CET", "ms": 8644531, "ticks": 8621, "late_sum_ms": 37892, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794156968.305, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160565.0, "src": "CET", "ms": 8644588, "ticks": 8621, "late_sum_ms": 37892, "late_max_ms": 1395, "lost_ms": 4}
+{"t": 1794157008.195, "node": "t-deck-14", "tag": "CLOCK", "kind": "set", "src": "CET", "old": 1794160605.0, "new": 1794160490.0, "delta_ms": -115580}
+{"t": 1794157028.259, "node": "t-deck-14", "tag": "CLOCK", "kind": "stat", "epoch": 1794160510.0, "src": "CET", "ms": 8704542, "ticks": 8681, "late_sum_ms": 38087, "late_max_ms": 1395, "lost_ms": 2}
