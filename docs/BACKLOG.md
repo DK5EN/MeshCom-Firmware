@@ -324,7 +324,7 @@ Code is in `fork-dev`; a test or measurement on DK5EN-1, -14, -90 or -92 is left
 | SENS-04     | Sensors                               | One-wire DHT path only accepts DHT11, DHT21/DHT22 are never read.                                                             | Code done 2026-11-08 (W2): `--dht` takes 11 or 22, persisted (key node_dht, default 11, sanitized), DHT built after settings load on the `--owgpio` pin; DHT21 not supported. Bench: connect a DHT22 to a bench node, `--dht 22`, `--onewire on`, expect temperature and humidity; check --info and reboot persistence. Release note: DHT now uses the configured `--owgpio` pin (was the compile-time pin). |
 | CSMA-01     | LoRa TX / CSMA                        | A reply to a received frame gets no priority on the first CSMA attempt.                                                       | Code done 2026-11-08 (W2): a higher-priority enqueue shortens the running CSMA wait (shorten only, no extra random draw); not benched. Bench: repeat matched run C (RM1 reply first CAD expected 3000-3350 ms) with CSMA-04 stamps.                                                                                                                                                                          |
 
-#### Soak and production gateway (4)
+#### Soak and production gateway (7)
 
 Long runs or anything on DK5EN-98 (explicit OK each time). Run after the release, in parallel to other work.
 
@@ -334,6 +334,36 @@ Long runs or anything on DK5EN-98 (explicit OK each time). Run after the release
 | REBOOT-98 | Stability / gateway       | Production gateway DK5EN-98 rebooted once without panic text on 2026-10-04.                                        | Single event, cause unknown; watch only.                                                               | If it repeats: read reset reason, check router/power      |
 | AU-24     | Auto update / T-Beam heap | On DK5EN-92 after hours of uptime Download refuses with lowheap_tls, and a first Download hit TASK_WDT in gateway. | Open, cause unknown; seen at 4.8 h uptime on 44075ef3, likely also on 11.06.                           | Reproduce on DK5EN-92 after long uptime with console log. |
 | WEB-TX-01 | Web GUI / T-Beam          | Web send guard cut a page on the T-Beam, leaving incomplete HTML and a 2 s loop stall.                             | Stall windows and chunked responses released in v4.40a.11.06; 60 of 60 loads fine, cause unconfirmed.  | Watch for a repeat on the T-Beam.                         |
+| SOAK-1108 | Radio / gateway           | 24 h soak of v4.40a.11.08 on DK5EN-98: LoRa, CAD, CSMA and TX ring changes since 2026-11-01 under real traffic.    | Running 2026-11-08 20:38 until 2026-11-09 20:00 CET, watch-list below.                                 | Evaluate the log against the watch-list; `--setlog off`.  |
+| AU-25     | Auto update / heap        | Download on DK5EN-1 (local INSTRUMENT build, 3 h uptime) stopped twice at about 54 % with `nomem`.                 | Seen 2026-11-08; after a reboot the Download went through. Related to AU-24.                           | Read free heap before/after Download on a long-up node.   |
+| AU-26     | Auto update / web card    | During the install DK5EN-98's Info card read "Installing v4.40a.11.06" while it installed v4.40a.11.08.            | Seen once 2026-11-08 (operator screenshot); the result was correct.                                    | Find where the card takes the tag (stale `updcheck`).     |
+
+**SOAK-1108 run.** `screen` `soak98` on rpizero, `~/meshlog/dk5en-98-soak-11.08-20261108/`, flags
+`txcapture,loradebug,nbrdebug` (restored at the end) and `--setlog on` once at the start (persistent, not restored:
+switch it off afterwards). All nodes run the CI release images since 2026-11-08 20:22-20:37 (DK5EN-98 from 20:22:17).
+
+**SOAK-1108 watch-list** (from the commits 2026-11-01 .. 2026-11-08; every tag needs `--loradebug`):
+
+- **CSMA-01/05 re-arm and idle ceiling** (`2ade9625`, `68ee6dcf`; highest risk, shared by every TX path, no own
+  log line): check the timing of `CAD_FREE attempt=` -> `TX_START qlen=` -> `RADIO_TX len=`. Bad: a priority frame
+  (ack, RM1 reply, beacon) waits a full relay window; a low-priority frame goes out very fast after an idle period;
+  more than ~10 s from `RELAY_QUEUED msg_id=` to `RADIO_TX`.
+- **CSMA backoff:** `CAD_BUSY attempt=`, `CAD_FALSE_POSITIVE`, `CAD_FREE_NO_TX`, `CSMA_AGED slot=`. Bad: attempts
+  repeatedly past ~6, a `CAD_FREE_NO_TX` loop, a tiny `next_timeout`.
+- **CSMA-03/04** are nRF52-only or INSTRUMENT-only: `CAD_STALE_RECHECK` and the `cad= free=+ tx=+` suffix must not
+  appear on DK5EN-98 at all.
+- **QA-RX-03 ring release only after a decoded frame** (`304414f1`): count per hour `RETRANSMIT_GIVEUP`,
+  `RETRANSMIT_GIVEUP_DM`, `RING_DROP_STALE`, `RING_DROP_PRIO`, `RING_DROP_NEW`, `RING_OVERFLOW`, `RING_REJECT`.
+  Bad: a give-up for an msg_id whose echo was heard.
+- **RX path** (`7e99ad40`, zeroed RX tail): rate of `CRC_ERROR`, `CRC_PAYLOAD`, `ERR_PAYLOAD`, `RX_ERROR`,
+  `CHECKRX zero_length` against the last 11.06 capture; `RX_IRQ_STALE`, `RX_TIMEOUT missed_edge`, `RX_SILENCE t=`
+  repeating on a busy gateway.
+- **Dedup and store echo** (`d9b07f8c`, `f882bc7d`, `a9071cc7`, `16245dcf`): `RX_DEDUP_NEW` twice for one msg_id, a
+  `RX_DEDUP_DUP` storm, or one message stored or delivered twice.
+- **CET-AGE-01** (`e7c4bd32`): `[CET];skip;back_s;` now and then is fine; bad is a skip on every beacon or a clock
+  step back without a skip.
+- **Capture integrity:** `[MC-TEST] CAPTURE_DROPPED n=` means the log itself lost data; `ONRXDONE_TIME`,
+  `CHANNEL_UTIL` for load context. REBOOT-98: any new start banner in the log.
 
 #### Field (16)
 

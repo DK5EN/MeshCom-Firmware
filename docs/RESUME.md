@@ -5,6 +5,10 @@
 merge (`da76033b`), GPIO-01..05, GPSV4-01 (hardware-untested), TD-THEME-01, TD-CHAT-01, and the BACKLOG-ROUND fixes
 (CLK-01, CET-AGE-01, ping display, nRF52 ping budget, CSMA-03, web setup page). No PR of ours is open.
 
+**Fleet on `v4.40a.11.08` CI images since 2026-11-08 20:37** (incl. DK5EN-98). **SOAK-1108 running** on DK5EN-98
+until 2026-11-09 20:00 CET: screen `soak98` on rpizero, `~/meshlog/dk5en-98-soak-11.08-20261108/`; watch-list and
+next step in [BACKLOG.md](BACKLOG.md) (soak table).
+
 This page is the current state only. Open work lives in [BACKLOG.md](BACKLOG.md) section 3.2; history in the
 archive journals (see "Where things are").
 

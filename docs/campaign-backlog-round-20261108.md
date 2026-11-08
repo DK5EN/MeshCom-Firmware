@@ -137,3 +137,8 @@ arrow on the T-Deck), remaining release-train bench rows, CLK-01 upstream PR.
    T-Deck field commands), web flasher published (31 boards, 0 mismatches), Pages synced.
 2. Backlog after the release: TD-NAV-01, TRACK-PING-01, DEDUP-LAP-01, T-Deck Pro pin bench, release-train bench
    rows, CLK-01 upstream PR (W4 of campaign-clk-01).
+3. Done 2026-11-08 20:22-20:37: DK5EN-1, -14, -92, -98 via the Info-page Auto Update, DK5EN-90 via DFU with the CI
+   zip; all on the CI images of `v4.40a.11.08`. Findings AU-25 (`nomem` on DK5EN-1 before a reboot), AU-26 (card
+   showed the wrong tag while installing).
+4. Running: SOAK-1108 on DK5EN-98 until 2026-11-09 20:00 CET (screen `soak98` on rpizero); evaluate against the
+   watch-list in BACKLOG.md, then `--setlog off`.
