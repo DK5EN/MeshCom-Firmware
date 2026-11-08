@@ -83,7 +83,7 @@ Two Sonnet writers, advisor REWORK twice (pageHold countdown frozen by a call-si
 draws nothing), first rework by two fresh writers at high, second by the orchestrator. Every fix has a test that fails
 before and passes after.
 
-## Wave 3: bulk bench (2026-11-08, running)
+## Wave 3: bulk bench (2026-11-08, done)
 
 INSTRUMENT builds of `90ece48c` on DK5EN-1, -92, -14 (OTA) and DK5EN-90 (`-DCSMA_CAD_MAX_AGE_US=0`). Operator
 decisions: W1 "before" S2-S4 skipped; T-Deck clock run over USB after CSMA-03 (RAK unplugged); GPIO-06/08/09 stay
@@ -112,11 +112,28 @@ Wave 4 writers (running): PING-HOLD-01 (`loop_functions.cpp` ping/pong display, 
 `nrf52_main.cpp` ping section and final delay, `csma_timing.h`, `test_ping_budget`, `test_csma_timing`).
 Orchestrator: `platformio.ini` (`test_ping_budget` registered), web files, tools, docs.
 
+## Wave 4 and release (2026-11-08, done)
+
+Commits `9d5b854e` (web), `4da46f95` (`--offline-ok`), `b3b2bf0b` (PING-HOLD-01, PING-NRF-01, CSMA-03 loop delay),
+`5583b177` (PING-HOLD-02, PING-STOP-01), `e7c4bd32` (CET-AGE-01), `bc05ea88` (release docs); tag `v4.40a.11.08`.
+Every behaviour change had an Opus advisor pass; every gate `--stage 1,2` PASS (release gate: 3765 Unity cases in
+107 envs, 1593 pytest).
+
+| Re-bench on `e7c4bd32`                         | Result                                                                                      |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| CET guard (Heltec + T-Beam, 1 h, `{CET}` only) | every set within 0.8 s, no backward step (before: 3-4 per hour, up to 116 s on 3 nodes)     |
+| CSMA-03 (DK5EN-90, threshold 0)                | CAD result 1-2 ms old (was 60-97 ms), CAD to TX 2-3 ms (was 63.5 ms); 5 ms threshold kept   |
+| Ping hold (DK5EN-1, `5583b177`)                | hold 14-15 s per ping cycle, longest clock gap 16 s (was 158 s)                             |
+| S4 (DK5EN-1, no WLAN, `--offline-ok`)          | free-running clock stable between corrections; boot start 368 s off until the first `{CET}` |
+| Idle heap T-Beam release image                 | 65024 B (+1008 B vs baseline)                                                               |
+| Safari (operator)                              | setup page, page clock, messages, neighbours fine; slider value nit -> TD-NAV-01            |
+
+Moved to the backlog (operator): GPIO-06/08/09 T-Deck Pro bench, DEDUP-LAP-01, TRACK-PING-01, TD-NAV-01 (double GPS
+arrow on the T-Deck), remaining release-train bench rows, CLK-01 upstream PR.
+
 ## Next wave (resume here)
 
-1. **Bench (bulk bench):** CLK-01 W1 rest (S2, S3, S4) and W3 after-run incl. A4 OLED frame time with
-   `--oledlog on`; clock on a pinged ESP32 OLED node (CLK-PING-01, `[DISPCLK];skip;hold` only during the pong text);
-   CSMA-03 on DK5EN-90 (count `CAD_STALE_RECHECK`, then set `CSMA_CAD_MAX_AGE_US`); GPIO-06/08/09 on a T-Deck Pro;
-   web GUI look in Safari (T-Deck controls, page clock, toggles, theme/font switch); T-Deck green and setup page on
-   DK5EN-14.
-2. Release only after the backlog is complete (operator); upstream PRs later as a bundle.
+1. Done 2026-11-08: release `v4.40a.11.08` verified (68 assets, 28 `.autoupdate` re-inflate ok, tag string,
+   T-Deck field commands), web flasher published (31 boards, 0 mismatches), Pages synced.
+2. Backlog after the release: TD-NAV-01, TRACK-PING-01, DEDUP-LAP-01, T-Deck Pro pin bench, release-train bench
+   rows, CLK-01 upstream PR (W4 of campaign-clk-01).

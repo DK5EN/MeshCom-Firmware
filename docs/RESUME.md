@@ -1,14 +1,9 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-11-08 afternoon, branch `fork-dev`. Last release **`v4.40a.11.06`** (Latest, tag on `3ecf429e`, 68 assets,
-built by CI). Upstream released **`v4.40a.11.07`** on 2026-11-08 (`upstream/dev` 5d76238b): it ships all our
-PRs up to #1257 plus OE1KBC's RAK L76K GPS probe (#1259) and T3 S3 / T-Deck Pro bootloader assets (#1260-#1262).
-`fork-dev` has merged up to 649b5b17 (`71c324e7`); **5d76238b is not merged yet** (`/sync-upstream`; conflicts in
-`meshcom-ci.yml` and both safeboot bins). No PR of ours is open.
-
-**Unreleased on `fork-dev`:** GPIO-01..05 (pins page, free GPIO, RM1 `pins`/`gpio`), GPSV4-01 W1 (Heltec V4
-GNSS, untested on hardware), TD-THEME-01 W1-W3 (T-Deck light/dark theme, setup controls, boot logo, web toggle), TD-CHAT-01
-(readable light-mode chat, S-M-L chat text, `9ca52108`), DISP-PAT-01 (`--tdpattern` contrast pattern).
+**Stand:** 2026-11-08 evening, branch `fork-dev`. Release **`v4.40a.11.08`** published (Latest, tag on `bc05ea88`,
+68 assets built by CI, checked; web flasher and Pages on `.11.08`, `.11.06` pruned). It contains everything since `v4.40a.11.06`, incl. the official `v4.40a.11.07`
+merge (`da76033b`), GPIO-01..05, GPSV4-01 (hardware-untested), TD-THEME-01, TD-CHAT-01, and the BACKLOG-ROUND fixes
+(CLK-01, CET-AGE-01, ping display, nRF52 ping budget, CSMA-03, web setup page). No PR of ours is open.
 
 This page is the current state only. Open work lives in [BACKLOG.md](BACKLOG.md) section 3.2; history in the
 archive journals (see "Where things are").
@@ -26,8 +21,8 @@ and `/release-firmware`. Soak on DK5EN-98, the GPSV4-01 upstream PR and field ch
   T-Deck theme bench. Bench 2026-11-08: INSTRUMENT flash done; CLK-01 S1 and S5 measured (campaign-clk-01), S2-S4 open.
   [campaign-impl-train-20261107.md](campaign-impl-train-20261107.md).
 
-- **BACKLOG-ROUND:** operator decisions 2026-11-08: CLK-01 fix, web controls and eight follow-ups now, release
-  after the backlog. Waves 1 and 2 done (CLK-PING-01, SENS-05 schema, GPIO-09); next is the bulk bench.
+- **BACKLOG-ROUND:** waves 1-4 and the bulk bench done 2026-11-08; reduced-scope release `v4.40a.11.08` (operator).
+  Next: release verification and web flasher, then the moved-out backlog rows.
   [campaign-backlog-round-20261108.md](campaign-backlog-round-20261108.md) -- resume here.
 
 - **TD-THEME-01:** W1-W3 done (last `f4c944e1`); W4 is the bench pass on DK5EN-14 (screenshots of both themes,
@@ -37,7 +32,8 @@ and `/release-firmware`. Soak on DK5EN-98, the GPSV4-01 upstream PR and field ch
 - **GPIO-01:** done, no bench test by decision; GPIO-06 (T-Deck Pro pin) is an `impl` row, GPIO-07 a field test.
   [campaign-gpio-01-20261107.md](campaign-gpio-01-20261107.md).
 
-- **CLK-01:** planned 2026-11-07, display clock lags then jumps (T3 S3 field report); W0 instrumentation next.
+- **CLK-01:** fixed and benched 2026-11-08 (F1-F3, A3 via CET-AGE-01, A4 3.8 %); released in `v4.40a.11.08`. Next: W4
+  upstream PR.
   [campaign-clk-01-20261107.md](campaign-clk-01-20261107.md).
 
 ## Bench checks owed from campaign docs (add to the bulk bench)

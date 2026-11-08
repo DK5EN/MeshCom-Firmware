@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MeshCom-Fork von DK5EN: Firmware zum Flashen und sechs belegte Analysen</title>
-<meta name="description" content="Web-Flasher für die MeshCom-Fork-Firmware v4.40a.11.06 und sechs belegte Vorträge und Analysen zu Protokoll, Nachbarschaftsmatrix, Fernsteuerung, Hauptschleife und Pull Requests.">
+<meta name="description" content="Web-Flasher für die MeshCom-Fork-Firmware v4.40a.11.08 und sechs belegte Vorträge und Analysen zu Protokoll, Nachbarschaftsmatrix, Fernsteuerung, Hauptschleife und Pull Requests.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%236366f1'/%3E%3Cg stroke='%23fff' stroke-width='2' fill='%23fff'%3E%3Cline x1='9' y1='11' x2='23' y2='21'/%3E%3Cline x1='23' y1='11' x2='9' y2='21'/%3E%3Ccircle cx='9' cy='11' r='3'/%3E%3Ccircle cx='23' cy='11' r='3'/%3E%3Ccircle cx='16' cy='22' r='3'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,12 +26,12 @@
   <h1>Fork-Firmware zum Flashen und sechs belegte Analysen dazu</h1>
   <ul class="meta">
     <li>Stand: 07.11.2026, Aussagen geprüft gegen den Quellcode von <code>fork-dev</code></li>
-    <li>Firmware: Release v4.40a.11.06 vom 06.11.2026</li>
+    <li>Firmware: Release v4.40a.11.08 vom 08.11.2026</li>
     <li>Quellen: Quellcode, Repo-Dokumente, GitHub-API; jede Seite nennt ihre Quellen am Ende</li>
   </ul>
 
   <div class="bluf">
-    <p class="lead">Diese Seite führt zum Web-Flasher für die MeshCom-Firmware v4.40a.11.06 aus dem Fork von DK5EN und zu sechs Seiten, die erklären, wie MeshCom funktioniert und was der Fork verbessert hat.</p>
+    <p class="lead">Diese Seite führt zum Web-Flasher für die MeshCom-Firmware v4.40a.11.08 aus dem Fork von DK5EN und zu sechs Seiten, die erklären, wie MeshCom funktioniert und was der Fork verbessert hat.</p>
     <p class="reco">Wer ein T-Beam 1W oder ein T-Deck Pro betreibt, liest zuerst den Handlungsbedarf in der Release-Karte.</p>
   </div>
 
@@ -47,38 +47,55 @@
 
   <div class="cards">
     <div class="card wide">
-      <div class="eyebrow">Aktuelles Release · 06.11.2026</div>
-      <h2>v4.40a.11.06: Landeszeichen, UV und Wind, Web-Passwort, Pins-Seite, Store-Knoten ohne Endlos-Zustellung</h2>
-      <p><strong>Alle Displays zeigen Landeszeichen, UV- und Windsensoren kommen dazu, das Web-Passwort lässt sich auf der Seite verwalten, und ein Postfach-Knoten sendet eine Direktnachricht nicht mehr über Stunden neu.</strong> Die Einstellungen bleiben erhalten.</p>
+      <div class="eyebrow">Aktuelles Release · 08.11.2026</div>
+      <h2>v4.40a.11.08: Uhr ohne Sprünge durch veraltete Zeit-Baken, Ping-Anzeige 10 s, nRF52-Ping-Budget und Kanalprüfung, Web-Einstellungsseite, Pins- und GPIO-Seite, T-Deck Hell/Dunkel</h2>
+      <p><strong>Die Displayuhr springt nicht mehr zurück, Ping-Bilder verdecken sie nur noch 10 Sekunden, das T-Deck hat ein helles und ein dunkles Thema, und die Pins-Seite zeigt und schaltet GPIO-Pins.</strong> Die Einstellungen bleiben erhalten. Wer auf einem nRF52 pingt oder am Heltec V4 Sensoren an GPIO 41/42 hat, muss handeln.</p>
       <div class="callout warn">
-        <p><strong>Handlungsbedarf: Skripte mit Reboot per HTTP, T-Beam 1W und T-Deck Pro</strong></p>
+        <p><strong>Handlungsbedarf: nRF52-Ping, Heltec V4, T-Beam 1W und T-Deck Pro</strong></p>
         <ul>
-          <li><strong>Skripte mit <code>/callfunction/?otaupdate</code> oder <code>?reboot</code></strong> müssen den Header <code>X-MC: 1</code> senden, sonst antwortet der Knoten mit 403. Web-GUI und <code>tools/webflash.py</code> tun das schon.</li>
-          <li><strong>Von vor v4.40a.11.01:</strong> ein gespeichertes Ping-Ziel, das kein Rufzeichen ist, wird beim Start gelöscht. <strong>Von vor v4.40a.10.30:</strong> die Anmeldung mit <code>/?nodepassword=</code> antwortet 403. Der neue Ablauf steht in <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.11.06/src/web_functions/Web-API_documentation.txt">Web-API_documentation.txt</a>.</li>
-          <li><strong>T-Beam 1W:</strong> einmal per <a href="flash/">Web-Flasher</a> flashen, falls nicht schon mit v4.40a.10.20 geschehen (ohne Löschen). Bis dahin nicht über die Luft aktualisieren: <strong>der Knoten verliert sonst seine Einstellungen</strong>.</li>
-          <li><strong>T-Deck Pro:</strong> einmal per <a href="flash/">Web-Flasher</a> flashen, falls nicht schon mit v4.40a.10.21 geschehen (ohne Löschen); die alte Partitionstabelle hatte keinen Safeboot-Platz.</li>
-          <li><strong>Alle anderen:</strong> wie gewohnt aktualisieren (Web-Flasher, <code>.bin</code> per USB, <code>tools/webflash.py</code> oder Auto Update im Kanal <code>dev</code>).</li>
+          <li><strong>RAK4631, T114 und T-Echo:</strong> ein Ping läuft nicht mehr endlos (PING-NRF-01).
+            <ul>
+              <li>Ohne <code>--ping start</code> wird nichts gepingt. <code>--ping stop</code> und <code>--pingmax</code> wirken jetzt wie auf ESP32.</li>
+              <li>Das Ping-Budget wird nicht gespeichert: nach einem Neustart den Ping neu starten.</li>
+              <li>Ein Ping ohne Antwort zeigt jetzt PONG FAILED.</li>
+            </ul>
+          </li>
+          <li><strong>Heltec V4:</strong> der I2C-Bus liegt jetzt auf SDA 4 und SCL 3 statt auf GPIO 41/42 (GPSV4-01). Die Pins 41 und 42 gehören dem GNSS-Kit; ein Sensor an 41/42 muss umgesteckt werden. Der GNSS-Fix ist nicht auf Hardware getestet.</li>
+          <li><strong>T-Beam 1W und T-Deck Pro:</strong> einmal per <a href="flash/">Web-Flasher</a> flashen, falls nicht schon mit v4.40a.10.20 (1W) oder v4.40a.10.21 (Pro) geschehen. Details in den Release Notes unter „Known gaps“.</li>
+          <li><strong>Alle anderen:</strong> wie gewohnt aktualisieren (Web-Flasher, <code>.bin</code> per USB, <code>tools/webflash.py</code> oder Auto Update im Kanal <code>dev</code>). Skripte mit <code>?otaupdate</code> oder <code>?reboot</code> brauchen den Header <code>X-MC: 1</code> seit v4.40a.11.06.</li>
         </ul>
       </div>
       <h3>Kernfakten</h3>
       <ul>
-        <li><strong>Landeszeichen auf allen Displays:</strong> fehlt einem Display ein Buchstabe, wird er umschrieben (<code>ä</code> zu <code>ae</code>), statt zu verschwinden.</li>
-        <li><strong>Sensoren und Akku:</strong> UV-Sensor LTR390 und Reed-Windmesser auf ESP32, standardmäßig aus; Ladezustand auf Boards mit PMU (Ladechip).</li>
-        <li><strong>Web-GUI:</strong> Web-Passwort auf der Setup-Seite setzen und löschen, Pins-Seite mit Live-Werten, Board-LED aus, blinkend oder dauerhaft an.</li>
-        <li><strong>Postfach-Knoten sendet nicht mehr endlos:</strong> gilt für ESP32-S3 und nRF52 mit eingeschaltetem Postfach (Store and Forward).
+        <li><strong>Uhr:</strong> ein zweiter Server-Strom lieferte {CET}-Zeitbaken, die 20 bis 115 s alt waren; jede setzte die Uhr zurück (CET-AGE-01).
           <ul>
-            <li>Ursache: die eigene Zustellung kam über ein anderes Gateway zurück und sah wie eine neue Nachricht aus. Haltezeit und Pause begannen neu.</li>
-            <li>Jetzt: eine Kopie nach Beginn der Zustellung ändert nichts mehr (seit 06.11.2026 in upstream <code>dev</code>, #1257). Geprüft auf einem Heltec V3 mit eingespeisten Kopien, nicht mit einem echten zweiten Gateway.</li>
+            <li>Jetzt: eine Bake, die mehr als 5 s hinterherhinkt, wird ignoriert. Bench: vorher Sprünge bis -116 s, mit dem Schutz blieb jede gesetzte Zeit über 1 h innerhalb von 0,8 s.</li>
+            <li>Die Uhr wird auf allen Uhrseiten jede Sekunde gezeichnet; ein eingestellter Ping friert sie nicht mehr ein.</li>
           </ul>
         </li>
-        <li><strong>Schutz vor Fehlbedienung:</strong> eine Pin-Einstellung kann einen RAK nicht mehr lahmlegen; das Web-Guard ist standardmäßig an.</li>
-        <li><strong>Server-Ausfall:</strong> Textnachrichten werden bis zu 20 Minuten gehalten und danach mit derselben ID nachgesendet. Nur ein simulierter Ausfall auf der Bench.</li>
-        <li><strong>T-Beam, offen:</strong> weniger freier Speicher im Leerlauf (64,0 KB statt 68,7 KB, 06.11.2026, vom Betreiber akzeptiert). Beim Download von Auto Update gab es auf dem Stand vor dem Release zwei Ablehnungen wegen Speichermangel und einen Watchdog-Neustart (06.11.2026, DK5EN-92). Der Watchdog-Neustart kam beim ersten Versuch nach einem Neustart des Knotens, der zweite lief durch.</li>
+        <li><strong>Ping-Anzeige:</strong> Ping- und Pong-Bilder stehen 10 s, danach kehrt die Uhr zurück. Längste Uhrlücke auf der Bench 16 s, vorher 158 s (PING-HOLD-01).</li>
+        <li><strong>T-Deck:</strong> Thema Auto, Dunkel oder Hell (<code>--theme</code>), lesbarer Hell-Modus, Schriftgröße und Helligkeit auf der Einstellungsseite (TD-THEME-01, TD-CHAT-01, WEB-TD-01).</li>
+        <li><strong>Web-GUI:</strong> Einstellungsseite mit Beschriftung und Schalter in einer Zeile, eigenes Thema und eigene Textgröße im Browser, höherer Kontrast für Sonnenlicht.</li>
+        <li><strong>Pins und GPIO:</strong> die Pins-Seite zeigt, welcher Pin welche Funktion hat (GPIO-01). Freie GPIO-Pins schaltbar mit <code>--gpiocontrol on</code>, standardmäßig aus und nur auf T-Beam und Heltec V3.</li>
+        <li><strong>Entfernt:</strong> die Einstellung <code>--nbrreport</code>; der Nachbarschaftsbericht läuft automatisch (BL-01).</li>
+        <li><strong>Nicht auf der Bench:</strong> Heltec-V4-GNSS, RAK4631-L76K, Pins-Seite, T-Deck-Pro-Pins und das nRF52-Ping-Budget sind gebaut und im Host getestet, nicht auf Hardware. Uhr, Ping-Anzeige und T-Deck-Thema liefen am 08.11.2026 auf der Bench.</li>
+        <li><strong>Basis:</strong> das offizielle v4.40a.11.07 (08.11.2026). Nicht byte-gleich mit einem offiziellen Release, auch nicht mit v4.40a.11.07.</li>
         <li><strong>Einstellungen:</strong> der Flash-Strukturstand bleibt <code>20260724</code>.</li>
-        <li><strong>Build:</strong> von GitHub CI aus dem getaggten Commit gebaut, 68 Dateien. Nicht byte-gleich mit einem offiziellen Release. Hintergrund: <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.11.06">Release-Text</a>.</li>
+        <li><strong>Build:</strong> von GitHub CI aus dem getaggten Commit gebaut, 68 Dateien. Hintergrund: <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.11.08">Release-Text</a>.</li>
       </ul>
       <details>
         <summary>Was seit v4.40a.10.16 dazukam</summary>
+        <h4>v4.40a.11.06</h4>
+        <ul>
+          <li><strong>Landeszeichen auf allen Displays</strong> (fehlende Buchstaben werden umschrieben), <strong>UV-Sensor LTR390 und Reed-Windmesser</strong> auf ESP32 (standardmäßig aus), Ladezustand auf Boards mit PMU.</li>
+          <li><strong>Web-GUI:</strong> Web-Passwort auf der Setup-Seite setzen und löschen, Pins-Seite mit Live-Werten, Board-LED aus, blinkend oder an.</li>
+          <li><strong>Handlungsbedarf:</strong> Skripte mit <code>/callfunction/?otaupdate</code> oder <code>?reboot</code> senden den Header <code>X-MC: 1</code>, sonst 403. Von vor v4.40a.11.01: ein gespeichertes Ping-Ziel, das kein Rufzeichen ist, wird beim Start gelöscht. Von vor v4.40a.10.30: die Anmeldung mit <code>/?nodepassword=</code> antwortet 403; der Ablauf steht in <a href="https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.11.06/src/web_functions/Web-API_documentation.txt">Web-API_documentation.txt</a>.</li>
+          <li><strong>Postfach-Knoten sendet nicht mehr endlos</strong> (ESP32-S3 und nRF52 mit Store and Forward): eine Kopie der eigenen Zustellung über ein anderes Gateway ändert Haltezeit und Pause nicht mehr (upstream #1257). Geprüft mit eingespeisten Kopien, nicht mit einem echten zweiten Gateway.</li>
+          <li><strong>Schutz vor Fehlbedienung:</strong> eine Pin-Einstellung kann einen RAK nicht mehr lahmlegen; das Web-Guard ist standardmäßig an.</li>
+          <li><strong>Server-Ausfall:</strong> Textnachrichten werden bis zu 20 Minuten gehalten und danach mit derselben ID nachgesendet. Nur ein simulierter Ausfall auf der Bench.</li>
+          <li><strong>T-Beam, offen:</strong> weniger freier Speicher im Leerlauf (64,0 KB statt 68,7 KB, 06.11.2026, vom Betreiber akzeptiert). Beim Auto-Update-Download gab es zwei Ablehnungen wegen Speichermangel und einen Watchdog-Neustart (DK5EN-92).</li>
+          <li><strong>Build:</strong> von GitHub CI, 68 Dateien, Flash-Strukturstand <code>20260724</code>. Hintergrund: <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.11.06">Release-Text</a>.</li>
+        </ul>
         <h4>v4.40a.11.01</h4>
         <ul>
           <li><strong>Update-Kanal per Fernwartung:</strong> eine authentifizierte RM1-Nachricht <code>upd chan dev</code> oder <code>upd chan prod</code> stellt den Kanal um; dieselbe Funktion nutzen <code>--updchan</code> und die Fernwartungs-Webseite. Nur in Builds mit Kanal <code>dev</code>.</li>
@@ -162,7 +179,7 @@
           <li><strong>Offizielles v4.40a.hbserver</strong> plus die Fork-Funktionen aus #1187 bis #1189: Auto Update über GitHub, Speichern-und-Weiterleiten über den Server (seit v4.40a.10.19 in Release-Builds gesperrt) und HMAC-gesicherte Fernsteuerung per LoRa (ab Werk aus).</li>
         </ul>
       </details>
-      <div class="card-meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.11.06">Release v4.40a.11.06</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie der Pull Requests</a></div>
+      <div class="card-meta"><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.11.08">Release v4.40a.11.08</a> · <a href="flash/">Web-Flasher</a> · <a href="pr-history.html">Historie der Pull Requests</a></div>
     </div>
 
     <a class="card" href="meshcom-protocol.html">
@@ -216,16 +233,16 @@
     </a>
     <a class="card" href="flash/">
       <div class="eyebrow">Werkzeug · 31 Boards</div>
-      <h2>Web-Flasher: v4.40a.11.06 direkt aus dem Browser</h2>
+      <h2>Web-Flasher: v4.40a.11.08 direkt aus dem Browser</h2>
       <p><strong>Das aktuelle Release per USB auf den Knoten, ohne Installation und ohne esptool.</strong> Bootloader, Partitionstabelle, Safeboot und Anwendung gehen in einem Durchgang; das Board wird am Knoten erkannt oder aus dem Flash gelesen.</p>
       <p>Ohne Löschen bleiben die Einstellungen erhalten. Läuft in Chrome, Edge und Opera auf dem Desktop.</p>
-      <div class="card-meta">v4.40a.11.06 · Web Serial</div>
+      <div class="card-meta">v4.40a.11.08 · Web Serial</div>
     </a>
   </div>
 
   <div class="foot">
     <p>Quellcode und Release Notes: <a href="https://github.com/DK5EN/MeshCom-Firmware">github.com/DK5EN/MeshCom-Firmware</a>
-    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.11.01">v4.40a.11.01</a> (01.11.2026)
+    · aktuelles Release <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.11.08">v4.40a.11.08</a> (08.11.2026)
     · Web-Flasher <a href="https://dk5en.github.io/MeshCom-Firmware/flash/">dk5en.github.io/MeshCom-Firmware/flash</a></p>
     <p class="note">Dies ist nicht die offizielle MeshCom-Firmware. Die offizielle Firmware entwickelt und veröffentlicht das
     ICSSW-Team unter <a href="https://github.com/icssw-org/MeshCom-Firmware">icssw-org/MeshCom-Firmware</a>.</p>
