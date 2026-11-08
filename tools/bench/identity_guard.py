@@ -11,7 +11,9 @@ XX0XXX without WiFi):
 - bench TX power at most ``max_txpower_dbm`` (2 dBm);
 - an ESP32 node needs a WiFi IP, a set clock and the web server -- without
   WiFi there is no NTP and no web server, and the web and clock paths go
-  untested.
+  untested. Narrow waiver (operator 2026-11-08, CLK-01 S4): offline_ok=True /
+  --offline-ok waives ONLY these three ESP32 checks (reported as "offline waiver");
+  callsign, SSID/fleet match and TX power are still enforced.
 
 Library use (harnesses call this before the first test step)::
 
@@ -40,7 +42,7 @@ import socket
 import sys
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -65,6 +67,7 @@ class NodeInfo:
     ip: str | None
     clock_year: int | None
     clock_source: str | None
+    waived: list[str] = field(default_factory=list)  # checks waived by offline_ok: wifi, web, clock
 
 
 def parse_info(text: str) -> NodeInfo:
@@ -97,8 +100,20 @@ def load_fleet(path: Path = FLEET_FILE) -> dict:
     return json.loads(path.read_text())
 
 
-def check(info: NodeInfo, node: str, fleet: dict) -> list[str]:
-    """Every reason why ``node`` must not be tested; empty list = fit."""
+def check(info: NodeInfo, node: str, fleet: dict, offline_ok: bool = False,
+          waived: list[str] | None = None) -> list[str]:
+    """Every reason why ``node`` must not be tested; empty list = fit.
+
+    ``offline_ok`` waives only the ESP32 wifi/web/clock checks; the names of the
+    waived checks that would have refused are appended to ``waived``.
+    """
+    def wave(name: str, reason: str) -> None:
+        if offline_ok:
+            if waived is not None:
+                waived.append(name)
+        else:
+            reasons.append(reason)
+
     reasons: list[str] = []
     entry = fleet["nodes"].get(node)
     if entry is None:
@@ -120,24 +135,29 @@ def check(info: NodeInfo, node: str, fleet: dict) -> list[str]:
 
     if entry["family"] == "esp32":
         if not info.has_ip:
-            reasons.append("no WiFi IP (hasIpAddress not yes): no NTP, no web server, no net console")
+            wave("wifi", "no WiFi IP (hasIpAddress not yes): no NTP, no web server, no net console")
         if not info.webserver:
-            reasons.append("web server off")
+            wave("web", "web server off")
         if info.clock_year is None or info.clock_year < 2025:
-            reasons.append(f"clock not set (UPDATE year {info.clock_year}, source {info.clock_source})")
+            wave("clock", f"clock not set (UPDATE year {info.clock_year}, source {info.clock_source})")
     return reasons
 
 
-def require(info_text: str, node: str, fleet: dict | None = None) -> NodeInfo:
-    """Raise IdentityError unless ``node`` is fit for tests."""
+def require(info_text: str, node: str, fleet: dict | None = None, offline_ok: bool = False) -> NodeInfo:
+    """Raise IdentityError unless ``node`` is fit for tests.
+
+    ``offline_ok`` waives the ESP32 wifi/web/clock checks only (CLK-01 S4); the
+    waived ones are listed in the returned ``NodeInfo.waived``.
+    """
     info = parse_info(info_text)
-    reasons = check(info, node, fleet if fleet is not None else load_fleet())
+    reasons = check(info, node, fleet if fleet is not None else load_fleet(), offline_ok, info.waived)
     if reasons:
         raise IdentityError(f"{node}: refused -- " + "; ".join(reasons))
     return info
 
 
-def require_node(node: str, port: str | None = None, fleet: dict | None = None) -> NodeInfo:
+def require_node(node: str, port: str | None = None, fleet: dict | None = None,
+                 offline_ok: bool = False) -> NodeInfo:
     """Read ``--info`` from ``node`` and raise IdentityError unless it is fit.
 
     For harnesses that do not speak the text console themselves (BLE): uses
@@ -153,7 +173,7 @@ def require_node(node: str, port: str | None = None, fleet: dict | None = None) 
         text = read_info_net(entry["host"], call=entry.get("call"))
     else:
         raise IdentityError(f"{node}: refused -- no console path: pass --guard-port (fleet.json has no host)")
-    return require(text, node, fleet)
+    return require(text, node, fleet, offline_ok=offline_ok)
 
 
 def add_guard_args(ap: argparse.ArgumentParser) -> None:
@@ -348,6 +368,8 @@ def main(argv: list[str] | None = None) -> int:
     src.add_argument("--host", help="read --info over the 2323 net console")
     src.add_argument("--port", help="read --info over serial (DTR on)")
     src.add_argument("--info-file", type=Path, help="check a saved --info reply")
+    ap.add_argument("--offline-ok", action="store_true",
+                    help="S4 only: accept an ESP32 node without WiFi/web/clock; callsign and TX power are still checked")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args(argv)
     if a.self_test:
@@ -370,12 +392,13 @@ def main(argv: list[str] | None = None) -> int:
     else:
         text = a.info_file.read_text()
     try:
-        info = require(text, a.node, fleet)
+        info = require(text, a.node, fleet, offline_ok=a.offline_ok)
     except IdentityError as exc:
         print(exc)
         return 1
+    waiver = f" (offline waiver: {', '.join(info.waived)})" if info.waived else ""
     print(
-        f"{a.node}: ok -- {info.call}, {info.txpower_dbm} dBm, "
+        f"{a.node}: ok{waiver} -- {info.call}, {info.txpower_dbm} dBm, "
         f"ip {info.ip or '-'}, web {'on' if info.webserver else 'off'}, clock {info.clock_source}"
     )
     return 0

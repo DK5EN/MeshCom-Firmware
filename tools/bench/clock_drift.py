@@ -19,7 +19,8 @@ console commands --clockstat, --timesrc all|cet|none, --oledshot, --tdshot (whit
 allowed_command()); nothing here transmits on LoRa. OPENING A PORT REBOOTS AN ESP32 (USB-UART
 bridge reset): the run starts from the boot, wait for [BOOT];ready before judging anything. Ports
 held by another process (lsof, Chrome Web Serial, serial_capture.py) are refused. Run
-tools/bench/identity_guard.py first.
+tools/bench/identity_guard.py first. --offline-ok (S4 only) waives the ESP32 WiFi/web/clock identity
+checks, never callsign or TX power; the summary records it as "identity_waiver".
 
 LINE CONTRACT (the INSTRUMENT firmware must print exactly this; fields are key;value pairs, ';' or
 whitespace separated, so printfdeb's space form parses too):
@@ -356,6 +357,7 @@ class NodeSink:
         self._n_td = 0
         self._f = open(f"{prefix}.jsonl", "w", encoding="utf-8") if jsonl else None
         self._lock = threading.Lock()
+        self.identity_waiver: List[str] = []  # identity_guard checks waived by --offline-ok
 
     def line(self, t: float, text: str) -> None:
         """Feed one stamped serial line."""
@@ -412,6 +414,7 @@ class NodeSink:
             if self._f:
                 self._f.close()
             summ = self.stats.summary(gap_threshold_s)
+            summ["identity_waiver"] = list(self.identity_waiver)
             Path(f"{self.prefix}.summary").write_text(json.dumps(summ, indent=2) + "\n", encoding="utf-8")
             return summ
 
@@ -542,11 +545,15 @@ def open_port(dev: str) -> Any:
     return s
 
 
-def check_identity(node: str, dev: str) -> None:
-    """identity_guard on the live port; raises identity_guard.IdentityError (or OSError) on refusal."""
+def check_identity(node: str, dev: str, offline_ok: bool = False) -> List[str]:
+    """identity_guard on the live port; raises identity_guard.IdentityError (or OSError) on refusal.
+
+    Returns the list of checks waived by ``offline_ok`` (empty when not used).
+    """
     import identity_guard
 
-    identity_guard.require_node(node, port=dev)
+    info = identity_guard.require_node(node, port=dev, offline_ok=offline_ok)
+    return list(getattr(info, "waived", []) or [])
 
 
 # ---------------------------------------------------------------- CLI
@@ -568,6 +575,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="display gap (s) counted as a miss; the 1 s cadence plus host jitter (default 1.5)")
     ap.add_argument("--yes-reboot", action="store_true",
                     help="required for live ports: opening a port reboots ESP32 nodes (USB-UART bridge reset)")
+    ap.add_argument("--offline-ok", action="store_true",
+                    help="S4 only: accept an ESP32 node without WiFi/web/clock; callsign and TX power are still checked")
     return ap
 
 
@@ -612,9 +621,11 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(f"{n}: {found[n]} is held by another process (lsof)", file=sys.stderr)
                 return 2
             devs[n] = found[n]
+        waivers: Dict[str, List[str]] = {}
         for n, dev in devs.items():
             try:
-                check_identity(n, dev)
+                res = check_identity(n, dev, offline_ok=True) if args.offline_ok else check_identity(n, dev)
+                waivers[n] = list(res) if isinstance(res, list) else []
             except Exception as exc:  # noqa: BLE001  (IdentityError, serial failure: refuse either way)
                 print(f"{n}: identity guard refused: {exc}", file=sys.stderr)
                 return 2
@@ -624,6 +635,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         threads = []
         for n, dev in devs.items():
             sinks[n] = NodeSink(n, prefix(n))
+            sinks[n].identity_waiver = waivers.get(n, [])
             periodic: List[Tuple[float, str]] = []
             if args.clockstat_every:
                 periodic.append((args.clockstat_every, "--clockstat"))

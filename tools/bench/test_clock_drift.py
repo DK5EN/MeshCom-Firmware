@@ -392,6 +392,31 @@ class MainRefusalTest(unittest.TestCase):
             g.assert_called_once_with("n1", "/dev/cu.fake")
             w.assert_called_once()
 
+    def test_offline_ok_passed_and_recorded_in_summary(self) -> None:
+        with self.mock.patch.object(cd.bench_suite, "port_busy", return_value=False), \
+                self.mock.patch.object(cd, "check_identity", return_value=["wifi", "web"]) as g, \
+                self.mock.patch.object(cd, "live_worker") as w:
+            self.assertEqual(self.run_main("--yes-reboot", "--offline-ok"), 0)
+            g.assert_called_once_with("n1", "/dev/cu.fake", offline_ok=True)
+            w.assert_called_once()
+        summaries = list(Path(self.out).glob("clock-n1-*.summary"))
+        self.assertEqual(len(summaries), 1)
+        self.assertEqual(json.loads(summaries[0].read_text())["identity_waiver"], ["wifi", "web"])
+
+    def test_check_identity_forwards_offline_ok(self) -> None:
+        import identity_guard
+
+        info = identity_guard.NodeInfo(None, None, None, None, None, None, None, waived=["clock"])
+        with self.mock.patch.object(identity_guard, "require_node", return_value=info) as r:
+            self.assertEqual(cd.check_identity("n1", "/dev/x", offline_ok=True), ["clock"])
+            r.assert_called_once_with("n1", port="/dev/x", offline_ok=True)
+
+    def test_summary_without_waiver_is_empty_list(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            summ, _ = run([], Path(d))
+        self.assertEqual(summ["identity_waiver"], [])
+        self.assertEqual(cd.build_parser().parse_args(["--node", "n1"]).offline_ok, False)
+
 
 if __name__ == "__main__":
     unittest.main()
