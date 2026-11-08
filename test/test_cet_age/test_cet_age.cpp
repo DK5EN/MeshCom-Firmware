@@ -1,6 +1,7 @@
 // Native-Tests fuer src/cet_age.h (Kampagne TXP, W0).
 #include <unity.h>
 #include <string.h>
+#include <stdio.h>
 #include "cet_age.h"
 
 void setUp(void) {}
@@ -124,6 +125,43 @@ static void test_frame_stale_truth_table(void)
     TEST_ASSERT_TRUE(cetFrameStale(b, n, c));
 }
 
+static bool fileContains(const char *path, const char *needle, long *pos)
+{
+    FILE *f = fopen(path, "rb");
+    if(!f) return false;
+    static char buf[1 << 20];
+    size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    buf[n] = 0;
+    const char *h = strstr(buf, needle);
+    if(!h) return false;
+    *pos = (long)(h - buf);
+    return true;
+}
+
+// CET-AGE-01 R1: rueckwaerts > 5 s binnen 30 min nach letztem Accept -> verwerfen.
+void test_step_guard(void)
+{
+    const long back[] = {-114482 / 1000, -30898 / 1000, -25911 / 1000, -22427 / 1000, -34320 / 1000};
+    for(size_t i = 0; i < sizeof(back) / sizeof(back[0]); i++)
+        TEST_ASSERT_FALSE(cetStepAllowed(back[i], true, 60UL * 1000UL));
+    TEST_ASSERT_TRUE(cetStepAllowed(-5, true, 1000UL));
+    TEST_ASSERT_FALSE(cetStepAllowed(-6, true, 1000UL));
+    TEST_ASSERT_TRUE(cetStepAllowed(0, true, 1000UL));
+    TEST_ASSERT_TRUE(cetStepAllowed(1, true, 1000UL));
+    TEST_ASSERT_TRUE(cetStepAllowed(100000, true, 1000UL));
+    TEST_ASSERT_TRUE(cetStepAllowed(-114, false, 0UL));
+    TEST_ASSERT_FALSE(cetStepAllowed(-114, true, CET_BACKSTEP_WINDOW_MS));
+    TEST_ASSERT_TRUE(cetStepAllowed(-114, true, CET_BACKSTEP_WINDOW_MS + 1UL));
+
+    // Anchored on the CALL (not the include comment) and on the gate between call and set (advisor).
+    long a = 0, g = 0, b = 0;
+    TEST_ASSERT_TRUE_MESSAGE(fileContains("src/loop_functions.cpp", "cetAllow = cetStepAllowed(cetDeltaS", &a), "{CET} set site does not call cetStepAllowed()");
+    TEST_ASSERT_TRUE_MESSAGE(fileContains("src/loop_functions.cpp", "if(cetAllow)", &g), "{CET} set is not gated by cetAllow");
+    TEST_ASSERT_TRUE(fileContains("src/loop_functions.cpp", "MyClock.setCurrentTime(meshcom_settings.node_utcoff, Year", &b));
+    TEST_ASSERT_TRUE_MESSAGE(a < g && g < b, "call -> if(cetAllow) -> setCurrentTime order broken");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -134,5 +172,6 @@ int main(int, char **)
     RUN_TEST(test_trusted_truth_table);
     RUN_TEST(test_find_in_frame);
     RUN_TEST(test_frame_stale_truth_table);
+    RUN_TEST(test_step_guard);
     return UNITY_END();
 }
