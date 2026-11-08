@@ -789,6 +789,8 @@ void nrf52setup()
     bBMP3ON = meshcom_settings.node_sset3 & 0x0010;
     bAHT20ON = meshcom_settings.node_sset3 & 0x0020;
     bUSER_BOARD_LED = meshcom_settings.node_sset3 & 0x0080;   // LED-07: --board led
+    bGPSUBLOX = meshcom_settings.node_sset3 & 0x2000;   // --setublox on (as on ESP32)
+    bGPSL76K = meshcom_settings.node_sset3 & 0x4000;    // --setl76k on (as on ESP32)
 
     bDEBUGCSV = meshcom_settings.node_sset4 & 0x0001;
     bDEBUGEN = meshcom_settings.node_sset4 & 0x0002;
@@ -960,10 +962,19 @@ void nrf52setup()
         static const unsigned long GPS_BAUDS[] = {9600, 38400};
         static const size_t   GPS_BAUD_COUNT = sizeof(GPS_BAUDS) / sizeof(GPS_BAUDS[0]);
 
+        bool bGpsProbed = false;
+
         for(int iGpsBaud=0; iGpsBaud < (int)GPS_BAUD_COUNT; iGpsBaud++)
         {
             Serial.printf("GPS: trying %lu baud\n", GPS_BAUDS[iGpsBaud]);
             
+            // Uart::begin() returns early when already begun, so end first to apply the next baud
+            if(iGpsBaud > 0)
+            {
+                Serial1.end();
+                delay(20);
+            }
+
             Serial1.begin(GPS_BAUDS[iGpsBaud]);
             Serial1.setTimeout(500);
 
@@ -971,9 +982,24 @@ void nrf52setup()
 
             if(GPSprobe())
             {
+                bGpsProbed = true;
                 break;
             }
 
+        }
+
+        // No L76K/UBLOX answer at any baud: keep the former behaviour (UBLOX setup on every boot
+        // for RAK u-blox modules, harmless without a module) at the 9600 default
+        if(!bGpsProbed)
+        {
+            Serial1.end();
+            delay(20);
+            Serial1.begin(9600);
+            Serial1.setTimeout(500);
+            delay(100);
+
+            Serial.printf("[GPS ]...no L76K/UBLOX answer, UBLOX default setup\n");
+            SetupUBLOX();
         }
 
         #endif
@@ -3039,15 +3065,16 @@ void sendUBX_SET_GNSS() {  // Binäres Paket senden
 String readUBX() {
   startTimeout = millis() + 500;
   ver = "";
+  ver.reserve(512);
   while ((int32_t)(millis() - startTimeout) < 0) {
     // N-25/B-9: Das Timeout wird bei JEDEM empfangenen Byte neu gesetzt.
-    // Gegen ein dauerhaft sendendes Modul hat diese Schleife daher keine
-    // obere Schranke; ohne Fütterung reboot der Knoten mitten in der
-    // GPS-Erkennung. Die Schranke selbst gehört noch gezogen (S2).
+    // Die Schleife ist durch das 500-Zeichen-Limit (ver.length() > 500) und
+    // das Timeout begrenzt. Der nRF52 hat keinen Hardware-WDT, meshcom_wdt_feed()
+    // ist dort ein No-Op (watchdog_feed.h); die Fütterung bleibt auskommentiert.
     //meshcom_wdt_feed();
     while (Serial1.available()) {
       if (ver.length() > 500) { break; }  //TODO: mehr Zeichen für ganzen Versions-String
-      ver = ver + char(Serial1.read());
+      ver += (char)Serial1.read();
       startTimeout = millis() + 500;  // retrigger timeout
     }
   }
@@ -3057,6 +3084,7 @@ String readUBX() {
 String readUBXbin() {
   startTimeout = millis() + 500;
   ver = "";
+  ver.reserve(512);
     while ((int32_t)(millis() - startTimeout) < 0) {
     #if defined(USE_HELTEC_T114) or defined(BOARD_T_ECHO)
     while (Serial1.available()) {
@@ -3069,7 +3097,7 @@ String readUBXbin() {
       if ((ver.length() > 500) || (c == 0x0D)) { break; }  //TODO: mehr Zeichen für ganzen Versions-String
       if (c == 0xB5) { c = 0x75; }
       if ((c < 0x20) || (c > 0x7E)) { c = 0x2E; }
-      ver = ver + char(c);
+      ver += (char)c;
       startTimeout = millis() + 500;  // retrigger timeout
     }
   }
@@ -3094,11 +3122,12 @@ bool GPSprobe() {
 
   Serial.printf("[GPS ]...Try to init L76K/UBLOX\n");
   ver = "";
+  ver.reserve(512);
   startTimeout = millis() + WAIT_DURATION;
   if(iGPSDEBUG >= 2)
     Serial.printf("[GPS ]...clear NMEA-Buffer\n");
   while (Serial1.available()) {  // clear RX-Buffer
-    ver = ver + char(Serial1.read());
+    ver += (char)Serial1.read();
 
     //meshcom_wdt_feed();   // N-25: bis zu WAIT_DURATION = 2000 ms
 
