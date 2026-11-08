@@ -17,9 +17,9 @@ and `/release-firmware`. Soak on DK5EN-98, the GPSV4-01 upstream PR and field ch
 
 ## Running campaigns
 
-- **IMPL-TRAIN:** release-train implementation, pure coding. W1 (`d1ec388e`), W2 (`2ade9625`) and W3 (CLK-01
-  instrumentation) done; next W4 (GOLDEN-MACROS-01), then one INSTRUMENT flash of DK5EN-1/-14/-92 for the clock
-  before-measurement and the T-Deck theme bench. [campaign-impl-train-20261107.md](campaign-impl-train-20261107.md).
+- **IMPL-TRAIN:** release-train implementation, pure coding, done 2026-11-08: W1 `d1ec388e`, W2 `2ade9625`, W3
+  `244cd0c6`, W4 `84eed6d5`. Next: INSTRUMENT flash of DK5EN-1/-14/-92 for the CLK-01 before-measurement and the
+  T-Deck theme bench. [campaign-impl-train-20261107.md](campaign-impl-train-20261107.md).
 
 - **TD-THEME-01:** W1-W3 done (last `f4c944e1`); W4 is the bench pass on DK5EN-14 (screenshots of both themes,
   lock glyph against the bt/wifi icons, boot logo tab). [campaign-tdeck-theme.md](campaign-tdeck-theme.md).

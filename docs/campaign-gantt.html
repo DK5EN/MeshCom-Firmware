@@ -67,7 +67,7 @@
 <body>
 <h1>MeshCom fork: campaigns since September 2026, and the backlog ahead</h1>
 <ul class="meta">
-  <li>State: 2026-11-07 late evening; branch <code>fork-dev</code> at <code>83bf116f</code>; release-train implementation W1 in its gate</li>
+  <li>State: 2026-11-07 late evening; branch <code>fork-dev</code> at <code>83bf116f</code>; release-train implementation W1-W4 done, bench flash next</li>
   <li>Tokens and cost: local Claude Code transcripts at API list prices (method in the foot)</li>
   <li>Sources: commit dates on <code>fork-dev</code>, release tags, <code>docs/campaign-*.md</code>, <code>docs/BACKLOG.md</code>, <code>docs/RESUME.md</code></li>
 </ul>
@@ -192,10 +192,10 @@ const rows = [
  {p:"Upstream PRs merged",n:"#1240, #1243 to #1245 (E290, web login)",id:"",st:"rel",s:"10-31",e:"10-31",note:""},
  {p:"Upstream PRs merged",n:"#1246 to #1251 (LRF, characters, battery)",id:"",st:"rel",s:"11-02",e:"11-02",note:""},
  {p:"Upstream PRs merged",n:"#1257 (store-node echo)",id:"",st:"rel",s:"11-07",e:"11-07",note:""},
- {p:"Release train",n:"Impl W1: 8 writers in parallel",id:"IMPL-TRAIN",st:"run",s:"11-07",e:"11-07",note:"BL-01, IDEE-04, BLE-SET-01, GPIO-06, RM-NOANS-01, TEST-OTA-01, SB-06, CLK-01 host tool; all 8 back, host gate, board builds and Opus advisor running"},
- {p:"Release train",n:"Impl W2: SENS-04, CSMA-01, CLK-01 core",id:"IMPL-TRAIN",st:"plan",s:"11-08",e:"11-08",note:"DHT type as new keyed setting; CSMA re-arm shorten-only; clock tick and display-gate helpers, tests deactivated until the fix"},
- {p:"Release train",n:"Impl W3: CLK-01 instrumentation",id:"CLK-01",st:"plan",s:"11-08",e:"11-09",note:"[CLOCK], [DISPCLK], --timesrc, --clockstat, --oledshot, --tdshot; INSTRUMENT builds only"},
- {p:"Release train",n:"Impl W4: GOLDEN-MACROS-01",id:"IMPL-TRAIN",st:"plan",s:"11-09",e:"11-09",note:"Regenerate variant-macros-effective.txt, add its check to the golden selftest. CSMA-03 not in this train (operator)"},
+ {p:"Release train",n:"Impl W1: 8 writers in parallel",id:"IMPL-TRAIN",st:"done",s:"11-07",e:"11-07",note:"d1ec388e; BL-01, IDEE-04, BLE-SET-01, GPIO-06, RM-NOANS-01, TEST-OTA-01, SB-06, CLK-01 host tool; advisor one rework round"},
+ {p:"Release train",n:"Impl W2: SENS-04, CSMA-01, CLK-01 core",id:"IMPL-TRAIN",st:"done",s:"11-08",e:"11-08",note:"2ade9625; DHT type as new keyed setting; CSMA re-arm shorten-only; clock tick and display-gate helpers, tests deactivated until the fix"},
+ {p:"Release train",n:"Impl W3: CLK-01 instrumentation",id:"CLK-01",st:"done",s:"11-08",e:"11-08",note:"244cd0c6; [CLOCK], [DISPCLK], --timesrc, --clockstat, --oledshot, --tdshot; INSTRUMENT builds only"},
+ {p:"Release train",n:"Impl W4: GOLDEN-MACROS-01",id:"IMPL-TRAIN",st:"done",s:"11-08",e:"11-08",note:"84eed6d5; golden regenerated, no gate (operator). CSMA-03 not in this train (operator)"},
  {p:"Release train",n:"Bulk build: host gate and every board env",id:"",st:"plan",s:"11-11",e:"11-11",note:"regression.sh --stage 1,2, then each env once, sequential"},
  {p:"Release train",n:"Bulk flash DK5EN-1, -14, -90, -92",id:"",st:"plan",s:"11-11",e:"11-11",note:"Not DK5EN-98"},
  {p:"Release train",n:"Bulk bench: 28 bench rows plus campaign checks",id:"",st:"plan",s:"11-12",e:"11-13",note:"TD-THEME-01 W4, TD-22/23/27-34, CSMA-02/04, AU-14, BOOT-01, NRF-BLEDFU, web rows; list in BACKLOG 3.2"},

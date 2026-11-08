@@ -19,12 +19,12 @@ bench step stays an open `bench` row for the bulk bench later.
 
 ## Waves
 
-| Wave | Rows                                                                                       | Status |
-| ---- | ------------------------------------------------------------------------------------------ | ------ |
-| W1   | BL-01, IDEE-04, BLE-SET-01, GPIO-06, RM-NOANS-01, TEST-OTA-01, SB-06, CLK-01 host tool     | done   |
-| W2   | SENS-04, CSMA-01, CLK-01 core (tick and display-gate helpers, deactivated tests)           | done   |
-| W3   | CLK-01 instrumentation (`[CLOCK]`, `[DISPCLK]`, `--timesrc`, `--clockstat`, shots)         | done   |
-| W4   | GOLDEN-MACROS-01 (orchestrator: regenerate golden, add check to `test/golden/selftest.sh`) | open   |
+| Wave | Rows                                                                                   | Status |
+| ---- | -------------------------------------------------------------------------------------- | ------ |
+| W1   | BL-01, IDEE-04, BLE-SET-01, GPIO-06, RM-NOANS-01, TEST-OTA-01, SB-06, CLK-01 host tool | done   |
+| W2   | SENS-04, CSMA-01, CLK-01 core (tick and display-gate helpers, deactivated tests)       | done   |
+| W3   | CLK-01 instrumentation (`[CLOCK]`, `[DISPCLK]`, `--timesrc`, `--clockstat`, shots)     | done   |
+| W4   | GOLDEN-MACROS-01 (orchestrator: regenerate golden; no gate by operator decision)       | done   |
 
 Per wave: `ls` of expected files, diff read, `tools/regression.sh --stage 1,2`, every touched board env built
 sequentially, Opus advisor pass (W1-W3), commit with explicit paths, this doc and BACKLOG updated.
@@ -84,3 +84,9 @@ non-reproducibility). Advisor first pass REWORK: `--timesrc cet` never applied `
 writer at high effort fixed these plus three bench-relevant points (no RTC write-back while the gate is active,
 free-running clock forced on RTC boards with GPS fix, info lines not counted as malformed by `clock_drift.py`).
 Second pass APPROVED. Build INSTRUMENT images with `PLATFORMIO_BUILD_FLAGS="-DINSTRUMENT_ENABLED=1"`.
+
+## W4 result (2026-11-08)
+
+GOLDEN-MACROS-01: `variant-macros-effective.txt` regenerated in its own commit (`84eed6d5`, 140 s run); every drift
+line traced to a known change. Operator decision: no gate, the tool stays manual for refactors. The release-train
+implementation block is done; next is the INSTRUMENT bench flash (see "Bench session after W3").
