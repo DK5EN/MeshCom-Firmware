@@ -52,6 +52,9 @@
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
 #include "t-deck/tdeck_palette.h" // TD-THEME-01 W3: tdeck_theme_parse/name (header only)
 #include "command_functions.h"   // commandAction() for setparam tdecktheme
+#include "t-deck/tdeck_helpers.h" // WEB-TD-01: brightnessMode/ActiveLevel/SetActiveLevel for the display controls
+#include "daylight.h"            // WEB-TD-01: brightness_mode_* (BlMode names and segments)
+#include <t-deck/lv_obj_functions.h> // WEB-TD-01: tdeck_refresh_SET_view() after setparam tdblbright
 #endif
 #include "charge_led_mode.h"   // LED-02: chargeLedModeName() for the info row
 #if defined(XPOWERS_CHIP_AXP192) || defined(XPOWERS_CHIP_AXP2101)
@@ -90,6 +93,7 @@ static void sub_au_status(); // GET /austatus (defined next to call_function)
 #endif
 #include <url_decode.h>         // #1173: decodeURLPercentCoding() -- full percent-decoding of WebUI parameters
 #include <charset_filter.h>     // #1173: UTF-8-safe cut of the 150-byte web message
+#include "cet_age.h"           // WEB-TD-01: cetEpochFromFields() for the ticking page time
 #include "clock.h"              // TZ-01: tzActiveAbbrev() -- flags an unparsable node_tz on the info page
 #if defined(ENABLE_MSGSTORE)
 #include <msgstore_api.h> // stage 3 store node: /?page=mailbox, mboxpurge/mboxdeliver, the setup card
@@ -1569,7 +1573,7 @@ void deliver_scaffold(bool bget_password)
     // WEB-AUTH-01: login(), logout(), mcLoginFocus() -- challenge-response, must stay after the X-MC wrapper (mc.js above)
     webLoginScaffoldJs();
     // this function is used to load content depending on the navigation button pressed
-    web_client.println("function loadPage(page,sender,useSpinner) {" AU_LP_LEAVE "if(typeof rmPageLeave=='function')rmPageLeave();if(typeof pinsLeave=='function')pinsLeave();cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;if(typeof mcLoginFocus=='function')mcLoginFocus();mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='remote'&&cpage=='remote')rmPageInit();if(page=='pins'&&cpage=='pins'&&typeof pinsInit=='function')pinsInit();" AU_LP_INIT "if(page=='setup'&&typeof raSt=='function')raSt();}else if(this.readyState==4&&useSpinner)document.getElementById('content_layer').innerHTML='Node did not answer completely. Please reload.';};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
+    web_client.println("function loadPage(page,sender,useSpinner) {" AU_LP_LEAVE "if(typeof rmPageLeave=='function')rmPageLeave();if(typeof pinsLeave=='function')pinsLeave();cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;if(typeof mcLoginFocus=='function')mcLoginFocus();if(typeof mcClockTick=='function')mcClockTick();mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='remote'&&cpage=='remote')rmPageInit();if(page=='pins'&&cpage=='pins'&&typeof pinsInit=='function')pinsInit();" AU_LP_INIT "if(page=='setup'&&typeof raSt=='function')raSt();if(page=='setup'&&typeof mcLookMark=='function')mcLookMark();}else if(this.readyState==4&&useSpinner)document.getElementById('content_layer').innerHTML='Node did not answer completely. Please reload.';};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
     web_client.println("</script>\n");
 #if defined(ESP32)
     web_client.println("<script src=\"/mcau.js?v=" WEB_MC_AU_JS_TAG "\"></script>"); // AU web GUI: Info page Auto update row
@@ -1897,7 +1901,7 @@ void sub_page_wx()
     web_client.printf("<tr><td>BME680</td><td>%s %s</td></tr>\n", (bBME680ON ? "on" : "off"), c680);
     web_client.printf("<tr><td>MCU811</td><td>%s %s</td></tr>\n", (bMCU811ON ? "on" : "off"), c811);
     web_client.printf("<tr><td>LPS33</td><td>%s (RAK)</td></tr>\n", (bLPS33 ? "on" : "off"));
-    web_client.printf("<tr><td>1-Wire</td><td>%s (GPIO %i)</td></tr>\n", (bONEWIRE ? "on" : "off"), meshcom_settings.node_owgpio);
+    web_client.printf("<tr><td>1-Wire</td><td>%s (GPIO %i, DHT%i)</td></tr>\n", (bONEWIRE ? "on" : "off"), meshcom_settings.node_owgpio, meshcom_settings.node_dht_type); // SENS-05(c): DHT11 or DHT22 (--dht)
     web_client.printf("<tr><td>Temperature</td><td>%.1f &deg;C</td></tr>\n", meshcom_settings.node_temp);
     web_client.printf("<tr><td>Tout</td><td>%.1f &deg;C</td></tr>\n", meshcom_settings.node_temp2);
     web_client.printf("<tr><td>Humidity</td><td>%.1f%% rH</td></tr>\n", meshcom_settings.node_hum);
@@ -2966,18 +2970,6 @@ void sub_page_neighbours()
     // call to thread the flag through, only this status line.
     web_client.printf("<p>Symmetry: %s (SNR &gt;= %d dB)</p>", (bNBRSYM ? "on" : "off"), (int)NBR_SYM_MIN_SNR);
 
-    // Stufe 3 (--nbrreport): eigener HN-Bericht, unabhaengig vom Trickle-HEY
-    // oben. "auto" sendet nur, wenn weder Mesh-Relay noch Gateway-Betrieb an
-    // sind (nbrReportTick() in loop_functions.cpp) -- die dritte Zeile sagt
-    // fuer den aktuell konfigurierten Modus dazu, ob das gerade zutrifft.
-    {
-        const char *nbrreport_mode = "auto";
-        bool nbrreport_sends_now = (!bMESH && !bGATEWAY);
-        web_client.printf("<p>HN report: %s (every %d min, SNR &gt;= %d dB)%s</p>",
-                           nbrreport_mode, (int)(NBR_REPORT_INTERVAL_S / 60), (int)LORA_SNR_STABLE_MIN_DB,
-                           (nbrreport_sends_now ? " -- sending" : " -- not sending (mesh/gateway on)"));
-    }
-
     web_client.println("</div>");
     web_client.println(); // The HTTP response ends with another blank line
     free(scratch);
@@ -3325,6 +3317,22 @@ void sub_page_setup()
         if (ledHw.charge)
             _create_setup_switch_element("chargeled", "Charge LED", "on = follows charging, off = dark", bCHARGE_LED);
     }
+    { // WEB-LOOK-01: look of this web page only (per browser, localStorage); buttons are marked by mcLookMark() after the page loads
+        // WEBLOOK-HTML-BEGIN
+        static const char *const themeNames[3] = {"auto", "light", "dark"};
+        static const char *const fontNames[3] = {"s", "m", "l"};
+        web_client.println("<label id=\"weblook_theme_lbl\">Web page theme <span class=\"font-small\">(this page, this browser)</span></label>");
+        web_client.println("<div class=\"mcledgrp\" role=\"group\" aria-labelledby=\"weblook_theme_lbl\">");
+        for (int i = 0; i < 3; i++)
+            web_client.printf("<button type=\"button\" class=\"mctab mcledbtn\" id=\"weblook_theme_%s\" aria-pressed=\"false\" onclick=\"mcLookSet('mcTheme','%s')\">%s</button>\n", themeNames[i], themeNames[i], themeNames[i]);
+        web_client.println("</div>");
+        web_client.println("<label id=\"weblook_font_lbl\">Web page font size <span class=\"font-small\">(this page, this browser)</span></label>");
+        web_client.println("<div class=\"mcledgrp\" role=\"group\" aria-labelledby=\"weblook_font_lbl\">");
+        for (int i = 0; i < 3; i++)
+            web_client.printf("<button type=\"button\" class=\"mctab mcledbtn\" id=\"weblook_font_%s\" aria-pressed=\"false\" onclick=\"mcLookSet('mcFont','%s')\">%s</button>\n", fontNames[i], fontNames[i], fontNames[i]);
+        web_client.println("</div>");
+        // WEBLOOK-HTML-END
+    }
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
     { // TD-THEME-01 W3: T-Deck DISPLAY theme (not the web page theme); stored value 0 auto, 1 dark, 2 light; setparam tdecktheme -> --theme
         // TD-HTML-BEGIN
@@ -3338,6 +3346,28 @@ void sub_page_setup()
         }
         web_client.println("</div>");
         // TD-HTML-END
+    }
+    { // WEB-TD-01: T-Deck font size, display (backlight mode) and brightness, same order as the T-Deck setup page
+        // TD2-HTML-BEGIN
+        static const char *const fontNames[3] = {"s", "m", "l"};
+        static const char *const dispNames[3] = {"auto", "light", "dark"};
+        const int fontCur = meshcom_settings.node_tdeck_chatfont > 2 ? 0 : meshcom_settings.node_tdeck_chatfont;
+        const int dispCur = (int)brightness_mode_to_seg(brightnessMode());
+        web_client.println("<label id=\"tdfont_lbl\">T-Deck font size <span class=\"font-small\">(chat text on the device screen)</span></label>");
+        web_client.println("<div class=\"mcledgrp\" role=\"group\" aria-labelledby=\"tdfont_lbl\">");
+        for (int i = 0; i < 3; i++)
+            web_client.printf("<button type=\"button\" class=\"mctab mcledbtn%s\" id=\"tdfont_%s\" aria-pressed=\"%s\" onclick=\"tdFont('%s')\">%s</button>\n",
+                              fontCur == i ? " mctab-on" : "", fontNames[i], fontCur == i ? "true" : "false", fontNames[i], fontNames[i]);
+        web_client.println("</div>");
+        web_client.println("<label id=\"tddisp_lbl\">T-Deck display <span class=\"font-small\">(backlight: auto = day/night, light = day level, dark = night level)</span></label>");
+        web_client.println("<div class=\"mcledgrp\" role=\"group\" aria-labelledby=\"tddisp_lbl\">");
+        for (int i = 0; i < 3; i++)
+            web_client.printf("<button type=\"button\" class=\"mctab mcledbtn%s\" id=\"tddisp_%s\" aria-pressed=\"%s\" onclick=\"tdDisp('%s')\">%s</button>\n",
+                              dispCur == i ? " mctab-on" : "", dispNames[i], dispCur == i ? "true" : "false", dispNames[i], dispNames[i]);
+        web_client.println("</div>");
+        web_client.printf("<label for=\"tdbright\">T-Deck brightness <span class=\"font-small\">(level of the slot the display mode selects)</span></label><div><input type=\"range\" id=\"tdbright\" min=\"1\" max=\"16\" value=\"%d\" oninput=\"document.getElementById('tdbright_val').textContent=this.value\" onchange=\"tdBright(this.value)\"> <span id=\"tdbright_val\">%d</span></div>\n",
+                          (int)brightnessActiveLevel(), (int)brightnessActiveLevel());
+        // TD2-HTML-END
     }
 #endif
 
@@ -4663,7 +4693,15 @@ void send_http_header(uint16_t http_status_code, uint8_t content_type, const cha
  */
 void _create_meshcom_subheader(String title)
 {
-    web_client.printf("<div id=\"content_title\"><p class=\"font-small\">%i-%02i-%02i&nbsp;%02i:%02i:%02i&nbsp;%s&nbsp;[%s]</p><h1 class=\"font-bold\">%s</h1></div>", meshcom_settings.node_date_year, meshcom_settings.node_date_month, meshcom_settings.node_date_day, meshcom_settings.node_date_hour, meshcom_settings.node_date_minute, meshcom_settings.node_date_second, getTimeZone().c_str(), cTimeSource, title.c_str());
+    // WEB-TD-01 item 6: mc.js advances the time every second (mcClockTick). data-epoch is the shown local date/time read as UTC seconds
+    // (so JS needs no tz maths); without a valid node time no id/attribute is written and the text stays as rendered.
+    uint32_t clkEpoch = 0;
+    const bool clkOk = cetEpochFromFields(meshcom_settings.node_date_year, meshcom_settings.node_date_month, meshcom_settings.node_date_day,
+                                          meshcom_settings.node_date_hour, meshcom_settings.node_date_minute, meshcom_settings.node_date_second, &clkEpoch);
+    char clkAttr[48] = "";
+    if (clkOk)
+        snprintf(clkAttr, sizeof(clkAttr), " id=\"mc_clock\" data-epoch=\"%lu\"", (unsigned long)clkEpoch);
+    web_client.printf("<div id=\"content_title\"><p class=\"font-small\"><span%s>%i-%02i-%02i&nbsp;%02i:%02i:%02i</span>&nbsp;%s&nbsp;[%s]</p><h1 class=\"font-bold\">%s</h1></div>", clkAttr, meshcom_settings.node_date_year, meshcom_settings.node_date_month, meshcom_settings.node_date_day, meshcom_settings.node_date_hour, meshcom_settings.node_date_minute, meshcom_settings.node_date_second, getTimeZone().c_str(), cTimeSource, title.c_str());
 }
 
 /**
@@ -5028,6 +5066,50 @@ void setparam(String web_header)
         else
             setupData.returnCode = WS_RETURNCODE_FAIL;
         setupData.returnValue = tdeck_theme_name(meshcom_settings.node_tdeck_theme);
+    }
+    else if (param_name.equals("tdchatfont"))
+    { // WEB-TD-01: same path as the console --chatfont s|m|l
+        const int f = tdeck_chatfont_parse(param_value.c_str());
+        if (f >= 0)
+        {
+            char message_text[32];
+            snprintf(message_text, sizeof(message_text), "--chatfont %s", tdeck_chatfont_name((uint8_t)f));
+            commandAction(message_text, isPhoneReady == 1);
+            setupData.returnCode = (meshcom_settings.node_tdeck_chatfont == f) ? WS_RETURNCODE_OKAY : WS_RETURNCODE_FAIL;
+        }
+        else
+            setupData.returnCode = WS_RETURNCODE_FAIL;
+        setupData.returnValue = tdeck_chatfont_name(meshcom_settings.node_tdeck_chatfont);
+    }
+    else if (param_name.equals("tdbldisp"))
+    { // WEB-TD-01: display mode auto|light|dark = --bl mode auto|day|night; the answer is "<mode>:<active level>"
+        const char *v = param_value.c_str();
+        const char *cmd = strcmp(v, "auto") == 0 ? "auto" : strcmp(v, "light") == 0 ? "day" : strcmp(v, "dark") == 0 ? "night" : NULL;
+        if (cmd != NULL)
+        {
+            char message_text[32];
+            snprintf(message_text, sizeof(message_text), "--bl mode %s", cmd);
+            commandAction(message_text, isPhoneReady == 1);
+            setupData.returnCode = (brightnessMode() == brightness_mode_parse(cmd)) ? WS_RETURNCODE_OKAY : WS_RETURNCODE_FAIL;
+        }
+        else
+            setupData.returnCode = WS_RETURNCODE_FAIL;
+        static const char *const dispNames[3] = {"auto", "light", "dark"};
+        setupData.returnValue = String(dispNames[brightness_mode_to_seg(brightnessMode())]) + ":" + String((int)brightnessActiveLevel());
+    }
+    else if (param_name.equals("tdblbright"))
+    { // WEB-TD-01: level of the slot the display mode selects -- the device slider's own call (no console form edits "the active slot")
+        char *end = NULL;
+        const long lv = strtol(param_value.c_str(), &end, 10);
+        if (end != param_value.c_str() && *end == 0 && lv >= 1 && lv <= BRIGHTNESS_STEPS)
+        {
+            brightnessSetActiveLevel((uint8_t)lv);
+            tdeck_refresh_SET_view(); // the device's own setup slider shows the new level (loop task, like --bl mode / --chatfont)
+            setupData.returnCode = WS_RETURNCODE_OKAY;
+        }
+        else
+            setupData.returnCode = WS_RETURNCODE_FAIL;
+        setupData.returnValue = String((int)brightnessActiveLevel());
     }
     else
 #endif

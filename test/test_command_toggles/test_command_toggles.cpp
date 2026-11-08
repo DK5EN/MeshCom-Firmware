@@ -904,17 +904,21 @@ static void test_prod_lock_gate_covers_toggle_rows_and_precedes_toggle_apply()
 // Production lock call sites that no host harness reaches (nrf52_ble.cpp, web_functions.cpp and
 // loop_functions.cpp are not host-compilable): each pin goes red when the call is removed.
 
-// nRF52 BLE settings blob: the blob is copied over meshcom_settings unchecked, so the normaliser must run
-// after the Applied check and before save_settings().
-static void test_real_nrf52_ble_blob_is_normalised_before_save()
+// nRF52 BLE settings blob (BLE-SET-01-FU): the old pin required prodLockNormalise() before save_settings()
+// in applyPendingBleSettings(); that apply path (characteristic 0xF0A1, s_bleSettingsStage) was dead on air
+// and is removed, so the pin became an absence pin (test_nrf52_settings_paths pins the characteristic itself).
+// A BLE write that copies a blob over meshcom_settings is exactly what the production lock has to normalise:
+// if such a path comes back it must call prodLockNormalise(meshcom_settings, INSTRUMENT_ENABLED != 0, false)
+// after the apply and before save_settings(); replace this pin with that order check then.
+static void test_real_nrf52_ble_blob_apply_path_stays_removed()
 {
     const std::string src = read_whole_file(repo_root() + "/src/nrf52/nrf52_ble.cpp");
-    const size_t applied = src.find("result != BleSettingsV1ApplyResult::Applied");
-    TEST_ASSERT_TRUE_MESSAGE(applied != std::string::npos, "BLE blob Applied check not found");
-    const size_t norm = src.find("prodLockNormalise(meshcom_settings, INSTRUMENT_ENABLED != 0, false)", applied);
-    const size_t save = src.find("save_settings();", applied);
-    TEST_ASSERT_TRUE_MESSAGE(norm != std::string::npos, "nRF52 BLE blob apply must call prodLockNormalise()");
-    TEST_ASSERT_TRUE_MESSAGE(norm < save, "prodLockNormalise() must run before save_settings() in the BLE blob apply");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("tryApplyBleSettingsV1Stage") == std::string::npos,
+                             "BLE blob apply is back in nrf52_ble.cpp: it needs prodLockNormalise() before save_settings() (see comment)");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("applyPendingBleSettings") == std::string::npos,
+                             "applyPendingBleSettings is back in nrf52_ble.cpp: it needs prodLockNormalise() before save_settings() (see comment)");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("bleSettingsFromV1(") == std::string::npos,
+                             "a blob-to-meshcom_settings conversion is back in nrf52_ble.cpp: it needs prodLockNormalise() before save_settings()");
 }
 
 // The web spectrum page must not write the node_spec* settings (it used to overwrite and persist them,
@@ -1001,7 +1005,7 @@ static void test_real_uv_wind_rows_use_node_wx_flags_bits()
 int main(int, char **)
 {
     UNITY_BEGIN();
-    RUN_TEST(test_real_nrf52_ble_blob_is_normalised_before_save);
+    RUN_TEST(test_real_nrf52_ble_blob_apply_path_stays_removed);
     RUN_TEST(test_real_web_spectrum_page_writes_no_spec_settings);
     RUN_TEST(test_real_lora_set_block_uses_prod_lock);
     RUN_TEST(test_prod_lock_gate_covers_toggle_rows_and_precedes_toggle_apply);

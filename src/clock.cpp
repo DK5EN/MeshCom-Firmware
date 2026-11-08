@@ -104,9 +104,16 @@ Clock::EEvent Clock::CheckEvent()
 		// next minute
 		u8Day      = suClock_m.tm_mday;
 		u8Hour     = suClock_m.tm_hour;
-		u32Diff    = clockTickSeconds(u32Start_m, u32Next_m);
+		// CLK-01 F3: count the real elapsed whole seconds, carry the remainder
+		const uint32_t u32Now = millis();
+		// whole seconds + new start/next (start advanced by exactly secs*1000, remainder kept);
+		// clock_tick.h clockTickStep() is the call test_clock_tick exercises
 #if INSTRUMENT_ENABLED
-		clockInstrOnTick(millis(), u32Next_m, u32Diff);
+		const uint32_t u32NextDue = u32Next_m;
+#endif
+		u32Diff    = clockTickStep(&u32Start_m, &u32Next_m, u32Now);
+#if INSTRUMENT_ENABLED
+		clockInstrOnTick(u32Now, u32NextDue, u32Diff);
 #endif
 		tsClock_m += u32Diff;
 		localtime_r(&tsClock_m, &suClock_m);
@@ -147,9 +154,7 @@ Clock::EEvent Clock::CheckEvent()
 			}
 		}
 
-		// set new update cycle
-		u32Start_m = millis();
-		u32Next_m  = clockTickRearm(u32Start_m); //((60 - suClock_m.tm_sec) * 1000);
+		// new update cycle: u32Start_m / u32Next_m were set by clockTickStep() above
 #if defined(TEST)
 		Serial.printf("[clock] now %lu -> then %lu\n", u32Start_m, u32Next_m);
 #endif

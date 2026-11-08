@@ -207,6 +207,9 @@ static void test_state_names_and_messages(void)
         TEST_ASSERT_NOT_NULL(strstr(m, "With strict security on"));
         TEST_ASSERT_NULL(strstr(m, ". A third failed try"));
     }
+    // RM-TXT-02: the waiting sentence names the real timeout (171 s), not "a minute"
+    TEST_ASSERT_NOT_NULL_MESSAGE(strstr(rmStateMessage(RM_ST_WAITING), "up to 3 minutes"), "waiting text must say 3 minutes");
+    TEST_ASSERT_NULL_MESSAGE(strstr(rmStateMessage(RM_ST_WAITING), "a minute"), "waiting text still says a minute");
     // err entries carry the sentence of the reply's token
     TEST_ASSERT_EQUAL_STRING(rmErrTokenMessage("failed"), rmEntryMessage(RM_ST_ERR, "err failed"));
     TEST_ASSERT_EQUAL_STRING(rmErrTokenMessage("not output"), rmEntryMessage(RM_ST_ERR, "err not output"));

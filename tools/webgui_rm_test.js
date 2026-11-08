@@ -2116,6 +2116,12 @@ function leaks(P, canary) {
     P.w.rmPageLeave();
   }
 
+  {
+    // RM-TXT-02: the WAITING sentence of rm_sender_policy.h names the real 171 s timeout
+    const pol = fs.readFileSync(path.join(SRC_DIR, 'rm_sender_policy.h'), 'utf8');
+    check('RM-TXT-02 waiting text says "up to 3 minutes", not "a minute"', pol.includes('this can take up to 3 minutes.') && !/take up to a minute/.test(pol));
+  }
+
   console.log(failures ? '\n' + failures + ' FAILED' : '\nall passed');
   process.exit(failures ? 1 : 0);
 })().catch((e) => { console.log('FAIL harness error: ' + (e && e.stack || e)); process.exit(2); });

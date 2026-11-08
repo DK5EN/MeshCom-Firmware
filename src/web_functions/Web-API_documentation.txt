@@ -117,6 +117,9 @@ The returncodes are defined as:
 	
 The JSON Object will also contain the parameter name that has been requested to set as well as the current value used by the node (or an empty string if the parameter was not found).
 So if the parameter could be set to the new value, the returned value will contain the new value.
+	/setparam/?tdchatfont=s|m|l		(T-Deck only) Chat font size of the T-Deck display (same as --chatfont; read-back is s|m|l)
+	/setparam/?tdbldisp=auto|light|dark	(T-Deck only) Display mode (same as --bl mode auto|day|night); read-back is "<mode>:<level>", mode auto|light|dark and level 1..16 = the brightness level that mode uses now
+	/setparam/?tdblbright=1..16		(T-Deck only) Brightness level of the slot the display mode selects (the T-Deck setup slider; auto uses the daylight slot); an out-of-range value fails; read-back is the level in use
 If the parameter could not be set (e.g. the value was not accepted) the returned value will contain the previous value that is still be used by the node.
 This is to make sure your frontend stays synchron with the node.
 
@@ -138,6 +141,10 @@ The HTML Body will contain a JSON Object with a content body like:
 	{"returncode":0, "setcall":"AB1CDE-12"}
 
 witch is the same as described in "Setting Parameters".
+
+Read-only parameters (getparam only, no setparam; change them with the console command):
+
+	/getparam/?dht				DHT sensor type, 11 or 22 (set with --dht)
 
 
 

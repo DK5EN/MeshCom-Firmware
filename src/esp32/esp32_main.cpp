@@ -1142,6 +1142,7 @@ bool is_new_packet(uint8_t compBuffer[4]);     // switch if we have a packet rec
 #ifdef ENABLE_WIND
 #include "wind_counter.h"
 #endif
+#include "csma_timing.h"   // CSMA-05: csmaIdleCeilingMs() (idle re-anchor), independent of ENABLE_WIND
 
 bool g_meshcom_initialized;
 bool init_flash_done=false;
@@ -4243,6 +4244,9 @@ void esp32loop()
             else
             {
                 // Nothing to send — restart timeout cycle
+                // CSMA-05: drop the armed priority and the shortened wait with the old anchor
+                csma_armed_prio = 0xFF;
+                csma_timeout = csmaIdleCeilingMs(cad_attempt);
                 iReceiveTimeOutTime = millis();
             }
         }
@@ -5109,9 +5113,9 @@ void esp32loop()
         heyinfo_timer = millis();
     }
 
-    // HN-Bericht (Nachbarschaftsmatrix Stufe 3, --nbrreport): eigener Takt,
+    // HN-Bericht (Nachbarschaftsmatrix Stufe 3; Option --nbrreport entfernt, BL-01): eigener Takt,
     // unabhaengig vom Trickle-Intervall oben und nie unterdrueckt -- siehe
-    // nbrReportTick() in loop_functions.cpp fuer Zeitplan und Modus-Auswertung.
+    // nbrReportTick() in loop_functions.cpp fuer Zeitplan und die feste Auto-Regel.
     nbrReportTick();
 
     // --nbrdebug (24-h-Dauertest der Nachbarschaftsmatrix): 15-Minuten-Takt fuer

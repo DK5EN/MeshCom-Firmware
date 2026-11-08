@@ -79,6 +79,8 @@ void init_onewire_dht()
 
     // SENS-04: the former block-local objects never reached dht.begin(), which ran on a global built with the
     // compile-time pin; build the one object here with the configured pin and type.
+    // Invariant: `dht` is created, read and deleted from the loop task only (readDHT/--dht/init run there);
+    // no other task holds the pointer, so the delete needs no lock. Do not touch it from another task.
     if(dht != nullptr)
         delete dht;
     dht = new DHT_Unified(meshcom_settings.node_owgpio, (uint8_t)meshcom_settings.node_dht_type);

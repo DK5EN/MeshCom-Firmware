@@ -1,6 +1,15 @@
 // CLK-01 (docs/campaign-clk-01-20261107.md) -- redraw gate of
-// sendDisplayTime() as a pure decision, for host tests. Behaviour is identical
-// to the former inline early returns, in the same order.
+// sendDisplayTime() as a pure decision, for host tests.
+// W2 contract: the clock line is redrawn every second (no 15 s gate, F2) on every page that HAS a
+// clock line. The message page (iDisplayType == 0) has none: pageText[0] / the TFT header bar carry
+// the sender header ("GM<grp> <CALL> <rssi>"), so the clock stays frozen there (SkipType0, F1
+// operator decision 2026-11-08) and is drawn again when the next clock page is built (every
+// sendDisplayHead/Position/Track/WX call sendDisplayMainline(), which draws the current time).
+// Returned: Draw, SkipNoDisplay, SkipOff, SkipType0, SkipSetDisplay. SkipGate15 (F2) and SkipHold are
+// no longer returned here; the enumerators and reason strings stay for the INSTRUMENT [DISPCLK]
+// contract. SkipPing (dispClkPingActive()) and the WP_DISP "gate15" (10 s e-paper refresh) are
+// emitted by the caller in loop_functions.cpp. Ping pages (DisplayPong) are full-screen text
+// without a clock line and are treated like the message page: no clock draw, no overwrite.
 #pragma once
 
 enum class DispClkDecision
@@ -8,11 +17,11 @@ enum class DispClkDecision
     Draw,
     SkipNoDisplay,   // no u8g2 / board without this clock line
     SkipOff,         // bDisplayIsOff
-    SkipType0,       // iDisplayType == 0 (message page, F1)
+    SkipType0,       // iDisplayType == 0 (message page, F1): no clock line there, content stays
     SkipHold,        // page hold (not consulted by sendDisplayTime today)
     SkipSetDisplay,  // bSetDisplay: a draw is in progress
     SkipPing,        // configured ping skips the caller (not decided here)
-    SkipGate15       // second not in {0,15,30,45} (F2)
+    SkipGate15       // legacy (F2): no longer returned by dispClkDecide
 };
 
 struct DispClkInputs
@@ -33,10 +42,14 @@ static inline DispClkDecision dispClkDecide(const DispClkInputs &in)
     if (in.displayIsOff)       return DispClkDecision::SkipOff;
     if (in.displayType == 0)   return DispClkDecision::SkipType0;
     if (in.setDisplay)         return DispClkDecision::SkipSetDisplay;
-    if (in.second == 0 || in.second == 15 || in.second == 30 || in.second == 45
-        || in.oneButton || in.displayDirty)
-        return DispClkDecision::Draw;
-    return DispClkDecision::SkipGate15;
+    return DispClkDecision::Draw;
+}
+
+// Configured ping (call set, interval and count > 0): the ping/pong frames own the screen and have
+// no clock line, so the clock draw is skipped (SkipPing). Same predicate as the caller gates.
+static inline bool dispClkPingActive(bool pingCallSet, unsigned pingTime, unsigned pingCount)
+{
+    return pingCallSet && pingTime != 0 && pingCount != 0;
 }
 
 static inline const char *dispClkReason(DispClkDecision d)

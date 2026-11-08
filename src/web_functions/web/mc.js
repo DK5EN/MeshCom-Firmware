@@ -130,6 +130,54 @@ raM(k?'Remote management is '+v+'.':'Could not change it. Is a password set?',!k
 function tdMark(v){['auto','dark','light'].forEach(function(n){var b=document.getElementById('tdtheme_'+n);if(b){var on=n==v;b.setAttribute('aria-pressed',on?'true':'false');b.classList.toggle('mctab-on',on);}});}
 function tdSet(v){fetch('/setparam/?tdecktheme='+encodeURIComponent(v)).then(function(r){return r.json();}).then(function(j){if(j&&j.returncode==0)tdMark(v);else alert('The T-Deck theme could not be set.');}).catch(function(){alert('The node did not answer. Try again.');});}
 // TD-JS-END
+// WEB-TD-01: the page time (#mc_clock, data-epoch = node local date/time as UTC seconds) advances once a second from performance.now(),
+// not from the PC clock. A new render (new data-epoch) re-syncs; no #mc_clock (node without valid time) = nothing ticks.
+// mcClockTick() also runs right after each page render (loadPage) and at load, so t0 is the render, not the first interval tick.
+// Sleep guard: performance.now() may pause while the PC sleeps. Date.now() is used ONLY to notice that (its delta since the sync vs the
+// performance.now() delta, > 2 s apart): the clock then stops (the shown text is never advanced from a doubtful base), is dimmed, and is
+// re-synced from a fresh render of the info page (GET ?page=info, never the current page: ?page=spectrum would start a radio scan;
+// only the data-epoch is taken from it, the page itself is not replaced,
+// so form input stays). If the node does not answer it stays stopped and dimmed and retries every 30 s. The PC clock never sets the shown time.
+// Known limit (DST): the zone label (CET/CEST) and the offset are those of the last render. A page left open across a DST switch is 1 h
+// off until the next render (reload or page change); the node's own offset is not known to JS.
+// CLOCK-JS-BEGIN
+var mcClk={e:null,b:0,t0:0,w0:0,stale:null};
+function mcClockText(s){var d=new Date(s*1000),z=function(n){return(n<10?'0':'')+n;};
+return d.getUTCFullYear()+'-'+z(d.getUTCMonth()+1)+'-'+z(d.getUTCDate())+'\u00a0'+z(d.getUTCHours())+':'+z(d.getUTCMinutes())+':'+z(d.getUTCSeconds());}
+function mcClockStale(el,e){mcClk.stale=e;el.style.opacity='.5';
+var back=function(){setTimeout(function(){if(mcClk.stale===e){mcClk.stale=null;mcClockTick();}},30000);};
+fetch('?page=info').then(function(r){return r.text();}).then(function(t){var m=/id="mc_clock" data-epoch="(\d+)"/.exec(t),c=document.getElementById('mc_clock');
+if(m&&c&&c.getAttribute('data-epoch')===e){c.setAttribute('data-epoch',m[1]);c.style.opacity='';mcClk.stale=null;mcClockTick();}else back();}).catch(back);}
+function mcClockTick(){var el=document.getElementById('mc_clock');if(!el)return;var e=el.getAttribute('data-epoch'),n=window.performance.now();
+if(e!==mcClk.e){mcClk.e=e;mcClk.b=parseInt(e,10);mcClk.t0=n;mcClk.w0=Date.now();mcClk.stale=null;el.style.opacity='';}
+if(isNaN(mcClk.b)||e===mcClk.stale)return;
+if(Math.abs((Date.now()-mcClk.w0)-(n-mcClk.t0))>2000){mcClockStale(el,e);return;}
+var t=mcClockText(mcClk.b+Math.floor((n-mcClk.t0)/1000));if(el.textContent!==t)el.textContent=t;}
+setInterval(mcClockTick,1000);
+document.addEventListener('DOMContentLoaded',mcClockTick);
+document.addEventListener('visibilitychange',function(){if(document.visibilityState!=='hidden')mcClockTick();});
+// CLOCK-JS-END
+// WEB-LOOK-01: look of this web page only (theme Auto|Light|Dark, font size S|M|L), kept per browser in localStorage.
+// Auto removes the attribute (follows the OS); mc.css reads data-theme / data-font on <html>. Runs at load, in the head, before first paint.
+// WEBLOOK-JS-BEGIN
+function mcLookGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+function mcLookApply(){var h=document.documentElement,t=mcLookGet('mcTheme'),f=mcLookGet('mcFont');
+if(t==='light'||t==='dark')h.setAttribute('data-theme',t);else h.removeAttribute('data-theme');
+if(f==='s'||f==='l')h.setAttribute('data-font',f);else h.removeAttribute('data-font');}
+function mcLookMark(){var g={mcTheme:['theme',['auto','light','dark'],'auto'],mcFont:['font',['s','m','l'],'m']};
+Object.keys(g).forEach(function(k){var cur=mcLookGet(k)||g[k][2];if(g[k][1].indexOf(cur)<0)cur=g[k][2];
+g[k][1].forEach(function(n){var b=document.getElementById('weblook_'+g[k][0]+'_'+n);if(b){var on=n===cur;b.setAttribute('aria-pressed',on?'true':'false');b.classList.toggle('mctab-on',on);}});});}
+function mcLookSet(k,v){try{if(v==='auto'||v==='m')localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){}mcLookApply();mcLookMark();}
+mcLookApply();
+// WEBLOOK-JS-END
+// T-Deck font size / display mode / brightness of the Settings page (WEB-TD-01): /setparam/?tdchatfont=s|m|l, tdbldisp=auto|light|dark, tdblbright=1..16.
+// TD2-JS-BEGIN
+function tdMark2(g,names,v){names.forEach(function(n){var b=document.getElementById(g+'_'+n);if(b){var on=n==v;b.setAttribute('aria-pressed',on?'true':'false');b.classList.toggle('mctab-on',on);}});}
+function tdPut(k,v,ok){fetch('/setparam/?'+k+'='+encodeURIComponent(v)).then(function(r){return r.json();}).then(function(j){if(j&&j.returncode==0)ok(j);else alert('The T-Deck setting could not be set.');}).catch(function(){alert('The node did not answer. Try again.');});}
+function tdFont(v){tdPut('tdchatfont',v,function(){tdMark2('tdfont',['s','m','l'],v);});}
+function tdDisp(v){tdPut('tdbldisp',v,function(j){tdMark2('tddisp',['auto','light','dark'],v);var s=document.getElementById('tdbright'),o=document.getElementById('tdbright_val');if(s&&j&&j.tdbldisp!==undefined){var l=parseInt(String(j.tdbldisp).split(':')[1],10);if(l>0){s.value=l;if(o)o.textContent=l;}}});}
+function tdBright(v){var o=document.getElementById('tdbright_val');if(o)o.textContent=v;tdPut('tdblbright',v,function(){});}
+// TD2-JS-END
 // Web login password card (WEB-PWD-01): the login of this web GUI, NOT the RM/KISS password. Body only, never a URL.
 // WP-JS-BEGIN
 var wpA=0,wpT=0;

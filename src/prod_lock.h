@@ -45,7 +45,7 @@
 
 /* node_sset / node_sset4 bits owned by locked settings. */
 #define PRODLOCK_SSET_MASK_SHORTPATH  0x0400
-#define PRODLOCK_SSET4_CLEAR_NBR      0x2300   /* 0x0100 0x0200 0x2000: report auto, symmetry on */
+#define PRODLOCK_SSET4_CLEAR_NBR      0x2300   /* 0x0100 0x0200 retired (--nbrreport removed, BL-01; cleared on load), 0x2000: symmetry on */
 #define PRODLOCK_SSET4_SET_NBR        0x1800   /* 0x0800 0x1000: --nbrrelay on (count + cancel) */
 #define PRODLOCK_SSET4_MASK_NBR       (PRODLOCK_SSET4_CLEAR_NBR | PRODLOCK_SSET4_SET_NBR)
 

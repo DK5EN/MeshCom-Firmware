@@ -350,7 +350,7 @@ inline const char *rmStateMessage(RmEntryState s)
     case RM_ST_QUEUED:
         return "Handed to the radio. It goes on air in a moment.";
     case RM_ST_WAITING:
-        return "Sent. Waiting for the node to answer, this can take up to a minute.";
+        return "Sent. Waiting for the node to answer, this can take up to 3 minutes.";
     case RM_ST_NOANSWER:
         return "No answer after " RM_NOANSWER_S_TEXT " seconds. Check the password, the distance and that remote "
                "management is on at the other node. With strict security on, a third failed try locks you "

@@ -1,16 +1,25 @@
 /* basic definitions */
 /* WEB-DARK-01/WEB-A11Y-01: light palette on :root, dark palette overrides the same names below (follows the OS). */
 /* --mcgray is the ink colour (text, borders). Contrast pairs are pinned by tools/webgui_theme_test.js. */
-:root {color-scheme:light;--fs-s:.85rem;--fs-m:1rem;--fs-l:1.25rem;--fs-xl:1.6rem;--mcbg:#FFFFFF;--mcgray:#252323;--mcred:#A2182F;--mclightred:#FCEDF0;--mcmidred:#FFA5B4;--mclightblue:#CADFEA;--mclightgreen:#CBFBD4;--widthfactor:1.0;}
-:root {--mcbord:#767676;--mcline:#E0E0E0;--mcmute:#595959;--mcok:#1A7F37;--mcyel:#F6E7B8;--mcredbtn:#A2182F;--mctbl:#F9F9F9;--mceven:#F0F0F0;--mcempty:#ECECEC;--mcsw0:#767676;--mcsw1:#1A7F37;--mcsw2:#8A5A00;--mcp2:#E07B39;--mcp3:#3B7DD8;--mcp4:#6FA96F;--mcp5:#9E9E9E;}
+:root {color-scheme:light;--fs-s:.85rem;--fs-m:1rem;--fs-l:1.25rem;--fs-xl:1.6rem;--mcbg:#FFFFFF;--mcgray:#252323;--mcred:#A2182F;--mclightred:#FCEDF0;--mcmidred:#FFA5B4;--mclightblue:#CADFEA;--mclightgreen:#CBFBD4;--widthfactor:1.0;--fscale:1;}
+:root {--mcbord:#767676;--mcline:#E0E0E0;--mcmute:#595959;--mcok:#1A7733;--mcyel:#F6E7B8;--mcredbtn:#A2182F;--mctbl:#F9F9F9;--mceven:#F0F0F0;--mcempty:#ECECEC;--mcsw0:#767676;--mcswf:#C8C8C8;--mcswb:#767676;--mcswk:#FFFFFF;--mcswkb:#595959;--mcsw1:#1A7F37;--mcsw2:#8A5A00;--mcp2:#E07B39;--mcp3:#3B7DD8;--mcp4:#6FA96F;--mcp5:#9E9E9E;}
 :root {--navbg:#252323;--navfg:#FFFFFF;--navhov:#4A4545;--navselbg:#FFFFFF;--navselfg:#252323;--navinv:invert(1);}
-@media (prefers-color-scheme:dark) {:root {color-scheme:dark;--mcbg:#14161A;--mcgray:#E8E8E8;--mcred:#FF8A9B;--mclightred:#3A1D24;--mcmidred:#6B2A37;--mclightblue:#1F3A4D;--mclightgreen:#1D4A2B;}}
-@media (prefers-color-scheme:dark) {:root {--mcbord:#8A8F98;--mcline:#3A3F47;--mcmute:#A8ADB5;--mcok:#3FB950;--mcyel:#4A3D12;--mcredbtn:#B3203A;}}
-@media (prefers-color-scheme:dark) {:root {--mctbl:#1B1E23;--mceven:#22262C;--mcempty:#2A2E35;--mcsw0:#8A8F98;--mcsw1:#3FB950;--mcsw2:#D29922;--mcp2:#F0883E;--mcp3:#5B9DF0;--mcp4:#6FBF6F;--mcp5:#9E9E9E;}}
-@media (prefers-color-scheme:dark) {:root {--navbg:#0B0C0E;--navfg:#E8E8E8;--navhov:#2C3037;--navselbg:#E8E8E8;--navselfg:#14161A;}}
-@media screen and (max-width:600px) {html {font-size:12px;} :root{--widthfactor:0.7;}}
-@media screen and (min-width:601px) {html {font-size:14px;} :root{--widthfactor:0.7;}}
-@media screen and (min-width:801px) {html {font-size:14px;} :root{--widthfactor:1.0;}}
+@media (prefers-color-scheme:dark) {:root:not([data-theme=light]) {color-scheme:dark;--mcbg:#14161A;--mcgray:#E8E8E8;--mcred:#FF8A9B;--mclightred:#3A1D24;--mcmidred:#6B2A37;--mclightblue:#1F3A4D;--mclightgreen:#1D4A2B;}}
+@media (prefers-color-scheme:dark) {:root:not([data-theme=light]) {--mcbord:#8A8F98;--mcline:#3A3F47;--mcmute:#A8ADB5;--mcok:#3FB950;--mcyel:#4A3D12;--mcredbtn:#AB1F36;}}
+@media (prefers-color-scheme:dark) {:root:not([data-theme=light]) {--mctbl:#1B1E23;--mceven:#22262C;--mcempty:#2A2E35;--mcsw0:#8A8F98;--mcswf:#3A3F47;--mcswb:#8A8F98;--mcswk:#C9CDD3;--mcswkb:#E8E8E8;--mcsw1:#3FB950;--mcsw2:#D29922;--mcp2:#F0883E;--mcp3:#5B9DF0;--mcp4:#6FBF6F;--mcp5:#9E9E9E;}}
+@media (prefers-color-scheme:dark) {:root:not([data-theme=light]) {--navbg:#0B0C0E;--navfg:#E8E8E8;--navhov:#2C3037;--navselbg:#E8E8E8;--navselfg:#14161A;}}
+/* WEB-LOOK-01: Theme Light/Dark on the setup page sets data-theme on <html>; Auto removes it and follows the OS. The forced-dark block repeats the dark tokens above. */
+:root[data-theme=light] {color-scheme:light;}
+:root[data-theme=dark] {color-scheme:dark;--mcbg:#14161A;--mcgray:#E8E8E8;--mcred:#FF8A9B;--mclightred:#3A1D24;--mcmidred:#6B2A37;--mclightblue:#1F3A4D;--mclightgreen:#1D4A2B;}
+:root[data-theme=dark] {--mcbord:#8A8F98;--mcline:#3A3F47;--mcmute:#A8ADB5;--mcok:#3FB950;--mcyel:#4A3D12;--mcredbtn:#AB1F36;}
+:root[data-theme=dark] {--mctbl:#1B1E23;--mceven:#22262C;--mcempty:#2A2E35;--mcsw0:#8A8F98;--mcswf:#3A3F47;--mcswb:#8A8F98;--mcswk:#C9CDD3;--mcswkb:#E8E8E8;--mcsw1:#3FB950;--mcsw2:#D29922;--mcp2:#F0883E;--mcp3:#5B9DF0;--mcp4:#6FBF6F;--mcp5:#9E9E9E;}
+:root[data-theme=dark] {--navbg:#0B0C0E;--navfg:#E8E8E8;--navhov:#2C3037;--navselbg:#E8E8E8;--navselfg:#14161A;}
+/* WEB-LOOK-01: font size S/M/L of this page scales the root size (every rem and --fs-* token follows) */
+html[data-font=s] {--fscale:.85;}
+html[data-font=l] {--fscale:1.2;}
+@media screen and (max-width:600px) {html {font-size:calc(12px*var(--fscale));} :root{--widthfactor:0.7;}}
+@media screen and (min-width:601px) {html {font-size:calc(14px*var(--fscale));} :root{--widthfactor:0.7;}}
+@media screen and (min-width:801px) {html {font-size:calc(14px*var(--fscale));} :root{--widthfactor:1.0;}}
 h1,h2,h3,h4,h5,h6,small,code,pre,kbd,samp,button,input,select,textarea {font-size:inherit;}
 body {font-size:var(--fs-m);background:var(--mcbg);padding:0px;margin:0px 0px;height:100%;width:100%;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:var(--mcgray);font-family:sans-serif;}
 .font-small {font-size:var(--fs-s);}
@@ -72,10 +81,10 @@ select:focus,input:focus,textarea:focus {border:solid 1px var(--mcred);backgroun
 .flex-auto-wrap {display:flex;flex-direction:row;flex-wrap:wrap;gap:10px;}
 .flex-auto-wrap>* {flex:1;}
 /* content definitions -> commonly used inputs */
-input:where([type="checkbox"][role="switch"]) {-webkit-appearance:none;-moz-appearance:none;appearance:none;position:relative;font-size:inherit;width:2.5em;height:1.2em;box-sizing:content-box;border-radius:1em;vertical-align:text-bottom;margin:auto;color:inherit;background-color:var(--mcsw0);}
-input:where([type="checkbox"][role="switch"]):checked {background-color:var(--mcsw1);}
-input:where([type="checkbox"][role="switch"])::before {content:"";position:absolute;top:50%;left:0;transform:translate(0,-50%);box-sizing:border-box;width:1.1em;height:1.1em;margin:0 0.15em;border-radius:50%;background:var(--mcbg);-webkit-transition:0.5s;transition:0.5s;}
-input:where([type="checkbox"][role="switch"]):checked::before {left:1.8em;}
+input:where([type="checkbox"][role="switch"]) {-webkit-appearance:none;-moz-appearance:none;appearance:none;position:relative;font-size:inherit;width:2.5em;height:1.2em;box-sizing:content-box;border-radius:1em;vertical-align:text-bottom;margin:auto;color:inherit;background-color:var(--mcswf);border:1px solid var(--mcswb);}
+input:where([type="checkbox"][role="switch"]):checked {background-color:var(--mcsw1);border-color:var(--mcsw1);}
+input:where([type="checkbox"][role="switch"])::before {content:"";position:absolute;top:50%;left:0;transform:translate(0,-50%);box-sizing:border-box;width:1.1em;height:1.1em;margin:0 0.15em;border-radius:50%;background:var(--mcswk);border:1px solid var(--mcswkb);-webkit-transition:0.5s;transition:0.5s;}
+input:where([type="checkbox"][role="switch"]):checked::before {left:1.8em;background:var(--mcbg);border-color:var(--mcbg);}
 /* content definitions -> setup collapsable cards */
 .collapsablecard>.cardtoggle {position:absolute;right:8px;top:-1px;transform:translateY(-50%);z-index:10;width:36px;height:36px;border-radius:50% !important;disjplay:none;}
 .collapsablecard>.cardtoggle>i {padding:4px;margin:auto;border:solid var(--mcgray);border-width:2px 0 0 2px;display:block;-webkit-transform:rotate(-135deg);transform:rotate(-135deg);-webkit-transition:0.5s;transition:0.5s;}
@@ -171,7 +180,8 @@ input:where([type="checkbox"][role="switch"]):checked::before {left:1.8em;}
 .rmtile{min-height:3.4em;justify-content:center;text-align:center;}
 .rmarmed{background:var(--mcmidred);font-weight:bold;}
 #rm_page button:disabled{opacity:0.45;cursor:default;}
-.rmsw:indeterminate{background-color:var(--mcsw0);}
+.rmsw:indeterminate{background-color:var(--mcsw0);border-color:var(--mcsw0);}
+.rmsw:indeterminate::before{background:var(--mcbg);border-color:var(--mcbg);}
 .rmsw:indeterminate::before{left:.9em;}
 /* The active update channel is disabled but must read as selected, not unavailable: after the disabled rule. */
 #rm_upd_chan button.rmsel:disabled{opacity:1;color:inherit;border:solid 2px var(--mcgray);font-weight:bold;}

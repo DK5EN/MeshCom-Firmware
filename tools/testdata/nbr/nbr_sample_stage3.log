@@ -1,4 +1,4 @@
-# Stufe 3 -- HN-Nachbarschaftsmeldung (docs/nbr-logformat.md, --nbrreport):
+# Stufe 3 -- HN-Nachbarschaftsmeldung (docs/nbr-logformat.md; der Schalter --nbrreport ist entfernt, BL-01):
 # RPT, RPTSUM, RPTTX, SYM-Rolle VETO und DROP-Grund RPT. Diese sechs
 # Kommentarzeilen sind keine Firmware-Ausgabe und muessen als Fremdzeile
 # ("no_timestamp") verworfen werden, ohne den Lauf zu stoeren.

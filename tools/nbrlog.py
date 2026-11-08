@@ -386,7 +386,7 @@ class NbrState:
     me: list[MeRec] = field(default_factory=list)
     edges: list[EdgeRec] = field(default_factory=list)
     syms: list[SymRec] = field(default_factory=list)
-    #: HN-Nachbarschaftsmeldung (docs/nbr-logformat.md, ``--nbrreport``).
+    #: HN-Nachbarschaftsmeldung (docs/nbr-logformat.md; the ``--nbrreport`` switch was removed, BL-01).
     rpts: list[RptRec] = field(default_factory=list)
     rptsums: list[RptSumRec] = field(default_factory=list)
     rpttx: list[RptTxRec] = field(default_factory=list)
@@ -1327,7 +1327,7 @@ def a10_symmetrie(state: NbrState) -> dict[str, Any]:
 
 def a11_hn_berichte(state: NbrState) -> dict[str, Any]:
     """Abschnitt 11 -- HN-Nachbarschaftsmeldung (docs/nbr-logformat.md,
-    ``--nbrreport``, ``[NBR]|RPT``/``RPTSUM``/``RPTTX``, ``[NBR]|SYM|...|VETO``,
+    the removed ``--nbrreport`` switch (BL-01), ``[NBR]|RPT``/``RPTSUM``/``RPTTX``, ``[NBR]|SYM|...|VETO``,
     ``[NBR]|DROP|...|RPT``).
 
     Vier unabhaengige Quellen, die dieselbe Sache aus vier Seiten zeigen:
@@ -2010,7 +2010,7 @@ def render_md(res: dict[str, Any]) -> str:
     )
 
     hn = res["11_hn_berichte"]
-    out.append("## 11. HN-Nachbarschaftsmeldungen (`--nbrreport`)")
+    out.append("## 11. HN-Nachbarschaftsmeldungen (fester Modus auto)")
     out.append("")
     out.append(
         "Vier Quellen (docs/nbr-logformat.md): `RPTSUM` je empfangenem Bericht, `RPT` je "
@@ -2402,7 +2402,7 @@ def run_self_test() -> int:
         _check("stage2 sym top paar anzahl", top["anzahl"], 2, failures)
         _check("stage2 sym top paar snr_median", top["snr_median"], -11.0, failures)
 
-    # -- 5) Stufe-3-Erweiterung (docs/nbr-logformat.md, --nbrreport): RPT,
+    # -- 5) Stufe-3-Erweiterung (docs/nbr-logformat.md; --nbrreport entfernt, BL-01): RPT,
     #    RPTSUM, RPTTX, SYM-Rolle VETO, DROP-Grund RPT -- alle fuenf muessen
     #    sauber parsen (RPT mit fehlendem Feld als "malformed:RPT", nie als
     #    "foreign_line"), und Abschnitt 11 muss die richtigen Kennzahlen

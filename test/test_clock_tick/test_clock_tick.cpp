@@ -1,7 +1,11 @@
 // CLK-01: tick arithmetic of Clock::CheckEvent() (src/clock_tick.h).
-// Current behaviour passes; F3 fix criteria are TEST_IGNORE until the fix wave.
+// F3 fix (W2): real elapsed seconds counted, remainder carried (clockTickAdvance).
 #include <unity.h>
 #include <stdint.h>
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <unistd.h>
 #include "clock_tick.h"
 
 void setUp() {}
@@ -44,16 +48,19 @@ void test_tick_due_across_millis_rollover(void)
     TEST_ASSERT_EQUAL_UINT32(1u, clockTickSeconds(start, next));
 }
 
-void test_tick_counts_scheduled_second_only(void)
+void test_prefix_model_counts_scheduled_second_only(void)
 {
-    // Current behaviour (F3): a tick handled 3 s late still counts 1 s.
+    // PRE-FIX MODEL of defect F3 (not the current behaviour, see test_fix_F3_*): the old scheme
+    // counted the scheduled second only, so a tick handled 3 s late still counted 1 s.
     uint32_t start = 0, next = clockTickRearm(start);
     TEST_ASSERT_TRUE(clockTickDue(next + 3000, next));
     TEST_ASSERT_EQUAL_UINT32(1u, clockTickSeconds(start, next));
 }
 
-void test_current_3600_late_ticks_lose_time(void)
+void test_prefix_model_3600_late_ticks_lose_time(void)
 {
+    // PRE-FIX MODEL of defect F3 (old scheme inline: one second per tick, start = now): documents
+    // why the clock ran slow; the fixed path is test_fix_F3_3600_late_ticks_count_3600s.
     uint32_t now = 0, start = 0, next = clockTickRearm(0);
     uint32_t secs = 0;
     uint32_t ticks = 0;
@@ -74,27 +81,108 @@ void test_current_3600_late_ticks_lose_time(void)
 
 void test_fix_F3_3600_late_ticks_count_3600s(void)
 {
-    TEST_IGNORE_MESSAGE("CLK-01 fix wave: F3");
-    // 3600 ticks each 40 ms late must give real elapsed seconds (3744 s), not 3600.
+    // Loop passes every 40 ms, ticks handled up to 40 ms late: the counted seconds must follow
+    // real elapsed time (remainder carried), not drift behind it.
     uint32_t now = 0, start = 0, next = clockTickRearm(0), secs = 0;
-    for (int i = 0; i < 3600; i++)
+    while (now < 3744u * 1000u)
     {
-        now = next + 40;
-        TEST_ASSERT_TRUE(clockTickDue(now, next));
-        secs += (now - start) / 1000;  // fix: real elapsed (remainder carry omitted here)
-        start = now;
-        next  = clockTickRearm(start);
+        now += 40;
+        if (clockTickDue(now, next))
+        {
+            uint32_t d = clockTickSeconds(start, now);
+            secs += d;
+            start = clockTickAdvance(start, d);
+            next  = clockTickRearm(start);
+        }
     }
-    TEST_ASSERT_UINT32_WITHIN(2u, 3744u, secs);
+    TEST_ASSERT_UINT32_WITHIN(1u, 3744u, secs);
 }
 
 void test_fix_F3_3s_block_counts_3s(void)
 {
-    TEST_IGNORE_MESSAGE("CLK-01 fix wave: F3");
     uint32_t start = 0, next = clockTickRearm(0);
     uint32_t now = next + 2000;  // loop blocked: handled at 3000 ms
     TEST_ASSERT_EQUAL_UINT32(3u, (now - start) / 1000);
     TEST_ASSERT_EQUAL_UINT32(3u, clockTickSeconds(start, now));  // helper must account real time
+    TEST_ASSERT_EQUAL_UINT32(3000u, clockTickAdvance(start, 3u));
+    TEST_ASSERT_EQUAL_UINT32(4000u, clockTickRearm(clockTickAdvance(start, 3u)));
+}
+
+// clockTickStep() is the call Clock::CheckEvent() makes: seconds out, start/next moved.
+void test_step_late_tick_carries_remainder(void)
+{
+    uint32_t start = 0, next = clockTickRearm(0);
+    const uint32_t secs = clockTickStep(&start, &next, 1040u);   // handled 40 ms late
+    TEST_ASSERT_EQUAL_UINT32(1u, secs);
+    TEST_ASSERT_EQUAL_UINT32(1000u, start);    // advanced by exactly 1 s, 40 ms stay as lateness
+    TEST_ASSERT_EQUAL_UINT32(2000u, next);
+    TEST_ASSERT_FALSE(clockTickDue(2000u, next));
+    TEST_ASSERT_TRUE(clockTickDue(2001u, next));
+}
+
+void test_step_block_across_millis_wrap_counts_70s(void)
+{
+    uint32_t start = 0xFFFFFE00u;                // 512 ms before the millis() wrap
+    uint32_t next  = clockTickRearm(start);
+    const uint32_t now = start + 70u * 1000u + 250u;   // loop blocked 70.25 s, now wrapped
+    TEST_ASSERT_TRUE(now < start);               // the block really crosses the wrap
+    TEST_ASSERT_TRUE(clockTickDue(now, next));
+    const uint32_t secs = clockTickStep(&start, &next, now);
+    TEST_ASSERT_EQUAL_UINT32(70u, secs);
+    TEST_ASSERT_EQUAL_UINT32(0xFFFFFE00u + 70000u, start);
+    TEST_ASSERT_EQUAL_UINT32(250u, now - start);       // remainder carried across the wrap
+    TEST_ASSERT_EQUAL_UINT32(start + 1000u, next);
+    TEST_ASSERT_FALSE(clockTickDue(now, next));        // next deadline is 750 ms ahead
+}
+
+void test_step_3600_late_ticks_over_wrap_count_real_seconds(void)
+{
+    // same loop as the F3 test, driven through clockTickStep() and across the millis() wrap
+    uint32_t start = 0xFFFFE000u, next = clockTickRearm(start), now = start, secs = 0;
+    const uint32_t t0 = start;
+    while ((uint32_t)(now - t0) < 3744u * 1000u)
+    {
+        now += 40;
+        if (clockTickDue(now, next))
+            secs += clockTickStep(&start, &next, now);
+    }
+    TEST_ASSERT_UINT32_WITHIN(1u, 3744u, secs);
+}
+
+// Source pin: the real call site (Clock::CheckEvent in src/clock.cpp) goes through clockTickStep(),
+// so the tests above exercise the code that runs on the device and not a copy of it.
+static std::string read_repo_file(const char *rel)
+{
+    char cwd_buf[4096];
+    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
+    std::string dir(cwd_buf);
+    for (int hops = 0; hops < 16; hops++)
+    {
+        std::ifstream a((dir + "/test/test_clock_tick/test_clock_tick.cpp").c_str()), b((dir + "/platformio.ini").c_str());
+        if (a.good() && b.good())
+            break;
+        const size_t pos = dir.find_last_of('/');
+        if (pos == std::string::npos || pos == 0)
+            TEST_FAIL_MESSAGE("could not derive repo root");
+        dir = dir.substr(0, pos);
+    }
+    std::ifstream f((dir + "/" + rel).c_str());
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+void test_checkevent_uses_clockTickStep(void)
+{
+    const std::string src = read_repo_file("src/clock.cpp");
+    const size_t start = src.find("Clock::EEvent Clock::CheckEvent()");
+    TEST_ASSERT_TRUE_MESSAGE(start != std::string::npos, "CheckEvent() not found");
+    const size_t end = src.find("\n//----", start);
+    const std::string body = src.substr(start, end == std::string::npos ? std::string::npos : end - start);
+    TEST_ASSERT_TRUE_MESSAGE(body.find("clockTickStep(&u32Start_m, &u32Next_m") != std::string::npos,
+                             "CheckEvent() no longer calls clockTickStep()");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("clockTickAdvance(") == std::string::npos,
+                             "CheckEvent() computes the tick arithmetic inline again");
 }
 
 // CLK-01 W0 instrument helpers
@@ -127,10 +215,14 @@ int main(int, char **)
     RUN_TEST(test_helpers_match_old_inline_expressions);
     RUN_TEST(test_tick_due_after_deadline);
     RUN_TEST(test_tick_due_across_millis_rollover);
-    RUN_TEST(test_tick_counts_scheduled_second_only);
-    RUN_TEST(test_current_3600_late_ticks_lose_time);
+    RUN_TEST(test_prefix_model_counts_scheduled_second_only);
+    RUN_TEST(test_prefix_model_3600_late_ticks_lose_time);
     RUN_TEST(test_fix_F3_3600_late_ticks_count_3600s);
     RUN_TEST(test_fix_F3_3s_block_counts_3s);
+    RUN_TEST(test_step_late_tick_carries_remainder);
+    RUN_TEST(test_step_block_across_millis_wrap_counts_70s);
+    RUN_TEST(test_step_3600_late_ticks_over_wrap_count_real_seconds);
+    RUN_TEST(test_checkevent_uses_clockTickStep);
     RUN_TEST(test_instrument_late_and_lost);
     RUN_TEST(test_delta_clamp_ms);
     return UNITY_END();

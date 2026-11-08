@@ -227,6 +227,48 @@ void test_csma01_nicht_scharf_keine_aenderung()
 }
 
 
+// ---- CSMA-05: idle re-anchor ceiling ----
+void test_csma05_idle_ceiling_deckt_jede_klasse_ab()
+{
+    for (int attempt = 0; attempt < CSMA_MAX_ATTEMPTS; attempt++) {
+        unsigned long c = csmaIdleCeilingMs(attempt);
+        for (uint8_t p = MSG_PRIO_CRITICAL; p <= MSG_PRIO_BACKGROUND; p++) {
+            for (long j = 0; j <= csmaSlotsForPrio(p); j++)
+                TEST_ASSERT_TRUE(csmaTimeoutPrio(attempt, p, j) <= c);
+        }
+    }
+    TEST_ASSERT_EQUAL_UINT32(CSMA_RAPID_RX_MS, csmaIdleCeilingMs(CSMA_MAX_ATTEMPTS));
+}
+
+// After an idle re-anchor (prio 0xFF, wait = ceiling) a low-priority frame must NOT inherit the short wait
+// a CRITICAL frame had armed before, and a CRITICAL frame still gets its own short wait.
+void test_csma05_nach_idle_erbt_niedrige_prio_keine_kurze_wartezeit()
+{
+    unsigned long before_short = csmaTimeoutPrio(0, MSG_PRIO_CRITICAL, 0);   // stale short wait
+    unsigned long idle = csmaIdleCeilingMs(0);
+    TEST_ASSERT_TRUE(idle > before_short);
+    TEST_ASSERT_TRUE(csmaShouldRearm(true, 0xFF, MSG_PRIO_BACKGROUND));
+    unsigned long low = csmaRearm(idle, csmaTimeoutPrio(0, MSG_PRIO_BACKGROUND, 4));
+    TEST_ASSERT_TRUE(low > before_short + 1000);
+    unsigned long hi = csmaRearm(idle, csmaTimeoutPrio(0, MSG_PRIO_CRITICAL, 4));
+    TEST_ASSERT_EQUAL_UINT32(csmaTimeoutPrio(0, MSG_PRIO_CRITICAL, 4), hi);
+}
+
+// ---- CSMA-03: stale CAD-free result -> one fresh CAD ----
+void test_csma03_frisches_ergebnis_sendet_veraltetes_wird_neu_gescannt()
+{
+    TEST_ASSERT_FALSE(csmaCadFreeNeedsRecheck(csmaCadResultAgeUs(1000, 1000 + CSMA_CAD_MAX_AGE_US), false));
+    TEST_ASSERT_TRUE(csmaCadFreeNeedsRecheck(csmaCadResultAgeUs(1000, 1000 + CSMA_CAD_MAX_AGE_US + 1), false));
+    // bounded: the one fresh CAD is spent -> transmit even if the loop is slow
+    TEST_ASSERT_FALSE(csmaCadFreeNeedsRecheck(1000000UL, true));
+}
+
+void test_csma03_alter_ist_micros_wrap_sicher()
+{
+    TEST_ASSERT_EQUAL_UINT32(300, csmaCadResultAgeUs(0xFFFFFF00UL, 0x0000002CUL));
+    TEST_ASSERT_FALSE(csmaCadFreeNeedsRecheck(csmaCadResultAgeUs(0xFFFFFF00UL, 0x0000002CUL), false));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -250,5 +292,9 @@ int main(int, char **)
     RUN_TEST(test_csma01_gleiche_oder_niedrigere_prio_aendert_nichts);
     RUN_TEST(test_csma01_verlaengert_nie);
     RUN_TEST(test_csma01_nicht_scharf_keine_aenderung);
+    RUN_TEST(test_csma05_idle_ceiling_deckt_jede_klasse_ab);
+    RUN_TEST(test_csma03_frisches_ergebnis_sendet_veraltetes_wird_neu_gescannt);
+    RUN_TEST(test_csma03_alter_ist_micros_wrap_sicher);
+    RUN_TEST(test_csma05_nach_idle_erbt_niedrige_prio_keine_kurze_wartezeit);
     return UNITY_END();
 }

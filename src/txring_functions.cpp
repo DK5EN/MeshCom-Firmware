@@ -411,14 +411,19 @@ unsigned long txringCaseBackoffSlot(int slot, int attempt, uint32_t now_ms)
         // Fall A: Vorrang, unveraendert -- nur Fall B litt unter dem
         // re-armten Hold (Feldlauf 23.09.), Fall A war nie betroffen.
         if((uint32_t)(now_ms - ringEnqueueTime[slot]) >= NBR_RELAY_CASE_A_MAX_WAIT_MS)
-            return NBR_RELAY_CASE_A_SHORT_MS +
-                   (unsigned long)random(0, NBR_RELAY_CASE_A_SLOTS) * CSMA_SLOT_SIZE;
+        {
+            long jit_s = random(0, NBR_RELAY_CASE_A_SLOTS);
+            csma_armed_jitter = jit_s;  // CSMA-05: real spread for csmaRearmOnEnqueue()
+            return NBR_RELAY_CASE_A_SHORT_MS + (unsigned long)jit_s * CSMA_SLOT_SIZE;
+        }
 
         unsigned long base_a = NBR_RELAY_CASE_A_BASE_MS;
         if(attempt >= 2) base_a = base_a * 2 / 3;
         else if(attempt >= 1) base_a = base_a * 5 / 6;
 
-        return base_a + (unsigned long)random(0, NBR_RELAY_CASE_A_SLOTS) * CSMA_SLOT_SIZE;
+        long jit_a = random(0, NBR_RELAY_CASE_A_SLOTS);
+        csma_armed_jitter = jit_a;  // CSMA-05
+        return base_a + (unsigned long)jit_a * CSMA_SLOT_SIZE;
     }
 
     // Fall B (ringAlone[slot]==0). Text ist bereits vom Aufrufer
@@ -440,8 +445,10 @@ unsigned long txringCaseBackoffSlot(int slot, int attempt, uint32_t now_ms)
     // Normale Fall-B-Basis: heutiger Wert OHNE NBR_RELAY_CASE_B_EXTRA_MS --
     // die frueher bei JEDEM Re-Arm neu addierte Sperre entfaellt hier, sie
     // wirkt nur noch unten als einmalige Deadline.
+    long jit_b = random(0, 3);
+    csma_armed_jitter = jit_b;  // CSMA-05 (the fixed SLOT_START offset is not spread)
     unsigned long normal_b = base_b +
-        (unsigned long)(NBR_RELAY_CASE_B_SLOT_START + random(0, 3)) * CSMA_SLOT_SIZE;
+        (unsigned long)(NBR_RELAY_CASE_B_SLOT_START + jit_b) * CSMA_SLOT_SIZE;
 
     if(waited < NBR_RELAY_CASE_B_EXTRA_MS)
     {
@@ -459,8 +466,9 @@ unsigned long txringCaseBackoffSlot(int slot, int attempt, uint32_t now_ms)
     // 60s-Deckel (NBR_RELAY_CASE_B_MAX_WAIT_MS, Feldlauf 23.09.: 82% der
     // Abbrueche fielen in die ersten 60s): danach wie Fall A nur noch die
     // Kurzsuche -- Schutzabstand nach Empfangsende, dann CAD.
-    return NBR_RELAY_CASE_A_SHORT_MS +
-           (unsigned long)random(0, NBR_RELAY_CASE_A_SLOTS) * CSMA_SLOT_SIZE;
+    long jit_c = random(0, NBR_RELAY_CASE_A_SLOTS);
+    csma_armed_jitter = jit_c;  // CSMA-05
+    return NBR_RELAY_CASE_A_SHORT_MS + (unsigned long)jit_c * CSMA_SLOT_SIZE;
 }
 
 /**
@@ -741,9 +749,11 @@ static inline bool supersedeStatusOk(uint8_t st)
 // would sit in that wait with no priority benefit. Called after every accepted enqueue: if a wait
 // is armed and the new entry is strictly higher priority than the one it was armed for, the wait
 // is replaced by the new priority's timeout, SHORTEN ONLY (csmaRearm), on the same anchor.
-// No random(): the jitter slot of the armed draw is reused (clamped to the new class's range), so
-// the PRNG sequence is unchanged. A fresh entry has age 0, the age floor does not apply; if the
-// armed wait already used the floor it is shorter and stays.
+// Normally no random(): the jitter slot of the armed draw is reused (clamped to the new class's
+// range), so the PRNG sequence is unchanged. Exception (CSMA-05 idle re-anchor, csma_armed_prio ==
+// 0xFF): no draw sits behind that wait (it is only the ceiling), so exactly one random() is drawn
+// here, for the first entry after an idle period. A fresh entry has age 0, the age floor does not
+// apply; if the armed wait already used the floor it is shorter and stays.
 // Context: OnRxDone (arm) and doTX/loop (consume) share csma_timeout. On nRF52 the enqueue may run
 // in the LORA task while the loop reads it, so the read-modify-write sits in a critical section
 // (a 32-bit store is atomic, the section keeps the min() from overwriting a concurrent re-arm).
@@ -755,8 +765,9 @@ static void csmaRearmOnEnqueue(uint8_t prio)
 #endif
     if(csmaShouldRearm(iReceiveTimeOutTime != 0, csma_armed_prio, prio))
     {
-        long jit = csma_armed_jitter;
         long maxj = csmaSlotsForPrio(prio);
+        // 0xFF = idle-armed (CSMA-05): no draw behind this wait, so draw one now.
+        long jit = (csma_armed_prio == 0xFF) ? (long)random(0, maxj + 1) : csma_armed_jitter;
         if(jit > maxj) jit = maxj;
         unsigned long before = csma_timeout;
         csma_timeout = csmaRearm(csma_timeout, csmaTimeoutPrio(cad_attempt, prio, jit));
@@ -1213,6 +1224,11 @@ bool txRingRearmRetry(int slot, const uint8_t *frame, uint16_t len, uint8_t expe
 #if defined(NRF52_SERIES)
     taskEXIT_CRITICAL();
 #endif
+
+    // CSMA-05: the slot is READY again, like a fresh enqueue. After an idle re-anchor the wait is
+    // the ceiling (armed prio 0xFF); pull it down to this entry's class (shorten-only).
+    if(ok)
+        csmaRearmOnEnqueue(ringPriority[slot]);
 
     if(ok)
     {

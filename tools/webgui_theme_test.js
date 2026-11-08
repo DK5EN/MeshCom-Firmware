@@ -74,7 +74,7 @@ function parse(src, media, out) {
         const x = p.indexOf(':');
         if (x > 0) decl[p.slice(0, x).trim()] = p.slice(x + 1).replace(/!important/, '').trim();
       }
-      for (const sel of head.split(',')) out.push({ sel: sel.trim().replace(/\s+/g, ' '), decl, media });
+      for (const sel of head.split(',')) out.push({ sel: sel.trim().replace(/\s+/g, ' ').replace(':root:not([data-theme=light])', ':root'), decl, media }); // WEB-LOOK-01: the OS-dark block excludes a forced Light page
     }
     i = j;
   }
@@ -136,6 +136,20 @@ check('dark palette under @media (prefers-color-scheme:dark)', rules.some((r) =>
 check('dark palette overrides the page background',
   resolve('var(--mcbg)', 'dark') !== resolve('var(--mcbg)', 'light'));
 
+// ---- WEB-LOOK-01: forced theme (data-theme) repeats the OS-dark tokens; font scale via --fscale ---------------------------------
+{
+  const merge = (f) => Object.assign({}, ...rules.filter(f).map((r) => r.decl));
+  const osDark = merge((r) => r.media === DARKMQ && r.sel === ':root');
+  const forced = merge((r) => r.media === null && r.sel === ':root[data-theme=dark]');
+  delete osDark['color-scheme']; delete forced['color-scheme'];
+  const diff = Object.keys(osDark).filter((k) => osDark[k] !== forced[k]).concat(Object.keys(forced).filter((k) => !(k in osDark)));
+  check('forced dark (:root[data-theme=dark]) carries exactly the OS-dark tokens (' + Object.keys(osDark).length + ')', Object.keys(osDark).length > 20 && diff.length === 0, diff.join(','));
+  check('OS-dark block is skipped for a forced light page', /@media \(prefers-color-scheme:dark\) \{:root:not\(\[data-theme=light\]\)/.test(css));
+  check('forced light sets color-scheme:light', merge((r) => r.media === null && r.sel === ':root[data-theme=light]')['color-scheme'] === 'light');
+  check('font size S/M/L scale on html[data-font]', lookup(['html[data-font=s]'], '--fscale', 'light') === '.85' && lookup(['html[data-font=l]'], '--fscale', 'light') === '1.2' && lookup([':root'], '--fscale', 'light') === '1');
+  check('html font-size follows --fscale in every width class', rules.filter((r) => r.sel === 'html' && 'font-size' in r.decl).every((r) => /var\(--fscale\)/.test(r.decl['font-size'])));
+}
+
 // ---- contrast pairs ---------------------------------------------------------------------------------------------
 const BODY = ['body'];
 const pairs = [
@@ -162,10 +176,12 @@ const pairs = [
   ['input', ['select,input,textarea'.split(',')[0]], 'color', ['select'], 'background-color', 4.5],
   ['input focus', ['select'], 'color', ['select:focus'], 'background-color', 4.5],
   ['input border vs page', ['select'], 'border-color', BODY, 'background', 3],
-  ['toggle off track vs page', ['input:where([type="checkbox"][role="switch"])'], 'background-color', BODY, 'background', 3],
+  ['toggle off track outline vs page', ['input:where([type="checkbox"][role="switch"])'], 'border-color', BODY, 'background', 3],
+  ['toggle off knob outline vs off track', ['input:where([type="checkbox"][role="switch"])::before'], 'border-color', ['input:where([type="checkbox"][role="switch"])'], 'background-color', 3],
+  ['toggle off knob outline vs page', ['input:where([type="checkbox"][role="switch"])::before'], 'border-color', BODY, 'background', 3],
+  ['toggle off knob vs off track (fill)', ['input:where([type="checkbox"][role="switch"])::before'], 'background', ['input:where([type="checkbox"][role="switch"])'], 'background-color', 1.3],
   ['toggle on track vs page', ['input:where([type="checkbox"][role="switch"]):checked'], 'background-color', BODY, 'background', 3],
-  ['toggle knob vs off track', ['input:where([type="checkbox"][role="switch"])::before'], 'background', ['input:where([type="checkbox"][role="switch"])'], 'background-color', 3],
-  ['toggle knob vs on track', ['input:where([type="checkbox"][role="switch"])::before'], 'background', ['input:where([type="checkbox"][role="switch"]):checked'], 'background-color', 3],
+  ['toggle on knob vs on track', ['input:where([type="checkbox"][role="switch"])::before', 'input:where([type="checkbox"][role="switch"]):checked::before'], 'background', ['input:where([type="checkbox"][role="switch"])', 'input:where([type="checkbox"][role="switch"]):checked'], 'background-color', 3],
   ['toggle indeterminate vs page', ['.rmsw:indeterminate'], 'background-color', BODY, 'background', 3],
   ['received message', ['.message'], 'color', ['.message-received'], 'background-color', 4.5],
   ['sent message', ['.message'], 'color', ['.message-send'], 'background-color', 4.5],
@@ -197,6 +213,45 @@ for (const theme of ['light', 'dark']) {
     check(theme + ' ' + name + ' ' + r.toFixed(2) + ':1 >= ' + min, r >= min, r.toFixed(2));
   }
 }
+
+// ---- WEB-TD-01 stray-light targets: body text >= 7:1, secondary text >= 5.5:1, outlines and controls >= 3:1 ----------------
+// Every pair above that asks for 4.5:1 is text: body text unless listed in SECONDARY. Pairs at 3:1 are outlines/controls/icons and
+// keep 3:1. Extra pairs cover the --mcmute secondary text and control outlines on the table surface. A pair that misses its new
+// target is KNOWN-LOW: reported, not failing. A miss that is NOT listed in KNOWN_LOW fails (the palette must not get worse); a
+// KNOWN_LOW entry that now passes is reported so it can be removed. The palette itself is the operator's call.
+const SECONDARY = new Set(['mailbox legend text', 'mailbox stale text', 'AU hint text', 'remote ok text', 'remote bad text', 'secondary text (--mcmute) on page', 'secondary text (--mcmute) on table']);
+const extraPairs = [
+  ['secondary text (--mcmute) on page', ['.mbx-legend'], 'color', BODY, 'background', 5.5],
+  ['secondary text (--mcmute) on table', ['.mbx-legend'], 'color', ['#content_inner > table'], 'background', 5.5],
+  ['control border (--mcbord) vs table', ['select'], 'border-color', ['#content_inner > table'], 'background', 3],
+  ['tab/button outline vs page', ['#content_inner .mctab'], 'border-color', BODY, 'background', 3],
+  ['tab selected: text', BODY, 'color', ['#content_inner .mctab-on'], 'background-color', 7],
+  ['tab idle: text', BODY, 'color', ['#content_inner .mctab'], 'background-color', 7],
+];
+const KNOWN_LOW = new Set([]);
+const lowRows = [];
+for (const theme of ['light', 'dark']) {
+  for (const [name, fgc, fgp, bgc, bgp, min] of [...pairs, ...extraPairs]) {
+    if (min < 3) continue; // decorative fill pairs (nav hover tile, queue bar, toggle knob fill) keep their own floor
+    const target = min === 3 ? 3 : SECONDARY.has(name) ? 5.5 : 7;
+    let fg = colour(fgc, fgp, theme) || (fgp === 'color' ? colour(BODY, 'color', theme) : null);
+    let bg = colour(bgc, bgp, theme) || (bgp.startsWith('background') ? colour(BODY, 'background', theme) : null);
+    if (fgp === 'border-color' && !fg) { const bd = resolve(lookup(fgc, 'border', theme), theme); const m = bd && bd.match(/(#[0-9a-fA-F]{3,8}|rgb[^)]*\))/); fg = m ? parseColor(m[1]) : null; }
+    if (!fg || !bg) { check('target ' + theme + ' ' + name + ': colours resolvable', false); continue; }
+    const r = ratio(fg, bg);
+    const key = theme + ' ' + name;
+    if (r >= target) {
+      check('target ' + key + ' ' + r.toFixed(2) + ':1 >= ' + target + (KNOWN_LOW.has(key) ? '  (now passes: remove from KNOWN_LOW)' : ''), true);
+    } else if (KNOWN_LOW.has(key)) {
+      console.log('KNOWN-LOW target ' + key + ' ' + r.toFixed(2) + ':1 < ' + target);
+      lowRows.push([key, r.toFixed(2), target]);
+    } else {
+      check('target ' + key + ' ' + r.toFixed(2) + ':1 >= ' + target, false, r.toFixed(2));
+      lowRows.push([key + ' (NEW)', r.toFixed(2), target]);
+    }
+  }
+}
+console.log('KNOWN-LOW total: ' + lowRows.length);
 
 // ---- font sizes -------------------------------------------------------------------------------------------------
 const sizes = new Set();

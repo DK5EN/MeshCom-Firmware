@@ -34,8 +34,8 @@
  * to this one.
  *
  * The two marker fields (valid_mark_1 == 0xAA, valid_mark_2 == 0x55) are
- * validated by settings_rx_callback() (nrf52_ble.cpp) before anything is
- * staged; they stay part of the v1 image and are frozen the same way as
+ * validated by the caller before anything is staged (the BLE settings write
+ * path was removed, BLE-SET-01); they stay part of the v1 image and are frozen the same way as
  * every other member -- see BLE_SETTINGS_V1_MARK_1/2 below, which are
  * deliberately NOT the same macro as the live MESHCOM_DATA_MARKER so that a
  * future change to that macro cannot silently change what v1 validates.
@@ -453,16 +453,14 @@ void bleSettingsToV1(const s_meshcom_settings &src, s_ble_settings_v1 &out);
 /**
  * Populates `out` (the live settings struct) from a wire image already
  * validated (length + markers) by the caller. Does NOT validate -- that is
- * settings_rx_callback()'s job, and must happen on the raw bytes BEFORE
- * this is ever called.
+ * the caller's job, and must happen on the raw bytes BEFORE this is ever
+ * called.
  */
 void bleSettingsFromV1(const s_ble_settings_v1 &in, s_meshcom_settings &out);
 
 // ---------------------------------------------------------------------------
-// Wire-image validation -- pulled out of settings_rx_callback() (nrf52_ble.cpp)
-// so the length (":339") and marker (":344-348") contracts are host-testable
-// without the BLE stack. settings_rx_callback() must check both, IN THIS
-// ORDER, on the raw bytes BEFORE anything is staged.
+// Wire-image validation -- kept host-testable without the BLE stack. A caller
+// must check both, IN THIS ORDER, on the raw bytes BEFORE anything is staged.
 // ---------------------------------------------------------------------------
 
 /** True iff `len` matches the frozen v1 wire image's length. */
@@ -473,7 +471,7 @@ bool bleSettingsV1MarkersOk(const s_ble_settings_v1 &img);
 
 /**
  * The one v1-sized scratch image of the nRF52 loop task. Users:
- * init_settings_characteristic() and applyPendingBleSettings() (nrf52_ble.cpp,
+ * init_settings_characteristic() (nrf52_ble.cpp,
  * the image handed to write()/notify()), init_flash() and flash_reset()
  * (nrf52_flash.cpp, the legacy blob). All run in the loop task; flash_reset()
  * overwrites it, so init_flash() re-reads the blob into it after every

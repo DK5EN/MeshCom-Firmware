@@ -21,7 +21,6 @@
 #include <debugconf.h>
 #include <configuration.h>
 #include <command_functions.h>
-#include <prod_lock.h>      // prodLockNormalise(): the blob is copied unchecked
 #include <maxhop.h>        // maxHopTextSanitize()
 #include <settings_sanitize.h>   // sanitize_ping_target()
 #include <instrument.h>     // INSTRUMENT_ENABLED
@@ -427,23 +426,6 @@ void nrf52BleServiceDisconnect(void)
 	}
 }
 
-// CONC-17: the settings write callback (removed, BLE-SET-01) ran in the Bluefruit Ada callback task,
-// which can be preempted mid-write by a higher-priority task or, on a tick
-// wake-up, an equal-priority one — a torn image could put a beacon on the air
-// with a spliced callsign or frequency once applied.
-// The callback stages the wire bytes with the seqlock writer in
-// ble_settings_stage.h (counter odd, memcpy, counter even) and wakes the loop
-// task. applyPendingBleSettings(), called once per Main Loop iteration,
-// converts the staged image straight onto meshcom_settings inside a short
-// critical section. No snapshot and no converted copy are needed: inside the
-// section the callback task cannot run, and an odd counter (a write paused
-// mid-copy) makes the apply back off and retry. Converting in place also
-// keeps node_msgid, which bleSettingsFromV1() deliberately never writes; a
-// whole-struct copy from a scratch struct would reset it and replay message
-// ids into the neighbours' dedup rings.
-static BleSettingsV1Stage s_bleSettingsStage;
-static uint32_t s_appliedBleSettingsSeq = 0;
-
 /**
  * @brief Start the LoRa service (no characteristic, see BLE-SET-01)
  *
@@ -454,62 +436,6 @@ BLEService init_settings_characteristic(void)
 	lora_service.begin();
 
 	return lora_service;
-}
-
-static void bleSanitizeLog(const char *field, const char *oldv, const char *newv)
-{
-	Serial.printf("[FLASH]...sanitized %s: %s -> %s\n", field, oldv, newv);
-}
-
-/**
- * @brief Apply a settings write staged by stageBleSettingsV1(), if any.
- * Must be called from the Main Loop task only (CONC-17).
- */
-void applyPendingBleSettings(void)
-{
-	BleSettingsV1ApplyResult result;
-	int tries = 0;
-	for (;;)
-	{
-		// The critical section keeps the callback task out while the staged
-		// image is read and converted (see the comment above s_bleSettingsStage).
-		taskENTER_CRITICAL();
-		result = tryApplyBleSettingsV1Stage(s_bleSettingsStage, &s_appliedBleSettingsSeq, meshcom_settings);
-		taskEXIT_CRITICAL();
-
-		if (result != BleSettingsV1ApplyResult::Busy)
-			break;
-
-		// Busy: a write was paused mid-copy. Yield so the callback task can
-		// finish; bounded, and the next Main Loop iteration retries anyway
-		// because the staged sequence still differs from the applied one.
-		if (++tries >= 20)
-			return;
-		delay(1);
-	}
-
-	if (result != BleSettingsV1ApplyResult::Applied)
-		return; // None: nothing staged since the last apply
-
-	// The blob copies every field unchecked: bring the locked settings (production) and the
-	// ranges back before anything is saved or reported to the app (docs/production-locked-settings.md).
-	meshcom_settings.max_hop_text = maxHopTextSanitize(meshcom_settings.max_hop_text);
-	// LRF 2.1 (D1): the blob also carries node_pingcall unchecked; before prodLockNormalise(),
-	// which derives node_pingtime from node_pingcall[0]
-	sanitize_ping_target(meshcom_settings.node_pingcall, sizeof(meshcom_settings.node_pingcall), meshcom_settings.node_call, bleSanitizeLog);
-	prodLockNormalise(meshcom_settings, INSTRUMENT_ENABLED != 0, false);
-
-	// Save new settings
-	save_settings();
-
-	/*KBC
-	if (meshcom_settings.resetRequest)
-	{
-		API_LOG("SETT", "Initiate reset");
-		delay(1000);
-		sd_nvic_SystemReset();
-	}
-	*/
 }
 
 #endif

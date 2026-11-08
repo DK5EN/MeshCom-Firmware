@@ -29,7 +29,7 @@ BMESH_ALLOWLIST = {
     "t-deck-pro/ui_deckpro.cpp": 3,
     "t-deck/lv_obj_functions.cpp": 1,
     "via_functions.cpp": 14,
-    "web_functions/web_functions.cpp": 3,
+    "web_functions/web_functions.cpp": 2,  # BL-01-FU: dead "HN report: auto" block removed 2026-11-08
     "web_functions/web_setup.cpp": 3,
 }
 

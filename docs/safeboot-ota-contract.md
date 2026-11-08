@@ -169,9 +169,8 @@ and after every abort). When `esp_image_verify()` succeeded but an identity chec
 header is readable from flash; `chip` the header `chip_id` equals the running chip (ESP32 0x0000, ESP32-S3
 0x0009); `segs` header `segment_count` is 1..16 (`ESP_IMAGE_MAX_SEGMENTS`); `desc` the `esp_app_desc_t` is
 readable and its `magic_word` is `0xABCD5432`. Chip and segment count are also checked inside
-`esp_image_verify()`; the repeat only gives a readable reason. The same checks run on the
-`SAFEBOOT_APP_VALID_VIA_SET_BOOT_PARTITION` fallback path (header and desc are read from flash). No SHA-256 by
-design. No `project_name` check (operator decision 2026-11-07): every Arduino-ESP32 build carries the generic
+`esp_image_verify()`; the repeat only gives a readable reason. Header and desc are read from flash (the former `SAFEBOOT_APP_VALID_VIA_SET_BOOT_PARTITION` fallback path
+was removed, SB-07). No SHA-256 by design. No `project_name` check (operator decision 2026-11-07): every Arduino-ESP32 build carries the generic
 `arduino-lib-builder`, so the check would not tell MeshCom from other Arduino images, and a framework switch
 that changes the name would make every Safeboot in the field refuse every new app.
 

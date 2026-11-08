@@ -1021,6 +1021,11 @@ static void test_ble_set_01_dead_settings_characteristic_is_gone(void)
     TEST_ASSERT_TRUE_MESSAGE(src.find("setFixedLen(") == std::string::npos, "setFixedLen() is back in nrf52_ble.cpp");
     TEST_ASSERT_TRUE_MESSAGE(src.find("g_lora_data") == std::string::npos, "g_lora_data is back in nrf52_ble.cpp");
     TEST_ASSERT_TRUE_MESSAGE(src.find("settings_rx_callback(uint16_t") == std::string::npos, "settings_rx_callback() is back in nrf52_ble.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("applyPendingBleSettings") == std::string::npos, "applyPendingBleSettings is back in nrf52_ble.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(read_repo_source("src/nrf52/WisBlock-API.h").find("applyPendingBleSettings") == std::string::npos,
+                             "applyPendingBleSettings is declared again in WisBlock-API.h");
+    TEST_ASSERT_TRUE_MESSAGE(read_repo_source("src/nrf52/WisBlock-API.h").find("g_lora_data") == std::string::npos,
+                             "g_lora_data is declared again in WisBlock-API.h");
 }
 
 int main(void)

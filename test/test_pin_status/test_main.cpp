@@ -694,6 +694,10 @@ static void test_tdeck_pro_enable_and_keyboard_pins_are_reserved(void)
 
     struct { const char *name; int pin; } want[] = {
         {"TDECK_KEYBOARD_INT", 15}, {"BOARD_GPS_EN", 39}, {"BOARD_1V8_EN", 38}, {"BOARD_6609_EN", 41}, {"BOARD_LORA_EN", 46}};
+    // GPIO-08: SD CS and touch IRQ follow src/t-deck-pro/utilities.h (BOARD_SD_CS 48, BOARD_TOUCH_INT 12), not the T-Deck copy
+    TEST_ASSERT_EQUAL_INT_MESSAGE(48, gpio06_define(cfg, "TDECK_SDCARD_CS"), "TDECK_SDCARD_CS");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(12, gpio06_define(cfg, "TDECK_TOUCH_INT"), "TDECK_TOUCH_INT");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("BOARD_GPS_EN == 39 && (kHardMask & (1ULL << BOARD_GPS_EN))") != std::string::npos, "GPS EN static_assert");
     for (const auto &w : want)
     {
         TEST_ASSERT_EQUAL_INT_MESSAGE(w.pin, gpio06_define(cfg, w.name), w.name);

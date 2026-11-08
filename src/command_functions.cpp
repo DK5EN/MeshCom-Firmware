@@ -1788,7 +1788,7 @@ void commandAction(char *umsg_text, bool ble)
             printdeb("--lps33 on/off          LPS33\n");
             #endif
             #ifdef OneWire_GPIO
-            printdeb("--onewire on/off        1-Wire DSxxxx\n--onewire gpio 99       1-Wire pin\n--dht 11|22            1-Wire DHT type\n");
+            printdeb("--onewire on/off        1-Wire DSxxxx\n--onewire gpio 99       1-Wire pin\n--dht 11|22             1-Wire DHT type\n");
             #endif
             #if defined (ENABLE_INA226)
             printdeb("--ina226 on/off         INA226\n--shunt 9.999           INA226 shunt ohms\n--imax 9.9              INA226 max current A\n--isamp 9               INA226 sample count\n");

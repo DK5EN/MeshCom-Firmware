@@ -23,6 +23,7 @@
 #include <loop_functions_extern.h>
 #include <txring_functions.h>
 #include <txring_ttl.h>
+#include <csma_timing.h>      // CSMA-05
 #include <aprs_functions.h>
 #include <dm_stats.h>             // M0-1: ringstat_enqueue/ringstat_parked_overwrite
 #include <nrf52/WisBlock-API.h>   // Shim aus test/support: s_meshcom_settings
@@ -80,6 +81,12 @@ static void resetRing(void)
     // M0-1 (0.4): reset between tests, same as every other stat_* counter above.
     ringstat_enqueue.store(0);
     ringstat_parked_overwrite.store(0);
+    // CSMA-05: no CSMA wait armed between tests
+    iReceiveTimeOutTime = 0;
+    csma_armed_prio = 0xFF;
+    csma_armed_jitter = 0;
+    csma_timeout = 0;
+    cad_attempt = 0;
 }
 
 static const CetClock kNoClock = {false, false, 0};
@@ -2556,6 +2563,139 @@ static void test_w1c_nutzertext_mit_cet_praefix_bleibt_text(void)
     TEST_ASSERT_EQUAL_UINT32(1, stat_supersede_count);
 }
 
+// ---- CSMA-05 (d): csmaRearmOnEnqueue() driven through addTxRingEntry() --------------------
+// A CSMA wait armed for a NORMAL frame is shortened when a CRITICAL own DM is enqueued, on the
+// same anchor, shorten-only; an equal/lower priority or an unarmed wait is left alone.
+static void csma05_arm(uint8_t prio, unsigned long timeout, long jit)
+{
+    cad_attempt = 0;
+    iReceiveTimeOutTime = 1;           // armed (non-zero anchor)
+    csma_armed_prio = prio;
+    csma_armed_jitter = jit;
+    csma_timeout = timeout;
+}
+
+static void test_csma05_enqueue_hoehere_prio_verkuerzt_wartezeit(void)
+{
+    csma05_arm(MSG_PRIO_NORMAL, CSMA_PRIO_BASE_3 + 3 * CSMA_SLOT_SIZE, 3);
+    BuiltFrame f = buildTextFrame("DK5EN-92", "hello");
+    int slot = addTxRingEntry(f.bytes, f.len, 0x00, "user_msg", 0);
+    TEST_ASSERT_TRUE(slot >= 0);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[slot]);
+    TEST_ASSERT_EQUAL_UINT32(csmaTimeoutPrio(0, MSG_PRIO_CRITICAL, 3), csma_timeout);
+    TEST_ASSERT_TRUE(csma_timeout < CSMA_PRIO_BASE_3);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, csma_armed_prio);
+}
+
+static void test_csma05_enqueue_gleiche_oder_niedrigere_prio_laesst_wartezeit(void)
+{
+    unsigned long armed = CSMA_PRIO_BASE_1 + 2 * CSMA_SLOT_SIZE;
+    csma05_arm(MSG_PRIO_CRITICAL, armed, 2);
+    BuiltFrame f = buildTextFrame("DK5EN-92", "hello");   // CRITICAL again: not strictly higher
+    addTxRingEntry(f.bytes, f.len, 0x00, "user_msg", 0);
+    TEST_ASSERT_EQUAL_UINT32(armed, csma_timeout);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, csma_armed_prio);
+}
+
+static void test_csma05_enqueue_ohne_armed_wait_aendert_nichts(void)
+{
+    csma05_arm(MSG_PRIO_NORMAL, 4000UL, 1);
+    iReceiveTimeOutTime = 0;           // no wait running
+    BuiltFrame f = buildTextFrame("DK5EN-92", "hello");
+    addTxRingEntry(f.bytes, f.len, 0x00, "user_msg", 0);
+    TEST_ASSERT_EQUAL_UINT32(4000UL, csma_timeout);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_NORMAL, csma_armed_prio);
+}
+
+// ---- CSMA-05 (a): idle-armed state (0xFF + ceiling) ------------------------------------------
+// The idle re-anchor (esp32_main/nrf52_main) leaves csma_armed_prio = 0xFF and csma_timeout =
+// csmaIdleCeilingMs(). The first enqueue must pull the wait down to its own class: addTxRingEntry()
+// draws one jitter (no draw sits behind the idle wait), txRingRearmRetry() re-arms like an enqueue.
+static void csma05_idle_arm(void)
+{
+    cad_attempt = 0;
+    iReceiveTimeOutTime = 1;           // re-anchored, nothing queued
+    csma_armed_prio = 0xFF;
+    csma_armed_jitter = 0;
+    csma_timeout = csmaIdleCeilingMs(0);
+}
+
+static void test_csma05_idle_armed_enqueue_zieht_jitter_und_verkuerzt(void)
+{
+    const unsigned long ceiling = csmaIdleCeilingMs(0);
+    const unsigned long lo = csmaTimeoutPrio(0, MSG_PRIO_CRITICAL, 0);
+    const unsigned long hi = csmaTimeoutPrio(0, MSG_PRIO_CRITICAL, csmaSlotsForPrio(MSG_PRIO_CRITICAL));
+    TEST_ASSERT_TRUE(hi < ceiling);
+    unsigned long seenMax = 0;
+    for(int i = 0; i < 200; i++)
+    {
+        setUp();
+        csma05_idle_arm();
+        BuiltFrame f = buildTextFrame("DK5EN-92", "hello", 0x75000000UL + (uint32_t)i);
+        int slot = addTxRingEntry(f.bytes, f.len, 0x00, "user_msg", 0);
+        TEST_ASSERT_TRUE(slot >= 0);
+        TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[slot]);
+        TEST_ASSERT_TRUE(csma_timeout >= lo && csma_timeout <= hi);
+        TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, csma_armed_prio);
+        if(csma_timeout > seenMax) seenMax = csma_timeout;
+    }
+    // the idle path draws its own jitter: more than the jitter-0 wait occurs in 200 draws
+    TEST_ASSERT_TRUE_MESSAGE(seenMax > lo, "idle-armed enqueue never drew a jitter slot");
+}
+
+static void test_csma05_idle_armed_rearm_retry_verkuerzt_wartezeit(void)
+{
+    BuiltFrame p = buildTextFrame("DK5EN-92", "geparkt", 0x76000000UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(p.bytes, p.len, 0x00, "user_msg", 0));
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[0]);
+    ringBuffer[0][1] = 0x15;                       // parked on the SENT ladder, waiting for the ACK
+    csma05_idle_arm();                              // loop re-anchored while the ACK timer ran
+    const unsigned long ceiling = csma_timeout;
+
+    BuiltFrame r = p;
+    r.bytes[1] = 0x42;                              // new msg-id for the retry
+    TEST_ASSERT_TRUE(txRingRearmRetry(0, r.bytes, r.len, 0x15));
+    TEST_ASSERT_TRUE_MESSAGE(csma_timeout < ceiling, "retry slot still waits the idle ceiling");
+    TEST_ASSERT_TRUE(csma_timeout <= csmaTimeoutPrio(0, MSG_PRIO_CRITICAL, csmaSlotsForPrio(MSG_PRIO_CRITICAL)));
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, csma_armed_prio);
+}
+
+static void test_csma05_rearm_retry_ohne_armed_wait_aendert_nichts(void)
+{
+    BuiltFrame p = buildTextFrame("DK5EN-92", "geparkt", 0x76000000UL);
+    TEST_ASSERT_EQUAL_INT(0, addTxRingEntry(p.bytes, p.len, 0x00, "user_msg", 0));
+    ringBuffer[0][1] = 0x15;
+    csma05_idle_arm();
+    iReceiveTimeOutTime = 0;                        // no wait running
+    BuiltFrame r = p;
+    r.bytes[1] = 0x42;
+    TEST_ASSERT_TRUE(txRingRearmRetry(0, r.bytes, r.len, 0x15));
+    TEST_ASSERT_EQUAL_UINT32(csmaIdleCeilingMs(0), csma_timeout);
+    TEST_ASSERT_EQUAL_UINT8(0xFF, csma_armed_prio);
+}
+
+// ---- CSMA-05 (b): the case-A/B relay backoff records the jitter it drew ----------------------
+static void test_csma05_relay_backoff_meldet_jitter(void)
+{
+    ringPriority[0] = MSG_PRIO_NORMAL;
+    long maxA = 0, maxB = 0;
+    for(int i = 0; i < 200; i++)
+    {
+        ringAlone[0] = nbrMaskNone();                       // case B
+        csma_armed_jitter = 0;
+        txringCaseBackoffSlot(0, 0, 25000UL);
+        TEST_ASSERT_TRUE(csma_armed_jitter >= 0 && csma_armed_jitter < 3);
+        if(csma_armed_jitter > maxB) maxB = csma_armed_jitter;
+        ringAlone[0] = nbrMaskBit(1);                       // case A
+        csma_armed_jitter = 0;
+        txringCaseBackoffSlot(0, 0, 100UL);
+        TEST_ASSERT_TRUE(csma_armed_jitter >= 0 && csma_armed_jitter < NBR_RELAY_CASE_A_SLOTS);
+        if(csma_armed_jitter > maxA) maxA = csma_armed_jitter;
+    }
+    TEST_ASSERT_TRUE_MESSAGE(maxA > 0, "case A never recorded a jitter");
+    TEST_ASSERT_TRUE_MESSAGE(maxB > 0, "case B never recorded a jitter");
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -2661,5 +2801,12 @@ int main(int argc, char **argv)
     RUN_TEST(test_w1c_voller_pool_hey_wird_ersetzt_statt_verworfen);
     RUN_TEST(test_w1c_rearm_im_vollen_pool);
     RUN_TEST(test_w1c_rearm_verliert_gegen_ack_oder_laenge);
+    RUN_TEST(test_csma05_enqueue_hoehere_prio_verkuerzt_wartezeit);
+    RUN_TEST(test_csma05_enqueue_gleiche_oder_niedrigere_prio_laesst_wartezeit);
+    RUN_TEST(test_csma05_enqueue_ohne_armed_wait_aendert_nichts);
+    RUN_TEST(test_csma05_idle_armed_enqueue_zieht_jitter_und_verkuerzt);
+    RUN_TEST(test_csma05_idle_armed_rearm_retry_verkuerzt_wartezeit);
+    RUN_TEST(test_csma05_rearm_retry_ohne_armed_wait_aendert_nichts);
+    RUN_TEST(test_csma05_relay_backoff_meldet_jitter);
     return UNITY_END();
 }

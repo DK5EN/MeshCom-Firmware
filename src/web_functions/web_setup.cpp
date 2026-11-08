@@ -63,6 +63,7 @@ static const WsParam wsParams[] = {
     WSP_INT_RO("onewiregpio", meshcom_settings.node_owgpio),
     WSP_ONOFF_RO("onewire", bONEWIRE),
     #endif
+    WSP_INT_RO("dht", meshcom_settings.node_dht_type), // SENS-05(c): 11 or 22, set with --dht
     #ifndef BOARD_T_DECK_PRO
     WSP_INT   ("buttongpio", "button gpio", meshcom_settings.node_button_pin),
     #else

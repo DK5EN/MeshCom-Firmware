@@ -3,9 +3,8 @@
  * @brief Hand-over of a BLE settings write from the BLE callback task to the
  * loop task (CONC-17), without a snapshot or a converted copy.
  *
- * settings_rx_callback() (nrf52_ble.cpp) stages the wire image with
- * stageBleSettingsV1(); applyPendingBleSettings() calls
- * tryApplyBleSettingsV1Stage() inside its own critical section, which converts
+ * A BLE writer stages the wire image with stageBleSettingsV1(); the loop task
+ * calls tryApplyBleSettingsV1Stage() inside its own critical section, which converts
  * the image straight onto meshcom_settings. Converting in place writes only
  * the v1 fields, so node_msgid (never written by bleSettingsFromV1()) keeps
  * its live value.

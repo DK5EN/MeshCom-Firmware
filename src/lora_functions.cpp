@@ -3896,7 +3896,10 @@ unsigned long externalTxBusyBackoffMs(void)
     // gives a normal base+jitter delay; this is a true delay before the next
     // external submission, not a same-pass reselect.
     // No age floor: an aged head frame must not burn its busy retries in ~2 s.
-    return csma_compute_timeout_nofloor(0);
+    // CSMA-05: the call also overwrites csma_armed_prio/jitter; keep csma_timeout consistent with
+    // them so csmaRearmOnEnqueue() never shortens against a stale value.
+    csma_timeout = csma_compute_timeout_nofloor(0);
+    return csma_timeout;
 }
 #endif  // EXTERNAL_RADIO
 

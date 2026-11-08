@@ -445,6 +445,11 @@ static_assert((kHardMask & ((1ULL << 37) | (1ULL << 38) | (1ULL << 42) | (1ULL <
 #if defined(BOARD_T_DECK_PRO) && defined(BOARD_LORA_EN)
 static_assert((kHardMask & (1ULL << BOARD_LORA_EN)) != 0, "T-Deck Pro: BOARD_LORA_EN (radio power enable) is not reserved HARD");
 #endif
+// GPIO-08: BOARD_GPS_EN (39) powers the GNSS module; it was once also the SD card CS in the variant header (now 48,
+// TDECK_SDCARD_CS), so it must stay reserved HARD against user functions.
+#if defined(BOARD_T_DECK_PRO) && defined(BOARD_GPS_EN)
+static_assert(BOARD_GPS_EN == 39 && (kHardMask & (1ULL << BOARD_GPS_EN)) != 0, "T-Deck Pro: BOARD_GPS_EN (GNSS power enable, 39) is not reserved HARD");
+#endif
 // GPIO-06: keyboard IRQ 15 (was a copy of the T-Deck 46, which is the LoRa EN pin here), GPS EN 39, 1V8 EN 38, modem EN 41.
 #if defined(BOARD_T_DECK_PRO) && defined(TDECK_KEYBOARD_INT) && defined(BOARD_GPS_EN) && defined(BOARD_1V8_EN) && defined(BOARD_6609_EN)
 static_assert(TDECK_KEYBOARD_INT == 15 && BOARD_1V8_EN == 38 && BOARD_GPS_EN == 39 && BOARD_6609_EN == 41 && BOARD_LORA_EN == 46,

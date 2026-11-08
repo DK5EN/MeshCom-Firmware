@@ -28,7 +28,9 @@ whitespace separated, so printfdeb's space form parses too):
   [CLOCK];set;src;<NTP|GPS|RTC|CET|PHONE|CMD>;old;<s>;new;<s>;delta_ms;<signed ms>
   [DISPCLK];draw;hms;<hh:mm:ss>;type;<iDisplayType>
   [DISPCLK];skip;<reason>        reason: type0|hold|setdisplay|off|ping|gate15
-                                 (also accepted: [DISPCLK];skip;reason;<reason>)
+                                 (also accepted: [DISPCLK];skip;reason;<reason>).
+                                 SKIP_REASONS lists the known values; any other reason is counted
+                                 in skip_reasons as is, never malformed.
   [OLEDSHOT];<w>x<h>;<base64>    u8g2 buffer, layout of GET /screen.oled (oled_screenshot.unpack)
   Info lines (recorded under "info_events" in the summary, not malformed):
   [CLOCK];timesrc;<all|cet|none>   [CLOCK];timesrc;err;<text>;now;<mode>
@@ -434,30 +436,99 @@ def send_command(ser: Any, cmd: str) -> None:
     ser.flush()
 
 
+class BootWaitTimeout(RuntimeError):
+    """The node printed boot output but never [BOOT];ready within the boot wait."""
+
+
+BOOT_MARKERS = (b"[BOOT]", b"CLIENT", b"rst:")
+BOOT_READY = b"[BOOT];ready"
+BOOT_WAIT_S = 45.0
+
+
+def restore_timesrc(ser: Any) -> None:
+    """Best effort: put the time source mode back to `all` (never raises)."""
+    try:
+        send_command(ser, "--timesrc all")
+    except Exception as exc:  # noqa: BLE001  (port may be gone; the run is over anyway)
+        print(f"WARNING: could not restore --timesrc all: {exc}", file=sys.stderr)
+
+
 def run_live(sink: NodeSink, ser: Any, duration_s: float, startup: List[str], periodic: List[Tuple[float, str]],
-             stop: threading.Event, clock: Callable[[], float] = time.time) -> None:
-    """Read `ser` for duration_s; send startup commands after 3 s, periodic ones every N s."""
+             stop: threading.Event, clock: Callable[[], float] = time.time,
+             boot_wait_s: float = BOOT_WAIT_S) -> None:
+    """Read `ser` for duration_s; send startup/periodic commands only once the node is up.
+
+    Like identity_guard.read_info_serial: if boot output shows up (the port open reset the node),
+    wait for [BOOT];ready (up to boot_wait_s, else BootWaitTimeout); a node that stays silent for
+    3 s did not reboot and is asked at once. A --timesrc mode other than `all` set by this run is
+    restored to `all` on every way out (end, Ctrl-C, exception).
+    """
     end = clock() + duration_s
     t_start = clock()
     pending = list(startup)
-    next_due = {c: t_start + 3.0 + every for every, c in periodic}
+    every_of = {c: e for e, c in periodic}
+    next_due: Dict[str, float] = {}
+    released = False
+    boot_seen = False
+    timesrc_changed = False
+    tail = b""
     buf = b""
-    while clock() < end and not stop.is_set():
-        if pending and clock() - t_start >= 3.0:
-            send_command(ser, pending.pop(0))
-        for cmd, due in list(next_due.items()):
-            if clock() >= due:
-                send_command(ser, cmd)
-                next_due[cmd] = due + dict((c, e) for e, c in periodic)[cmd]
-        # Read what has arrived (or block for one byte): a chunked read(4096) waits for the
-        # 0.5 s timeout on a slow console and stamps every line in the chunk late.
-        chunk = ser.read(getattr(ser, "in_waiting", 0) or 1)
-        if not chunk:
-            continue
-        buf += chunk
-        while b"\n" in buf:
-            line, buf = buf.split(b"\n", 1)
-            sink.line(clock(), line.decode("utf-8", errors="replace").rstrip("\r"))
+
+    def send(cmd: str) -> None:
+        nonlocal timesrc_changed
+        parts = allowed_command(cmd).split()
+        if parts[0] == "--timesrc":
+            timesrc_changed = parts[1] != "all"
+        send_command(ser, cmd)
+
+    try:
+        while clock() < end and not stop.is_set():
+            if not released and (pending or periodic):
+                ready = BOOT_READY in tail
+                if ready or (not boot_seen and clock() - t_start >= 3.0):
+                    released = True
+                    next_due = {c: clock() + e for c, e in every_of.items()}
+                elif boot_seen and clock() - t_start >= boot_wait_s:
+                    raise BootWaitTimeout(f"no {BOOT_READY.decode()} within {boot_wait_s:.0f} s of the port open")
+            if released:
+                if pending:
+                    send(pending.pop(0))
+                for cmd, due in list(next_due.items()):
+                    if clock() >= due:
+                        send(cmd)
+                        next_due[cmd] = due + every_of[cmd]
+            # Read what has arrived (or block for one byte): a chunked read(4096) waits for the
+            # 0.5 s timeout on a slow console and stamps every line in the chunk late.
+            chunk = ser.read(getattr(ser, "in_waiting", 0) or 1)
+            if not chunk:
+                continue
+            tail = (tail + chunk)[-512:]
+            boot_seen = boot_seen or any(m in tail for m in BOOT_MARKERS)
+            buf += chunk
+            while b"\n" in buf:
+                line, buf = buf.split(b"\n", 1)
+                sink.line(clock(), line.decode("utf-8", errors="replace").rstrip("\r"))
+    finally:
+        if timesrc_changed:
+            restore_timesrc(ser)
+
+
+def live_worker(sink: NodeSink, dev: str, duration_s: float, startup: List[str],
+                periodic: List[Tuple[float, str]], stop: threading.Event, errors: Dict[str, str],
+                opener: Optional[Callable[[str], Any]] = None) -> None:
+    """Open the port, run_live, always close the port; failures are recorded, not swallowed by the thread."""
+    ser = None
+    try:
+        ser = (opener or open_port)(dev)
+        run_live(sink, ser, duration_s, startup, periodic, stop)
+    except Exception as exc:  # noqa: BLE001
+        errors[sink.stats.node] = f"{type(exc).__name__}: {exc}"
+    finally:
+        if ser is not None:
+            try:
+                ser.close()
+            except Exception:  # noqa: BLE001
+                pass
 
 
 def open_port(dev: str) -> Any:
@@ -469,6 +540,13 @@ def open_port(dev: str) -> Any:
     s.dtr, s.rts = identity_guard.serial_dtr_for(dev), False  # same DTR rule as identity_guard
     s.open()
     return s
+
+
+def check_identity(node: str, dev: str) -> None:
+    """identity_guard on the live port; raises identity_guard.IdentityError (or OSError) on refusal."""
+    import identity_guard
+
+    identity_guard.require_node(node, port=dev)
 
 
 # ---------------------------------------------------------------- CLI
@@ -498,6 +576,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     sinks: Dict[str, NodeSink] = {}
+    rc = 0
 
     def prefix(node: str) -> Path:
         return args.out / f"clock-{node}-{stamp}"
@@ -533,8 +612,15 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(f"{n}: {found[n]} is held by another process (lsof)", file=sys.stderr)
                 return 2
             devs[n] = found[n]
+        for n, dev in devs.items():
+            try:
+                check_identity(n, dev)
+            except Exception as exc:  # noqa: BLE001  (IdentityError, serial failure: refuse either way)
+                print(f"{n}: identity guard refused: {exc}", file=sys.stderr)
+                return 2
         startup = [f"--timesrc {args.timesrc}"] if args.timesrc else []
         stop = threading.Event()
+        errors: Dict[str, str] = {}
         threads = []
         for n, dev in devs.items():
             sinks[n] = NodeSink(n, prefix(n))
@@ -543,8 +629,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 periodic.append((args.clockstat_every, "--clockstat"))
             if args.shot_every:
                 periodic.append((args.shot_every, "--tdshot" if n.startswith("t-deck") else "--oledshot"))
-            th = threading.Thread(target=run_live, daemon=True,
-                                  args=(sinks[n], open_port(dev), args.duration, startup, periodic, stop))
+            th = threading.Thread(target=live_worker, daemon=True,
+                                  args=(sinks[n], dev, args.duration, startup, periodic, stop, errors))
             th.start()
             threads.append(th)
         try:
@@ -553,7 +639,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         except KeyboardInterrupt:
             stop.set()
             for th in threads:
-                th.join(5.0)
+                th.join(15.0)
+        for n, msg in errors.items():
+            print(f"{n}: live run failed: {msg}", file=sys.stderr)
+        rc = 1 if errors else 0
     if not sinks:
         print("nothing to do: give --node or --replay", file=sys.stderr)
         return 2
@@ -562,7 +651,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"{node}: stats={summ['stat_count']} draws={summ['draw_count']} sets={len(summ['sets'])} "
               f"drift_total_s={summ.get('drift_total_s')} display_gap_max_s={summ['display_gap_max_s']} "
               f"-> {sink.prefix}.summary")
-    return 0
+    return rc
 
 
 if __name__ == "__main__":

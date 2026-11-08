@@ -2020,10 +2020,8 @@ static void test_lrf21_ping_target_sanitize_and_callers(void)
     const size_t n0 = pos_after(nrf, "void sanitize_loaded_settings(void)", 0, "nrf52 sanitize_loaded_settings");
     pos_after(nrf, "sanitize_ping_target(meshcom_settings.node_pingcall", n0, "nrf52 sanitize call");
 
-    const size_t b0 = pos_after(ble, "void applyPendingBleSettings(void)", 0, "applyPendingBleSettings");
-    const size_t bs = pos_after(ble, "sanitize_ping_target(meshcom_settings.node_pingcall", b0, "ble sanitize call");
-    const size_t bv = pos_after(ble, "save_settings();", b0, "ble save");
-    TEST_ASSERT_TRUE_MESSAGE(bs < bv, "sanitize before save_settings()");
+    // BLE-SET-01: the BLE settings apply path (and its ping sanitize) is removed
+    TEST_ASSERT_TRUE_MESSAGE(ble.find("applyPendingBleSettings") == std::string::npos, "applyPendingBleSettings is back");
 
     pos_after(emain, "pingResult != PING_INVALID_TARGET", 0, "esp32 caller keeps node_pingcount");
 }
@@ -2039,10 +2037,8 @@ static void test_lrf_w1_advisor_rework_pins(void)
 
     // W1a-1: the BLE blob's ping target is sanitized before prodLockNormalise() derives
     // node_pingtime from node_pingcall[0].
-    const size_t b0 = pos_after(ble, "void applyPendingBleSettings(void)", 0, "applyPendingBleSettings");
-    const size_t bs = pos_after(ble, "sanitize_ping_target(meshcom_settings.node_pingcall", b0, "ble sanitize call");
-    const size_t bp = pos_after(ble, "prodLockNormalise(meshcom_settings", b0, "ble prodLockNormalise");
-    TEST_ASSERT_TRUE_MESSAGE(bs < bp, "sanitize_ping_target before prodLockNormalise()");
+    // (the BLE blob apply path with this ordering was removed, BLE-SET-01)
+    TEST_ASSERT_TRUE_MESSAGE(ble.find("applyPendingBleSettings") == std::string::npos, "applyPendingBleSettings is back");
 
     // W1a-2: neither ping caller prints a per-interval FAILED line for an invalid target.
     const size_t ep = pos_after(emain, "[PING]...%s Ping to %s", 0, "esp32 ping print");

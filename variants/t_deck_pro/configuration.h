@@ -61,7 +61,7 @@
 //! The board peripheral power control pin needs to be set to HIGH when using the peripheral
 #define TDECK_POWERON 10
 
-#define TDECK_SDCARD_CS     39
+#define TDECK_SDCARD_CS     48
 
 #define TDECK_SPI_MOSI      33
 #define TDECK_SPI_MISO      47
@@ -83,7 +83,7 @@
 #define LED 2 // ?
 
 // touchscreen
-#define TDECK_TOUCH_INT     16
+#define TDECK_TOUCH_INT     12
 
 #define I2C_SDA 13
 #define I2C_SCL 14

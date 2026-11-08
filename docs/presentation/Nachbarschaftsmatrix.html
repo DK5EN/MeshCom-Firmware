@@ -41,7 +41,7 @@ table.wide { min-width: 640px; }
 </div>
 
 <div class="callout note">
-<p><b>Seit <code>v4.40a.10.19</code> fest eingestellt:</b> In Release-Builds laufen <code>--nbrrelay on</code>, <code>--nbrsym on</code> und <code>--nbrreport auto</code> mit festem Wert.</p>
+<p><b>Seit <code>v4.40a.10.19</code> fest eingestellt:</b> In Release-Builds laufen <code>--nbrrelay on</code>, <code>--nbrsym on</code> fest; der Nachbarbericht läuft immer im Modus „auto“. Den Schalter <code>--nbrreport</code> gibt es nicht mehr.</p>
 <ul>
 <li><b>Änderung:</b> Sie wird mit <code>[ERR];locked;&lt;name&gt;</code> abgelehnt. Ein Knoten, der einen anderen Wert hatte, wird beim ersten Start zurückgesetzt.</li>
 <li><b>Wirkung:</b> Wer Relays vorher abgeschaltet hatte, sieht jetzt weniger doppelte Kopien und kürzere Warteschlangen.</li>
@@ -296,7 +296,7 @@ table.wide { min-width: 640px; }
     <li>Ohne diese beiden waren es 36 gegen 900.</li>
   </ul>
 </li>
-<li><strong>Nachbarbericht (<code>--nbrreport auto</code>):</strong> Ein Knoten sagt selbst, wen er hört, statt dass die anderen raten. Ein HEY an „HN“, ein Hop, alle 15 Minuten, erster Bericht 5 Minuten nach dem Start, höchstens 8 Einträge, nur Links der letzten 60 Minuten.
+<li><strong>Nachbarbericht (fest im Modus „auto“, kein Schalter mehr):</strong> Ein Knoten sagt selbst, wen er hört, statt dass die anderen raten. Ein HEY an „HN“, ein Hop, alle 15 Minuten, erster Bericht 5 Minuten nach dem Start, höchstens 8 Einträge, nur Links der letzten 60 Minuten.
   <ul><li><code>auto</code> sendet nur, wenn der Knoten weder Mesh-Relay noch Gateway ist. Ein vollständiger Bericht (45 Minuten gültig) kann eine Symmetrie-Annahme widerlegen.</li><li>Stock-Firmware verwirft „HN“, weil es die Rufzeichenprüfung nicht besteht.</li></ul></li>
 </ul>
 
@@ -319,7 +319,7 @@ table.wide { min-width: 640px; }
 <tr><td><code>--nbrdebug</code></td><td>on, off</td><td>Debugausgabe aller NBR-Entscheidungen</td><td>frei</td></tr>
 <tr><td><code>--nbrrelay</code></td><td>off, count, on</td><td>Relay-Entscheidung aus, nur zählen, aktiv abbrechen</td><td><span class="tag ok">fest on</span></td></tr>
 <tr><td><code>--nbrsym</code></td><td>on, off</td><td>Symmetrie-Annahme</td><td><span class="tag ok">fest on</span></td></tr>
-<tr><td><code>--nbrreport</code></td><td>off, auto, on</td><td>Nachbarbericht (HN)</td><td><span class="tag ok">fest auto</span></td></tr>
+<tr><td>Nachbarbericht (HN)</td><td>kein Schalter mehr</td><td>immer Modus „auto“</td><td><span class="tag ok">fest auto</span></td></tr>
 <tr><td><code>--shortpath</code></td><td>on, off</td><td>kürzt den Pfad auf Absender und Relais; dann fehlen der Matrix Zwischenhops</td><td><span class="tag ok">fest off</span></td></tr>
 </tbody>
 </table>
@@ -469,7 +469,7 @@ table.wide { min-width: 640px; }
 <tr><td>Feld</td><td>Läufe auf DK5EN-98 vom 21. bis 23.09.2026, danach Relay-Entscheidung, Symmetrie, Nachbarbericht</td><td><span class="tag ok">erledigt</span> <code>docs/nbr-stage2-campaign.md</code></td></tr>
 <tr><td>Review</td><td>Advisor-Durchgang je Welle</td><td><span class="tag ok">erledigt</span></td></tr>
 <tr><td>Upstream</td><td>PR #1186 mit 4.40a, ersetzt dort MHeard und Pfadtabelle</td><td><span class="tag ok">gemergt</span> 02.10.2026</td></tr>
-<tr><td>Fest eingestellt</td><td><code>--nbrrelay on</code>, <code>--nbrsym on</code>, <code>--nbrreport auto</code></td><td><span class="tag ok">seit</span> <code>v4.40a.10.19</code></td></tr>
+<tr><td>Fest eingestellt</td><td><code>--nbrrelay on</code>, <code>--nbrsym on</code>; Nachbarbericht immer „auto“</td><td><span class="tag ok">seit</span> <code>v4.40a.10.19</code></td></tr>
 <tr><td>Später</td><td>Gateway-ACK-Zuordnung</td><td><span class="tag">zurückgestellt</span> zwei Fork-Gateways in Hörweite nötig</td></tr>
 </tbody>
 </table>

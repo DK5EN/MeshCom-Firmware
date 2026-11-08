@@ -316,6 +316,10 @@ std::atomic<bool> cad_channel_busy{false};
 std::atomic<bool> cad_in_progress{false};
 std::atomic<bool> cad_double_check{false};
 unsigned long cad_start_time = 0;
+// CSMA-03: micros() stamp of the last CadDone, and "the one fresh CAD for this attempt was spent".
+// Both are written under the same critical sections as the flags above.
+volatile uint32_t g_cad_done_us = 0;
+bool cad_recheck_used = false;
 
 bool g_meshcom_initialized;
 bool init_flash_done=false;
@@ -467,6 +471,7 @@ void blinkLED2();                                    // blink RED
 // gatewayService_*() likewise (C4 carve-out)
 #include "gateway_service.h"
 #include "gw_reg_runtime.h"
+#include "csma_timing.h"   // CSMA-05: csmaIdleCeilingMs()
 
 
 #if defined(ENABLE_RTC)
@@ -505,6 +510,7 @@ void OnCadDone(bool channelActivityDetected)
     // RACE-05 fix: atomic flag update under critical section
     taskENTER_CRITICAL();
     cad_channel_busy = channelActivityDetected;
+    g_cad_done_us = micros();   // CSMA-03: age of this result when the loop consumes it
     cad_done_flag.store(true, std::memory_order_release);
     taskEXIT_CRITICAL();
 }
@@ -1809,6 +1815,7 @@ void nrf52loop()
                 cad_in_progress = true;
                 cad_done_flag = false;
                 cad_double_check = false;
+                cad_recheck_used = false;   // CSMA-03: new attempt, one fresh CAD available again
                 cad_start_time = millis();
                 taskEXIT_CRITICAL();
                 taskENTER_CRITICAL();
@@ -1831,6 +1838,31 @@ void nrf52loop()
                 if(bLORADEBUG)
                     Serial.printf("[MC-DBG] CAD_SCAN result=%d\n", _cad_cb ? -702 : 0);
 
+                // CSMA-03: the CAD result is consumed here, up to a loop pass after OnCadDone().
+                // If it is older than CSMA_CAD_MAX_AGE_US the channel may have become busy in the
+                // gap (radio in standby, nothing listens): run one fresh CAD and decide on that.
+                // A busy fresh result takes the existing double-check/back-off path.
+                uint32_t _cad_age_us = csmaCadResultAgeUs(g_cad_done_us, micros());
+                if(!_cad_cb && csmaCadFreeNeedsRecheck(_cad_age_us, cad_recheck_used))
+                {
+                    if(bLORADEBUG)
+                        Serial.printf("[MC-DBG] CAD_STALE_RECHECK age_us=%lu\n", (unsigned long)_cad_age_us);
+                    taskENTER_CRITICAL();
+                    cad_recheck_used = true;
+                    cad_in_progress = true;
+                    cad_done_flag = false;
+                    cad_start_time = millis();
+                    taskEXIT_CRITICAL();
+                    taskENTER_CRITICAL();
+                    Radio.Standby();
+                    Radio.StartCad();
+#if INSTRUMENT_ENABLED
+                    g_csma04_cad_t0 = micros();   // CSMA-04 fork-only
+#endif
+                    taskEXIT_CRITICAL();
+                    g_rxs.noteAction(RXS_BY_CAD, millis());
+                }
+                else
                 if(!_cad_cb)
                 {
                     if(_cad_dc && bLORADEBUG)
@@ -1937,6 +1969,12 @@ void nrf52loop()
             // Nothing to send — restart timeout cycle (radio watchdog).
             // Matches ESP32 esp32_main.cpp behaviour: periodic Radio.Rx()
             // prevents silent SX1262 stall when queue is empty.
+            // CSMA-05: drop the armed priority and the shortened wait with the old anchor
+            // (csmaRearmOnEnqueue() may run in the LORA task, hence the critical section).
+            taskENTER_CRITICAL();
+            csma_armed_prio = 0xFF;
+            csma_timeout = csmaIdleCeilingMs(cad_attempt);
+            taskEXIT_CRITICAL();
             iReceiveTimeOutTime = millis();
         }
     }
@@ -2007,9 +2045,6 @@ void nrf52loop()
         extern void nrf52BleTick(void);
         nrf52BleTick();
     }
-
-    // Apply a settings write staged by settings_rx_callback(), if any (CONC-17)
-    { INSTR_SECTION("ble_settings"); applyPendingBleSettings(); }
 
     // check if message from phone to send
     if(hasMsgFromPhone)
@@ -2360,9 +2395,9 @@ void nrf52loop()
         heyinfo_timer = millis();
     }
 
-    // HN-Bericht (Nachbarschaftsmatrix Stufe 3, --nbrreport): eigener Takt,
+    // HN-Bericht (Nachbarschaftsmatrix Stufe 3; Option --nbrreport entfernt, BL-01): eigener Takt,
     // unabhaengig vom Trickle-Intervall oben und nie unterdrueckt -- siehe
-    // nbrReportTick() in loop_functions.cpp fuer Zeitplan und Modus-Auswertung.
+    // nbrReportTick() in loop_functions.cpp fuer Zeitplan und die feste Auto-Regel.
     nbrReportTick();
 
     // --nbrdebug (24-h-Dauertest der Nachbarschaftsmatrix): 15-Minuten-Takt fuer

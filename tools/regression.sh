@@ -224,6 +224,8 @@ stage2() {
         node tools/webgui_tdeck_theme_test.js
     NODE_PATH="$jsdom/node_modules" run_step "node webgui_theme_test.js" stage2-webgui-theme \
         node tools/webgui_theme_test.js
+    NODE_PATH="$jsdom/node_modules" run_step "node webgui_look_test.js" stage2-webgui-look \
+        node tools/webgui_look_test.js
     NODE_PATH="$jsdom/node_modules" run_step "node webgui_au_test.js" stage2-webgui-au \
         node tools/webgui_au_test.js
     NODE_PATH="$jsdom/node_modules" run_step "node webgui_au_sbwhy_test.js" stage2-webgui-au-sbwhy \

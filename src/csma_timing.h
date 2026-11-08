@@ -126,3 +126,40 @@ static inline bool csmaShouldRearm(bool armed, uint8_t armed_prio, uint8_t new_p
 {
     return armed && new_prio < armed_prio;
 }
+
+/* CSMA-05 (2026-11-08): idle re-anchor. When the loop re-anchors iReceiveTimeOutTime with nothing
+ * queued, the previously armed priority and (possibly shortened) csma_timeout must not survive,
+ * or a later low-priority frame inherits the short wait. The caller sets csma_armed_prio = 0xFF
+ * (csmaShouldRearm then accepts any priority) and csma_timeout = this ceiling: the longest wait
+ * any priority class can draw at this attempt, so the first enqueue shortens it to its own class
+ * wait (csmaRearm is shorten-only) and never gets more than its class wait. */
+static inline unsigned long csmaIdleCeilingMs(int attempt)
+{
+    unsigned long m = 0;
+    for (uint8_t p = MSG_PRIO_CRITICAL; p <= MSG_PRIO_BACKGROUND; p++) {
+        unsigned long t = csmaTimeoutPrio(attempt, p, csmaSlotsForPrio(p));
+        if (t > m) m = t;
+    }
+    return m;
+}
+
+/* CSMA-03 (2026-11-08): nRF52 CAD is asynchronous. OnCadDone() only stamps the result; the main
+ * loop consumes it on a later pass and then calls doTX(). The SX126x is in standby after CAD, so a
+ * neighbour that starts to transmit in that gap is not seen by anything. A "channel free" result
+ * older than CSMA_CAD_MAX_AGE_US is therefore not trusted: the loop runs ONE fresh CAD instead
+ * (recheck_used bounds it, a slow loop can never livelock the TX gate) and transmits on that
+ * result. Pure helper so the decision is natively testable; stamps are free-running micros(),
+ * the subtraction is wrap-safe. */
+#ifndef CSMA_CAD_MAX_AGE_US
+#define CSMA_CAD_MAX_AGE_US 5000UL
+#endif
+
+static inline uint32_t csmaCadResultAgeUs(uint32_t done_us, uint32_t now_us)
+{
+    return (uint32_t)(now_us - done_us);
+}
+
+static inline bool csmaCadFreeNeedsRecheck(uint32_t age_us, bool recheck_used)
+{
+    return !recheck_used && age_us > (uint32_t)CSMA_CAD_MAX_AGE_US;
+}

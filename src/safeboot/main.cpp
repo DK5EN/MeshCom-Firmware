@@ -43,15 +43,6 @@ SafebootTee SafebootSerial;
 
 #define TAG "SafeBoot"
 
-// 0: validate ota_0 via esp_image_verify() (bootloader_support, linked in by
-//    esp_ota_ops.c) without touching the boot pointer -- the normal path.
-// 1: fallback for a toolchain where esp_image_verify() does not link --
-//    validate by attempting esp_ota_set_boot_partition() itself and reading
-//    its verdict (see checkAppImageValid()).
-#ifndef SAFEBOOT_APP_VALID_VIA_SET_BOOT_PARTITION
-#define SAFEBOOT_APP_VALID_VIA_SET_BOOT_PARTITION 0
-#endif
-
 const unsigned int port = 80;
 AsyncWebServer webServer(port);
 String hostname = "MeshCom-OTA";
@@ -401,11 +392,7 @@ void wifiConnect() {
  // abort that landed after chunks were written is exactly the case that
  // invalidates the single app slot. esp_image_verify() comes from
  // bootloader_support, which esp_ota_ops.c already links into every
- // arduino-esp32 app -- if that ever stops being true in this toolchain,
- // the fallback below (attempting the real esp_ota_set_boot_partition() and
- // reading its verdict, undoing it immediately) is exactly the check the
- // fallback-to-app path would perform anyway, just run early instead of at
- // reboot time.
+ // arduino-esp32 app.
  bool checkAppImageValid()
  {
    const esp_partition_t *partition = esp_partition_find_first(esp_partition_type_t::ESP_PARTITION_TYPE_APP, esp_partition_subtype_t::ESP_PARTITION_SUBTYPE_APP_OTA_0, nullptr);
@@ -415,26 +402,15 @@ void wifiConnect() {
      return false;
    }
 
-#if SAFEBOOT_APP_VALID_VIA_SET_BOOT_PARTITION
-   // Fallback path: esp_image_verify() did not link. The boot-partition
-   // switch validates the image as its own side effect (ESP_ERR_OTA_
-   // VALIDATE_FAILED on a half-written image), so use that verdict directly
-   // -- this is exactly what the fallback-to-app reboot would do anyway,
-   // just performed here instead of at reboot time so the state machine can
-   // stay quiet in the meantime.
-   esp_err_t rc = esp_ota_set_boot_partition(partition);
-   bool valid = (rc == ESP_OK);
-#else
    esp_partition_pos_t pos;
    pos.offset = partition->address;
    pos.size = partition->size;
    esp_image_metadata_t data;
    esp_err_t rc = esp_image_verify(ESP_IMAGE_VERIFY_SILENT, &pos, &data);
    bool valid = (rc == ESP_OK);
-#endif
    // SB-06: identity checks on top of the structural verdict (src/safeboot/
-   // app_check.h). Both paths read the 24-byte header and the app desc from
-   // flash, so the fallback path gets the same checks.
+   // app_check.h). The 24-byte header and the app desc are read from
+   // flash.
    safeboot::AppCheck why = safeboot::AppCheck::Ok;
    if (valid)
    {

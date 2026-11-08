@@ -495,6 +495,26 @@ static void test_au_schedule_esp32_load_path_calls_the_repair(void)
                              "sanitize_loaded_settings() does not repair the install schedule settings");
 }
 
+/* SENS-05: both settings load paths run sanitize_dht_type(), so a stored 15 never shows in --info/--persiststat. */
+static void test_dht_type_sanitised_on_both_load_paths(void)
+{
+    const struct { const char *file; const char *fn; } paths[] = {
+        {"src/esp32/esp32_flash.cpp", "bool sanitize_loaded_settings(void)"},
+        {"src/nrf52/nrf52_flash.cpp", "void sanitize_loaded_settings(void)"},
+    };
+    for (const auto &p : paths)
+    {
+        const std::string src = read_src(p.file);
+        const size_t at = src.find(p.fn);
+        TEST_ASSERT_TRUE_MESSAGE(at != std::string::npos, p.file);
+        const size_t end = src.find("\n}\n", at);
+        TEST_ASSERT_TRUE_MESSAGE(src.substr(at, end - at).find("sanitize_dht_type(meshcom_settings.node_dht_type") != std::string::npos, p.file);
+    }
+    int v = 15; /* inside the schema range 11..22, still invalid */
+    TEST_ASSERT_TRUE(sanitize_dht_type(v, capture_log));
+    TEST_ASSERT_EQUAL_INT(11, v);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -525,5 +545,6 @@ int main(int, char **)
     RUN_TEST(test_nrf52_reserved_pins);
     RUN_TEST(test_nrf52_load_path_repairs_reserved_pins);
     RUN_TEST(test_console_refuses_reserved_pins);
+    RUN_TEST(test_dht_type_sanitised_on_both_load_paths);
     return UNITY_END();
 }

@@ -1916,6 +1916,8 @@ void sendDisplayHead(bool bInit)
     bSetDisplay=false;
 }
 
+static void sendDisplayClockLine();
+
 void sendDisplayTrack()
 {
     if(bSetDisplay)
@@ -1953,11 +1955,21 @@ void sendDisplayTrack()
         #endif
     }
 
-    iDisplayType=9;
-
-    // nur alle 15 sekunden
-    if(meshcom_settings.node_date_second == 0 || meshcom_settings.node_date_second == 15 || meshcom_settings.node_date_second == 30 || meshcom_settings.node_date_second == 45 || bOneButton || bDisplayDirty)
+    // Seite nur alle 15 Sekunden neu aufbauen (Positions-/RATE-Daten). Dazwischen nur die Uhrzeile
+    // (CLK-01 W2, A1 "jede Seite"): sendDisplayClockLine() tauscht pageText[0] und uebertraegt den
+    // Seitenpuffer neu, ohne die Zeilen neu zu formatieren (auf E-Paper ohne Wirkung). iDisplayType
+    // wird erst beim Aufbau auf 9 gesetzt: eine geblaetterte Nachrichtenseite (Typ 0) behaelt so
+    // ihre Kopfzeile, die Uhr bleibt dort eingefroren (F1).
+    if(!(meshcom_settings.node_date_second == 0 || meshcom_settings.node_date_second == 15 || meshcom_settings.node_date_second == 30 || meshcom_settings.node_date_second == 45 || bOneButton || bDisplayDirty))
     {
+        bSetDisplay=false;
+        sendDisplayClockLine();
+        return;
+    }
+
+    {
+        iDisplayType=9;
+
         bOneButton    = false;
         bDisplayDirty = false;
 
@@ -2106,8 +2118,18 @@ void sendDisplayTime()
             pagePointer=PAGE_MAX-1;
     }
 
-    // CLK-01: early returns and the 15 s gate as one pure decision (display_clock_gate.h).
-    // Order and conditions are unchanged; board guards stay here as hasDisplay.
+    sendDisplayClockLine();
+}
+
+// CLK-01 W2: draws the clock line of the current clock page (also called by sendDisplayTrack() on
+// the seconds between its 15 s page rebuilds). Own function so that the pageHold countdown of
+// sendDisplayTime() is not run a second time or from the track page.
+static void sendDisplayClockLine()
+{
+    // CLK-01: early returns as one pure decision (display_clock_gate.h): no display, off, message
+    // page (iDisplayType == 0: pageText[0] / TFT header bar hold the sender header, the clock stays
+    // frozen there, F1), draw in progress. No 15 s gate any more (F2). Board guards stay here as
+    // hasDisplay.
     DispClkInputs dcIn;
     dcIn.hasDisplay = true;
     #if MC_HAS_U8G2   // GRD-01: war die wortgleiche 11-Term-Liste
@@ -2181,8 +2203,10 @@ void sendDisplayTime()
     if(!bGPSON && !bDisplayTrack)
         snprintf(cstatus, sizeof(cstatus),  "%-4.4s%-1.1s ", SOURCE_VERSION, SOURCE_VERSION_SUB);
 
-    // nur alle 15 sekunden
-    if(meshcom_settings.node_date_second == 0 || meshcom_settings.node_date_second == 15 || meshcom_settings.node_date_second == 30 || meshcom_settings.node_date_second == 45 || bOneButton || bDisplayDirty)
+    // CLK-01 W2 (F2): Uhrzeile jede Sekunde auf Seiten mit Uhrzeile (Info/Position/Track/WX); nur
+    // pageText[0] wird getauscht und der Seitenpuffer neu uebertragen. Die Nachrichtenseite
+    // (iDisplayType 0) kommt nie bis hierher (SkipType0 oben): ihre Kopfzeile bleibt erhalten.
+    // Der Frame-CRC-Skip im OLED-Pfad bleibt.
     {
         bOneButton    = false;
         bDisplayDirty = false;
@@ -2206,7 +2230,10 @@ void sendDisplayTime()
         #elif defined (HAS_TFT) || defined(HAS_TFT_114) || defined(HAS_TFT_CONNECT)
             displayTFT(msg_text);
         #else
-            sendDisplay1306(false, true, 3, dzeile[0], msg_text);
+            if(pageLineAnz > 0)
+                sendDisplay1306(false, true, 3, dzeile[0], (char*)"#N");   // pageText[0] ist aktualisiert: neu zeichnen, keine Zeile anhaengen
+            else
+                sendDisplay1306(false, true, 3, dzeile[0], msg_text);
         #endif
     }
 
@@ -2715,7 +2742,9 @@ void mainStartTimeLoop()
                         clockInstrDispSkip(bDisplayIsOff ? "off" : "gate15");   // WP_DISP: 10 s gate
                     #endif
                     #else
-                    if(meshcom_settings.node_pingcall[0] == 0x00 || meshcom_settings.node_pingtime == 0 || meshcom_settings.node_pingcount == 0)
+                    // Konfigurierter Ping: Ping-/Pong-Seiten (DisplayPong) sind Vollbild-Text ohne
+                    // Uhrzeile -> wie die Nachrichtenseite kein Uhr-Zeichnen, kein Ueberschreiben.
+                    if(!dispClkPingActive(meshcom_settings.node_pingcall[0] != 0x00, meshcom_settings.node_pingtime, meshcom_settings.node_pingcount))
                         sendDisplayTime(); // Time only
                     #if INSTRUMENT_ENABLED
                     else
@@ -6043,14 +6072,14 @@ void sendHey()
     }
 }
 
-// HN-Bericht (Nachbarschaftsmatrix Stufe 3, --nbrreport off|auto|on): periodischer
+// HN-Bericht (Nachbarschaftsmatrix Stufe 3, fest "auto" seit BL-01): periodischer
 // HEY-artiger Bericht "wen ich direkt mit welchem SNR hoere" (Nachbau von
 // sendHey() oben) an das eigene Ziel "HN", max_hop 0 explizit gesetzt --
 // dieser Bericht wird NIE weiterrelayt (siehe OnRxDone-Abfangpunkt in
 // lora_functions.cpp, der ihn ausschliesslich in die eigene Matrix fuettert
 // und aus jedem anderen Pfad heraushaelt). Der Aufrufer (Timer in
-// esp32_main.cpp/nrf52_main.cpp) entscheidet Takt und ob der --nbrreport-Modus
-// ueberhaupt senden soll; diese Funktion prueft den Modus nicht noch einmal.
+// esp32_main.cpp/nrf52_main.cpp) entscheidet Takt und ob ueberhaupt gesendet
+// werden soll (nbrReportTick()); diese Funktion prueft das nicht noch einmal.
 //
 // Wie sendHey() (GW-01) geht der Bericht NUR ueber addTxRingEntry() auf die
 // LoRa-TX-Seite: finalizeAndSendAPRS() ruft weder addNodeData() (Server-
@@ -6123,9 +6152,9 @@ void sendNbrReport()
 
 // Takt fuer sendNbrReport() (Stufe 3): laeuft UNABHAENGIG vom Trickle-
 // Intervall und wird NIE unterdrueckt -- der Zeitpunkt der naechsten Pruefung
-// ruckt immer weiter, auch bei --nbrreport off, damit ein spaeteres Umschalten
-// auf auto/on nicht sofort einen aufgestauten Bericht nachholt. Nur der
-// SEND-Entscheid haengt am Modus (siehe unten).
+// ruckt immer weiter, auch wenn nicht gesendet wird (Mesh-Relay/Gateway), damit
+// ein spaeterer Wechsel nicht sofort einen aufgestauten Bericht nachholt. Nur
+// der SEND-Entscheid haengt an Relay-/Gateway-Betrieb (siehe unten).
 static unsigned long nbrreport_timer = 0;
 static unsigned long nbrreport_due_ms = (unsigned long)NBR_REPORT_FIRST_S * 1000UL;
 
@@ -6134,7 +6163,7 @@ void nbrReportTick()
     if((uint32_t)(millis() - nbrreport_timer) < nbrreport_due_ms)
         return;
 
-    // Fest "auto" (--nbrreport entfernt, BL-01): nur senden, wenn weder
+    // Fest "auto" (Option --nbrreport entfernt, BL-01): nur senden, wenn weder
     // Mesh-Relay noch Gateway-Betrieb an sind -- ein Gateway hoert die
     // eigentliche Information laengst aus dem Server, ein Mesh-Relay flutet
     // ohnehin schon.

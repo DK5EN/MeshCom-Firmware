@@ -235,5 +235,163 @@ class RunLiveStampTest(unittest.TestCase):
             self.assertAlmostEqual(t, 0.1 * (i + 1), delta=0.02, msg=f"line {i} stamped {t:.3f}")
 
 
+class _RecSerial(_DripSerial):
+    """_DripSerial that records writes; optionally raises on the Nth read after `fail_after` seconds."""
+
+    def __init__(self, schedule: list[tuple[float, bytes]], fail_at: float | None = None) -> None:
+        super().__init__(schedule)
+        self.writes = bytearray()
+        self.fail_at = fail_at
+        self.closed = False
+
+    def write(self, b: bytes) -> int:
+        self.writes += b
+        return len(b)
+
+    def flush(self) -> None:
+        pass
+
+    def close(self) -> None:
+        self.closed = True
+
+    def read(self, n: int) -> bytes:
+        if self.fail_at is not None and self.now >= self.fail_at:
+            raise OSError("device disconnected")
+        return super().read(n)
+
+    def commands(self) -> list[str]:
+        return [c for c in self.writes.decode().split("\n") if c]
+
+
+READY = (0.5, b"[BOOT];ready;ms;4000;ip;0\n")
+
+
+class LiveHardeningTest(unittest.TestCase):
+    def setUp(self) -> None:
+        import unittest.mock as mock
+        p = mock.patch.object(cd.time, "sleep", lambda s: None)
+        p.start()
+        self.addCleanup(p.stop)
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.tmp = Path(self._td.name)
+
+    def sink(self) -> cd.NodeSink:
+        return cd.NodeSink("n1", self.tmp / "clock-n1-test", jsonl=False)
+
+    def test_startup_waits_for_boot_ready(self) -> None:
+        import threading
+        ser = _RecSerial([(0.1, b"rst:0x1 (POWERON_RESET)\n"), (8.0, b"[BOOT];ready;ms;4000;ip;0\n")])
+        cd.run_live(self.sink(), ser, 12.0, ["--clockstat"], [], threading.Event(), clock=ser.clock)
+        self.assertEqual(ser.commands(), ["--clockstat"])
+        self.assertGreaterEqual(ser.now, 8.0)
+
+    def test_silent_node_is_asked_after_three_seconds(self) -> None:
+        import threading
+        ser = _RecSerial([])
+        cd.run_live(self.sink(), ser, 6.0, ["--clockstat"], [], threading.Event(), clock=ser.clock)
+        self.assertEqual(ser.commands(), ["--clockstat"])
+
+    def test_boot_wait_timeout_sends_nothing(self) -> None:
+        import threading
+        ser = _RecSerial([(0.1, b"rst:0x1 (POWERON_RESET)\n"), (0.2, b"[BOOT];warn\n")])
+        with self.assertRaises(cd.BootWaitTimeout):
+            cd.run_live(self.sink(), ser, 100.0, ["--timesrc cet"], [], threading.Event(),
+                        clock=ser.clock, boot_wait_s=10.0)
+        self.assertEqual(ser.commands(), [])
+
+    def test_timesrc_restored_on_exception(self) -> None:
+        import threading
+        ser = _RecSerial([READY], fail_at=5.0)
+        with self.assertRaises(OSError):
+            cd.run_live(self.sink(), ser, 100.0, ["--timesrc cet"], [], threading.Event(), clock=ser.clock)
+        self.assertEqual(ser.commands(), ["--timesrc cet", "--timesrc all"])
+
+    def test_timesrc_restored_on_normal_end_and_not_when_all(self) -> None:
+        import threading
+        ser = _RecSerial([READY])
+        cd.run_live(self.sink(), ser, 6.0, ["--timesrc none"], [], threading.Event(), clock=ser.clock)
+        self.assertEqual(ser.commands(), ["--timesrc none", "--timesrc all"])
+        ser2 = _RecSerial([READY])
+        cd.run_live(self.sink(), ser2, 6.0, ["--timesrc all"], [], threading.Event(), clock=ser2.clock)
+        self.assertEqual(ser2.commands(), ["--timesrc all"])
+
+    def test_worker_closes_port_and_records_error(self) -> None:
+        import threading
+        ser = _RecSerial([READY], fail_at=5.0)
+        errors: dict[str, str] = {}
+        sink = self.sink()
+        orig = cd.run_live
+        cd.run_live = lambda *a, **k: orig(*a, clock=ser.clock, **k)  # type: ignore[assignment]
+        try:
+            cd.live_worker(sink, "/dev/fake", 100.0, ["--timesrc cet"], [], threading.Event(), errors,
+                           opener=lambda dev: ser)
+        finally:
+            cd.run_live = orig  # type: ignore[assignment]
+        self.assertTrue(ser.closed)
+        self.assertIn("OSError", errors["n1"])
+        self.assertEqual(ser.commands()[-1], "--timesrc all")
+
+    def test_unknown_skip_reason_is_counted_not_malformed(self) -> None:
+        sink = self.sink()
+        cd.replay(sink, ["[DISPCLK];skip;newreason", "[DISPCLK];skip;reason;other", "[DISPCLK];skip;newreason"])
+        summ = sink.close()
+        self.assertEqual(summ["skip_reasons"], {"newreason": 2, "other": 1})
+        self.assertEqual(summ["malformed_lines"], 0)
+        self.assertNotIn("newreason", cd.SKIP_REASONS)
+
+    def test_whitelist_unchanged(self) -> None:
+        for bad in ("--reboot", "--timesrc bogus", "--clockstat x", "--info"):
+            with self.assertRaises(ValueError):
+                cd.allowed_command(bad)
+
+
+class MainRefusalTest(unittest.TestCase):
+    def setUp(self) -> None:
+        import unittest.mock as mock
+        self.mock = mock
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.out = self._td.name
+        fleet = {"nodes": {"n1": {}}}
+        for name, val in (("load_fleet", fleet), ("list_comports", [object()]),
+                          ("discover_ports", {"n1": "/dev/cu.fake"})):
+            p = mock.patch.object(cd.bench_suite, name, return_value=val)
+            p.start()
+            self.addCleanup(p.stop)
+        po = mock.patch.object(cd, "open_port", side_effect=AssertionError("a real port must never be opened"))
+        po.start()
+        self.addCleanup(po.stop)
+
+    def run_main(self, *extra: str) -> int:
+        return cd.main(["--node", "n1", "--duration", "1", "--out", self.out, *extra])
+
+    def test_refused_without_yes_reboot(self) -> None:
+        with self.mock.patch.object(cd, "check_identity") as g:
+            self.assertEqual(self.run_main(), 2)
+            g.assert_not_called()
+
+    def test_refused_when_port_busy(self) -> None:
+        with self.mock.patch.object(cd.bench_suite, "port_busy", return_value=True), \
+                self.mock.patch.object(cd, "check_identity") as g:
+            self.assertEqual(self.run_main("--yes-reboot"), 2)
+            g.assert_not_called()
+
+    def test_refused_when_identity_guard_fails(self) -> None:
+        with self.mock.patch.object(cd.bench_suite, "port_busy", return_value=False), \
+                self.mock.patch.object(cd, "check_identity", side_effect=RuntimeError("placeholder call")), \
+                self.mock.patch.object(cd, "live_worker") as w:
+            self.assertEqual(self.run_main("--yes-reboot"), 2)
+            w.assert_not_called()
+
+    def test_guard_pass_runs_worker(self) -> None:
+        with self.mock.patch.object(cd.bench_suite, "port_busy", return_value=False), \
+                self.mock.patch.object(cd, "check_identity") as g, \
+                self.mock.patch.object(cd, "live_worker") as w:
+            self.assertEqual(self.run_main("--yes-reboot"), 0)
+            g.assert_called_once_with("n1", "/dev/cu.fake")
+            w.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()
