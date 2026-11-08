@@ -63,24 +63,33 @@ Target bench node: T-Deck Plus **DK5EN-14**. Repo: `MeshCom-Firmware-DEV-Main`, 
 
 ## Palette (tokens, mirrors mc.css)
 
-| Token        | Dark      | Light     | Use                                         |
-| ------------ | --------- | --------- | ------------------------------------------- |
-| `header_bg`  | `#A2182F` | `#A2182F` | header bar, both modes (like `#head_layer`) |
-| `header_fg`  | `#FFFFFF` | `#FFFFFF` | time, battery, satellites (replaces lime)   |
-| `tab_bg`     | `#3A1D24` | `#FCEDF0` | tab bar, inactive tabs                      |
-| `tab_sel`    | `#B3203A` | `#A2182F` | selected tab, focus outline                 |
-| `bg`         | `#14161A` | `#FFFFFF` | screen background                           |
-| `surface`    | `#1B1E23` | `#F9F9F9` | panels, lists, message area                 |
-| `text`       | `#E8E8E8` | `#252323` | body text                                   |
-| `muted`      | `#A8ADB5` | `#595959` | secondary text, hints                       |
-| `border`     | `#8A8F98` | `#767676` | input and panel borders                     |
-| `btn_on`     | `#B3203A` | `#A2182F` | active/primary button                       |
-| `btn_off`    | `#3A1D24` | `#FCEDF0` | inactive button                             |
-| `btn_fg_off` | `#E8E8E8` | `#252323` | text on inactive button                     |
-| `ok`         | `#3FB950` | `#1A7F37` | on/ok states (replaces `#00a300`)           |
-| `bubble_in`  | `#22262C` | `#F0F0F0` | received message bubble                     |
-| `bubble_out` | `#3A1D24` | `#FCEDF0` | sent message bubble                         |
-| `accent`     | `#FF8A9B` | `#A2182F` | red as text on background (`--mcred`)       |
+| Token           | Dark            | Light           | Use                                                            |
+| --------------- | --------------- | --------------- | -------------------------------------------------------------- |
+| `header_bg`     | `#A2182F`       | `#A2182F`       | header bar, both modes (like `#head_layer`)                    |
+| `header_fg`     | `#FFFFFF`       | `#FFFFFF`       | time, battery, satellites (replaces lime)                      |
+| `tab_bg`        | `#3A1D24`       | `#FCEDF0`       | tab bar, inactive tabs                                         |
+| `tab_sel`       | `#B3203A`       | `#A2182F`       | selected tab, focus outline                                    |
+| `bg`            | `#14161A`       | `#FFFFFF`       | screen background                                              |
+| `surface`       | `#1B1E23`       | `#F9F9F9`       | panels, lists, message area                                    |
+| `text`          | `#E8E8E8`       | `#181818`       | body text (light: RGB565 grid, 2026-11-08)                     |
+| `muted`         | `#A8ADB5`       | `#4A494A`       | secondary text, hints (light: 2026-11-08)                      |
+| `border`        | `#8A8F98`       | `#767676`       | input and panel borders                                        |
+| `btn_on`        | `#B3203A`       | `#A2182F`       | active/primary button                                          |
+| `btn_off`       | `#3A1D24`       | `#FCEDF0`       | inactive button                                                |
+| `btn_fg_off`    | `#E8E8E8`       | `#252323`       | text on inactive button                                        |
+| `ok`            | `#3FB950`       | `#1A7F37`       | on/ok states (replaces `#00a300`)                              |
+| `bubble_in`     | `#22262C`       | `#FFFFFF`       | received message bubble                                        |
+| `bubble_out`    | `#3A1D24`       | `#FFEBEF`       | sent message bubble                                            |
+| `bubble_sys`    | `#2A2F36`       | `#EFF7FF`       | system message bubble                                          |
+| `bubble_border` | `#2A2F36`, 0 px | `#181818`, 3 px | bubble and group-button outline, light only                    |
+| `chat_bg`       | `#14161A`       | `#CED7DE`       | chat area (`msg_list` and tab page t2); dark = `bg`, as before |
+| `accent`        | `#FF8A9B`       | `#A2182F`       | red as text on background (`--mcred`)                          |
+
+Chat text size S/M/L = 12/14/16 px (`mc_font_latin_12/14/16`), setting `node_tdeck_chatfont` (key `node_tdchatf`), console `--chatfont s|m|l`, setup dropdown "Chat text"; sender line and timestamp stay 12 px. Bubble styles carry `pad_all = 8 - bubble_border_w`.
+
+Light bubbles changed 2026-11-08 after the operator's T-Deck photos: the old fills (`#F0F0F0`, `#FCEDF0`) sat one or
+two RGB565 steps off the white chat area and vanished on the panel. Light text, muted and bubble fills now deviate from
+`mc.css` on purpose; the host test judges every pair after RGB565 quantisation.
 
 Contrast requirement: at least 4.5:1 for every text-on-background pair, at least 3:1 for borders and state
 indicators. The W1 host test enforces this. If a pair fails, adjust the T-Deck token and note it in the campaign

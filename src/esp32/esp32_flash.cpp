@@ -285,6 +285,12 @@ bool sanitize_loaded_settings(void)
         meshcom_settings.node_tdeck_theme = 0;
         fixed++;
     }
+    // 0 S, 1 M, 2 L chat font; anything else is a corrupt value -> S
+    if(meshcom_settings.node_tdeck_chatfont > 2)
+    {
+        meshcom_settings.node_tdeck_chatfont = 0;
+        fixed++;
+    }
     #endif
 
     #if !defined(NATIVE_BUILD)   // the repair rule is host-tested in test_pin_policy; the board context needs the variant macros

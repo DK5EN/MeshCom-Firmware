@@ -21,6 +21,7 @@
 #include <node_position.h>
 #include <daylight.h>
 #include "tdeck_theme.h"
+#include "tdeck_pattern.h"
 #define CET_AGE_WITH_CLOCK
 #include <cet_age.h>
 
@@ -131,6 +132,15 @@ void brightnessTick(bool force)
         s_bl_save_pending = false;
         save_settings();
     }
+
+#if INSTRUMENT_ENABLED
+    // DISP-PAT-01: a test pattern is on screen -- keep the panel awake and the level untouched (no day/night switch)
+    if (tdeck_pattern_active())
+    {
+        tdeck_tft_timer = now;
+        return;
+    }
+#endif
 
     const unsigned long every = (s_bl_period == BL_PERIOD_FALLBACK) ? BL_FALLBACK_TICK_MS : BL_TICK_MS;
     if (!force && (now - s_bl_tick_ms) < every)

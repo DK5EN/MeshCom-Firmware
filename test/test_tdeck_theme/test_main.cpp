@@ -8,9 +8,10 @@ void tearDown(void) {}
 
 static void check_pair(const char* mode, const char* name, uint32_t fg, uint32_t bg, double min)
 {
-    double c = tdeck_contrast(fg, bg);
+    // judged on the RGB565 colour the panel shows, not on the 24-bit token
+    double c = tdeck_contrast(tdeck_rgb565(fg), tdeck_rgb565(bg));
     char msg[96];
-    snprintf(msg, sizeof(msg), "%s %s %.2f < %.1f", mode, name, c, min);
+    snprintf(msg, sizeof(msg), "%s %s %.2f < %.2f", mode, name, c, min);
     TEST_ASSERT_TRUE_MESSAGE(c >= min, msg);
 }
 
@@ -55,6 +56,52 @@ static void check_palette(bool dark)
     check_pair(m, "muted/bubble_sys", p.muted, p.bubble_sys, 4.5);
 }
 
+// Regression (T-Deck photos 2026-11-08): in light mode the bubbles vanished into the white chat area. The chat
+// area now has its own blue-grey chat_bg and the bubbles are light on it; the outline carries WCAG 1.4.11 (3:1),
+// the fill only has to be visibly distinct (1.2:1). Muted on chat_bg is the "No messages yet" hint.
+void test_light_bubbles_stand_out(void)
+{
+    const TdeckPalette& p = tdeck_palette(false);
+    const double min = 1.2;
+    check_pair("light", "bubble_in/chat_bg", p.bubble_in, p.chat_bg, min);
+    check_pair("light", "bubble_out/chat_bg", p.bubble_out, p.chat_bg, min);
+    check_pair("light", "bubble_sys/chat_bg", p.bubble_sys, p.chat_bg, min);
+    check_pair("light", "muted/chat_bg", p.muted, p.chat_bg, 4.5);
+    check_pair("light", "text/chat_bg", p.text, p.chat_bg, 4.5);
+    check_pair("light", "border/chat_bg", p.bubble_border, p.chat_bg, 3.0);
+    check_pair("dark", "muted/chat_bg", tdeck_palette(true).muted, tdeck_palette(true).chat_bg, 4.5);
+    // dark chat area must look as before: the chat tab showed LVGL's dark screen colour 0x15171A
+    TEST_ASSERT_EQUAL_HEX32(tdeck_rgb565(0x15171A), tdeck_rgb565(tdeck_palette(true).chat_bg));
+}
+
+// Operator decision 2026-11-08 (photo IMG_9963): light bubbles get a near-black outline, dark ones none.
+void test_bubble_border(void)
+{
+    const TdeckPalette& l = tdeck_palette(false);
+    // operator 2026-11-08 (IMG_9970): 2 px was too thin on the panel; group buttons carry the same outline,
+    // and their pad (6 px) and the bubble pad (8 px) absorb it, so the width must stay <= 6
+    TEST_ASSERT_TRUE(l.bubble_border_w >= 3);
+    TEST_ASSERT_TRUE(l.bubble_border_w <= 6);
+    check_pair("light", "bubble_border/chat_bg", l.bubble_border, l.chat_bg, 3.0);
+    check_pair("light", "bubble_border/bubble_in", l.bubble_border, l.bubble_in, 3.0);
+    check_pair("light", "bubble_border/bubble_out", l.bubble_border, l.bubble_out, 3.0);
+    check_pair("light", "bubble_border/bubble_sys", l.bubble_border, l.bubble_sys, 3.0);
+    TEST_ASSERT_EQUAL_UINT8(0, tdeck_palette(true).bubble_border_w);
+}
+
+void test_rgb565_quantise(void)
+{
+    TEST_ASSERT_EQUAL_HEX32(0xFFFFFF, tdeck_rgb565(0xFFFFFF));
+    TEST_ASSERT_EQUAL_HEX32(0x000000, tdeck_rgb565(0x000000));
+    TEST_ASSERT_EQUAL_HEX32(0xF7F3F7, tdeck_rgb565(0xF0F0F0)); // the old light bubble_in, as the panel shows it
+    TEST_ASSERT_EQUAL_HEX32(0xFFFBFF, tdeck_rgb565(0xF9F9F9));
+    // light text, muted and bubbles are on the grid, so the host checks exactly what the panel shows
+    const TdeckPalette& p = tdeck_palette(false);
+    const uint32_t on_grid[] = {p.text, p.muted, p.bubble_in, p.bubble_out, p.bubble_sys, p.chat_bg};
+    for(uint32_t c : on_grid)
+        TEST_ASSERT_EQUAL_HEX32(c, tdeck_rgb565(c));
+}
+
 void test_contrast_dark(void) { check_palette(true); }
 void test_contrast_light(void) { check_palette(false); }
 
@@ -62,6 +109,26 @@ void test_contrast_function(void)
 {
     TEST_ASSERT_TRUE(fabs(tdeck_contrast(0x000000, 0xFFFFFF) - 21.0) < 0.01);
     TEST_ASSERT_TRUE(fabs(tdeck_contrast(0x123456, 0x123456) - 1.0) < 0.001);
+}
+
+void test_chatfont(void)
+{
+    TEST_ASSERT_EQUAL_INT(0, tdeck_chatfont_parse("s"));
+    TEST_ASSERT_EQUAL_INT(1, tdeck_chatfont_parse("m"));
+    TEST_ASSERT_EQUAL_INT(2, tdeck_chatfont_parse("l"));
+    TEST_ASSERT_EQUAL_INT(-1, tdeck_chatfont_parse(NULL));
+    TEST_ASSERT_EQUAL_INT(-1, tdeck_chatfont_parse(""));
+    TEST_ASSERT_EQUAL_INT(-1, tdeck_chatfont_parse("S"));
+    TEST_ASSERT_EQUAL_INT(-1, tdeck_chatfont_parse("ml"));
+    TEST_ASSERT_EQUAL_INT(-1, tdeck_chatfont_parse("1"));
+    TEST_ASSERT_EQUAL_STRING("s", tdeck_chatfont_name(0));
+    TEST_ASSERT_EQUAL_STRING("m", tdeck_chatfont_name(1));
+    TEST_ASSERT_EQUAL_STRING("l", tdeck_chatfont_name(2));
+    TEST_ASSERT_EQUAL_STRING("s", tdeck_chatfont_name(9));
+    TEST_ASSERT_EQUAL_INT(12, tdeck_chatfont_px(0));
+    TEST_ASSERT_EQUAL_INT(14, tdeck_chatfont_px(1));
+    TEST_ASSERT_EQUAL_INT(16, tdeck_chatfont_px(2));
+    TEST_ASSERT_EQUAL_INT(12, tdeck_chatfont_px(200));
 }
 
 void test_resolve_table(void)
@@ -111,6 +178,10 @@ int main(int, char**)
     RUN_TEST(test_contrast_dark);
     RUN_TEST(test_contrast_light);
     RUN_TEST(test_contrast_function);
+    RUN_TEST(test_light_bubbles_stand_out);
+    RUN_TEST(test_rgb565_quantise);
+    RUN_TEST(test_bubble_border);
+    RUN_TEST(test_chatfont);
     RUN_TEST(test_resolve_table);
     RUN_TEST(test_resolve_out_of_range_is_auto);
     RUN_TEST(test_parse);
