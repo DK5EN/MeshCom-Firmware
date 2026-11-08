@@ -369,12 +369,13 @@ FIELD_CLASSIFICATION: Dict[str, str] = {
     "node_bleon": PERSIST,
     "node_tdeck_theme": PERSIST,
     "node_tdeck_chatfont": PERSIST,
+    "node_bl_fnight": PERSIST,
     "valid_mark_1": RUNTIME,
     "valid_mark_2": RUNTIME,
 }
-assert len(FIELD_CLASSIFICATION) == 164, (
+assert len(FIELD_CLASSIFICATION) == 165, (
     f"FIELD_CLASSIFICATION has {len(FIELD_CLASSIFICATION)} entries, expected "
-    f"164 (163 + node_tdchatf T-Deck chat font S-M-L; 162 + node_dht_type SENS-04; 161 + node_tdtheme TD-THEME-01; 158 + node_audelay/node_auday/node_autime, AU install schedule; 157 + node_bleon TD-30; 156 + node_gwlab, F1 --gateway lab) -- TRIAGE_DOC section 3's original 147 minus auto_join, "
+    f"165 (164 + node_blfnight T-Deck display mode night; 163 + node_tdchatf T-Deck chat font S-M-L; 162 + node_dht_type SENS-04; 161 + node_tdtheme TD-THEME-01; 158 + node_audelay/node_auday/node_autime, AU install schedule; 157 + node_bleon TD-30; 156 + node_gwlab, F1 --gateway lab) -- TRIAGE_DOC section 3's original 147 minus auto_join, "
     f"send_repeat_time and node_ackid, removed from struct s_meshcom_settings "
     f"outright in the D1-04 W3 struct merge (see the comment above this table), "
     f"plus node_ethmtu (2026-10-01, #1183), node_tz (2026-10-04, TZ-01) and "

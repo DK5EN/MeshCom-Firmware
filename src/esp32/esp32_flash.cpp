@@ -291,6 +291,12 @@ bool sanitize_loaded_settings(void)
         meshcom_settings.node_tdeck_chatfont = 0;
         fixed++;
     }
+    // Display mode: forced-night flag is 0 or 1
+    if(meshcom_settings.node_bl_fnight > 1)
+    {
+        meshcom_settings.node_bl_fnight = 0;
+        fixed++;
+    }
     #endif
 
     #if !defined(NATIVE_BUILD)   // the repair rule is host-tested in test_pin_policy; the board context needs the variant macros

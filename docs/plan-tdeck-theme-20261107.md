@@ -79,7 +79,7 @@ Target bench node: T-Deck Plus **DK5EN-14**. Repo: `MeshCom-Firmware-DEV-Main`, 
 | `btn_fg_off`    | `#E8E8E8`       | `#252323`       | text on inactive button                                        |
 | `ok`            | `#3FB950`       | `#1A7F37`       | on/ok states (replaces `#00a300`)                              |
 | `bubble_in`     | `#22262C`       | `#FFFFFF`       | received message bubble                                        |
-| `bubble_out`    | `#3A1D24`       | `#CEF3CE`       | sent message bubble (light green)                              |
+| `bubble_out`    | `#3A1D24`       | `#8CD38C`       | sent message bubble (green)                                    |
 | `bubble_sys`    | `#2A2F36`       | `#FFF3C6`       | system message bubble (pale yellow)                            |
 | `bubble_border` | `#2A2F36`, 0 px | `#000000`, 3 px | bubble and group-button outline, light only                    |
 | `chat_bg`       | `#14161A`       | `#CED7DE`       | chat area (`msg_list` and tab page t2); dark = `bg`, as before |

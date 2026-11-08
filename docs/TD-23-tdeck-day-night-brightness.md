@@ -175,7 +175,9 @@ New `src/daylight.h` (pure, no Arduino includes, `static inline`, style like `sr
   `cetNowUtc()`; position via `nodeSignedLat/Lon` with the validity check above.
 - Console log line on every applied change (bench observability, keep the existing `[TFT];...`
   format family):
-  `[TFT];bl;period;day|night|fallback;level;%d;auto;%d;elev;%.1f`
+  `[TFT];bl;period;day|night|fallback;level;%d;auto;%d;mode;auto|day|night;elev;%s;day;%d;night;%d;why;%s`
+  (as printed by `brightnessLogState`; `mode;` since 2026-11-08,
+  `--bl mode auto|day|night`, setup "Display" Auto/Light/Dark)
 - Setup tab: add a checkable `btn_blauto` right of `btn_soundon` on `setup_line_callsign`, same
   grey/green styling and the same handler `btn_event_handler_setup_btn`. Label: there is no moon
   glyph in the built-in LVGL symbols; use text such as `"A"` / `"DN"` or check

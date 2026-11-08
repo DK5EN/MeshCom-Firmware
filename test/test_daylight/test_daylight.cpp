@@ -233,6 +233,69 @@ static void test_step_table(void)
     TEST_ASSERT_EQUAL_UINT8(16, brightness_next_step(17));
 }
 
+static void test_mode_parse_name(void)
+{
+    TEST_ASSERT_EQUAL_INT(BL_MODE_AUTO, brightness_mode_parse("auto"));
+    TEST_ASSERT_EQUAL_INT(BL_MODE_DAY, brightness_mode_parse("day"));
+    TEST_ASSERT_EQUAL_INT(BL_MODE_NIGHT, brightness_mode_parse("night"));
+    TEST_ASSERT_EQUAL_INT(-1, brightness_mode_parse(NULL));
+    TEST_ASSERT_EQUAL_INT(-1, brightness_mode_parse(""));
+    TEST_ASSERT_EQUAL_INT(-1, brightness_mode_parse("Auto"));
+    TEST_ASSERT_EQUAL_INT(-1, brightness_mode_parse("night "));
+    TEST_ASSERT_EQUAL_INT(-1, brightness_mode_parse("nigh"));
+    TEST_ASSERT_EQUAL_STRING("day", brightness_mode_name(BL_MODE_DAY));
+    TEST_ASSERT_EQUAL_STRING("auto", brightness_mode_name(BL_MODE_AUTO));
+    TEST_ASSERT_EQUAL_STRING("night", brightness_mode_name(BL_MODE_NIGHT));
+}
+
+static void test_mode_resolve_flags(void)
+{
+    // stored blauto (legacy) + forced-night flag -> mode; auto wins over a stale night flag
+    TEST_ASSERT_EQUAL_INT(BL_MODE_DAY, brightness_mode_resolve(false, 0));
+    TEST_ASSERT_EQUAL_INT(BL_MODE_AUTO, brightness_mode_resolve(true, 0));
+    TEST_ASSERT_EQUAL_INT(BL_MODE_NIGHT, brightness_mode_resolve(false, 1));
+    TEST_ASSERT_EQUAL_INT(BL_MODE_AUTO, brightness_mode_resolve(true, 1));
+    bool a = false;
+    uint8_t n = 9;
+    brightness_mode_flags(BL_MODE_AUTO, &a, &n);
+    TEST_ASSERT_TRUE(a);
+    TEST_ASSERT_EQUAL_UINT8(0, n);
+    brightness_mode_flags(BL_MODE_DAY, &a, &n);
+    TEST_ASSERT_FALSE(a);
+    TEST_ASSERT_EQUAL_UINT8(0, n);
+    brightness_mode_flags(BL_MODE_NIGHT, &a, &n);
+    TEST_ASSERT_FALSE(a);
+    TEST_ASSERT_EQUAL_UINT8(1, n);
+    for (int m = 0; m < 3; m++)
+    {
+        brightness_mode_flags(m, &a, &n);
+        TEST_ASSERT_EQUAL_INT(m, brightness_mode_resolve(a, n));
+    }
+}
+
+static void test_mode_segments(void)
+{
+    TEST_ASSERT_EQUAL_INT(BL_MODE_AUTO, brightness_mode_from_seg(0));
+    TEST_ASSERT_EQUAL_INT(BL_MODE_DAY, brightness_mode_from_seg(1));
+    TEST_ASSERT_EQUAL_INT(BL_MODE_NIGHT, brightness_mode_from_seg(2));
+    TEST_ASSERT_EQUAL_INT(BL_MODE_AUTO, brightness_mode_from_seg(9));
+    for (int m = 0; m < 3; m++)
+        TEST_ASSERT_EQUAL_INT(m, brightness_mode_from_seg(brightness_mode_to_seg(m)));
+}
+
+static void test_mode_period_and_slot(void)
+{
+    // auto follows the sun period; day and night force their slot
+    TEST_ASSERT_EQUAL_INT(BL_PERIOD_NIGHT, brightness_period_for_mode(BL_MODE_AUTO, BL_PERIOD_NIGHT));
+    TEST_ASSERT_EQUAL_INT(BL_PERIOD_DAY, brightness_period_for_mode(BL_MODE_AUTO, BL_PERIOD_DAY));
+    TEST_ASSERT_EQUAL_INT(BL_PERIOD_FALLBACK, brightness_period_for_mode(BL_MODE_AUTO, BL_PERIOD_FALLBACK));
+    TEST_ASSERT_EQUAL_INT(BL_PERIOD_DAY, brightness_period_for_mode(BL_MODE_DAY, BL_PERIOD_NIGHT));
+    TEST_ASSERT_EQUAL_INT(BL_PERIOD_DAY, brightness_period_for_mode(BL_MODE_DAY, BL_PERIOD_FALLBACK));
+    TEST_ASSERT_EQUAL_INT(BL_PERIOD_NIGHT, brightness_period_for_mode(BL_MODE_NIGHT, BL_PERIOD_DAY));
+    TEST_ASSERT_EQUAL_INT(BL_PERIOD_NIGHT, brightness_period_for_mode(BL_MODE_NIGHT, BL_PERIOD_FALLBACK));
+    // the slider writes the slot of s_bl_period (brightnessSetActiveLevel), which these forced periods set
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -247,5 +310,9 @@ int main(int, char **)
     RUN_TEST(test_symb_writes_active_slot);
     RUN_TEST(test_level_valid);
     RUN_TEST(test_step_table);
+    RUN_TEST(test_mode_parse_name);
+    RUN_TEST(test_mode_resolve_flags);
+    RUN_TEST(test_mode_segments);
+    RUN_TEST(test_mode_period_and_slot);
     return UNITY_END();
 }

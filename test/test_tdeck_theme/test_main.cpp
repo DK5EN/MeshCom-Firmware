@@ -82,6 +82,13 @@ void test_light_panel_measured(void)
     const TdeckPalette& p = tdeck_palette(false);
     TEST_ASSERT_EQUAL_HEX32(0x000000, p.text);
     TEST_ASSERT_EQUAL_HEX32(0x000000, p.bubble_border);
+    // operator 2026-11-08 (RAW photos): the sent bubble 0xCEF3CE read as white, its tint must be unmistakable
+    {
+        char msg[64];
+        const double st = tdeck_rgb565_steps(p.bubble_out, 0xFFFFFF);
+        snprintf(msg, sizeof(msg), "bubble_out/white %.1f steps < 8", st);
+        TEST_ASSERT_TRUE_MESSAGE(st >= 8.0, msg);
+    }
     check_pair("light", "muted/bubble_in", p.muted, p.bubble_in, 7.0);
     check_pair("light", "muted/chat_bg", p.muted, p.chat_bg, 7.0);
     const uint32_t fills[] = {p.chat_bg, p.bubble_in, p.bubble_out, p.bubble_sys};
@@ -201,6 +208,21 @@ void test_name(void)
     TEST_ASSERT_EQUAL_STRING("auto", tdeck_theme_name(9));
 }
 
+void test_theme_segments(void)
+{
+    // setup segments Auto | Light | Dark <-> TdeckTheme 0, 2, 1
+    TEST_ASSERT_EQUAL_UINT8(THEME_AUTO, tdeck_theme_seg_to_setting(0));
+    TEST_ASSERT_EQUAL_UINT8(THEME_LIGHT, tdeck_theme_seg_to_setting(1));
+    TEST_ASSERT_EQUAL_UINT8(THEME_DARK, tdeck_theme_seg_to_setting(2));
+    TEST_ASSERT_EQUAL_UINT8(THEME_AUTO, tdeck_theme_seg_to_setting(7));
+    TEST_ASSERT_EQUAL_UINT32(0, tdeck_theme_setting_to_seg(THEME_AUTO));
+    TEST_ASSERT_EQUAL_UINT32(1, tdeck_theme_setting_to_seg(THEME_LIGHT));
+    TEST_ASSERT_EQUAL_UINT32(2, tdeck_theme_setting_to_seg(THEME_DARK));
+    TEST_ASSERT_EQUAL_UINT32(0, tdeck_theme_setting_to_seg(9));
+    for(uint8_t s = 0; s < 3; s++)
+        TEST_ASSERT_EQUAL_UINT8(s, tdeck_theme_seg_to_setting(tdeck_theme_setting_to_seg(s)));
+}
+
 int main(int, char**)
 {
     UNITY_BEGIN();
@@ -217,5 +239,6 @@ int main(int, char**)
     RUN_TEST(test_resolve_out_of_range_is_auto);
     RUN_TEST(test_parse);
     RUN_TEST(test_name);
+    RUN_TEST(test_theme_segments);
     return UNITY_END();
 }

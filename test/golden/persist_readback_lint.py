@@ -63,6 +63,7 @@ ALIASES = {
     "blauto": "node_blauto",
     "theme": "node_tdtheme",
     "chatfont": "node_tdchatf",
+    "blfnight": "node_blfnight",
     "fversion": "node_fversion",
     "mversion": "node_mversion",
     "cflash": "node_cflash",
