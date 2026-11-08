@@ -212,6 +212,29 @@ Raw `*.log` stays gitignored. The wave commit carries only the cited files.
   partial buffer update (`u8g2.updateDisplayArea`) instead of a full frame.
 - **Ping gate:** the ping display shares the top line; decide in W2 whether it keeps priority.
 
+## W1 results (2026-11-08, partial: S1 and S5)
+
+INSTRUMENT builds of `fork-dev` `d9bd847f` on DK5EN-1 (Heltec V3), DK5EN-92 (T-Beam), DK5EN-14 (T-Deck Plus), USB,
+`clock_drift.py`. The first S1 run is void: Heltec and T-Beam had the stored `--display off`, so every draw was
+`skip;off` and every shot `display off`. Re-run with `--display on` (restored to off afterwards).
+
+| Run | Node   | Duration | Drift total | Lost ticks | Longest display gap | Skips (type0 / gate15) | Clock sets    |
+| --- | ------ | -------- | ----------- | ---------- | ------------------- | ---------------------- | ------------- |
+| S1  | Heltec | 10 min   | +0.39 s     | 0          | **374.6 s**         | 410 / 163              | GPS 17, NTP 9 |
+| S1  | T-Beam | 10 min   | +0.07 s     | 0          | 15.1 s              | 434 / 144              | GPS 11, NTP 2 |
+| S1  | T-Deck | 10 min   | +0.71 s     | 0          | no DISPCLK hook     | --                     | GPS 13, NTP 3 |
+| S5  | Heltec | 30 min   | **-5.38 s** | 5.9 s      | **481.4 s**         | 1063 / 673             | boot only     |
+| S5  | T-Beam | 30 min   | **-8.54 s** | 8.4 s      | **466.8 s**         | 1060 / 674             | boot only     |
+
+- **F3 confirmed:** with no source the software clock loses 11 to 17 s per hour, almost exactly the lost-tick sum;
+  late ticks, not crystal drift.
+- **F1 confirmed on the OLED boards:** `type0` skips dominate; the clock was not redrawn for 6 to 8 minutes while a
+  non-clock page was up (S1 Heltec, both S5 runs).
+- **Normal sources hide it:** with GPS and NTP (S1) the drift stays under 1 s because the clock is reset every
+  minute or so.
+- Open: S2, S3 (2 h), S4 (WLAN off). Summaries: `tools/bench/runs/harness/clock-*-20261108-084638.summary` (S1),
+  `clock-*-20261108-085654.summary` (S5).
+
 ## Waves
 
 | Wave | Content                                                                        | Gate                                                                                     |

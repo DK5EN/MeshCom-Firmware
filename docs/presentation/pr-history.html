@@ -39,14 +39,14 @@ details > h3:first-of-type{margin-top:.4rem}
 <div class="eyebrow">icssw-org/MeshCom-Firmware · Pull Requests von DK5EN</div>
 <h1>72 Pull Requests nach upstream gemergt, keiner offen</h1>
 <ul class="meta">
-<li>Stand: 07.11.2026, PR-Zahlen aus der GitHub-API (<code>gh pr list -R icssw-org/MeshCom-Firmware --author DK5EN --state all</code>)</li>
+<li>Stand: 08.11.2026, PR-Zahlen aus der GitHub-API (<code>gh pr list -R icssw-org/MeshCom-Firmware --author DK5EN --state all</code>)</li>
 <li>Zeitraum: 22.02.2026 bis 06.11.2026, letzter Merge ist #1257 (06.11.2026)</li>
 <li>Zeilenanteil in der Firmware: <code>git blame</code> auf upstream <code>dev</code> 9669ec99, Stand 18.10.2026, nicht neu berechnet</li>
-<li>Fork-Release: <code>v4.40a.11.06</code>; letztes offizielles Release: <code>v4.40a.10.28</code> (28.10.2026)</li>
+<li>Fork-Release: <code>v4.40a.11.06</code>; letztes offizielles Release: <code>v4.40a.11.07</code> (08.11.2026)</li>
 </ul>
 
 <div class="bluf">
-<p class="lead"><strong>DK5EN hat bis 06.11.2026 insgesamt 72 Pull Requests in die offizielle MeshCom-Firmware gemergt, verteilt auf neun Runden von 4.35m bis upstream <code>dev</code> 649b5b17; kein PR ist mehr offen.</strong>
+<p class="lead"><strong>DK5EN hat bis 06.11.2026 insgesamt 72 Pull Requests in die offizielle MeshCom-Firmware gemergt, verteilt auf neun Runden von 4.35m bis zum offiziellen Release 4.40a.11.07; kein PR ist mehr offen.</strong>
 Zusammen sind das +124.988 und −44.248 Zeilen in 1.156 Dateiänderungen.</p>
 <p>Die Zeilenbilanz unten zeigt, wie viel davon heute noch steht: 39,8 % der Kernfirmware sind unverändert das Original von Februar.</p>
 </div>
@@ -58,12 +58,12 @@ Zusammen sind das +124.988 und −44.248 Zeilen in 1.156 Dateiänderungen.</p>
   <ul><li>Davon stehen heute 28.148 Zeilen, das sind 23,3 % der Kernfirmware (Stand 18.10.2026).</li></ul></li>
 <li><strong>Original lebt weiter:</strong> 39,8 % der heutigen Kernfirmware sind unverändert die Zeilen von Februar. 74,8 % der damaligen Zeilen haben überlebt (Stand 18.10.2026).</li>
 <li><strong>Herkunft heute:</strong> 43,3 % der Zeilen stammen aus Commits dieses Forks, 16,9 % von anderen Autoren, im Wesentlichen vom ICSSW-Team (Stand 18.10.2026).</li>
-<li><strong>In offiziellen Releases:</strong> 4.40a (02.10.2026), 4.40a.hbserver (13.10.2026), 4.40a.spserver (22.10.2026) und 4.40a.10.28 (28.10.2026) tragen unsere Arbeit.
+<li><strong>In offiziellen Releases:</strong> 4.40a (02.10.2026), 4.40a.hbserver (13.10.2026), 4.40a.spserver (22.10.2026), 4.40a.10.28 (28.10.2026) und 4.40a.11.07 (08.11.2026) tragen unsere Arbeit.
   <ul>
   <li><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1213">#1213</a>, <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1214">#1214</a>, <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1224">#1224</a> und <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1233">#1233</a> stehen seit 4.40a.spserver im Release.</li>
   <li><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1235">#1235</a>, <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1236">#1236</a>, <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1238">#1238</a> und <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1239">#1239</a> stehen seit 4.40a.10.28 im Release.</li>
   </ul></li>
-<li><strong>Seit 31.10.2026 in upstream <code>dev</code>, noch in keinem offiziellen Release:</strong> zuletzt 4.40a.10.28 vom 28.10.2026.
+<li><strong>Seit 08.11.2026 im offiziellen Release 4.40a.11.07:</strong> alle PRs der Runden 8 und 9, dazu die L76K-GPS-Erkennung auf dem RAK von OE1KBC.
   <ul>
   <li><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1243">#1243</a> bis <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1245">#1245</a>: HEY-Upload nennt das Gateway, Extern-UDP-Nachrichten im Web-Chat, Web-Login ohne Klartext-Passwort. Im Fork seit <code>v4.40a.10.30</code>.</li>
   <li><a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1247">#1247</a>: Ping nur an Rufzeichen, eigene Baken mit Priorität 2, Empfangs-Stille-Log. Im Fork seit <code>v4.40a.11.01</code>.</li>
@@ -164,7 +164,7 @@ Zusammen sind das +124.988 und −44.248 Zeilen in 1.156 Dateiänderungen.</p>
 </details>
 
 <h2 id="r9">Runde 9: Ping nur an Rufzeichen, Landeszeichen, Akku, Wetter, Postfach-Knoten</h2>
-<p><strong>Vom 01. bis 06.11.2026 übernimmt das ICSSW-Team sechs PRs nach <code>dev</code>; ein offizielles Release mit ihnen gibt es noch nicht.</strong> Basis ist <code>dev</code> 147812e0. Von den +19.272 Zeilen sind 15.503 erzeugte T-Deck-Zeichensätze aus <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1249">#1249</a>.</p>
+<p><strong>Vom 01. bis 06.11.2026 übernimmt das ICSSW-Team sechs PRs nach <code>dev</code>; seit 08.11.2026 stehen sie im offiziellen Release 4.40a.11.07.</strong> Basis ist <code>dev</code> 147812e0. Von den +19.272 Zeilen sind 15.503 erzeugte T-Deck-Zeichensätze aus <a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1249">#1249</a>.</p>
 <ul>
 <li><strong>Weniger Last auf dem Kanal</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1247">#1247</a>, 01.11.): Ping nur noch an Rufzeichen, eigene Baken mit Priorität 2, dazu ein Log für Empfangs-Stille.</li>
 <li><strong>Review-Standard</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1248">#1248</a>, 02.11.): <code>REVIEW.md</code> mit vier Pflichtfragen. Reine Dokumentation.</li>
@@ -183,7 +183,7 @@ Zusammen sind das +124.988 und −44.248 Zeilen in 1.156 Dateiänderungen.</p>
 </tbody></table></div>
 
 <h2 id="r8">Runde 8: Web-Login ohne Klartext-Passwort, Gateway im HEY-Upload, Extern-UDP im Web-Chat</h2>
-<p><strong>Am 31.10.2026 übernimmt das ICSSW-Team drei Fixes vom 30.10.2026 nach <code>dev</code>; ein offizielles Release mit ihnen gibt es noch nicht.</strong> Basis ist 4.40a.10.28 (upstream <code>dev</code> 10203967). Der Fork liefert alle drei seit 30.10.2026 mit <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.30">v4.40a.10.30</a> aus.</p>
+<p><strong>Am 31.10.2026 übernimmt das ICSSW-Team drei Fixes vom 30.10.2026 nach <code>dev</code>; seit 08.11.2026 stehen sie im offiziellen Release 4.40a.11.07.</strong> Basis ist 4.40a.10.28 (upstream <code>dev</code> 10203967). Der Fork liefert alle drei seit 30.10.2026 mit <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.30">v4.40a.10.30</a> aus.</p>
 <ul>
 <li><strong>Ein Gateway nennt sich im HEY-Upload</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1243">#1243</a>, 31.10.): bisher fehlte der empfangende Gateway in etwa 44 % der HEY-Berichte am Server, Karten konnten die Verbindung nicht zeichnen. Der Pfad bleibt in den 119 Zeichen, die der Decoder annimmt.</li>
 <li><strong>Extern-UDP-Nachrichten erscheinen im eigenen Web-Chat</strong> (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1244">#1244</a>, 31.10.): eine über UDP 1799 gesendete Nachricht, etwa aus McApp, stand bisher nur auf LoRa, nicht im Verlauf des Knotens.</li>
@@ -432,6 +432,12 @@ Zusammen sind das +124.988 und −44.248 Zeilen in 1.156 Dateiänderungen.</p>
 
 <h2 id="fork">Was der Fork darüber hinaus liefert</h2>
 <p><strong>Seit 07.11.2026 steht im <a href="flash/">Web-Flasher</a> ausschließlich <a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.11.06">v4.40a.11.06</a>.</strong> Es ist upstream <code>dev</code> bis #1257 mit den Fork-Änderungen dieses Releases, dazu der Update-Kanal für Fork-Releases.</p>
+<p><strong>Gegenüber dem offiziellen 4.40a.11.07 vom 08.11.2026 bringt der Fork diese Firmware zusätzlich mit:</strong></p>
+<ul>
+<li><strong>Schon im Fork-Release v4.40a.11.06:</strong> die Pins-Seite im Web-GUI, die Web-Oberfläche komprimiert im Image, eine komprimierte Update-Seite im Safeboot, ein Zeitplan für die Auto-Update-Installation, ein Puffer für Gateway-Pakete bei Serverausfall, die Registrierungsabfrage für Extern-UDP und das Bildschirmfoto des T-Deck über das Web.</li>
+<li><strong>Nur auf <code>fork-dev</code>, noch in keinem Release:</strong> freie GPIO schalten mit Pin-Regeln je Board, auch per Fernwartung (GPIO-01 bis GPIO-06), das helle und dunkle Thema des T-Deck, GNSS am Heltec V4 (auf Hardware ungetestet), wählbarer DHT11- oder DHT22-Sensor, die Wiederaufnahme der Kanalabfrage vor dem Senden (CSMA-01) und Messhilfen für die Display-Uhr in Prüfstands-Builds (CLK-01).</li>
+<li><strong>Umgekehrt fehlt dem Fork:</strong> die neue Erkennung des L76K-GPS-Moduls am RAK4631 aus 4.40a.11.07 (<a href="https://github.com/icssw-org/MeshCom-Firmware/pull/1259">#1259</a>). Sie kommt mit dem nächsten Abgleich mit upstream in den Fork.</li>
+</ul>
 <p>Upstream hat 4.40a am 02.10.2026, 4.40a.hbserver am 13.10.2026 und 4.40a.spserver am 22.10.2026 veröffentlicht. Der Fork stellte aus dem Quelltext von 4.40a das Release v4.40a.10.02 bereit. Seit dem 19.10. kamen im Fork sieben Releases mit wichtigen Fehlerkorrekturen. Die Firmware all dieser Releases kam mit #1238 nach upstream und steht seit 28.10.2026 im offiziellen Release 4.40a.10.28.</p>
 <div class="table-wrap"><table><thead><tr><th>Release</th><th>Datum</th><th>Was es behebt oder bringt</th></tr></thead><tbody>
 <tr><td><a href="https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.10.19">v4.40a.10.19</a></td><td>19.10.2026</td><td><b>Volle LoRa-Sendewarteschlange:</b> ein Knoten mit eigenen und weitergeleiteten Paketen hängt nicht mehr minutenlang hinter seinen Nachbarn. Dazu feste Werte für zehn Protokoll-Einstellungen in Release-Builds, Auto Update im Web-GUI nur noch als Hinweis, mehr freier Heap für die Update-Prüfung auf klassischen ESP32, die Board-LED auf nRF52 und ein Watchdog-Fix für die Nachbarseite.</td></tr>
@@ -451,6 +457,7 @@ Zusammen sind das +124.988 und −44.248 Zeilen in 1.156 Dateiänderungen.</p>
 <ul>
 <li><strong>Zeilenanteil nicht neu berechnet:</strong> Die Zahlen im Abschnitt „Wie viel vom Original steckt noch in 4.40a?“ stammen vom 18.10.2026 (<code>git blame</code> auf <code>dev</code> 9669ec99). #1224, #1233, #1235, #1236, #1238, #1239, #1243 bis #1245, #1247 bis #1251 und #1257 sind darin nicht enthalten, die Spalte „In 4.40a“ ist für sie leer.</li>
 <li><strong>Beschreibungen der PRs</strong> sind aus den PR-Texten und Titeln übernommen und hier nicht gegen den Code neu geprüft. Zahlen, Anzahl und Zeilen kommen aus der GitHub-API und sind nachgerechnet.</li>
+<li><strong>Fork-Zusätze gegen 4.40a.11.07</strong> sind über Dateien ermittelt, die upstream fehlen, und über die Commits seit v4.40a.11.06. Einzelne Fork-Änderungen in Dateien, die es in beiden gibt, sind nicht vollständig zugeordnet (Stand 08.11.2026).</li>
 <li><strong>Frühe Versionsdaten</strong> von 4.35m, 4.35n und 4.35p sind aus der Seite vom 18.10.2026 übernommen. 4.35o und alle Daten ab 4.35s sind gegen die GitHub-Releases geprüft.</li>
 <li><strong>Zeilenbilanz je PR</strong> zählt, was GitHub im PR-Diff sieht. Dateiänderungen sind je PR gezählt, dieselbe Datei kann in mehreren PRs vorkommen.</li>
 </ul>
@@ -469,8 +476,8 @@ Zusammen sind das +124.988 und −44.248 Zeilen in 1.156 Dateiänderungen.</p>
 </ul>
 </details>
 <details class="dev">
-<summary>Versionsfolge upstream von 4.35l bis <code>dev</code> 649b5b17</summary>
-<p>4.35l → 4.35m (22.02.2026) → 4.35n (05.03.) → 4.35o (08.03.) → 4.35p (22.03.) → 4.35s (03.09.) → 4.35t (10.09., fortgeführt bis 13.09.) → 4.35t.09.20 (20.09.) → 4.35t.09.24 (24.09., #1153) → <code>dev</code> 6cc8b552 (26.09., darin unser #1157 vom 25.09. sowie #1158 OE1KFR SN1 WSPWD/ASYM und #1159 bis #1161 OE1KBC Repeat-Bit-Vorarbeiten, die letzten vier nicht von uns) → 4.35u (27.09., 61a58daa: 6cc8b552 plus #1162 und #1165 bis #1172, darin unsere #1162, #1168 und #1169) → 4.35v (29.09.; v4.35v.09.30 am 30.09. mit #1185) → 4.40a (02.10., #1186) → 4.40a.hbserver (13.10.; #1209 bis #1212 von OE1KBC mit HB- und HC-Server, darin unsere #1200/#1201 vom 10./11.10. und #1207/#1208 vom 12.10.) → <code>dev</code> 9669ec99 (18.10., unsere #1213 und #1214) → <code>dev</code> 06a4fd9a (18.10., #1215 von OE1KBC: Korrektur in <code>gw_servers.cpp</code> und neue Safeboot-Images) → 4.40a.spserver (22.10., d47c34c1: darin #1224, #1233 und #1234 von OE1KBC mit dem Polen-Server) → <code>dev</code> 72d32574 (24.10., unsere #1235 und #1236) → <code>dev</code> 7a1cdd70 (25.10., #1237 von OE1KFR mit den BLE-App-Einstellungen, dann unsere #1238 und #1239) → 4.40a.10.28 (28.10., 10203967: dazu #1240 von sp2ong mit dem E290-OTP-Image) → <code>dev</code> 147812e0 (31.10., unsere #1243 bis #1245) → <code>dev</code> 4f60051c (02.11., unsere #1247 bis #1251, dazu #1246 von sp2ong) → <code>dev</code> 649b5b17 (06.11., unsere #1257).</p>
+<summary>Versionsfolge upstream von 4.35l bis 4.40a.11.07</summary>
+<p>4.35l → 4.35m (22.02.2026) → 4.35n (05.03.) → 4.35o (08.03.) → 4.35p (22.03.) → 4.35s (03.09.) → 4.35t (10.09., fortgeführt bis 13.09.) → 4.35t.09.20 (20.09.) → 4.35t.09.24 (24.09., #1153) → <code>dev</code> 6cc8b552 (26.09., darin unser #1157 vom 25.09. sowie #1158 OE1KFR SN1 WSPWD/ASYM und #1159 bis #1161 OE1KBC Repeat-Bit-Vorarbeiten, die letzten vier nicht von uns) → 4.35u (27.09., 61a58daa: 6cc8b552 plus #1162 und #1165 bis #1172, darin unsere #1162, #1168 und #1169) → 4.35v (29.09.; v4.35v.09.30 am 30.09. mit #1185) → 4.40a (02.10., #1186) → 4.40a.hbserver (13.10.; #1209 bis #1212 von OE1KBC mit HB- und HC-Server, darin unsere #1200/#1201 vom 10./11.10. und #1207/#1208 vom 12.10.) → <code>dev</code> 9669ec99 (18.10., unsere #1213 und #1214) → <code>dev</code> 06a4fd9a (18.10., #1215 von OE1KBC: Korrektur in <code>gw_servers.cpp</code> und neue Safeboot-Images) → 4.40a.spserver (22.10., d47c34c1: darin #1224, #1233 und #1234 von OE1KBC mit dem Polen-Server) → <code>dev</code> 72d32574 (24.10., unsere #1235 und #1236) → <code>dev</code> 7a1cdd70 (25.10., #1237 von OE1KFR mit den BLE-App-Einstellungen, dann unsere #1238 und #1239) → 4.40a.10.28 (28.10., 10203967: dazu #1240 von sp2ong mit dem E290-OTP-Image) → <code>dev</code> 147812e0 (31.10., unsere #1243 bis #1245) → <code>dev</code> 4f60051c (02.11., unsere #1247 bis #1251, dazu #1246 von sp2ong) → <code>dev</code> 649b5b17 (06.11., unsere #1257) → 4.40a.11.07 (08.11., 5d76238b: dazu #1259 bis #1262 von OE1KBC mit der L76K-GPS-Erkennung auf dem RAK4631 und eigenen Bootloader-Dateien für T3 S3 und T-Deck Pro).</p>
 <p>Zwischen 4.35p und 4.35s liegen die Datums-Tags der Sommermonate (4.35p.07.02 bis 4.35p.08.29).</p>
 </details>
 

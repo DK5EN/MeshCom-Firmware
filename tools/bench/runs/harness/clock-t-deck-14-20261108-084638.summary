@@ -1,0 +1,225 @@
+{
+  "node": "t-deck-14",
+  "malformed_lines": 0,
+  "shot_errors": 0,
+  "shots": [
+    "clock-t-deck-14-20261108-084638-tdeck-001.png",
+    "clock-t-deck-14-20261108-084638-tdeck-002.png",
+    "clock-t-deck-14-20261108-084638-tdeck-003.png",
+    "clock-t-deck-14-20261108-084638-tdeck-004.png",
+    "clock-t-deck-14-20261108-084638-tdeck-005.png",
+    "clock-t-deck-14-20261108-084638-tdeck-006.png",
+    "clock-t-deck-14-20261108-084638-tdeck-007.png",
+    "clock-t-deck-14-20261108-084638-tdeck-008.png",
+    "clock-t-deck-14-20261108-084638-tdeck-009.png"
+  ],
+  "info_events": [
+    {
+      "t": 1794124002.068,
+      "tag": "CLOCK",
+      "kind": "timesrc",
+      "mode": "all"
+    }
+  ],
+  "stat_count": 16,
+  "drift_curve": [
+    {
+      "t": 1794124010.174,
+      "elapsed_s": 0.0,
+      "drift_s": 0.0,
+      "offset_s": 3598.826
+    },
+    {
+      "t": 1794124062.246,
+      "elapsed_s": 52.073,
+      "drift_s": -0.073,
+      "offset_s": 3598.754
+    },
+    {
+      "t": 1794124122.255,
+      "elapsed_s": 112.082,
+      "drift_s": -0.082,
+      "offset_s": 3598.745
+    },
+    {
+      "t": 1794124122.255,
+      "elapsed_s": 112.082,
+      "drift_s": -0.082,
+      "offset_s": 3598.745
+    },
+    {
+      "t": 1794124182.323,
+      "elapsed_s": 172.149,
+      "drift_s": -0.149,
+      "offset_s": 3598.677
+    },
+    {
+      "t": 1794124182.323,
+      "elapsed_s": 172.15,
+      "drift_s": -0.15,
+      "offset_s": 3598.677
+    },
+    {
+      "t": 1794124242.432,
+      "elapsed_s": 232.259,
+      "drift_s": -0.259,
+      "offset_s": 3598.568
+    },
+    {
+      "t": 1794124242.432,
+      "elapsed_s": 232.259,
+      "drift_s": -0.259,
+      "offset_s": 3598.568
+    },
+    {
+      "t": 1794124302.55,
+      "elapsed_s": 292.376,
+      "drift_s": -0.376,
+      "offset_s": 3598.45
+    },
+    {
+      "t": 1794124302.55,
+      "elapsed_s": 292.376,
+      "drift_s": -0.376,
+      "offset_s": 3598.45
+    },
+    {
+      "t": 1794124362.313,
+      "elapsed_s": 352.14,
+      "drift_s": -0.14,
+      "offset_s": 3598.687
+    },
+    {
+      "t": 1794124422.168,
+      "elapsed_s": 411.994,
+      "drift_s": 0.006,
+      "offset_s": 3598.832
+    },
+    {
+      "t": 1794124482.208,
+      "elapsed_s": 472.035,
+      "drift_s": -0.035,
+      "offset_s": 3598.792
+    },
+    {
+      "t": 1794124482.208,
+      "elapsed_s": 472.035,
+      "drift_s": -0.035,
+      "offset_s": 3598.792
+    },
+    {
+      "t": 1794124542.463,
+      "elapsed_s": 532.289,
+      "drift_s": -0.289,
+      "offset_s": 3598.537
+    },
+    {
+      "t": 1794124542.463,
+      "elapsed_s": 532.289,
+      "drift_s": 0.711,
+      "offset_s": 3599.537
+    }
+  ],
+  "drift_total_s": 0.711,
+  "drift_max_abs_s": 0.711,
+  "drift_ppm": 1335.7,
+  "lost_ms_last": 0,
+  "late_max_ms_max": 1345,
+  "sets": [
+    {
+      "t": 1794124018.858,
+      "src": "GPS",
+      "delta_ms": 1
+    },
+    {
+      "t": 1794124062.246,
+      "src": "GPS",
+      "delta_ms": 1006
+    },
+    {
+      "t": 1794124109.188,
+      "src": "GPS",
+      "delta_ms": 63
+    },
+    {
+      "t": 1794124169.254,
+      "src": "GPS",
+      "delta_ms": -1
+    },
+    {
+      "t": 1794124229.356,
+      "src": "GPS",
+      "delta_ms": -1
+    },
+    {
+      "t": 1794124259.44,
+      "src": "NTP",
+      "delta_ms": -44
+    },
+    {
+      "t": 1794124270.106,
+      "src": "GPS",
+      "delta_ms": 1000
+    },
+    {
+      "t": 1794124322.502,
+      "src": "GPS",
+      "delta_ms": 0
+    },
+    {
+      "t": 1794124322.513,
+      "src": "NTP",
+      "delta_ms": -12
+    },
+    {
+      "t": 1794124382.586,
+      "src": "GPS",
+      "delta_ms": -1
+    },
+    {
+      "t": 1794124409.636,
+      "src": "NTP",
+      "delta_ms": -13
+    },
+    {
+      "t": 1794124443.038,
+      "src": "GPS",
+      "delta_ms": -1
+    },
+    {
+      "t": 1794124460.203,
+      "src": "GPS",
+      "delta_ms": 1002
+    },
+    {
+      "t": 1794124461.071,
+      "src": "GPS",
+      "delta_ms": -1001
+    },
+    {
+      "t": 1794124482.208,
+      "src": "GPS",
+      "delta_ms": 1006
+    },
+    {
+      "t": 1794124539.178,
+      "src": "GPS",
+      "delta_ms": 2
+    }
+  ],
+  "set_by_src": {
+    "GPS": {
+      "count": 13,
+      "max_abs_delta_ms": 1006
+    },
+    "NTP": {
+      "count": 3,
+      "max_abs_delta_ms": 44
+    }
+  },
+  "max_abs_set_delta_ms": 1006,
+  "draw_count": 0,
+  "display_gap_max_s": null,
+  "display_gap_threshold_s": 1.5,
+  "skip_reasons": {}
+}
