@@ -3321,30 +3321,32 @@ void sub_page_setup()
         // WEBLOOK-HTML-BEGIN
         static const char *const themeNames[3] = {"auto", "light", "dark"};
         static const char *const fontNames[3] = {"s", "m", "l"};
-        web_client.println("<label id=\"weblook_theme_lbl\">Web page theme <span class=\"font-small\">(this page, this browser)</span></label>");
+        web_client.println("<div class=\"mcsegrow\"><label id=\"weblook_theme_lbl\">Web page theme <span class=\"font-small\">(this page, this browser)</span></label>");
         web_client.println("<div class=\"mcledgrp\" role=\"group\" aria-labelledby=\"weblook_theme_lbl\">");
         for (int i = 0; i < 3; i++)
             web_client.printf("<button type=\"button\" class=\"mctab mcledbtn\" id=\"weblook_theme_%s\" aria-pressed=\"false\" onclick=\"mcLookSet('mcTheme','%s')\">%s</button>\n", themeNames[i], themeNames[i], themeNames[i]);
-        web_client.println("</div>");
-        web_client.println("<label id=\"weblook_font_lbl\">Web page font size <span class=\"font-small\">(this page, this browser)</span></label>");
+        web_client.println("</div></div>");
+        web_client.println("<div class=\"mcsegrow\"><label id=\"weblook_font_lbl\">Web page font size <span class=\"font-small\">(this page, this browser)</span></label>");
         web_client.println("<div class=\"mcledgrp\" role=\"group\" aria-labelledby=\"weblook_font_lbl\">");
         for (int i = 0; i < 3; i++)
             web_client.printf("<button type=\"button\" class=\"mctab mcledbtn\" id=\"weblook_font_%s\" aria-pressed=\"false\" onclick=\"mcLookSet('mcFont','%s')\">%s</button>\n", fontNames[i], fontNames[i], fontNames[i]);
-        web_client.println("</div>");
+        web_client.println("</div></div>");
         // WEBLOOK-HTML-END
     }
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
     { // TD-THEME-01 W3: T-Deck DISPLAY theme (not the web page theme); stored value 0 auto, 1 dark, 2 light; setparam tdecktheme -> --theme
         // TD-HTML-BEGIN
-        web_client.println("<label id=\"tdtheme_lbl\">T-Deck display theme <span class=\"font-small\">(device screen, not this page)</span></label>");
+        web_client.println("<div class=\"mcsegrow\"><label id=\"tdtheme_lbl\">T-Deck display theme</label>");
         web_client.println("<div class=\"mcledgrp\" role=\"group\" aria-labelledby=\"tdtheme_lbl\">");
-        for (int i = 0; i < 3; i++)
+        static const int themeOrder[3] = {0, 2, 1}; // stored 0 auto, 1 dark, 2 light; shown auto - light - dark
+        for (int k = 0; k < 3; k++)
         {
+            const int i = themeOrder[k];
             const bool on = (meshcom_settings.node_tdeck_theme == i) || (i == 0 && meshcom_settings.node_tdeck_theme > 2);
             web_client.printf("<button type=\"button\" class=\"mctab mcledbtn%s\" id=\"tdtheme_%s\" aria-pressed=\"%s\" onclick=\"tdSet('%s')\">%s</button>\n",
                               on ? " mctab-on" : "", tdeck_theme_name(i), on ? "true" : "false", tdeck_theme_name(i), tdeck_theme_name(i));
         }
-        web_client.println("</div>");
+        web_client.println("</div></div>");
         // TD-HTML-END
     }
     { // WEB-TD-01: T-Deck font size, display (backlight mode) and brightness, same order as the T-Deck setup page
@@ -3353,19 +3355,19 @@ void sub_page_setup()
         static const char *const dispNames[3] = {"auto", "light", "dark"};
         const int fontCur = meshcom_settings.node_tdeck_chatfont > 2 ? 0 : meshcom_settings.node_tdeck_chatfont;
         const int dispCur = (int)brightness_mode_to_seg(brightnessMode());
-        web_client.println("<label id=\"tdfont_lbl\">T-Deck font size <span class=\"font-small\">(chat text on the device screen)</span></label>");
+        web_client.println("<div class=\"mcsegrow\"><label id=\"tdfont_lbl\">T-Deck font size</label>");
         web_client.println("<div class=\"mcledgrp\" role=\"group\" aria-labelledby=\"tdfont_lbl\">");
         for (int i = 0; i < 3; i++)
             web_client.printf("<button type=\"button\" class=\"mctab mcledbtn%s\" id=\"tdfont_%s\" aria-pressed=\"%s\" onclick=\"tdFont('%s')\">%s</button>\n",
                               fontCur == i ? " mctab-on" : "", fontNames[i], fontCur == i ? "true" : "false", fontNames[i], fontNames[i]);
-        web_client.println("</div>");
-        web_client.println("<label id=\"tddisp_lbl\">T-Deck display <span class=\"font-small\">(backlight: auto = day/night, light = day level, dark = night level)</span></label>");
+        web_client.println("</div></div>");
+        web_client.println("<div class=\"mcsegrow\"><label id=\"tddisp_lbl\">T-Deck display backlight</label>");
         web_client.println("<div class=\"mcledgrp\" role=\"group\" aria-labelledby=\"tddisp_lbl\">");
         for (int i = 0; i < 3; i++)
             web_client.printf("<button type=\"button\" class=\"mctab mcledbtn%s\" id=\"tddisp_%s\" aria-pressed=\"%s\" onclick=\"tdDisp('%s')\">%s</button>\n",
                               dispCur == i ? " mctab-on" : "", dispNames[i], dispCur == i ? "true" : "false", dispNames[i], dispNames[i]);
-        web_client.println("</div>");
-        web_client.printf("<label for=\"tdbright\">T-Deck brightness <span class=\"font-small\">(level of the slot the display mode selects)</span></label><div><input type=\"range\" id=\"tdbright\" min=\"1\" max=\"16\" value=\"%d\" oninput=\"document.getElementById('tdbright_val').textContent=this.value\" onchange=\"tdBright(this.value)\"> <span id=\"tdbright_val\">%d</span></div>\n",
+        web_client.println("</div></div>");
+        web_client.printf("<div class=\"mcsegrow\"><label for=\"tdbright\">T-Deck brightness</label><div><input type=\"range\" id=\"tdbright\" min=\"1\" max=\"16\" value=\"%d\" oninput=\"document.getElementById('tdbright_val').textContent=this.value\" onchange=\"tdBright(this.value)\"> <span id=\"tdbright_val\">%d</span></div></div>\n",
                           (int)brightnessActiveLevel(), (int)brightnessActiveLevel());
         // TD2-HTML-END
     }

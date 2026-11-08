@@ -81,10 +81,10 @@ select:focus,input:focus,textarea:focus {border:solid 1px var(--mcred);backgroun
 .flex-auto-wrap {display:flex;flex-direction:row;flex-wrap:wrap;gap:10px;}
 .flex-auto-wrap>* {flex:1;}
 /* content definitions -> commonly used inputs */
-input:where([type="checkbox"][role="switch"]) {-webkit-appearance:none;-moz-appearance:none;appearance:none;position:relative;font-size:inherit;width:2.5em;height:1.2em;box-sizing:content-box;border-radius:1em;vertical-align:text-bottom;margin:auto;color:inherit;background-color:var(--mcswf);border:1px solid var(--mcswb);}
-input:where([type="checkbox"][role="switch"]):checked {background-color:var(--mcsw1);border-color:var(--mcsw1);}
+input:where([type="checkbox"][role="switch"]) {-webkit-appearance:none;-moz-appearance:none;appearance:none;position:relative;font-size:inherit;width:2.5em;height:1.2em;box-sizing:content-box;border-radius:1em;vertical-align:text-bottom;margin:auto 0 auto auto;color:inherit;background-color:var(--mcswf);border:1px solid var(--mcswb);}
+input:where([type="checkbox"][role="switch"]):checked {background-color:var(--mcsw1);}
 input:where([type="checkbox"][role="switch"])::before {content:"";position:absolute;top:50%;left:0;transform:translate(0,-50%);box-sizing:border-box;width:1.1em;height:1.1em;margin:0 0.15em;border-radius:50%;background:var(--mcswk);border:1px solid var(--mcswkb);-webkit-transition:0.5s;transition:0.5s;}
-input:where([type="checkbox"][role="switch"]):checked::before {left:1.8em;background:var(--mcbg);border-color:var(--mcbg);}
+input:where([type="checkbox"][role="switch"]):checked::before {left:1.8em;background:var(--mcbg);}
 /* content definitions -> setup collapsable cards */
 .collapsablecard>.cardtoggle {position:absolute;right:8px;top:-1px;transform:translateY(-50%);z-index:10;width:36px;height:36px;border-radius:50% !important;disjplay:none;}
 .collapsablecard>.cardtoggle>i {padding:4px;margin:auto;border:solid var(--mcgray);border-width:2px 0 0 2px;display:block;-webkit-transform:rotate(-135deg);transform:rotate(-135deg);-webkit-transition:0.5s;transition:0.5s;}
@@ -111,10 +111,18 @@ input:where([type="checkbox"][role="switch"]):checked::before {left:1.8em;backgr
 #mctabs {margin:6px 0;}
 #content_inner .mctab {display:inline-flex;align-items:center;border:solid 1px var(--mcgray);background-color:var(--mcbg);border-radius:5px;padding:2px 8px;margin-right:4px;cursor:pointer;}
 /* WEB-LED-02: three-way LED buttons share one width */
-#content_inner .mcledgrp {display:flex;flex-wrap:wrap;gap:4px;}
+/* one non-wrapping row, right edge on the check-button column (grid: own row spanning both columns) */
+#content_inner .mcledgrp {display:flex;flex-wrap:nowrap;gap:4px;}
+/* right edge only inside a setup row; the pins-page LED/GPIO groups stay left under their label */
+#content_inner .mcsegrow .mcledgrp {width:max-content;max-width:100%;margin-left:auto;}
 #content_inner .mcledgrp .mcledbtn {box-sizing:border-box;width:5.5em;justify-content:center;margin-right:0;}
 #content_inner .mctab-new {background-color:var(--mclightgreen);}
 #content_inner .mctab-on {background-color:var(--mclightblue);}
+/* selected segment: toggle-ON green fill, normal ink border (--mcgray from .mctab), label in the page background colour */
+/* setup: label left, segment group / slider right, one line spanning both grid columns */
+#content_inner .mcsegrow {grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+#content_inner .mcsegrow input[type=range] {accent-color:var(--mcsw1);}
+#content_inner .mcledgrp .mctab-on {background-color:var(--mcsw1);color:var(--mcbg);}
 .mcbadge {font-size:var(--fs-s);font-weight:bold;margin-left:4px;}
 /* stage 3 mailbox card below: "before you switch this on" warning box. */
 .cardbody>.grid,.cardbody>.mbx-warn {margin:0 0 7px 0;}

@@ -216,6 +216,38 @@ const attr = (w, a) => w.document.documentElement.getAttribute(a);
     check('and keeps ticking from the new base', txt(w2) === '2026-11-08 12:43:17 CET [GPS]', txt(w2));
     skew = 0;
   }
+
+  // ---- WEB-LOOK layout/colour pins (mc.css, textual: jsdom does not resolve var()) ----
+  {
+    const CSS = fs.readFileSync(path.join(__dirname, '..', 'src', 'web_functions', 'web', 'mc.css'), 'utf8');
+    const rule = (sel) => { const m = CSS.split('\n').find((l) => l.startsWith(sel + ' {')); return m ? m.slice(m.indexOf('{') + 1, m.lastIndexOf('}')) : ''; };
+    const dec = (r, prop) => { const m = new RegExp('(?:^|;)\\s*' + prop + ':([^;]*)').exec(r); return m ? m[1].trim() : null; };
+    const grp = rule('#content_inner .mcledgrp'), on = rule('#content_inner .mcledgrp .mctab-on');
+    check('segment group is a non-wrapping single row', dec(grp, 'display') === 'flex' && dec(grp, 'flex-wrap') === 'nowrap', grp);
+    const segGrp = rule('#content_inner .mcsegrow .mcledgrp'), rng = rule('#content_inner .mcsegrow input[type=range]');
+    check('segment group is right-aligned only inside a setup row (.mcsegrow), not on the pins page', dec(segGrp, 'margin-left') === 'auto' && !dec(grp, 'margin-left'), grp + ' | ' + segGrp);
+    check('brightness slider is toggle-ON green (accent-color --mcsw1)', dec(rng, 'accent-color') === 'var(--mcsw1)', rng);
+    check('selected segment fills with --mcsw1 (toggle-ON green), not --mclightblue', dec(on, 'background-color') === 'var(--mcsw1)', on);
+    check('selected segment keeps the normal border (no border override)', !/border/.test(on) && /solid 1px var\(--mcgray\)/.test(rule('#content_inner .mctab')));
+    check('message tab bar keeps its blue', dec(rule('#content_inner .mctab-on'), 'background-color') === 'var(--mclightblue)');
+    const sw = rule('input:where([type="checkbox"][role="switch"])'), swOn = rule('input:where([type="checkbox"][role="switch"]):checked'), kn = rule('input:where([type="checkbox"][role="switch"])::before'), knOn = rule('input:where([type="checkbox"][role="switch"]):checked::before');
+    check('switch track border is --mcswb', /1px solid var\(--mcswb\)/.test(sw) && dec(sw, 'border') === '1px solid var(--mcswb)', sw);
+    check('checked switch does not override the border (stays --mcswb, not --mcsw1)', !/border/.test(swOn) && dec(swOn, 'background-color') === 'var(--mcsw1)', swOn);
+    check('knob border is --mcswkb and stays so when checked', /border:1px solid var\(--mcswkb\)/.test(kn) && !/border/.test(knOn), knOn);
+    check('switch sits on the right edge of its column', dec(sw, 'margin') === 'auto 0 auto auto', dec(sw, 'margin'));
+    // contrast of label/outline pairs in both themes
+    const tok = (block, n) => new RegExp('--' + n + ':(#[0-9A-Fa-f]{6})').exec(block)[1];
+    const lum = (h) => { const c = [1, 3, 5].map((i) => parseInt(h.substr(i, 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4))); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+    const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    const lightT = CSS.split('\n').filter((l) => l.startsWith(':root {')).join(' ');
+    const darkT = CSS.split('\n').filter((l) => l.startsWith(':root[data-theme=dark] {')).join(' ');
+    for (const [nm, T] of [['light', lightT], ['dark', darkT]]) {
+      const g = (n) => tok(T, n);
+      const lab = cr(g('mcbg'), g('mcsw1')), swb = cr(g('mcswb'), g('mcbg')), kb = cr(g('mcswkb'), g('mcbg')), seg = cr(g('mcgray'), g('mcbg'));
+      console.log('INFO ' + nm + ': label on green ' + lab.toFixed(2) + ', switch outline vs bg ' + swb.toFixed(2) + ', knob outline vs bg ' + kb.toFixed(2) + ', segment border vs bg ' + seg.toFixed(2));
+      check(nm + ': switch outline >= 3:1 against the page', swb >= 3, swb);
+    }
+  }
   console.log(failures ? failures + ' FAILED' : 'all passed');
   process.exit(failures ? 1 : 0);
 })();

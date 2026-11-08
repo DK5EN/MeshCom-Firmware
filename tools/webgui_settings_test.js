@@ -363,7 +363,7 @@ async function settle() { for (let i = 0; i < 6; i++) await flush(); }
       const rule = /\.mcledgrp\s+\.mcledbtn\s*\{([^}]*)\}/.exec(css);
       check('WEB-LED-02 all three LED buttons share the mcledbtn class (one loop, one format)', !!cls && /\bmcledbtn\b/.test(cls[1]) && /mcledgrp/.test(body), cls && cls[1]);
       check('WEB-LED-02 shipped mc.css gives .mcledbtn one fixed width', !!rule && /(^|;)\s*width:\s*[\d.]+(em|px|rem)/.test(rule[1]) && /box-sizing:\s*border-box/.test(rule[1]), rule && rule[1]);
-      check('WEB-LED-02 LED group wraps at narrow widths and uses no hard colours (dark mode follows the .mctab vars)', /\.mcledgrp\s*\{[^}]*flex-wrap:\s*wrap/.test(css) && !/#[0-9a-f]{3,6}\b/i.test(rule ? rule[1] : '#'));
+      check('WEB-LED-02 LED group is one non-wrapping row, left on the pins page (right edge only inside .mcsegrow) and uses no hard colours (dark mode follows the .mctab vars)', /#content_inner \.mcledgrp\s*\{[^}]*flex-wrap:\s*nowrap/.test(css) && !/#content_inner \.mcledgrp\s*\{[^}]*margin-left/.test(css) && !/#[0-9a-f]{3,6}\b/i.test(rule ? rule[1] : '#'));
     }
     check('LED-08 setparam chargeled issues --charge led on|off through commandAction', /paramName\.equals\("chargeled"\)[\s\S]{0,260}"--charge led %s"[\s\S]{0,200}commandAction\(message_text/.test(ws));
     check('LED-08 both parameters can be read back (getparam)', (ws.match(/paramName\.equals\("boardled"\)/g) || []).length === 2 && (ws.match(/paramName\.equals\("chargeled"\)/g) || []).length === 2);

@@ -31,9 +31,12 @@ if (MUT) console.log('NOTE mutation active: ' + MUT);
 const lit = (s) => s.replace(/\\(["\\])/g, '$1').replace(/\\n/g, '\n');
 const fixed = [...cpp.matchAll(/println\("((?:[^"\\]|\\.)*)"\)/g)].map((m) => lit(m[1]));
 const fmt = /printf\("((?:[^"\\]|\\.)*)",/.exec(cpp);
-const names = ['auto', 'dark', 'light'];
+const names = ['auto', 'dark', 'light']; // index = stored value (tdeck_theme_name)
+const ord = /themeOrder\[3\]\s*=\s*\{([^}]*)\}/.exec(cpp); // DOM order of the buttons, as emitted by the C++ loop
+const order = ord ? ord[1].split(',').map((x) => parseInt(x, 10)) : [0, 1, 2];
 function render(stored) {
-  const btn = names.map((n, i) => {
+  const btn = order.map((i) => {
+    const n = names[i];
     const on = stored === i;
     return lit(fmt[1]).replace('%s', on ? ' mctab-on' : '').replace('%s', n).replace('%s', on ? 'true' : 'false').replace('%s', n).replace('%s', n);
   }).join('');
@@ -62,7 +65,7 @@ const pressed = (w) => names.map((n) => w.document.getElementById('tdtheme_' + n
   for (const stored of [0, 1, 2]) {
     const w = mount(stored);
     const bt = [...w.document.querySelectorAll('button')];
-    check('stored ' + names[stored] + ': three buttons Auto/Dark/Light labels', bt.map((b) => b.textContent).join() === 'auto,dark,light');
+    check('stored ' + names[stored] + ': three buttons in DOM order auto, light, dark', bt.map((b) => b.textContent).join() === 'auto,light,dark', bt.map((b) => b.textContent).join());
     check('stored ' + names[stored] + ': only that button is aria-pressed', pressed(w) === names.map((_, i) => String(i === stored)).join(), pressed(w));
   }
   check('label text present', /T-Deck display theme/.test(render(0)));
@@ -89,6 +92,22 @@ const pressed = (w) => names.map((n) => w.document.getElementById('tdtheme_' + n
     const w = mount(1);
     w.document.getElementById('tdtheme_light').click(); await settle();
     check('error returncode ' + bad.returncode + ' leaves the state unchanged and tells the user', pressed(w) === 'false,true,false' && alerts.length === 1, pressed(w) + '|' + alerts.length);
+  }
+  { // Operator review 2026-11-08: label and control on ONE line (row spanning both grid columns), short labels
+    const w = mount(0);
+    const lbl = w.document.getElementById('tdtheme_lbl');
+    const row = lbl.parentElement;
+    check('T-Deck theme: label and button group share one .mcsegrow row', row.classList.contains('mcsegrow') && !!row.querySelector('.mcledgrp #tdtheme_auto'), row.className);
+    check('T-Deck theme label is exactly "T-Deck display theme"', lbl.textContent === 'T-Deck display theme', lbl.textContent);
+    const td2 = between(WF, 'TD2-HTML');
+    const wl = between(WF, 'WEBLOOK-HTML');
+    for (const [id, txt] of [['tdfont_lbl', 'T-Deck font size'], ['tddisp_lbl', 'T-Deck display backlight']])
+      check(id + ': row wrapper and label "' + txt + '"', td2.includes('<div class=\\"mcsegrow\\"><label id=\\"' + id + '\\">' + txt + '</label>'), id);
+    check('tdbright: row wrapper and label "T-Deck brightness"', td2.includes('<div class=\\"mcsegrow\\"><label for=\\"tdbright\\">T-Deck brightness</label><div>'), 'tdbright');
+    check('web look theme and font rows use the same row wrapper', (wl.match(/<div class=\\"mcsegrow\\"><label id=\\"weblook_/g) || []).length === 2, 'weblook');
+    const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'web_functions', 'web', 'mc.css'), 'utf8');
+    const r = /#content_inner \.mcsegrow \{([^}]*)\}/.exec(css);
+    check('.mcsegrow spans both columns as one flex line, control pushed right', !!r && /grid-column:1\/-1/.test(r[1]) && /display:flex/.test(r[1]) && /justify-content:space-between/.test(r[1]), r && r[1]);
   }
   console.log(failures ? 'FAILED: ' + failures : 'ALL PASS');
   process.exit(failures ? 1 : 0);
