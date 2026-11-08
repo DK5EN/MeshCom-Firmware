@@ -450,6 +450,12 @@ static_assert((kHardMask & (1ULL << BOARD_LORA_EN)) != 0, "T-Deck Pro: BOARD_LOR
 #if defined(BOARD_T_DECK_PRO) && defined(BOARD_GPS_EN)
 static_assert(BOARD_GPS_EN == 39 && (kHardMask & (1ULL << BOARD_GPS_EN)) != 0, "T-Deck Pro: BOARD_GPS_EN (GNSS power enable, 39) is not reserved HARD");
 #endif
+// GPIO-09: T-Deck copies (power-on 10, TFT CS/DC/backlight, ES7210 audio) are wrong pins on the Pro and must stay out of
+// its variant header.
+#if defined(BOARD_T_DECK_PRO) && (defined(TDECK_POWERON) || defined(TDECK_TFT_CS) || defined(TDECK_TFT_DC) || defined(TDECK_TFT_BACKLIGHT) || \
+                                  defined(TDECK_ES7210_MCLK) || defined(TDECK_ES7210_LRCK) || defined(TDECK_ES7210_SCK) || defined(TDECK_ES7210_DIN))
+#error "GPIO-09: T-Deck copies in variants/t_deck_pro/configuration.h (TDECK_POWERON / TDECK_TFT_* / TDECK_ES7210_*)"
+#endif
 // GPIO-06: keyboard IRQ 15 (was a copy of the T-Deck 46, which is the LoRa EN pin here), GPS EN 39, 1V8 EN 38, modem EN 41.
 #if defined(BOARD_T_DECK_PRO) && defined(TDECK_KEYBOARD_INT) && defined(BOARD_GPS_EN) && defined(BOARD_1V8_EN) && defined(BOARD_6609_EN)
 static_assert(TDECK_KEYBOARD_INT == 15 && BOARD_1V8_EN == 38 && BOARD_GPS_EN == 39 && BOARD_6609_EN == 41 && BOARD_LORA_EN == 46,

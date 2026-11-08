@@ -698,6 +698,13 @@ static void test_tdeck_pro_enable_and_keyboard_pins_are_reserved(void)
     TEST_ASSERT_EQUAL_INT_MESSAGE(48, gpio06_define(cfg, "TDECK_SDCARD_CS"), "TDECK_SDCARD_CS");
     TEST_ASSERT_EQUAL_INT_MESSAGE(12, gpio06_define(cfg, "TDECK_TOUCH_INT"), "TDECK_TOUCH_INT");
     TEST_ASSERT_TRUE_MESSAGE(src.find("BOARD_GPS_EN == 39 && (kHardMask & (1ULL << BOARD_GPS_EN))") != std::string::npos, "GPS EN static_assert");
+    // GPIO-09: the T-Deck audio (ES7210), TFT and power-on copies are wrong on the Pro (48 = SD CS, 42 = keyboard LED,
+    // 10 = A7682E RXD, e-paper instead of a TFT) and unused there, so the Pro variant must not define them at all.
+    const char *gone[] = {"TDECK_POWERON",     "TDECK_TFT_CS",      "TDECK_TFT_DC",     "TDECK_TFT_BACKLIGHT",
+                          "TDECK_ES7210_MCLK", "TDECK_ES7210_LRCK", "TDECK_ES7210_SCK", "TDECK_ES7210_DIN"};
+    for (const char *g : gone)
+        TEST_ASSERT_EQUAL_INT_MESSAGE(-1, gpio06_define(cfg, g), g);
+    TEST_ASSERT_TRUE_MESSAGE(src.find("GPIO-09: T-Deck copies") != std::string::npos, "GPIO-09 #error guard");
     for (const auto &w : want)
     {
         TEST_ASSERT_EQUAL_INT_MESSAGE(w.pin, gpio06_define(cfg, w.name), w.name);

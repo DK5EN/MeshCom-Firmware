@@ -27,7 +27,7 @@ and `/release-firmware`. Soak on DK5EN-98, the GPSV4-01 upstream PR and field ch
   [campaign-impl-train-20261107.md](campaign-impl-train-20261107.md).
 
 - **BACKLOG-ROUND:** operator decisions 2026-11-08: CLK-01 fix, web controls and eight follow-ups now, release
-  after the backlog. Wave 1 done (see its commit); next wave CLK-PING-01, GPIO-09 interview, open questions.
+  after the backlog. Waves 1 and 2 done (CLK-PING-01, SENS-05 schema, GPIO-09); next is the bulk bench.
   [campaign-backlog-round-20261108.md](campaign-backlog-round-20261108.md) -- resume here.
 
 - **TD-THEME-01:** W1-W3 done (last `f4c944e1`); W4 is the bench pass on DK5EN-14 (screenshots of both themes,

@@ -263,6 +263,16 @@ struct FieldDescriptor {
     bool has_range;
     double min_value;
     double max_value;
+
+    // Optional allowed-value set for integer fields (SENS-05: node_dht_type is
+    // valid only as 11 or 22, which a [11, 22] range cannot express). When
+    // allowed_values is non-null, decode() replaces any value NOT in the
+    // set with allowed_values[0] (the default) instead of clamping it by
+    // nearness; the set is applied before the range clamp. Trailing and without a
+    // default member initialiser on purpose: brace initialisers that stop at
+    // max_value stay valid and value-initialise these to nullptr / 0.
+    const long long *allowed_values;
+    size_t allowed_count;
 };
 
 // Counts of what decode() did, returned instead of a pass/fail code because
@@ -287,6 +297,13 @@ struct DecodeStats {
     // decoded for its field's type (see behaviour 4 above for the exact
     // list). state is untouched for these.
     size_t malformed_lines = 0;
+
+    // SENS-05: decoded lines (a subset of fields_set) whose value was NOT in the
+    // field's allowed-value set and was replaced by the set's default. The
+    // clamp-to-range case is deliberately not counted here (a clamp keeps no
+    // record). A caller that persists corrections (nRF52 load) treats a non-zero
+    // count like a sanitiser fix: log it and rewrite the file.
+    size_t values_substituted = 0;
 };
 
 // Encodes every field described by fields[0..field_count) by reading it out

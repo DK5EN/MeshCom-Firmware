@@ -369,6 +369,10 @@ static void sanitize_log(const char *field, const char *oldv, const char *newv)
 	Serial.printf("[FLASH]...sanitized %s: %s -> %s\n", field, oldv, newv);
 }
 
+// SENS-05: values the keyed store's decode() replaced (allowed-value set, e.g. node_dht 15 -> 11).
+// Set by init_flash() before the call so the correction is logged and written back like any other.
+static unsigned s_store_substituted = 0;
+
 void sanitize_loaded_settings(void)
 {
 	RadioLimits lim = { TX_POWER_MIN, TX_POWER_MAX, 400.0e6f, 960.0e6f, 1, 1, max_country };
@@ -449,6 +453,9 @@ void sanitize_loaded_settings(void)
 	// implemented in this file above) -- init_flash() calls countersLoad() right after this function
 	// returns, on every load path, and that call does the msgIdAfterLoad() step and its own
 	// write-back. Nothing here touches node_msgid any more.
+
+	fixed += (int)s_store_substituted;   // SENS-05: decode() substitutions, see s_store_substituted
+	s_store_substituted = 0;
 
 	if(fixed > 0 || strings > 0)
 	{
@@ -563,6 +570,7 @@ void init_flash(void)
 		Serial.printf("[SETST];path;keyed;fields_set=%u;unknown_keys=%u;malformed_lines=%u;lines_total=%u\n",
 					  (unsigned)keyed.stats.fields_set, (unsigned)keyed.stats.unknown_keys,
 					  (unsigned)keyed.stats.malformed_lines, (unsigned)keyed.stats.lines_total);
+		s_store_substituted = (unsigned)keyed.stats.values_substituted;
 		sanitize_loaded_settings();
 		countersLoad();
 		log_settings();

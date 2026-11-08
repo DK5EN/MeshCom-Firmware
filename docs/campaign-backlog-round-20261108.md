@@ -64,19 +64,30 @@ Operator decisions during the wave:
 - Web extras: ticking page clock (synced at render, re-sync after laptop sleep, PC clock only detects), lighter
   toggle OFF state (`#C8C8C8` track with `#767676` outline).
 
+## Wave 2 (2026-11-08)
+
+Operator interview: GPIO-09 remove; CSMA-03 threshold decided by the bench; SENS-05 schema tightened now;
+`clock_drift.py` two reboots per run accepted.
+
+| Item        | Result                                                                                                              |
+| ----------- | ------------------------------------------------------------------------------------------------------------------- |
+| CLK-PING-01 | A configured ping no longer freezes the clock. The clock line skips (`hold`) only while a drawn held frame is shown |
+|             | (`dispClkHeldFrame()`: `DisplayOffWait` running and `bHeldFrameDrawn`, set by `DisplayPong` and the hold text).     |
+|             | `sendDisplayTime()` and `mainStartTimeLoop()` unconditional; ESP32 hold-expiry `#C` clear no longer ping-gated.     |
+| SENS-05     | Schema allowed set: `node_dht` outside {11, 22} decodes to 11 (`FieldDescriptor::allowed_values`); nRF52 logs and   |
+|             | rewrites the corrected store (`values_substituted`). ESP32 NVS does not use `decode()`; the load sanitiser stays.   |
+|             | `node_dht` is persist-only, so JSON config import ignores it (pinned by a test).                                    |
+| GPIO-09     | The eight T-Deck copies removed from the Pro variant; `#error` guard in `pin_board.cpp`; golden updated.            |
+
+Two Sonnet writers, advisor REWORK twice (pageHold countdown frozen by a call-site gate; boards whose `DisplayPong`
+draws nothing), first rework by two fresh writers at high, second by the orchestrator. Every fix has a test that fails
+before and passes after.
+
 ## Next wave (resume here)
 
-1. **CLK-PING-01:** with a ping configured the ESP32 head-page clock freezes: `esp32_main.cpp` ~:5177 skips
-   `mainStartTimeLoop()` and `loop_functions.cpp` ~:2747 skips the clock draw whenever a ping is configured. Both
-   must test "pong page shown" (`DisplayOffWait` set at `loop_functions.cpp` ~:4196/:4210) instead. One writer, both
-   files, host test. Operator wants the clock current on every page.
-2. **GPIO-09 (interview the operator):** further T-Deck copies in `variants/t_deck_pro/configuration.h` that are
-   wrong for the Pro: ES7210 audio pins (MCLK 48 = SD CS, LRCK 21, SCK 47, DIN 14), TFT CS 12 / DC 11 (the Pro has
-   e-paper), backlight 42 (= keyboard LED), POWERON 10 (= A7682E RXD).
-3. **Open questions for the operator:** CSMA-03 staleness threshold `CSMA_CAD_MAX_AGE_US` 5 ms is a guess (bench on
-   DK5EN-90 decides, log marker `CAD_STALE_RECHECK`); SENS-05 schema range 11..22 lets 15 through (sanitiser
-   catches it on load); `clock_drift.py` now reboots each node twice per run (identity guard).
-4. **Bench (bulk bench):** CLK-01 W1 rest (S2, S3, S4) and W3 after-run incl. A4 OLED frame time with
-   `--oledlog on`; CSMA-03 on DK5EN-90; GPIO-06/08 on a T-Deck Pro; web GUI look in Safari (T-Deck controls, page
-   clock, toggles, theme/font switch); T-Deck green and setup page on DK5EN-14.
-5. Release only after the backlog is complete (operator); upstream PRs later as a bundle.
+1. **Bench (bulk bench):** CLK-01 W1 rest (S2, S3, S4) and W3 after-run incl. A4 OLED frame time with
+   `--oledlog on`; clock on a pinged ESP32 OLED node (CLK-PING-01, `[DISPCLK];skip;hold` only during the pong text);
+   CSMA-03 on DK5EN-90 (count `CAD_STALE_RECHECK`, then set `CSMA_CAD_MAX_AGE_US`); GPIO-06/08/09 on a T-Deck Pro;
+   web GUI look in Safari (T-Deck controls, page clock, toggles, theme/font switch); T-Deck green and setup page on
+   DK5EN-14.
+2. Release only after the backlog is complete (operator); upstream PRs later as a bundle.

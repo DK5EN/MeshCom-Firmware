@@ -58,18 +58,14 @@
 
 // OE3GJC: TODO check
 
-//! The board peripheral power control pin needs to be set to HIGH when using the peripheral
-#define TDECK_POWERON 10
+// GPIO-09: no TDECK_POWERON, TDECK_TFT_* or TDECK_ES7210_* here. Those are T-Deck copies that are wrong on the Pro
+// (10 = A7682E RXD, 42 = keyboard LED, 48 = SD CS, e-paper instead of a TFT) and unused; src/pin_board.cpp refuses them.
 
 #define TDECK_SDCARD_CS     48
 
 #define TDECK_SPI_MOSI      33
 #define TDECK_SPI_MISO      47
 #define TDECK_SPI_SCK       36
-
-#define TDECK_TFT_CS        12
-#define TDECK_TFT_DC        11
-#define TDECK_TFT_BACKLIGHT 42
 
 #define GPS_RX_PIN        44
 #define GPS_TX_PIN        43
@@ -99,12 +95,6 @@
 #define I2S_BCLK            7
 #define I2S_LRC             5
 #define I2S_DOUT            6
-
-// Audio input
-#define TDECK_ES7210_MCLK   48
-#define TDECK_ES7210_LRCK   21
-#define TDECK_ES7210_SCK    47
-#define TDECK_ES7210_DIN    14
 
 #define BOARD_I2S_WS        I2S_LRC
 #define BOARD_I2S_BCK       I2S_BCLK

@@ -5,11 +5,14 @@
 // the sender header ("GM<grp> <CALL> <rssi>"), so the clock stays frozen there (SkipType0, F1
 // operator decision 2026-11-08) and is drawn again when the next clock page is built (every
 // sendDisplayHead/Position/Track/WX call sendDisplayMainline(), which draws the current time).
-// Returned: Draw, SkipNoDisplay, SkipOff, SkipType0, SkipSetDisplay. SkipGate15 (F2) and SkipHold are
-// no longer returned here; the enumerators and reason strings stay for the INSTRUMENT [DISPCLK]
-// contract. SkipPing (dispClkPingActive()) and the WP_DISP "gate15" (10 s e-paper refresh) are
-// emitted by the caller in loop_functions.cpp. Ping pages (DisplayPong) are full-screen text
-// without a clock line and are treated like the message page: no clock draw, no overwrite.
+// Returned: Draw, SkipNoDisplay, SkipOff, SkipHold, SkipType0, SkipSetDisplay. SkipGate15 (F2) is
+// no longer returned here; the enumerator and reason string stay for the INSTRUMENT [DISPCLK]
+// contract (the WP_DISP "gate15" 10 s e-paper refresh is emitted by the caller in
+// loop_functions.cpp). CLK-PING-01: a drawn held full-screen frame (holdActive = dispClkHeldFrame(), e.g.
+// the ping/pong page from DisplayPong) has no clock line: SkipHold, no clock draw, no overwrite.
+// A merely configured ping does NOT skip the clock. The hold is decided here (one predicate), not
+// by gating the sendDisplayTime() call: that function also runs the button page-hold countdown.
+// Order: off, hold, type0, setdisplay (hold before type0: the reason "hold" is the more specific).
 #pragma once
 
 enum class DispClkDecision
@@ -18,9 +21,8 @@ enum class DispClkDecision
     SkipNoDisplay,   // no u8g2 / board without this clock line
     SkipOff,         // bDisplayIsOff
     SkipType0,       // iDisplayType == 0 (message page, F1): no clock line there, content stays
-    SkipHold,        // page hold (not consulted by sendDisplayTime today)
+    SkipHold,        // drawn held full-screen frame (DispClkInputs::holdActive, dispClkHeldFrame())
     SkipSetDisplay,  // bSetDisplay: a draw is in progress
-    SkipPing,        // configured ping skips the caller (not decided here)
     SkipGate15       // legacy (F2): no longer returned by dispClkDecide
 };
 
@@ -34,22 +36,28 @@ struct DispClkInputs
     int  second;         // node_date_second
     bool oneButton;
     bool displayDirty;
+    bool holdActive;     // dispClkHeldFrame(): drawn held frame (ping/pong page, hold text), no clock line
 };
 
 static inline DispClkDecision dispClkDecide(const DispClkInputs &in)
 {
     if (!in.hasDisplay)        return DispClkDecision::SkipNoDisplay;
     if (in.displayIsOff)       return DispClkDecision::SkipOff;
+    if (in.holdActive)         return DispClkDecision::SkipHold;
     if (in.displayType == 0)   return DispClkDecision::SkipType0;
     if (in.setDisplay)         return DispClkDecision::SkipSetDisplay;
     return DispClkDecision::Draw;
 }
 
-// Configured ping (call set, interval and count > 0): the ping/pong frames own the screen and have
-// no clock line, so the clock draw is skipped (SkipPing). Same predicate as the caller gates.
-static inline bool dispClkPingActive(bool pingCallSet, unsigned pingTime, unsigned pingCount)
+// CLK-PING-01: the clock line is skipped only while a held full-screen frame was really drawn
+// (DisplayOffWait running AND heldFrameDrawn, set by DisplayPong's u8g2 branch and the hold-text
+// frame). DisplayOffWait alone is not enough: it is also set on boards whose DisplayPong draws
+// nothing, and on the T-Deck Pro it never resets. An expired hold clears the flag.
+static inline bool dispClkHeldFrame(unsigned long displayOffWait, bool &heldFrameDrawn)
 {
-    return pingCallSet && pingTime != 0 && pingCount != 0;
+    if (displayOffWait == 0)
+        heldFrameDrawn = false;
+    return displayOffWait > 0 && heldFrameDrawn;
 }
 
 static inline const char *dispClkReason(DispClkDecision d)
@@ -62,7 +70,6 @@ static inline const char *dispClkReason(DispClkDecision d)
     case DispClkDecision::SkipType0:      return "type0";
     case DispClkDecision::SkipHold:       return "hold";
     case DispClkDecision::SkipSetDisplay: return "setdisplay";
-    case DispClkDecision::SkipPing:       return "ping";
     case DispClkDecision::SkipGate15:     return "gate15";
     }
     return "?";

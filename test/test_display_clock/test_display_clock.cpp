@@ -17,6 +17,7 @@ static DispClkInputs base(int sec = 0)
     DispClkInputs in;
     in.hasDisplay = true; in.displayIsOff = false; in.displayType = 1; in.pageHold = 0;
     in.setDisplay = false; in.second = sec; in.oneButton = false; in.displayDirty = false;
+    in.holdActive = false;
     return in;
 }
 
@@ -72,6 +73,9 @@ void test_order_off_before_type0_before_setdisplay(void)
     in.displayIsOff = true; in.displayType = 0; in.setDisplay = true;
     TEST_ASSERT_TRUE(dispClkDecide(in) == DispClkDecision::SkipOff);
     in.displayIsOff = false;
+    in.holdActive = true;
+    TEST_ASSERT_TRUE(dispClkDecide(in) == DispClkDecision::SkipHold);   // hold before type0
+    in.holdActive = false;
     TEST_ASSERT_TRUE(dispClkDecide(in) == DispClkDecision::SkipType0);
     in.displayType = 1;
     TEST_ASSERT_TRUE(dispClkDecide(in) == DispClkDecision::SkipSetDisplay);
@@ -92,7 +96,6 @@ void test_reason_strings(void)
     TEST_ASSERT_EQUAL_STRING("hold", dispClkReason(DispClkDecision::SkipHold));
     TEST_ASSERT_EQUAL_STRING("setdisplay", dispClkReason(DispClkDecision::SkipSetDisplay));
     TEST_ASSERT_EQUAL_STRING("off", dispClkReason(DispClkDecision::SkipOff));
-    TEST_ASSERT_EQUAL_STRING("ping", dispClkReason(DispClkDecision::SkipPing));
     TEST_ASSERT_EQUAL_STRING("gate15", dispClkReason(DispClkDecision::SkipGate15));
     TEST_ASSERT_EQUAL_STRING("draw", dispClkReason(DispClkDecision::Draw));
 }
@@ -131,13 +134,32 @@ void test_f1_message_header_survives_clock_pass(void)
     }
 }
 
-// Ping pages are full-screen text without a clock line: kept like the message page.
-void test_ping_active_predicate(void)
+// CLK-PING-01: a held full-screen frame (ping/pong page etc., holdActive = dispClkHeldFrame()) has no
+// clock line: SkipHold. Without a hold every clock page draws, whether or not a ping is configured
+// (the ping configuration is not an input of the decision at all).
+void test_hold_skips_clock_no_hold_draws(void)
 {
-    TEST_ASSERT_TRUE(dispClkPingActive(true, 30, 3));
-    TEST_ASSERT_FALSE(dispClkPingActive(false, 30, 3));   // no ping call
-    TEST_ASSERT_FALSE(dispClkPingActive(true, 0, 3));     // no interval
-    TEST_ASSERT_FALSE(dispClkPingActive(true, 30, 0));    // count used up
+    for (int s = 0; s < 60; s += 7)
+        for (int ty = 1; ty < 10; ty++)
+        {
+            DispClkInputs in = base(s);
+            in.displayType = ty;
+            in.holdActive = true;
+            TEST_ASSERT_TRUE(dispClkDecide(in) == DispClkDecision::SkipHold);
+            in.holdActive = false;
+            TEST_ASSERT_TRUE(dispClkDecide(in) == DispClkDecision::Draw);
+        }
+    DispClkInputs t0 = base(0);
+    t0.displayType = 0; t0.holdActive = true;
+    TEST_ASSERT_TRUE(dispClkDecide(t0) == DispClkDecision::SkipHold);   // hold wins over type0
+    t0.holdActive = false;
+    TEST_ASSERT_TRUE(dispClkDecide(t0) == DispClkDecision::SkipType0);  // message page stays frozen
+    DispClkInputs off = base(0);
+    off.displayIsOff = true; off.holdActive = true;
+    TEST_ASSERT_TRUE(dispClkDecide(off) == DispClkDecision::SkipOff);   // off wins over hold
+    DispClkInputs nod = base(0);
+    nod.hasDisplay = false; nod.holdActive = true;
+    TEST_ASSERT_TRUE(dispClkDecide(nod) == DispClkDecision::SkipNoDisplay);
 }
 
 void test_fix_F2_every_second_draws(void)
@@ -226,14 +248,100 @@ void test_clock_pages_draw_time_on_page_change(void)
     TEST_ASSERT_TRUE_MESSAGE(track.find("sendDisplayMainline();") != std::string::npos, "track page");
 }
 
-// Configured ping: the caller gate is the shared predicate, not a copy.
-void test_ping_gate_uses_shared_predicate(void)
+// Code lines of a source window (comment-only lines dropped), so the assertions below do not trip
+// over words in comments.
+static std::string code_only(const std::string &w)
+{
+    std::istringstream is(w);
+    std::string line, out;
+    while (std::getline(is, line))
+    {
+        const size_t f = line.find_first_not_of(" \t");
+        if (f == std::string::npos || line.compare(f, 2, "//") == 0) continue;
+        out += line + "\n";
+    }
+    return out;
+}
+
+// CLK-PING-01 (1): sendDisplayTime() (button page-hold countdown + clock line) is called every second,
+// unconditionally: no DisplayOffWait / hold / ping condition around the call site. The hold only
+// suppresses the clock LINE, inside dispClkDecide() (fed from dispClkHeldFrame(): hold AND drawn frame).
+void test_sendDisplayTime_call_site_ungated(void)
 {
     const std::string src = read_repo_file("src/loop_functions.cpp");
     const size_t call = src.find("sendDisplayTime(); // Time only");
     TEST_ASSERT_TRUE_MESSAGE(call != std::string::npos, "sendDisplayTime() call site not found");
-    const size_t gate = src.rfind("dispClkPingActive(", call);
-    TEST_ASSERT_TRUE_MESSAGE(gate != std::string::npos && call - gate < 400, "ping gate lost dispClkPingActive()");
+    const size_t start = src.rfind("#else", call);
+    TEST_ASSERT_TRUE_MESSAGE(start != std::string::npos && call - start < 600, "#else of the call site not found");
+    const std::string code = code_only(src.substr(start, call - start));
+    TEST_ASSERT_TRUE_MESSAGE(code.find("if") == std::string::npos, "sendDisplayTime() call is inside a condition");
+    TEST_ASSERT_TRUE_MESSAGE(code.find("DisplayOffWait") == std::string::npos, "call gated on DisplayOffWait");
+    TEST_ASSERT_TRUE_MESSAGE(code.find("dispClk") == std::string::npos && code.find("Hold") == std::string::npos, "call gated on hold");
+    TEST_ASSERT_TRUE_MESSAGE(code.find("node_ping") == std::string::npos, "call gated on ping");
+    // the hold is an input of the clock-line decision
+    const std::string body = func_body(src, "static void sendDisplayClockLine()\n{");
+    const size_t hold = body.find("dcIn.holdActive   = dispClkHeldFrame(DisplayOffWait, bHeldFrameDrawn);");
+    const size_t dec = body.find("dispClkDecide(dcIn)");
+    TEST_ASSERT_TRUE_MESSAGE(hold != std::string::npos && dec != std::string::npos && hold < dec,
+                             "dcIn.holdActive not fed from dispClkHeldFrame() before dispClkDecide()");
+    TEST_ASSERT_TRUE_MESSAGE(code_only(body).find("BOARD_T_DECK_PRO") == std::string::npos, "board special case in the hold input");
+}
+
+// CLK-PING-01 (2): esp32loop() ticks the clock (mainStartTimeLoop) whether or not a ping is configured.
+void test_esp32_clock_tick_not_gated_on_ping(void)
+{
+    const std::string src = read_repo_file("src/esp32/esp32_main.cpp");
+    const size_t call = src.find("mainStartTimeLoop();");
+    TEST_ASSERT_TRUE_MESSAGE(call != std::string::npos, "mainStartTimeLoop() call not found in esp32_main.cpp");
+    size_t start = src.rfind("\n\n", call);
+    TEST_ASSERT_TRUE_MESSAGE(start != std::string::npos, "block start not found");
+    const std::string code = code_only(src.substr(start, call - start));
+    TEST_ASSERT_TRUE_MESSAGE(code.find("node_ping") == std::string::npos, "mainStartTimeLoop() gated on the ping configuration");
+    TEST_ASSERT_TRUE_MESSAGE(code.find("if") == std::string::npos, "mainStartTimeLoop() is inside a condition");
+}
+
+// CLK-PING-01 (3): on hold expiry with display-off the clear "#C" is sent regardless of a configured
+// ping (as nrf52_main.cpp), else the pong frame stays lit on a display that is nominally off.
+void test_esp32_hold_expiry_clear_not_gated_on_ping(void)
+{
+    const std::string src = read_repo_file("src/esp32/esp32_main.cpp");
+    const size_t tick = src.find("mainStartTimeLoop();");
+    TEST_ASSERT_TRUE_MESSAGE(tick != std::string::npos, "mainStartTimeLoop() call not found");
+    const size_t clr = src.find("(char*)\"#C\"", tick);
+    TEST_ASSERT_TRUE_MESSAGE(clr != std::string::npos, "hold-expiry #C clear not found");
+    const size_t exp = src.find("bDisplayIsOff=true;", tick);
+    TEST_ASSERT_TRUE_MESSAGE(exp != std::string::npos && exp < clr && clr - exp < 600, "hold-expiry block not found");
+    const std::string code = code_only(src.substr(exp, clr - exp));
+    TEST_ASSERT_TRUE_MESSAGE(code.find("node_ping") == std::string::npos, "#C clear gated on the ping configuration");
+}
+
+// CLK-PING-01: DisplayOffWait is also set on boards whose DisplayPong draws nothing (T114, T-Echo, Stick V3,
+// Tracker, T-Deck family, T-Connect-Pro, e-paper) and on the T-Deck Pro it never resets. The clock may only be
+// skipped while a held frame was really drawn: hold running AND frame drawn; an expired hold clears the flag.
+void test_held_frame_needs_a_drawn_frame(void)
+{
+    bool drawn = false;
+    TEST_ASSERT_FALSE_MESSAGE(dispClkHeldFrame(5000UL, drawn), "hold without a drawn frame skips the clock");
+    drawn = true;
+    TEST_ASSERT_TRUE_MESSAGE(dispClkHeldFrame(5000UL, drawn), "drawn frame during its hold not protected");
+    TEST_ASSERT_TRUE(drawn);
+    TEST_ASSERT_FALSE_MESSAGE(dispClkHeldFrame(0UL, drawn), "expired hold still skips the clock");
+    TEST_ASSERT_FALSE_MESSAGE(drawn, "expired hold does not clear the drawn flag");
+    TEST_ASSERT_FALSE_MESSAGE(dispClkHeldFrame(5000UL, drawn), "next undrawn hold skips the clock after an old frame");
+}
+
+// The flag is set exactly where a held frame is drawn: DisplayPong's u8g2 branch and the hold-text frame.
+void test_held_frame_flag_set_where_frames_are_drawn(void)
+{
+    const std::string src = read_repo_file("src/loop_functions.cpp");
+    const std::string pong = code_only(func_body(src, "void DisplayPong(char line1[20], char line2[20], char line3[20], char line4[20])\n{"));
+    const size_t first = pong.find("u8g2->firstPage();");
+    const size_t set = pong.find("bHeldFrameDrawn = true;");
+    TEST_ASSERT_TRUE_MESSAGE(first != std::string::npos && set != std::string::npos && set > first, "DisplayPong does not mark its drawn frame");
+    const size_t hold = src.find("DisplayOffWait = millis() + (unsigned long)hold_s * 1000UL;");
+    TEST_ASSERT_TRUE_MESSAGE(hold != std::string::npos, "hold-text frame not found");
+    const size_t hset = src.find("bHeldFrameDrawn = true;", hold);
+    TEST_ASSERT_TRUE_MESSAGE(hset != std::string::npos && hset - hold < 200, "hold-text frame does not mark its drawn frame");
 }
 
 int main(int, char **)
@@ -243,14 +351,18 @@ int main(int, char **)
     RUN_TEST(test_display_track_clock_every_second_page_every_15s);
     RUN_TEST(test_clockline_decides_before_touching_pagetext);
     RUN_TEST(test_clock_pages_draw_time_on_page_change);
-    RUN_TEST(test_ping_gate_uses_shared_predicate);
+    RUN_TEST(test_sendDisplayTime_call_site_ungated);
+    RUN_TEST(test_esp32_clock_tick_not_gated_on_ping);
+    RUN_TEST(test_esp32_hold_expiry_clear_not_gated_on_ping);
     RUN_TEST(test_gate15_seconds);
     RUN_TEST(test_order_off_before_type0_before_setdisplay);
     RUN_TEST(test_pagehold_does_not_block_clock);
     RUN_TEST(test_reason_strings);
     RUN_TEST(test_f1_message_page_never_draws_clock);
     RUN_TEST(test_f1_message_header_survives_clock_pass);
-    RUN_TEST(test_ping_active_predicate);
+    RUN_TEST(test_hold_skips_clock_no_hold_draws);
     RUN_TEST(test_fix_F2_every_second_draws);
+    RUN_TEST(test_held_frame_needs_a_drawn_frame);
+    RUN_TEST(test_held_frame_flag_set_where_frames_are_drawn);
     return UNITY_END();
 }

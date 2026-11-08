@@ -8,6 +8,7 @@
 #include "settings_store.h"
 
 #include <cerrno>
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -222,6 +223,23 @@ double clamp_range(double v, const FieldDescriptor &f) {
     return v;
 }
 
+// SENS-05: an integer outside the descriptor's allowed-value set decodes to
+// the set's first entry (the default), not to the nearest member.
+long long apply_allowed(long long v, const FieldDescriptor &f, bool *substituted) {
+    if (f.allowed_values == nullptr || f.allowed_count == 0) {
+        return v;
+    }
+    for (size_t i = 0; i < f.allowed_count; i++) {
+        if (f.allowed_values[i] == v) {
+            return v;
+        }
+    }
+    if (substituted != nullptr) {
+        *substituted = true;
+    }
+    return f.allowed_values[0];
+}
+
 // Longest legitimate numeric token this codec ever emits is the double
 // worst case (sign + 17 significant digits in scientific form), well under
 // 32 bytes; 63 leaves ample margin for a hand-edited file's stray padding
@@ -240,7 +258,7 @@ bool copy_token(const char *value, size_t value_len, char (&tmp)[kNumTokenCap + 
 
 bool decode_signed(const char *value, size_t value_len, const FieldDescriptor &f,
                     long long native_min, long long native_max,
-                    long long *out) {
+                    long long *out, bool *substituted) {
     if (value_len == 0) {
         return false;
     }
@@ -254,6 +272,11 @@ bool decode_signed(const char *value, size_t value_len, const FieldDescriptor &f
     if (end != tmp + value_len || errno == ERANGE) {
         return false;
     }
+    if (f.allowed_values != nullptr) {
+        // Checked BEFORE the range clamp: 33 must fall back to the default,
+        // not clamp to the member 22.
+        v = apply_allowed(v, f, substituted);
+    }
     if (f.has_range) {
         v = (long long)clamp_range((double)v, f);
     } else if (v < native_min || v > native_max) {
@@ -264,7 +287,8 @@ bool decode_signed(const char *value, size_t value_len, const FieldDescriptor &f
 }
 
 bool decode_unsigned(const char *value, size_t value_len, const FieldDescriptor &f,
-                      unsigned long long native_max, unsigned long long *out) {
+                      unsigned long long native_max, unsigned long long *out,
+                      bool *substituted) {
     if (value_len == 0 || value[0] == '-') {
         return false;
     }
@@ -277,6 +301,9 @@ bool decode_unsigned(const char *value, size_t value_len, const FieldDescriptor 
     unsigned long long v = strtoull(tmp, &end, 10);
     if (end != tmp + value_len || errno == ERANGE) {
         return false;
+    }
+    if (f.allowed_values != nullptr && v <= (unsigned long long)LLONG_MAX) {
+        v = (unsigned long long)apply_allowed((long long)v, f, substituted);
     }
     if (f.has_range) {
         double clamped = clamp_range((double)v, f);
@@ -367,33 +394,33 @@ bool unescape_string(const char *value, size_t value_len, size_t cap, char *out)
 }
 
 bool decode_field_value(const FieldDescriptor &f, const char *value,
-                         size_t value_len, void *state) {
+                         size_t value_len, void *state, bool *substituted) {
     char *base = static_cast<char *>(state) + f.offset;
     switch (f.type) {
         case FieldType::I8: {
             long long v;
-            if (!decode_signed(value, value_len, f, -128LL, 127LL, &v)) return false;
+            if (!decode_signed(value, value_len, f, -128LL, 127LL, &v, substituted)) return false;
             int8_t stored = (int8_t)v;
             memcpy(base, &stored, sizeof(stored));
             return true;
         }
         case FieldType::U8: {
             unsigned long long v;
-            if (!decode_unsigned(value, value_len, f, 255ULL, &v)) return false;
+            if (!decode_unsigned(value, value_len, f, 255ULL, &v, substituted)) return false;
             uint8_t stored = (uint8_t)v;
             memcpy(base, &stored, sizeof(stored));
             return true;
         }
         case FieldType::I32: {
             long long v;
-            if (!decode_signed(value, value_len, f, -2147483648LL, 2147483647LL, &v)) return false;
+            if (!decode_signed(value, value_len, f, -2147483648LL, 2147483647LL, &v, substituted)) return false;
             int32_t stored = (int32_t)v;
             memcpy(base, &stored, sizeof(stored));
             return true;
         }
         case FieldType::U32: {
             unsigned long long v;
-            if (!decode_unsigned(value, value_len, f, 4294967295ULL, &v)) return false;
+            if (!decode_unsigned(value, value_len, f, 4294967295ULL, &v, substituted)) return false;
             uint32_t stored = (uint32_t)v;
             memcpy(base, &stored, sizeof(stored));
             return true;
@@ -456,8 +483,12 @@ void process_line(const FieldDescriptor *fields, size_t field_count,
         stats.unknown_keys++;
         return;
     }
-    if (decode_field_value(*f, value, value_len, state)) {
+    bool substituted = false;
+    if (decode_field_value(*f, value, value_len, state, &substituted)) {
         stats.fields_set++;
+        if (substituted) {
+            stats.values_substituted++;
+        }
     } else {
         stats.malformed_lines++;
     }

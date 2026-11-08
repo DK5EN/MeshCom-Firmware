@@ -177,10 +177,23 @@ SETTINGS_PERSIST_ONLY_LIST(X)
 // [lo, hi]. Sweeping every row on that rule finds exactly these two. Checking
 // only the fields that settings_sanitize.cpp names is NOT the same sweep and
 // misses max_hop_text -- that is how it was missed the first time.
+// SENS-05: node_dht_type is valid only as 11 or 22 (first entry = default).
+static const long long kDhtAllowed[] = {11, 22};
+
+// Allowed-value set for one row, by key. Compile-time string compare so the
+// X-macro row shape stays untouched; every other row gets nullptr / 0.
+constexpr bool schemaKeyIs(const char *a, const char *b) {
+    return *a == *b && (*a == '\0' || schemaKeyIs(a + 1, b + 1));
+}
+#define SETTINGS_SCHEMA_ALLOWED(key) \
+    (schemaKeyIs(key, "node_dht") ? kDhtAllowed : nullptr), \
+    (schemaKeyIs(key, "node_dht") ? (size_t)2 : (size_t)0)
+
 #define SETTINGS_SCHEMA_ROW(key, cfgtype, member, lo, hi, esc, has_esc)                          \
     {key, CfgTypeToFieldType(cfgtype), offsetof(s_meshcom_settings, member),                     \
      sizeof(((s_meshcom_settings *)0)->member),                                                   \
-     ((double)(lo) <= (double)(hi)) && !(has_esc), (double)(lo), (double)(hi)},
+     ((double)(lo) <= (double)(hi)) && !(has_esc), (double)(lo), (double)(hi),                    \
+     SETTINGS_SCHEMA_ALLOWED(key)},
 
 static const settings_store::FieldDescriptor kFields[] = {
 #define X(...) SETTINGS_SCHEMA_ROW(__VA_ARGS__)
@@ -189,6 +202,7 @@ static const settings_store::FieldDescriptor kFields[] = {
 };
 
 #undef SETTINGS_SCHEMA_ROW
+#undef SETTINGS_SCHEMA_ALLOWED
 
 static const size_t kFieldCount = sizeof(kFields) / sizeof(kFields[0]);
 

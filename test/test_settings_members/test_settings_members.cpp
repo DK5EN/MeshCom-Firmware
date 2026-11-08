@@ -517,6 +517,51 @@ static void test_setter_legal_values_survive_roundtrip()
     TEST_ASSERT_TRUE_MESSAGE(offenderCount == 0, report.c_str());
 }
 
+// SENS-05: the REAL schema carries node_dht's allowed-value set {11, 22} and no
+// other row has one. Guards settings_schema.cpp itself (the settings_store suite
+// uses its own descriptor and would stay green if the real row lost the set).
+static void test_dht_allowed_set_is_in_the_real_schema()
+{
+    const settings_store::FieldDescriptor *fields = settings_schema::fields();
+    const size_t n = settings_schema::fieldCount();
+
+    const settings_store::FieldDescriptor *dht = find_row("node_dht");
+    TEST_ASSERT_NOT_NULL_MESSAGE(dht, "no node_dht row");
+    TEST_ASSERT_NOT_NULL_MESSAGE(dht->allowed_values, "node_dht has no allowed-value set");
+    TEST_ASSERT_EQUAL_UINT32(2, (uint32_t)dht->allowed_count);
+    TEST_ASSERT_EQUAL_INT(11, (int)dht->allowed_values[0]);
+    TEST_ASSERT_EQUAL_INT(22, (int)dht->allowed_values[1]);
+
+    for (size_t i = 0; i < n; i++)
+    {
+        if (&fields[i] == dht)
+            continue;
+        if (fields[i].allowed_values != nullptr || fields[i].allowed_count != 0)
+        {
+            char msg[96];
+            snprintf(msg, sizeof(msg), "unexpected allowed-value set on row %s", fields[i].key);
+            TEST_FAIL_MESSAGE(msg);
+        }
+    }
+
+    const struct { const char *line; int want; size_t subst; } cases[] = {
+        {"node_dht=11\n", 11, 0}, {"node_dht=22\n", 22, 0}, {"node_dht=15\n", 11, 1},
+        {"node_dht=0\n", 11, 1},  {"node_dht=33\n", 11, 1}, {"node_dht=21\n", 11, 1},
+    };
+    for (const auto &c : cases)
+    {
+        std::vector<char> st(sizeof(s_meshcom_settings), 0);
+        const settings_store::DecodeStats stats =
+            settings_store::decode(fields, n, st.data(), c.line, strlen(c.line));
+        double got = -1;
+        TEST_ASSERT_TRUE(get_member(*dht, st.data(), &got));
+        char msg[96];
+        snprintf(msg, sizeof(msg), "stored line %s decoded to %g, want %d", c.line, got, c.want);
+        TEST_ASSERT_TRUE_MESSAGE(got == (double)c.want, msg);
+        TEST_ASSERT_EQUAL_UINT32((uint32_t)c.subst, (uint32_t)stats.values_substituted);
+    }
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -526,6 +571,7 @@ int main(void)
     RUN_TEST(test_member_sizes_and_padding_sum_to_sizeof);
     RUN_TEST(test_no_duplicate_descriptor_keys);
     RUN_TEST(test_setter_legal_values_survive_roundtrip);
+    RUN_TEST(test_dht_allowed_set_is_in_the_real_schema);
 
     return UNITY_END();
 }

@@ -402,6 +402,7 @@ char LogCallsign[10] = {0};
 
 bool bDisplayRetx = false;
 unsigned long DisplayOffWait = 0;
+bool bHeldFrameDrawn = false;   // CLK-PING-01: a held full-screen frame was drawn (DisplayPong, hold text)
 bool bDisplayTrack = false;
 bool bOneButton = false;
 bool bEnterDfu = false;   // --dfu: beim naechsten faelligen rebootAuto in den UF2-Bootloader statt Neustart
@@ -2128,8 +2129,8 @@ static void sendDisplayClockLine()
 {
     // CLK-01: early returns as one pure decision (display_clock_gate.h): no display, off, message
     // page (iDisplayType == 0: pageText[0] / TFT header bar hold the sender header, the clock stays
-    // frozen there, F1), draw in progress. No 15 s gate any more (F2). Board guards stay here as
-    // hasDisplay.
+    // frozen there, F1), a drawn held frame (ping/pong page, hold text, CLK-PING-01), draw in
+    // progress. No 15 s gate any more (F2). Board guards stay here as hasDisplay.
     DispClkInputs dcIn;
     dcIn.hasDisplay = true;
     #if MC_HAS_U8G2   // GRD-01: war die wortgleiche 11-Term-Liste
@@ -2146,6 +2147,7 @@ static void sendDisplayClockLine()
     dcIn.second       = meshcom_settings.node_date_second;
     dcIn.oneButton    = bOneButton;
     dcIn.displayDirty = bDisplayDirty;
+    dcIn.holdActive   = dispClkHeldFrame(DisplayOffWait, bHeldFrameDrawn);   // CLK-PING-01: drawn held frame, no clock line
 
     const DispClkDecision dcDecision = dispClkDecide(dcIn);
     if(dcDecision != DispClkDecision::Draw)
@@ -2742,14 +2744,10 @@ void mainStartTimeLoop()
                         clockInstrDispSkip(bDisplayIsOff ? "off" : "gate15");   // WP_DISP: 10 s gate
                     #endif
                     #else
-                    // Konfigurierter Ping: Ping-/Pong-Seiten (DisplayPong) sind Vollbild-Text ohne
-                    // Uhrzeile -> wie die Nachrichtenseite kein Uhr-Zeichnen, kein Ueberschreiben.
-                    if(!dispClkPingActive(meshcom_settings.node_pingcall[0] != 0x00, meshcom_settings.node_pingtime, meshcom_settings.node_pingcount))
-                        sendDisplayTime(); // Time only
-                    #if INSTRUMENT_ENABLED
-                    else
-                        clockInstrDispSkip(dispClkReason(DispClkDecision::SkipPing));
-                    #endif
+                    // CLK-PING-01: immer aufrufen (Button-Seiten-Haltezaehler in sendDisplayTime());
+                    // eine gehaltene, wirklich gezeichnete Vollbild-Seite (bHeldFrameDrawn) sperrt nur die Uhrzeile
+                    // (dispClkDecide: SkipHold), ein konfigurierter Ping nicht.
+                    sendDisplayTime(); // Time only
                     #endif
                 }
 
@@ -3978,6 +3976,7 @@ void DisplayPong(char line1[20], char line2[20], char line3[20], char line4[20])
             u8g2->drawStr(5, 60, line4);
         #endif
     } while (u8g2->nextPage());
+    bHeldFrameDrawn = true;   // CLK-PING-01: the clock line keeps off this frame while DisplayOffWait runs
 
     #endif
 }
@@ -4062,6 +4061,7 @@ int oledTextTest(const char *utf8, int font, int hold_s)
     if(hold_s < 1) hold_s = 1;
     if(hold_s > 600) hold_s = 600;
     DisplayOffWait = millis() + (unsigned long)hold_s * 1000UL;
+    bHeldFrameDrawn = true;   // CLK-PING-01
     if(DisplayOffWait == 0) DisplayOffWait = 1;
     bDisplayIsOff = false;
     return 0;

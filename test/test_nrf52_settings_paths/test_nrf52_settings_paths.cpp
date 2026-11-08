@@ -156,6 +156,35 @@ static void test_keyed_fast_path_wins_and_leaves_legacy_untouched(void)
     TEST_ASSERT_EQUAL_MEMORY(legacy.data(), after->data(), legacy.size());
 }
 
+// SENS-05: a stored DHT type outside {11, 22} is replaced by decode() (allowed-value set). The
+// correction must be persisted, not only applied in RAM: the keyed file is rewritten with 11.
+static void test_keyed_dht_substitution_is_written_back(void)
+{
+    auto legacy = make_legacy_blob("LEGACY-D1");
+    g_fake_fs.seed(kLegacyPath, legacy.data(), legacy.size());
+    seed_legacy_blob_crc(legacy);
+
+    s_meshcom_settings s;
+    strncpy(s.node_call, "KEYED-D2", sizeof(s.node_call) - 1);
+    s.max_hop_text = 4;        // valid, so the sanitiser has nothing else to correct (fixture default 0 is
+    s.node_sset4 = 6146;       // repaired and would trigger the write-back on its own); node_sset4 as init_flash leaves it
+    s.node_dht_type = 15;
+    auto keyed = make_keyed_store(s);
+    const std::string before(keyed.begin(), keyed.end());
+    TEST_ASSERT_TRUE_MESSAGE(before.find("node_dht=15") != std::string::npos, "fixture does not carry node_dht=15");
+    g_fake_fs.seed(kKeyedPath, keyed.data(), keyed.size());
+
+    init_flash();
+
+    TEST_ASSERT_EQUAL_STRING("KEYED-D2", meshcom_settings.node_call);
+    TEST_ASSERT_EQUAL_INT(11, meshcom_settings.node_dht_type);
+    const auto *after = g_fake_fs.peek(kKeyedPath);
+    TEST_ASSERT_NOT_NULL(after);
+    const std::string text(after->begin(), after->end());
+    TEST_ASSERT_TRUE_MESSAGE(text.find("node_dht=15") == std::string::npos, "keyed file still holds node_dht=15");
+    TEST_ASSERT_TRUE_MESSAGE(text.find("node_dht=11") != std::string::npos, "keyed file not rewritten with node_dht=11");
+}
+
 // ---------------------------------------------------------------------------
 // (b) sanity-gate rejection -- one case per reason, each must fall through to
 // the legacy path (proven by the legacy content winning), never straight to
@@ -1039,6 +1068,7 @@ int main(void)
 
     RUN_TEST(test_keyed_fast_path_wins_and_leaves_legacy_untouched);
 
+    RUN_TEST(test_keyed_dht_substitution_is_written_back);
     RUN_TEST(test_sanity_gate_rejects_empty_store_file);
     RUN_TEST(test_sanity_gate_rejects_all_unknown_keys);
     RUN_TEST(test_sanity_gate_rejects_blank_node_call);

@@ -537,6 +537,59 @@ static void test_range_clamps_instead_of_rejecting(void) {
 }
 
 // ---------------------------------------------------------------------------
+// Allowed-value set (SENS-05): node_dht_type is valid only as 11 or 22, so a
+// range [11, 22] is not enough -- 15 lies inside it. Mirrors the real
+// settings_schema row: range 11..22 plus the allowed set {11, 22}; anything
+// else decodes to the first allowed value (11), never clamped by nearness.
+// ---------------------------------------------------------------------------
+
+struct DhtState {
+    int dht;
+};
+
+static const long long kDhtAllowed[] = {11, 22};
+
+static const FieldDescriptor kDhtFields[] = {
+    {"dht", FieldType::I32, offsetof(DhtState, dht), 0, true, 11.0, 22.0, kDhtAllowed, 2},
+};
+
+static int decode_dht(const char *in) {
+    DhtState out;
+    out.dht = 11;
+    settings_store::decode(kDhtFields, 1, &out, in, strlen(in));
+    return out.dht;
+}
+
+static void test_allowed_set_rejects_values_outside_set(void) {
+    TEST_ASSERT_EQUAL_INT(11, decode_dht("dht=11\n"));
+    TEST_ASSERT_EQUAL_INT(22, decode_dht("dht=22\n"));
+    TEST_ASSERT_EQUAL_INT(11, decode_dht("dht=15\n"));
+    TEST_ASSERT_EQUAL_INT(11, decode_dht("dht=0\n"));
+    TEST_ASSERT_EQUAL_INT(11, decode_dht("dht=33\n"));
+    TEST_ASSERT_EQUAL_INT(11, decode_dht("dht=-1\n"));
+    TEST_ASSERT_EQUAL_INT(11, decode_dht("dht=21\n")); // nearest-to-22 must not win
+}
+
+// The substitution is reported in DecodeStats::values_substituted so a caller
+// that persists corrections (nRF52 load) can log and rewrite; members and a
+// plain range clamp are not counted.
+static void test_allowed_set_substitution_is_counted(void) {
+    DhtState out;
+    out.dht = 11;
+    const char *a = "dht=15\n";
+    DecodeStats s = settings_store::decode(kDhtFields, 1, &out, a, strlen(a));
+    TEST_ASSERT_EQUAL_UINT32(1, (uint32_t)s.values_substituted);
+    TEST_ASSERT_EQUAL_UINT32(1, (uint32_t)s.fields_set);
+    const char *b = "dht=22\n";
+    s = settings_store::decode(kDhtFields, 1, &out, b, strlen(b));
+    TEST_ASSERT_EQUAL_UINT32(0, (uint32_t)s.values_substituted);
+    TEST_ASSERT_EQUAL_INT(22, out.dht);
+    const char *c = "dht=11\n";
+    s = settings_store::decode(kDhtFields, 1, &out, c, strlen(c));
+    TEST_ASSERT_EQUAL_UINT32(0, (uint32_t)s.values_substituted);
+}
+
+// ---------------------------------------------------------------------------
 // encode() contract: all-or-nothing on a too-small buffer
 // ---------------------------------------------------------------------------
 
@@ -594,6 +647,8 @@ int main(int, char **) {
     RUN_TEST(test_string_too_long_is_rejected_not_truncated);
     RUN_TEST(test_string_too_long_by_one_is_rejected);
     RUN_TEST(test_range_clamps_instead_of_rejecting);
+    RUN_TEST(test_allowed_set_rejects_values_outside_set);
+    RUN_TEST(test_allowed_set_substitution_is_counted);
     RUN_TEST(test_encode_rejects_too_small_buffer);
     RUN_TEST(test_encode_exact_fit_succeeds);
     return UNITY_END();

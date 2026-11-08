@@ -603,6 +603,28 @@ static void test_stor_out_of_range_is_refused(void)
     TEST_ASSERT_EQUAL_INT(1, meshcom_settings.node_stor);
 }
 
+/* SENS-05: node_dht (one-wire DHT type, 11 or 22) is persist-only: it is in
+ * SETTINGS_PERSIST_ONLY_LIST, not in CFG_FIELD_LIST, so the JSON export never
+ * writes it and the import treats a "node_dht" key as unknown and ignores it.
+ * That is why the importer needs no 11/22 check -- this pins the property: if
+ * the key ever moves into CFG_FIELD_LIST the export assertion fails and the
+ * 11/22 rule must be added to the importer's range check. */
+static void test_dht_type_is_not_part_of_the_json_config(void)
+{
+    fill_settings();
+    meshcom_settings.node_dht_type = 22;
+    std::string doc = do_export();
+    TEST_ASSERT_TRUE_MESSAGE(doc.find("node_dht") == std::string::npos,
+                             "node_dht is exported: add the 11/22 rule to the import range check");
+
+    std::string mod = replace_once(doc, "\"settings\":{", "\"settings\":{\"node_dht\":\"15\",");
+    wipe_settings();
+    meshcom_settings.node_dht_type = 22;
+    TEST_ASSERT_EQUAL_INT(CFG_IMP_OK, do_import(mod));
+    TEST_ASSERT_NOT_NULL(strstr(g_err, "1 unknown"));
+    TEST_ASSERT_EQUAL_INT(22, meshcom_settings.node_dht_type);
+}
+
 /* SNF-D7: a file WITHOUT node_stor (export of an older firmware) stays
  * importable -- the CRC covers present keys only -- and leaves the node's own
  * node_stor unchanged, in both states (hand-built document, same shape as
@@ -1088,6 +1110,7 @@ int main(int, char **)
     RUN_TEST(test_ethmtu_out_of_range_is_refused);
     RUN_TEST(test_honly_mode_range);
     RUN_TEST(test_stor_out_of_range_is_refused);
+    RUN_TEST(test_dht_type_is_not_part_of_the_json_config);
     RUN_TEST(test_import_without_node_stor_keeps_current_value);
     RUN_TEST(test_rm_out_of_range_is_refused);
     RUN_TEST(test_import_without_node_rm_keeps_current_value);
