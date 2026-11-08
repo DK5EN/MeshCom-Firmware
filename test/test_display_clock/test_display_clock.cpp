@@ -280,7 +280,7 @@ void test_sendDisplayTime_call_site_ungated(void)
     TEST_ASSERT_TRUE_MESSAGE(code.find("node_ping") == std::string::npos, "call gated on ping");
     // the hold is an input of the clock-line decision
     const std::string body = func_body(src, "static void sendDisplayClockLine()\n{");
-    const size_t hold = body.find("dcIn.holdActive   = dispClkHeldFrame(DisplayOffWait, bHeldFrameDrawn, millis(), heldFrameUntilMs);");
+    const size_t hold = body.find("dcIn.holdActive   = dispClkHeldFrame(DisplayOffWait, bHeldFrameDrawn, dcNow, heldFrameUntilMs);");
     const size_t dec = body.find("dispClkDecide(dcIn)");
     TEST_ASSERT_TRUE_MESSAGE(hold != std::string::npos && dec != std::string::npos && hold < dec,
                              "dcIn.holdActive not fed from dispClkHeldFrame() before dispClkDecide()");
@@ -403,8 +403,57 @@ void test_pingframe_deadline_wiring(void)
     const std::string pong = code_only(func_body(src, "void DisplayPong(char line1[20], char line2[20], char line3[20], char line4[20])\n{"));
     TEST_ASSERT_TRUE_MESSAGE(pong.find("heldFrameUntilMs = dispClkFrameDeadline(millis(), dispClkPingHoldMs(meshcom_settings.node_pingtime));") != std::string::npos,
                              "DisplayPong does not set the deadline");
-    TEST_ASSERT_TRUE_MESSAGE(src.find("dispClkHeldFrame(DisplayOffWait, bHeldFrameDrawn, millis(), heldFrameUntilMs)") != std::string::npos,
+    TEST_ASSERT_TRUE_MESSAGE(src.find("dispClkHeldFrame(DisplayOffWait, bHeldFrameDrawn, dcNow, heldFrameUntilMs)") != std::string::npos,
                              "clock pass not fed with the deadline");
+}
+
+// PING-HOLD-02: model of one clock pass; counts page re-transfers.
+static int passRedraws(int type, unsigned long off, bool &drawn, unsigned long now, unsigned long &until)
+{
+    const bool expired = dispClkFrameExpired(drawn, until, now);
+    DispClkInputs in = base(7);
+    in.displayType = type;
+    in.holdActive = dispClkHeldFrame(off, drawn, now, until);
+    const DispClkDecision d = dispClkDecide(in);
+    return (expired && d == DispClkDecision::SkipType0) ? 1 : 0;
+}
+
+void test_ping_frame_expiry_redraws_message_page_once(void)
+{
+    bool drawn = true;
+    unsigned long until = dispClkFrameDeadline(0UL, dispClkPingHoldMs(30UL));
+    int n = 0;
+    for (unsigned long t = 1000; t <= 5000; t += 1000)
+        n += passRedraws(0, 30000UL, drawn, t, until);
+    TEST_ASSERT_EQUAL_MESSAGE(0, n, "redraw before expiry");
+    TEST_ASSERT_EQUAL_MESSAGE(0, passRedraws(0, 30000UL, drawn, 9000UL, until), "redraw at 9 s");
+    TEST_ASSERT_EQUAL_MESSAGE(1, passRedraws(0, 30000UL, drawn, 10000UL, until), "no redraw at expiry");
+    n = 0;
+    for (unsigned long t = 11000; t <= 40000; t += 1000)
+        n += passRedraws(0, 30000UL, drawn, t, until);
+    TEST_ASSERT_EQUAL_MESSAGE(0, n, "redraw after expiry");
+}
+
+void test_ping_frame_expiry_clock_page_unchanged(void)
+{
+    bool drawn = true;
+    unsigned long until = dispClkFrameDeadline(0UL, dispClkPingHoldMs(30UL));
+    TEST_ASSERT_TRUE(clockSkips(30000UL, drawn, 5000UL, until));
+    TEST_ASSERT_EQUAL_MESSAGE(0, passRedraws(1, 30000UL, drawn, 10000UL, until), "extra redraw on clock page");
+    DispClkInputs in = base(7);
+    TEST_ASSERT_TRUE(dispClkDecide(in) == DispClkDecision::Draw);   // clock line draws again
+}
+
+void test_ping_hold02_wiring(void)
+{
+    const std::string src = read_repo_file("src/loop_functions.cpp");
+    const std::string body = code_only(func_body(src, "static void sendDisplayClockLine()\n{"));
+    const size_t ex = body.find("dispClkFrameExpired(bHeldFrameDrawn, heldFrameUntilMs, dcNow)");
+    const size_t hold = body.find("dispClkHeldFrame(DisplayOffWait");
+    const size_t rd = body.find("heldFrameExpired && dcDecision == DispClkDecision::SkipType0");
+    TEST_ASSERT_TRUE_MESSAGE(ex != std::string::npos && hold != std::string::npos && ex < hold, "expiry not sampled before dispClkHeldFrame()");
+    TEST_ASSERT_TRUE_MESSAGE(rd != std::string::npos && rd > hold, "message-page redraw on expiry missing");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("sendDisplay1306(false, true, 0, 0, (char*)\"#N\")", rd) - rd < 200, "redraw is not the #N re-transfer");
 }
 
 int main(int, char **)
@@ -430,5 +479,8 @@ int main(int, char **)
     RUN_TEST(test_ping_frame_held_10s_then_clock);
     RUN_TEST(test_holdtext_keeps_its_duration);
     RUN_TEST(test_pingframe_deadline_wiring);
+    RUN_TEST(test_ping_frame_expiry_redraws_message_page_once);
+    RUN_TEST(test_ping_frame_expiry_clock_page_unchanged);
+    RUN_TEST(test_ping_hold02_wiring);
     return UNITY_END();
 }

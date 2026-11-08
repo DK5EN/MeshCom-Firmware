@@ -2477,6 +2477,26 @@ static void test_cmd_arg_copy_trim_empty_and_lf()
     TEST_ASSERT_EQUAL_STRING("0123456", b);
 }
 
+// PING-STOP-01: --ping start and --ping stop clear bPingSend (else the first tick after the next start
+// shows a spurious PONG FAILED). Source scrape: commandAction needs the whole firmware.
+static std::string pingRung(const std::string &cmd, const char *rung, const char *next)
+{
+    const size_t a = cmd.find(rung);
+    TEST_ASSERT_TRUE_MESSAGE(a != std::string::npos, rung);
+    const size_t b = cmd.find(next, a);
+    TEST_ASSERT_TRUE_MESSAGE(b != std::string::npos, next);
+    return cmd.substr(a, b - a);
+}
+
+static void test_ping_start_and_stop_clear_bPingSend()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const std::string st = pingRung(cmd, "commandCheck(msg_text+2, (char*)\"ping start\") == 0", "(char*)\"ping stop\"");
+    const std::string sp = pingRung(cmd, "commandCheck(msg_text+2, (char*)\"ping stop\") == 0", "(char*)\"pingmax max\"");
+    TEST_ASSERT_TRUE_MESSAGE(st.find("bPingSend = false;") != std::string::npos, "--ping start does not clear bPingSend");
+    TEST_ASSERT_TRUE_MESSAGE(sp.find("bPingSend = false;") != std::string::npos, "--ping stop does not clear bPingSend");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -2547,5 +2567,6 @@ int main(int, char **)
     RUN_TEST(test_shed_is_gated_staged_and_polled);
     RUN_TEST(test_pin_board_none_is_minus_one_gpio0_is_a_pin);
     RUN_TEST(test_guard_chain_announces_the_check_result_before_the_download);
+    RUN_TEST(test_ping_start_and_stop_clear_bPingSend);
     return UNITY_END();
 }
