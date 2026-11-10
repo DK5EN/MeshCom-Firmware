@@ -17,6 +17,7 @@ This file contains all web-based setup functions
 #include <blocked_calls.h> // BLK-01
 #include <mcpout_refusal.h> // WEB-PIN-01
 #include "web_guard.h" // webGuardIsGpioParam
+#include "web_coord.h" // P-0124 webCoordMatches (setlat/setlon read-back)
 #include "gpio_control.h" // GPIO-01 Part B: gpioCtlCommand (ESP32 only)
 #include <string>
 
@@ -467,7 +468,7 @@ void webSetup_setParam(setupStruct *setupData){
         // float-Vergleich scheitert fuer fast jede Koordinate (49.997 != 49.9970016f).
         // atof() liefert auf beiden Cores double; fabs(), weil --setlat negative
         // Werte als Betrag plus 'S'/'W' ablegt.
-        setupData->returnCode = (fabs(meshcom_settings.node_lat - fabs(atof(setupData->paramValue.c_str()))) < 1e-7)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnCode = webCoordMatches(meshcom_settings.node_lat, setupData->paramValue.c_str()) ? WS_RETURNCODE_OKAY : WS_RETURNCODE_FAIL;
         setupData->returnValue = String(meshcom_settings.node_lat,6);
         return;
     } else
@@ -479,7 +480,7 @@ void webSetup_setParam(setupStruct *setupData){
         // float-Vergleich scheitert fuer fast jede Koordinate (49.997 != 49.9970016f).
         // atof() liefert auf beiden Cores double; fabs(), weil --setlon negative
         // Werte als Betrag plus 'S'/'W' ablegt.
-        setupData->returnCode = (fabs(meshcom_settings.node_lon - fabs(atof(setupData->paramValue.c_str()))) < 1e-7)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        setupData->returnCode = webCoordMatches(meshcom_settings.node_lon, setupData->paramValue.c_str()) ? WS_RETURNCODE_OKAY : WS_RETURNCODE_FAIL;
         setupData->returnValue = String(meshcom_settings.node_lon,6);
         return;
     } else
