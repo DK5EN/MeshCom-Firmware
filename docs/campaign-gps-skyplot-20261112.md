@@ -20,12 +20,12 @@ Started 2026-11-12. Resume point for this multi-wave work.
 
 ## Waves
 
-| Wave | Content                                                                                                            | Owner                            | Status      |
-| ---- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------- | ----------- |
-| 1    | Merge `upstream/dev` (07e75a32) into `fork-dev`, resolve 4 conflicts, gate                                        | orchestrator                     | done `f05ead76`: gate 3770/3770, 35/36 envs (external-radio needs overlay) |
-| 2    | Move pure T114 logic to `src/gps_skyplot.{h,cpp}`, AGE guard with regression test, `native_gps_skyplot` env     | implementer Sonnet medium + advisor Opus | done: gate 3793/3793, 26 tests, advisor APPROVED after 1 rework |
-| 3    | T-Deck GPS view: GSV on, feed parser, LVGL sky plot with toggle to the old text view, photo on DK5EN-14          | implementer Sonnet medium + advisor Opus | code done: gate 3796/3796, advisor 1 rework applied; bench photo open |
-| 4    | T-Deck Pro sky plot: lock in the shared core, feed from gps_task, e-paper view with toggle                       | implementer Sonnet medium + 2 advisor passes Opus | done: gate 3798/3798, advisor APPROVED after 4 rework items |
+| Wave | Content                                                                                                     | Owner                                             | Status                                                                     |
+| ---- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------- |
+| 1    | Merge `upstream/dev` (07e75a32) into `fork-dev`, resolve 4 conflicts, gate                                  | orchestrator                                      | done `f05ead76`: gate 3770/3770, 35/36 envs (external-radio needs overlay) |
+| 2    | Move pure T114 logic to `src/gps_skyplot.{h,cpp}`, AGE guard with regression test, `native_gps_skyplot` env | implementer Sonnet medium + advisor Opus          | done: gate 3793/3793, 26 tests, advisor APPROVED after 1 rework            |
+| 3    | T-Deck GPS view: GSV on, feed parser, LVGL sky plot with toggle to the old text view, photo on DK5EN-14     | implementer Sonnet medium + advisor Opus          | code done: gate 3796/3796, advisor 1 rework applied; bench photo open      |
+| 4    | T-Deck Pro sky plot: lock in the shared core, feed from gps_task, e-paper view with toggle                  | implementer Sonnet medium + 2 advisor passes Opus | done: gate 3798/3798, advisor APPROVED after 4 rework items                |
 
 ## Wave 1 conflict resolutions
 
