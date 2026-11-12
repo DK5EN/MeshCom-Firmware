@@ -24,7 +24,7 @@ Started 2026-11-12. Resume point for this multi-wave work.
 | ---- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------- | ----------- |
 | 1    | Merge `upstream/dev` (07e75a32) into `fork-dev`, resolve 4 conflicts, gate                                        | orchestrator                     | done `f05ead76`: gate 3770/3770, 35/36 envs (external-radio needs overlay) |
 | 2    | Move pure T114 logic to `src/gps_skyplot.{h,cpp}`, AGE guard with regression test, `native_gps_skyplot` env     | implementer Sonnet medium + advisor Opus | done: gate 3793/3793, 26 tests, advisor APPROVED after 1 rework |
-| 3    | T-Deck GPS view: GSV on, feed parser, LVGL sky plot with toggle to the old text view, photo on DK5EN-14          | implementer Sonnet medium + advisor Opus | open        |
+| 3    | T-Deck GPS view: GSV on, feed parser, LVGL sky plot with toggle to the old text view, photo on DK5EN-14          | implementer Sonnet medium + advisor Opus | code done: gate 3796/3796, advisor 1 rework applied; bench photo open |
 
 ## Wave 1 conflict resolutions
 
@@ -58,6 +58,21 @@ Started 2026-11-12. Resume point for this multi-wave work.
   which is fine. The T-Deck Pro reads GPS in its own task and needs a mutex or a feed from the loop.
 - u-blox GSV on: `$PUBX,40,GSV,0,1,0,0,0,0*58` (checksum method checked against the existing `*59`).
 
+## Wave 3 result
+
+- `src/t-deck/tdeck_gps_sky.{h,cpp}`: sky plot (horizon, 30/60 degree rings, up to 40 dots in green,
+  yellow, red, grey) over the Position tab text view; checkable SKY/TEXT button under SEND POS. The
+  button names the view a press switches to. Default after boot: sky plot. State in RAM only.
+- `src/gps_functions.cpp`: `GPS_SKY_FEED` covers T114, T-Deck and T-Deck Plus. L76K gets GSV via
+  PCAS03, u-blox via `$PUBX,40,GSV,0,1,0,0,0,0*58`. On T-Deck boards the GPS UART RX buffer is 2048 B
+  (set before every `GPSSerial.begin`).
+- Advisor rework: SEND POS confirmation shows as "POS SENT" for 2 s in the sky view (the text view is
+  hidden there). "S" label moved off the container border.
+- T-Deck Pro not included: its GPS runs in its own task; feeding the shared module needs a lock.
+
 ## Open
 
+- T-Deck Plus bench check on DK5EN-14: flash, screenshot of sky view and text view, GSV seen in
+  the GPS log, no RMC/GGA loss.
+- T-Deck Pro sky view (separate item).
 - T114 bench check of the merged button/GPS page behaviour: no T114 on the bench.
