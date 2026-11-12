@@ -2,9 +2,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <unity.h>
+#include <fstream>
+#include <sstream>
+#include <string>
 #include "gps_skyplot.h"
 
-void setUp(void) { gpsSkyReset(); }
+void setUp(void) { gpsSkySetLock(NULL, NULL); gpsSkyReset(); }
 void tearDown(void) {}
 
 // build "$<body>*hh" with a correct checksum
@@ -311,6 +314,47 @@ void test_projection_off_axis(void)
     TEST_ASSERT_EQUAL_INT(86 - 21, y);
 }
 
+static int s_lockDepth = 0, s_lockCalls = 0, s_maxDepth = 0;
+static void tLock(void)   { s_lockCalls++; s_lockDepth++; if(s_lockDepth > s_maxDepth) s_maxDepth = s_lockDepth; }
+static void tUnlock(void) { s_lockDepth--; }
+
+void test_lock_wraps_table_access(void)
+{
+    s_lockDepth = s_lockCalls = s_maxDepth = 0;
+    gpsSkySetLock(tLock, tUnlock);
+    TEST_ASSERT_TRUE(parseBody("GPGSV,1,1,02,05,40,120,30,06,50,130,31", 1000));
+    TEST_ASSERT_EQUAL_INT(1, s_lockCalls);          // one lock for the whole sentence
+    GpsSkySat a[GPS_SKY_MAX_SATS];
+    TEST_ASSERT_EQUAL_INT(2, gpsSkyCopy(a, GPS_SKY_MAX_SATS, 1000));
+    TEST_ASSERT_EQUAL_INT(2, gpsSkySatsInView(1000));
+    TEST_ASSERT_EQUAL_INT(3, s_lockCalls);
+    TEST_ASSERT_EQUAL_INT(0, s_lockDepth);          // balanced
+    TEST_ASSERT_EQUAL_INT(1, s_maxDepth);           // never nested (a non-recursive mutex is enough)
+    TEST_ASSERT_FALSE(parseBody("GPGGA,1,2,3", 1000));
+    TEST_ASSERT_FALSE(gpsSkyParseLine("$GPGSV,1,1,01,05,40,120,30*48", 1000));   // bad checksum (good: 49)
+    TEST_ASSERT_EQUAL_INT(3, s_lockCalls);          // rejected sentences take no lock
+    TEST_ASSERT_EQUAL_INT(0, s_lockDepth);
+    gpsSkyReset();
+    TEST_ASSERT_EQUAL_INT(4, s_lockCalls);          // reset clears the table under the lock
+    TEST_ASSERT_EQUAL_INT(0, s_lockDepth);
+    gpsSkySetLock(NULL, NULL);
+}
+
+// GPS-SKY W4: on the T-Deck Pro bGPSON is forced false at boot (esp32_main.cpp), so a loop-side
+// tdeck_set_gps(false) suspended gps_task every 3 s and froze GPS screen 3 and the sky feed.
+// Only screen 3 (entry3/exit3) may start and stop that task.
+void test_tdeck_pro_loop_does_not_suspend_gps_task(void)
+{
+    std::string file(__FILE__);
+    const std::string suffix = "test/test_gps_skyplot/test_main.cpp";
+    std::string path = file.substr(0, file.size() - suffix.size()) + "src/esp32/esp32_main.cpp";
+    std::ifstream f(path.c_str(), std::ios::binary);
+    TEST_ASSERT_TRUE(f.good());
+    std::stringstream ss;
+    ss << f.rdbuf();
+    TEST_ASSERT_TRUE(ss.str().find("tdeck_set_gps(false);") == std::string::npos);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -336,6 +380,8 @@ int main(int, char **)
     RUN_TEST(test_snr_levels);
     RUN_TEST(test_projection);
     RUN_TEST(test_projection_off_axis);
+    RUN_TEST(test_lock_wraps_table_access);
+    RUN_TEST(test_tdeck_pro_loop_does_not_suspend_gps_task);
     RUN_TEST(test_projection_clamps_elevation);
     RUN_TEST(test_age_valid);
     RUN_TEST(test_age_invalid_fix);

@@ -25,6 +25,7 @@ Started 2026-11-12. Resume point for this multi-wave work.
 | 1    | Merge `upstream/dev` (07e75a32) into `fork-dev`, resolve 4 conflicts, gate                                        | orchestrator                     | done `f05ead76`: gate 3770/3770, 35/36 envs (external-radio needs overlay) |
 | 2    | Move pure T114 logic to `src/gps_skyplot.{h,cpp}`, AGE guard with regression test, `native_gps_skyplot` env     | implementer Sonnet medium + advisor Opus | done: gate 3793/3793, 26 tests, advisor APPROVED after 1 rework |
 | 3    | T-Deck GPS view: GSV on, feed parser, LVGL sky plot with toggle to the old text view, photo on DK5EN-14          | implementer Sonnet medium + advisor Opus | code done: gate 3796/3796, advisor 1 rework applied; bench photo open |
+| 4    | T-Deck Pro sky plot: lock in the shared core, feed from gps_task, e-paper view with toggle                       | implementer Sonnet medium + 2 advisor passes Opus | done: gate 3798/3798, advisor APPROVED after 4 rework items |
 
 ## Wave 1 conflict resolutions
 
@@ -68,11 +69,27 @@ Started 2026-11-12. Resume point for this multi-wave work.
   (set before every `GPSSerial.begin`).
 - Advisor rework: SEND POS confirmation shows as "POS SENT" for 2 s in the sky view (the text view is
   hidden there). "S" label moved off the container border.
-- T-Deck Pro not included: its GPS runs in its own task; feeding the shared module needs a lock.
+- T-Deck Pro followed in wave 4 (operator 2026-11-12: fix now).
+
+## Wave 4 result (T-Deck Pro)
+
+- `gpsSkySetLock()` in the shared core: optional lock around every satellite-table access; T114 and
+  T-Deck register none and are unchanged.
+- `src/t-deck-pro/peri_gps.cpp`: portMUX spinlock (not a mutex: gps_task is suspended from outside),
+  `gpsSkyFeed` in the gps_task byte loop, GSV on via UBX-CFG-VALSET (RAM layer, key 0x209100C5).
+- `src/t-deck-pro/tdeck_pro_gps_sky.{h,cpp}`: monochrome sky plot on GPS screen 3, SNR by dot shape
+  (filled 10 px strong, filled 6 px medium, 8 px ring weak, 4 px ring untracked), SKY/TEXT toggle
+  hides `scr3_cont`; state reset on every screen rebuild.
+- Pre-existing bug fixed: `bGPSON` is forced false at boot on the Pro, so the loop suspended gps_task
+  every 3 s and GPS screen 3 froze (also the old text view). The loop call is gone; only entry3/exit3
+  start and stop the task. Regression test `test_tdeck_pro_loop_does_not_suspend_gps_task`.
 
 ## Open
 
 - T-Deck Plus bench check on DK5EN-14: flash, screenshot of sky view and text view, GSV seen in
   the GPS log, no RMC/GGA loss.
-- T-Deck Pro sky view (separate item).
+- T-Deck Pro: no bench board; layout and e-paper refresh unseen.
+- Backlog candidate (pre-existing, T-Deck Pro): after `--gps on` at runtime `WZ_GPS_Init` opens
+  UART1 on the same pins 43/44 as Serial2 (gps_task); TX is rerouted and two parsers feed the
+  global `TinyGPSPlus gps`. Fix: skip `WZ_GPS_Init`/`WZ_GPS_Feed` on `BOARD_T_DECK_PRO`.
 - T114 bench check of the merged button/GPS page behaviour: no T114 on the bench.
