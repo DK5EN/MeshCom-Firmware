@@ -285,8 +285,27 @@ static void rxsNoteEvent(bool has_q, int16_t rssi, int8_t snr)
     g_rxs_ev_ms = millis();
     g_rxs_ev_seq = g_rxs_ev_seq + 1;
 }
+// RSSI/SNR of the last frame received without error, for the T114 status page.
+// Kept apart from g_rxs_ev_*, which an RX error resets.
+static volatile bool    g_lastRxValid = false;
+static volatile int16_t g_lastRxRssi = 0;
+static volatile int8_t  g_lastRxSnr = 0;
+
+// Returns false until the first frame was received.
+bool nrf52LastRxQuality(int16_t *rssi, int8_t *snr)
+{
+    if(!g_lastRxValid)
+        return false;
+    *rssi = g_lastRxRssi;
+    *snr = g_lastRxSnr;
+    return true;
+}
+
 static void rxsOnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 {
+    g_lastRxRssi = rssi;
+    g_lastRxSnr = snr;
+    g_lastRxValid = true;
     rxsNoteEvent(true, rssi, snr);
     OnRxDone(payload, size, rssi, snr);
 }
@@ -2926,7 +2945,26 @@ void nrf52loop()
         bool _dl_ip = cad_in_progress;
         bool _dl_df = cad_done_flag;
         taskEXIT_CRITICAL();
-        delay(csmaLoopDelayMs(_dl_ip, _dl_df));
+        unsigned long _dl_ms = csmaLoopDelayMs(_dl_ip, _dl_df);
+        #if defined(BOARD_HELTEC_T114)
+        // The loop body is cheap (measured: ~0 ms), so this delay IS the loop period: poll the
+        // button every 10 ms so double/triple clicks register (upstream #1265), and empty the
+        // GPS UART ring: with GSV on for the GPS page the L76K sends ~1 kB/s in bursts and the
+        // 250 byte ring would overflow within 100 ms (upstream #1266). The CSMA-03 period stays.
+        while(_dl_ms > 0)
+        {
+            unsigned long _dl_step = _dl_ms < 10UL ? _dl_ms : 10UL;
+            delay(_dl_step);
+            _dl_ms -= _dl_step;
+            btn.tick();
+            #if defined(ENABLE_GPS)
+            if(bGPSON && gpsDetected)
+                WZ_GPS_Feed();
+            #endif
+        }
+        #else
+        delay(_dl_ms);
+        #endif
     }
 
     yield();

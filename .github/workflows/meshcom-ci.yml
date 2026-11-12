@@ -126,6 +126,7 @@ jobs:
         mv .pio/build/heltec_t114/firmware.zip .pio/build/heltec_t114/heltec_t114.zip
         mv .pio/build/t_echo/firmware.zip .pio/build/t_echo/t_echo.zip
         mv .pio/build/esp32-S3-safeboot/bootloader.bin .pio/build/esp32-S3-safeboot/bootloader-s3.bin
+        mv .pio/build/LilyGo_T3_S3_V1_3/bootloader.bin .pio/build/LilyGo_T3_S3_V1_3/bootloader-s3-4.bin
 
     - name: Auto-update assets (.autoupdate)
       # one zlib twin per ESP32 app image (AU-D11); --check re-inflates and compares byte-exact.
@@ -202,6 +203,7 @@ jobs:
         .pio/build/esp32-S3-safeboot/safeboot-s3.bin,
         .pio/build/esp32-safeboot/safeboot.bin,
         .pio/build/esp32-S3-safeboot/bootloader-s3.bin,
+        .pio/build/LilyGo_T3_S3_V1_3/bootloader-s3-4.bin,
         .pio/build/esp32-safeboot/bootloader.bin,
         .pio/build/esp32-safeboot/partitions.bin,
         otadata.bin"

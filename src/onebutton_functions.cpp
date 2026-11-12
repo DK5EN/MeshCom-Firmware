@@ -18,6 +18,10 @@
 #include "tft_display_functions.h"
 #endif
 
+#if defined(BOARD_HELTEC_T114)
+#include "t114_gps_page.h"
+#endif
+
 #if defined(BOARD_T_ECHO)
 #include "nrf52_functions.h"
 #endif
@@ -37,11 +41,100 @@ void singleClick()
         return;
     #endif
 
+  #if defined(BOARD_HELTEC_T114)
+  // The T114 draws the page below via displayTFT() directly, which never touches
+  // the backlight: with the display off (--display off / double click) the click
+  // would paint onto a dark panel. This must run before the early returns below
+  // (sendDisplayHead(true) keeps the panel dark while bDisplayIsOff is set) and
+  // before the TRACK check, so a click can also wake the display in track mode.
+  // Switch the backlight on and, if the display is stored off, arm the same
+  // off-timer a received message uses.
+  if(bDisplayIsOff)
+  {
+      bDisplayIsOff=false;
+      digitalWrite(PIN_TFT_LEDA_CTL, LOW);   // TFT ON
+      if(bDisplayOff)
+          DisplayOffWait = millis() + (30 * 1000);
+
+      if(bDisplayTrack)
+      {
+          bOneButton = true;   // redraw the track page; the click only wakes the display
+          return;
+      }
+
+      if(t114GpsPageActive())
+      {
+          t114GpsPageRedraw();   // the click only wakes the display
+          return;
+      }
+  }
+  #endif
+
+  #if defined(BOARD_HELTEC_T114)
+  // Track mode keeps the track page, the click only toggles the graphic GPS page.
+  if(bDisplayTrack)
+  {
+      if(t114GpsPageActive())
+      {
+          t114GpsPageClose();
+          pageHold = 0;
+          pagePointer = pageLastPointer - 1;
+          if(pagePointer < 0)
+              pagePointer = PAGE_MAX - 1;
+          bOneButton = true;
+          sendDisplayHead(true);   // back to the track page
+      }
+      else
+      {
+          t114GpsPageOpen();
+      }
+      return;
+  }
+  #endif
+
   // no oneclick on TRACK=on
   if(!bDisplayTrack)
   {
     if(bDisplayCont)
         Serial.printf("BUTTON single press last:%i pointer:%i lines:%i\n", pageLastPointer, pagePointer, pageLastLineAnz[pagePointer]);
+
+    #if defined(BOARD_HELTEC_T114)
+    {
+      // Page order: stored messages -> status page -> GPS page -> status page (home) ...
+      static unsigned long t114StatusAt = 0;   // millis() when the status page was shown by a click
+
+      if(t114GpsPageActive())
+      {
+        // click on the GPS page: leave it, back to the status page; the next click starts again
+        t114GpsPageClose();
+        t114StatusAt = 0;
+        pageHold = 0;
+        pagePointer = pageLastPointer - 1;
+        if(pagePointer < 0)
+          pagePointer = PAGE_MAX - 1;
+        sendDisplayHead(true);
+        return;
+      }
+
+      // End of the stored messages (the status slot 5, or an empty slot): the status page
+      // first, a click while it is shown opens the GPS page.
+      if(pagePointer == 5 || pageLastLineAnz[pagePointer] == 0)
+      {
+        if(t114StatusAt != 0 && (millis() - t114StatusAt) < 6000)
+        {
+          t114StatusAt = 0;
+          t114GpsPageOpen();
+          return;
+        }
+        t114StatusAt = millis();
+        sendDisplayHead(true);
+        pageHold = 5;
+        return;
+      }
+
+      t114StatusAt = 0;
+    }
+    #endif
 
     #if defined(WP_DISP)
     // ===== Wireless Paper + E213: die letzten WP_MSG_BROWSE_MAX Nachrichten + Status in einer LOOP =====
@@ -231,7 +324,10 @@ void doubleClick()
   #endif
 
   #if defined(BOARD_HELTEC_T114) or defined(BOARD_T_ECHO)
-    if(!bDisplayOff)
+    // Follow what the panel actually shows (bDisplayIsOff), not the stored setting
+    // (bDisplayOff): after a single click woke a stored-off display, bDisplayOff is
+    // still set and the double click would have turned it on permanently.
+    if(!bDisplayIsOff)
     {
         commandAction((char*)"--display off", isPhoneReady, false);
     }
@@ -259,6 +355,12 @@ void tripleClick()
   bDisplayTrack=!bDisplayTrack;
 
   bDisplayIsOff=false;
+
+  #if defined(BOARD_HELTEC_T114)
+  digitalWrite(PIN_TFT_LEDA_CTL, LOW);   // TFT ON: sendDisplayHead() below can return early and leave the panel dark
+  t114GpsPageClose();                    // the track page replaces the GPS page
+  pageHold = 0;
+  #endif
 
   if(bDisplayTrack)
   {
@@ -312,6 +414,11 @@ void PressLong()
         commandAction((char*)"--deepsleep", isPhoneReady, false);
       #elif defined(BOARD_HELTEC_T114)
         Serial.println("[BOARD_HELTEC_T114]... GO to deepsleep");
+        // Visible feedback: otherwise the display just goes dark and a long press by
+        // accident looks like a crash. The sleep sequence switches the TFT off afterwards.
+        digitalWrite(PIN_TFT_LEDA_CTL, LOW);   // TFT ON (it may have been off)
+        displayTFT("DEEP SLEEP", "Press button to wake");
+        delay(1500);
         commandAction((char*)"--deepsleep", isPhoneReady, false);
       #elif defined(BOARD_TLORA_OLV216)
         Serial.println("[BOARD_TLORA_OLV216]... GO to deepsleep");

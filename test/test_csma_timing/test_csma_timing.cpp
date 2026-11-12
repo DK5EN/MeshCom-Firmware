@@ -290,7 +290,12 @@ static void test_csma03_nrf52loop_delay_nutzt_helper(void)
     std::stringstream ss;
     ss << f.rdbuf();
     std::string s = ss.str();
-    TEST_ASSERT_TRUE(s.find("delay(csmaLoopDelayMs(") != std::string::npos);
+    // The loop period comes from the helper. Non-T114 sleeps it in one piece; T114 splits it into
+    // <= 10 ms steps for button and GPS UART polling (merge of upstream #1265/#1266).
+    TEST_ASSERT_TRUE(s.find("unsigned long _dl_ms = csmaLoopDelayMs(_dl_ip, _dl_df);") != std::string::npos);
+    TEST_ASSERT_TRUE(s.find("delay(_dl_ms);") != std::string::npos);
+    TEST_ASSERT_TRUE(s.find("delay(_dl_step);") != std::string::npos);
+    TEST_ASSERT_TRUE(s.find("delay(10);\n        btn.tick();") == std::string::npos);
     TEST_ASSERT_TRUE(s.find("    delay(100);\n\n    yield();") == std::string::npos);
 }
 
