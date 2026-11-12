@@ -22,8 +22,8 @@ Started 2026-11-12. Resume point for this multi-wave work.
 
 | Wave | Content                                                                                                            | Owner                            | Status      |
 | ---- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------- | ----------- |
-| 1    | Merge `upstream/dev` (07e75a32) into `fork-dev`, resolve 4 conflicts, gate                                        | orchestrator                     | in progress |
-| 2    | Move pure T114 logic to `src/gps_skyplot.{h,cpp}`, AGE guard with regression test, `native_gps_skyplot` env     | implementer Sonnet medium + advisor Opus | open        |
+| 1    | Merge `upstream/dev` (07e75a32) into `fork-dev`, resolve 4 conflicts, gate                                        | orchestrator                     | done `f05ead76`: gate 3770/3770, 35/36 envs (external-radio needs overlay) |
+| 2    | Move pure T114 logic to `src/gps_skyplot.{h,cpp}`, AGE guard with regression test, `native_gps_skyplot` env     | implementer Sonnet medium + advisor Opus | done: gate 3793/3793, 26 tests, advisor APPROVED after 1 rework |
 | 3    | T-Deck GPS view: GSV on, feed parser, LVGL sky plot with toggle to the old text view, photo on DK5EN-14          | implementer Sonnet medium + advisor Opus | open        |
 
 ## Wave 1 conflict resolutions
@@ -45,6 +45,18 @@ Started 2026-11-12. Resume point for this multi-wave work.
 - No tests in the upstream PRs. Test candidates: `gsvParseLine` (checksum, empty groups, talker),
   `satFresh`/`gsvStore` (6 s expiry, slot reuse, millis rollover), `snrColor` (35/20 dB-Hz), sky
   projection, AGE formatter.
+
+## Wave 2 result
+
+- `src/gps_skyplot.{h,cpp}`: GSV parser, satellite table, freshness, SNR levels, projection, AGE
+  formatter. No Arduino dependency. `t114_gps_page.cpp` only draws.
+- AGE fix: without a fix the page shows `AGE   --s`. The test failed before the fix with
+  `AGE 4294967s`.
+- Advisor rework: the satellite array in `drawSky()` is `static`, because the T114 loop runs on a
+  4 kB stack. Added tests for NMEA 4.1 with 4 groups, an empty group and an off-axis projection.
+- For wave 3: the module has no lock. T-Deck and T-Deck Plus feed and draw from the same loop task,
+  which is fine. The T-Deck Pro reads GPS in its own task and needs a mutex or a feed from the loop.
+- u-blox GSV on: `$PUBX,40,GSV,0,1,0,0,0,0*58` (checksum method checked against the existing `*59`).
 
 ## Open
 
