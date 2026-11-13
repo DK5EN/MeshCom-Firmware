@@ -35,6 +35,8 @@ and `/release-firmware`. Soak on DK5EN-98, the GPSV4-01 upstream PR and field ch
   [campaign-gpsv4-01-20261107.md](campaign-gpsv4-01-20261107.md).
 - **GPIO-01:** done, no bench test by decision; GPIO-06 (T-Deck Pro pin) is an `impl` row, GPIO-07 a field test.
   [campaign-gpio-01-20261107.md](campaign-gpio-01-20261107.md).
+- **INA226-HELTEC-01:** INA226 enabled on Heltec V3, Wireless Stick and Wireless Tracker (`ca8da6f3`); upstream PR
+  [#1272](https://github.com/icssw-org/MeshCom-Firmware/pull/1272), build only, field test by users.
 
 - **CLK-01:** fixed and benched 2026-11-08 (F1-F3, A3 via CET-AGE-01, A4 3.8 %); released in `v4.40a.11.08`. Next: W4
   upstream PR.

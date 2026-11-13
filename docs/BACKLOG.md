@@ -13,7 +13,7 @@ there, what is still open. The dated campaign journal (2026-08-18 to 2026-09-29)
   #1247-#1251, #1257; no PR of ours is open. `fork-dev` has merged it (`da76033b`, 2026-11-08; RAK L76K GPS
   probe #1259, bootloader assets #1260-#1262). DK5EN never merges upstream himself.
 - **Last release:** `v4.40a.11.06` (2026-11-06, Latest, tag on `3ecf429e`, built by CI, run 42306803386). 68 assets.
-  Unreleased on `fork-dev`: GPIO-01..05, GPSV4-01 W1, TD-THEME-01 W1-W3, TD-CHAT-01, DISP-PAT-01. Release history:
+  Unreleased on `fork-dev`: GPIO-01..05, GPSV4-01 W1, TD-THEME-01 W1-W3, TD-CHAT-01, DISP-PAT-01, INA226-HELTEC-01. Release history:
   [`release-journal.md`](release-journal.md).
 - **Gate:** `tools/regression.sh --stage 1,2` (host) or `--stage all` (plus bench). Last full run: 101 envs, 3602 Unity
   cases, 1500 pytest (release gate of `v4.40a.11.06`). Inventory: [`test-suite-map.md`](test-suite-map.md).
@@ -251,7 +251,7 @@ The next release (`v4.40a.11.08`) is a **reduced-scope release**, operator 2026-
 5. **Docs:** release notes, RESUME, campaign docs; move rows that closed to the archive.
 6. **Commit, push `fork-dev`, release** with `/release-firmware` (CI builds and publishes).
 
-Already on `fork-dev` and unreleased, so they ship with this train: GPIO-01..05, GPSV4-01 W1, TD-THEME-01 W1-W3, TD-CHAT-01, DISP-PAT-01.
+Already on `fork-dev` and unreleased, so they ship with this train: GPIO-01..05, GPSV4-01 W1, TD-THEME-01 W1-W3, TD-CHAT-01, DISP-PAT-01, INA226-HELTEC-01.
 After the release: `soak` rows (DK5EN-98 with OK), the `upstream` PR, field checks when the hardware is there.
 
 #### Implement (firmware and tooling) (10)
@@ -365,7 +365,7 @@ switch it off afterwards). All nodes run the CI release images since 2026-11-08 
 - **Capture integrity:** `[MC-TEST] CAPTURE_DROPPED n=` means the log itself lost data; `ONRXDONE_TIME`,
   `CHANNEL_UTIL` for load context. REBOOT-98: any new start banner in the log.
 
-#### Field (16)
+#### Field (17)
 
 Needs conditions or hardware the bench does not have (sensors, T-Deck Pro, OLED, Windows, field captures).
 
@@ -387,6 +387,7 @@ Needs conditions or hardware the bench does not have (sensors, T-Deck Pro, OLED,
 | GPIO-07     | Field test / pins                               | GPIO-01 pin features are untested on hardware; wanted OM field reports after release.                        | Decided to release GPIO-01 unbenched; waits for OM reports after the release.                                                                  | Collect OM field reports on T-Beam, Heltec V3 after release.                                                      |
 | HV4-VEXT-01 | Power / Heltec V4                               | Heltec V4 Vext pin was not held during deep sleep.                                                           | Partly answered by GPSV4-01 deep-sleep hold, unreleased; no current measurement.                                                               | Measure sleep current on a Heltec V4.                                                                             |
 | GPIO-06     | Pin policy / T-Deck Pro                         | T-Deck Pro defines TDECK_KEYBOARD_INT as 46, same as LoRa EN; correct is GPIO 15; enable pins unreserved.    | Code done 2026-11-07 (W1): T-Deck Pro TDECK_KEYBOARD_INT 15, pins 15/38/39/41 reserved in kHard[] with static_asserts; not tested on hardware. | Keyboard works, pins page shows 15/38/39/41 reserved (needs a T-Deck Pro); operator 2026-11-08: after the release |
+| INA226-HELTEC-01 | Sensors / Heltec V3, Wireless Stick, Wireless Tracker | INA226 was disabled on these boards since V4.34c ("I2C fault", cause undocumented). Enabled in `ca8da6f3`; upstream PR #1272 (hardware-untested, build only). | Open 2026-11-13: built, not on hardware; field test by users. | Wait for field feedback and Kurt's answer on the original fault |
 
 #### Waiting on others (11)
 
