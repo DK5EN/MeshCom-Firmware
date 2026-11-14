@@ -280,6 +280,41 @@ static void test_csma03_loop_delay_1ms_waehrend_cad(void)
     TEST_ASSERT_EQUAL_UINT32(1, csmaLoopDelayMs(true, true));
 }
 
+// ACK-AGE-01: ACK frames reach stage 1 at CSMA_AGE_STAGE1_ACK_MS; prio-1 DMs keep CSMA_AGE_STAGE1_MS.
+static void test_ack_age01_ack_stufe1_frueher(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(6000UL, CSMA_AGE_STAGE1_ACK_MS);
+    TEST_ASSERT_EQUAL_INT(0, csmaAgeStageFor(CSMA_AGE_STAGE1_ACK_MS - 1, true));
+    TEST_ASSERT_EQUAL_INT(1, csmaAgeStageFor(CSMA_AGE_STAGE1_ACK_MS, true));
+    TEST_ASSERT_EQUAL_INT(0, csmaAgeStageFor(CSMA_AGE_STAGE1_ACK_MS, false));
+    TEST_ASSERT_EQUAL_INT(2, csmaAgeStageFor(CSMA_AGE_STAGE2_MS, true));
+    // queued 7 s, today's re-arm 3000 ms: an ACK gets the stage-1 hold, a DM keeps 3000
+    TEST_ASSERT_EQUAL_UINT32(1500, csmaApplyAgeFloorEx(3000, 7000UL, MSG_PRIO_CRITICAL, 400, 0, true));
+    TEST_ASSERT_EQUAL_UINT32(3000, csmaApplyAgeFloorEx(3000, 7000UL, MSG_PRIO_CRITICAL, 400, 0, false));
+    TEST_ASSERT_EQUAL_UINT32(3000, csmaApplyAgeFloor(3000, 7000UL, MSG_PRIO_CRITICAL, 400, 0));
+}
+
+// ACK-AGE-01: the call site must use the ACK-aware stage in its early return too, else the
+// 6-20 s range never reaches the floor (csma_compute_timeout_slot, lora_functions.cpp).
+static void test_ack_age01_aufrufstelle_nutzt_ack_stufe(void)
+{
+    std::string file(__FILE__);
+    const std::string suffix = "test/test_csma_timing/test_csma_timing.cpp";
+    std::string path = file.substr(0, file.size() - suffix.size()) + "src/lora_functions.cpp";
+    std::ifstream f(path.c_str(), std::ios::binary);
+    TEST_ASSERT_TRUE(f.good());
+    std::stringstream ss;
+    ss << f.rdbuf();
+    std::string s = ss.str();
+    const size_t a = s.find("unsigned long csma_compute_timeout_slot(int attempt, int slot) {");
+    TEST_ASSERT_TRUE(a != std::string::npos);
+    const std::string body = s.substr(a, 1500);
+    TEST_ASSERT_TRUE(body.find("txRingFrameIsAck(ringBuffer[slot] + 2, ringBuffer[slot][0])") != std::string::npos);
+    TEST_ASSERT_TRUE(body.find("if(csmaAgeStageFor(age, is_ack) == 0)") != std::string::npos);
+    TEST_ASSERT_TRUE(body.find("csmaApplyAgeFloorEx(today, age, prio,") != std::string::npos);
+    TEST_ASSERT_TRUE(body.find("if(csmaAgeStage(age) == 0)") == std::string::npos);
+}
+
 static void test_csma03_nrf52loop_delay_nutzt_helper(void)
 {
     std::string file(__FILE__);
@@ -317,6 +352,8 @@ int main(int, char **)
     RUN_TEST(test_age_stage1_clamp);
     RUN_TEST(test_age_stage2_wert);
     RUN_TEST(test_age_floor_min_mit_case_a);
+    RUN_TEST(test_ack_age01_ack_stufe1_frueher);
+    RUN_TEST(test_ack_age01_aufrufstelle_nutzt_ack_stufe);
     RUN_TEST(test_age_floor_prio_4_5_ausgeschlossen);
     RUN_TEST(test_csma01_hoehere_prio_verkuerzt_laufende_wartezeit);
     RUN_TEST(test_csma01_gleiche_oder_niedrigere_prio_aendert_nichts);

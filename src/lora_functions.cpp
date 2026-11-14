@@ -2982,7 +2982,7 @@ bool doTX()
         if(latency > stat_wait_hwm_ms)
             stat_wait_hwm_ms = latency;
         {
-            int _as = csmaAgeStage(latency);
+            int _as = csmaAgeStageFor(latency, txRingFrameIsAck(ringBuffer[txSlot] + 2, ringBuffer[txSlot][0]));   // ACK-AGE-01
             if(prio < 1 || prio > MSG_PRIO_NORMAL) _as = 0; // Boden gilt nur Prio 1-3
             stat_csma_aged_boot[_as]++;
         }
