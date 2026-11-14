@@ -2497,6 +2497,26 @@ static void test_ping_start_and_stop_clear_bPingSend()
     TEST_ASSERT_TRUE_MESSAGE(sp.find("bPingSend = false;") != std::string::npos, "--ping stop does not clear bPingSend");
 }
 
+// T-Beam (2026-11-14): long press keeps toggling the display; held 3 s it calls --deepsleep and
+// first undoes that press's persisted display toggle. Source scrape: OneButton needs the firmware.
+static void test_tbeam_very_long_press_deepsleep()
+{
+    const std::string s = read_repo_file("src/onebutton_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(s.find("#if defined(BOARD_TBEAM) || defined(BOARD_SX1262) || defined(BOARD_SX1268) || defined(BOARD_TBEAM_V3) || defined(BOARD_TBEAM_1W)\n") != std::string::npos, "guard misses a T-Beam env");
+    TEST_ASSERT_TRUE_MESSAGE(s.find("#define TBEAM_SLEEP_PRESS_MS 3000") != std::string::npos, "press time is not 3 s");
+    TEST_ASSERT_TRUE_MESSAGE(s.find("btn.attachDuringLongPress(TBeamDuringLongPress);") != std::string::npos, "handler not attached");
+    const size_t a = s.find("void TBeamDuringLongPress()\n{");
+    TEST_ASSERT_TRUE_MESSAGE(a != std::string::npos, "handler missing");
+    const std::string body = s.substr(a, s.find("\n}\n", a) - a);
+    TEST_ASSERT_TRUE_MESSAGE(s.find("uTBeamSsetBeforeLong = meshcom_settings.node_sset;") != std::string::npos, "PressLong does not record the pre-press settings");
+    // the restore must not go through "--display on", which forces posdisplay on
+    TEST_ASSERT_TRUE_MESSAGE(body.find("\"--display on\"") == std::string::npos, "restore goes through --display on");
+    const size_t restore = body.find("meshcom_settings.node_sset = uTBeamSsetBeforeLong;");
+    const size_t sleep = body.find("commandAction((char*)\"--deepsleep\"");
+    TEST_ASSERT_TRUE_MESSAGE(restore != std::string::npos && sleep != std::string::npos && restore < sleep, "display not restored before --deepsleep");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("bTBeamSleepFired = true;") != std::string::npos, "deepsleep can fire twice");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -2568,5 +2588,6 @@ int main(int, char **)
     RUN_TEST(test_pin_board_none_is_minus_one_gpio0_is_a_pin);
     RUN_TEST(test_guard_chain_announces_the_check_result_before_the_download);
     RUN_TEST(test_ping_start_and_stop_clear_bPingSend);
+    RUN_TEST(test_tbeam_very_long_press_deepsleep);
     return UNITY_END();
 }
