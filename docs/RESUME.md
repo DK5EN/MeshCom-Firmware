@@ -5,9 +5,11 @@
 merge (`da76033b`), GPIO-01..05, GPSV4-01 (hardware-untested), TD-THEME-01, TD-CHAT-01, and the BACKLOG-ROUND fixes
 (CLK-01, CET-AGE-01, ping display, nRF52 ping budget, CSMA-03, web setup page). No PR of ours is open.
 
-**Fleet on `v4.40a.11.08` CI images since 2026-11-08 20:37** (incl. DK5EN-98). **SOAK-1108 running** on DK5EN-98
-until 2026-11-09 20:00 CET: screen `soak98` on rpizero, `~/meshlog/dk5en-98-soak-11.08-20261108/`; watch-list and
-next step in [BACKLOG.md](BACKLOG.md) (soak table).
+**Fleet on `v4.40a.11.08` CI images since 2026-11-08 20:37** (incl. DK5EN-98). **SOAK-1108 done** (2026-11-09 20:00, evaluated 2026-11-14): clean run, two findings in the BACKLOG as high priority, ACK-AGE-01 and DEDUP-OWN-01 ([soak-1108-auswertung-20261114.md](soak-1108-auswertung-20261114.md)). `--setlog on` is still set on DK5EN-98 (needs OK to switch off).
+
+**Upstream sync 2026-11-14:** merged `upstream/dev` 520394fc (PRs #1274, #1275: BOARD_COUNTRY only as default, spectral scan 500 MHz split, Info page label `Gateway:`); gate stage 1,2 green, builds `wiscore_rak4631` and `heltec_wifi_lora_32_V3` green. PR feature list: [features-vs-upstream-20261114.md](features-vs-upstream-20261114.md).
+
+**Upstream PR #1277 open (2026-11-14):** wave 1 of [release-plan-upstream-20261114.md](release-plan-upstream-20261114.md), branch `pr/uhr-tdeck` (worktree `../MeshCom-PR-next`, head `5616c8a1`, 20 commits): clock every second (CLK-01, CLK-PING-01), CET-AGE-01, new: GPS-without-fix no longer overrides NTP and the shown time never runs back up to 10 s, T-Deck theme/chat/setup tab/GPS page (TD-29) and WLAN/BLE icon states, GPS sky plot, -fno-exceptions, LVGL trim; field parts Heltec V4 GNSS, DHT22, T-Deck Pro pins. Gate: 35/36 board envs (external-radio needs its overlay, as on dev), PR-scope host suites green. Bench 2026-11-14 on DK5EN-1/-14/-90/-92; they run the PR build overnight, then back to `v4.40a.11.08`. To port back to `fork-dev`: GPS/NTP order, display hold (with Unity tests in `test_display_clock`), WLAN/BLE icon rule. Next week: Safeboot wave (BOOT-01 "MeshCom 4.4" on the display) and Ping.
 
 This page is the current state only. Open work lives in [BACKLOG.md](BACKLOG.md) section 3.2; history in the
 archive journals (see "Where things are").
