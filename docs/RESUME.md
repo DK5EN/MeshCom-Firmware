@@ -7,7 +7,7 @@ merge (`da76033b`), GPIO-01..05, GPSV4-01 (hardware-untested), TD-THEME-01, TD-C
 
 **Fleet on `v4.40a.11.08` CI images since 2026-11-08 20:37** (incl. DK5EN-98). **SOAK-1108 done** (2026-11-09 20:00, evaluated 2026-11-14): clean run, two findings in the BACKLOG as high priority, ACK-AGE-01 and DEDUP-OWN-01 ([soak-1108-auswertung-20261114.md](soak-1108-auswertung-20261114.md)). `--setlog on` is still set on DK5EN-98 (needs OK to switch off).
 
-**DK5EN-98 runs a fork-dev build since 2026-11-14 21:44** (`aa8e1b45`, not a CI image): ACK frames reach the CSMA age stage 1 after 6 s (ACK-AGE-01). Log run on rpizero until 2026-11-15 12:00, screen `ackage`, `~/meshlog/dk5en-98-ackage-20261114/`; next: compare ACK waits with SOAK-1108. Also on fork-dev, not benched: T-Beam 3 s press = deep sleep (TBEAM-SLEEP-01).
+**DK5EN-98 runs a fork-dev build since 2026-11-14 21:44** (`aa8e1b45`, not a CI image): ACK frames reach the CSMA age stage 1 after 6 s (ACK-AGE-01). Log run on rpizero until 2026-11-15 12:00, screen `ackage`, `~/meshlog/dk5en-98-ackage-20261114/`; next (2026-11-15 after 12:00): evaluate the run, compare ACK waits (`CSMA_AGED ... ack=1`, `TX` wait) with SOAK-1108 (median 6.1 s, max 24.8 s). The follow-up commits `d0ecf82f`/`5f9486a7` are not on DK5EN-98 (stats counter and T-Beam only). Also on fork-dev, not benched: T-Beam 3 s press = deep sleep (TBEAM-SLEEP-01).
 
 **Upstream sync 2026-11-14:** merged `upstream/dev` 520394fc (PRs #1274, #1275: BOARD_COUNTRY only as default, spectral scan 500 MHz split, Info page label `Gateway:`); gate stage 1,2 green, builds `wiscore_rak4631` and `heltec_wifi_lora_32_V3` green. PR feature list: [features-vs-upstream-20261114.md](features-vs-upstream-20261114.md).
 
@@ -52,6 +52,7 @@ and `/release-firmware`. Soak on DK5EN-98, the GPSV4-01 upstream PR and field ch
 
 Not all of these have a backlog row; each campaign doc lists its own steps.
 
+- 2026-11-14: T-Beam 3 s press = deep sleep and wake by button on DK5EN-92 (TBEAM-SLEEP-01, BACKLOG); ACK-AGE-01 on a nRF52 node after the DK5EN-98 log evaluation.
 - Open items: operator bench checks, [campaign-open-items-20261102.md](campaign-open-items-20261102.md).
 - Bench fixes 2026-11-06: Safeboot `/ota` page, manipulated `.autoupdate`, BLE, RAK secrets with a real phone,
   [campaign-bench-fixes-20261106.md](campaign-bench-fixes-20261106.md).
