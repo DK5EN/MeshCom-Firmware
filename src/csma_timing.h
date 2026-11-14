@@ -80,6 +80,12 @@ static inline int csmaAgeStage(uint32_t age_ms)
     return csmaAgeStageEx(age_ms, CSMA_AGE_STAGE1_MS, CSMA_AGE_STAGE2_MS);
 }
 
+/* ACK-AGE-01: ACK frames reach stage 1 at CSMA_AGE_STAGE1_ACK_MS instead of CSMA_AGE_STAGE1_MS. */
+static inline int csmaAgeStageFor(uint32_t age_ms, bool is_ack)
+{
+    return csmaAgeStageEx(age_ms, is_ack ? CSMA_AGE_STAGE1_ACK_MS : CSMA_AGE_STAGE1_MS, CSMA_AGE_STAGE2_MS);
+}
+
 /* stage 1: clamp(ACK_WINDOW - airtime - GUARD, MIN, MAX) + jitter*SLOT; stage 2: RAPID_RX + jitter*SLOT */
 static inline unsigned long csmaAgedHoldMs(int stage, unsigned long own_airtime_ms, long jitter_slot)
 {
@@ -96,15 +102,22 @@ static inline unsigned long csmaAgedHoldMs(int stage, unsigned long own_airtime_
 }
 
 /* Floor decision: min(today, aged) for priorities 1-3 at stage > 0, else today. */
-static inline unsigned long csmaApplyAgeFloor(unsigned long today_ms, uint32_t age_ms, uint8_t priority,
-                                              unsigned long own_airtime_ms, long jitter_slot)
+/* is_ack: the head frame is an ACK (txRingFrameIsAck), which ages into stage 1 earlier (ACK-AGE-01). */
+static inline unsigned long csmaApplyAgeFloorEx(unsigned long today_ms, uint32_t age_ms, uint8_t priority,
+                                                unsigned long own_airtime_ms, long jitter_slot, bool is_ack)
 {
     if (priority != MSG_PRIO_CRITICAL && priority != MSG_PRIO_HIGH && priority != MSG_PRIO_NORMAL)
         return today_ms;
-    int stage = csmaAgeStage(age_ms);
+    int stage = csmaAgeStageFor(age_ms, is_ack);
     if (stage == 0) return today_ms;
     unsigned long aged = csmaAgedHoldMs(stage, own_airtime_ms, jitter_slot);
     return aged < today_ms ? aged : today_ms;
+}
+
+static inline unsigned long csmaApplyAgeFloor(unsigned long today_ms, uint32_t age_ms, uint8_t priority,
+                                              unsigned long own_airtime_ms, long jitter_slot)
+{
+    return csmaApplyAgeFloorEx(today_ms, age_ms, priority, own_airtime_ms, jitter_slot, false);
 }
 
 /* ---- CSMA-01 (2026-11-07): re-arm a running CSMA wait when a higher-priority entry is enqueued ----

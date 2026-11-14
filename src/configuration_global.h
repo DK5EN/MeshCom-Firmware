@@ -434,6 +434,12 @@ static inline bool flashLayoutCompatible(int stored)
 // Nur Prio 1-3, nie nach eigenem TX. CSMA_AGE_STAGE2_MS 0 = Stufe 2 nie.
 #define CSMA_AGE_STAGE1_MS      20000UL
 #define CSMA_AGE_STAGE2_MS      60000UL
+// ACK-AGE-01 (2026-11-14): weitergeleitete/eigene ACK-Frames (txRingFrameIsAck) erreichen
+// Stufe 1 frueher. Ohne das wartete ein Relay-ACK 6-25 s (SOAK-1108), weil jede Fremd-Frame
+// die 3-s-Wartezeit neu startet. Nur ACKs, nicht persoenliche DMs (ebenfalls Prio 1).
+#ifndef CSMA_AGE_STAGE1_ACK_MS
+#define CSMA_AGE_STAGE1_ACK_MS  6000UL
+#endif
 #define CSMA_AGE_ACK_WINDOW_MS  2850    // Empfaenger des Vorframes halten 3.0 s; davor enden
 #define CSMA_AGE_GUARD_MS       175
 #define CSMA_AGE_SHORT_MIN_MS   500

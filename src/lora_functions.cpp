@@ -1,6 +1,7 @@
 #include "mc_text.h"
 #include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
 #include "csma_timing.h"   // W0.6: CSMA back-off arithmetic, native-tested
+#include "txring_ttl.h"    // ACK-AGE-01: txRingFrameIsAck() for the earlier ACK age stage
 #include "mesh_policy.h"   // BL-01: meshTxAllowed(), --mesh off = nur kein Repeat fremder Frames
 #include "maxhop.h"      // IDEE-04: relayHopNext(), native-tested
 #include "Arduino.h"
@@ -4085,13 +4086,14 @@ unsigned long csma_compute_timeout_slot(int attempt, int slot) {
     if(slot < 0 || attempt >= CSMA_MAX_ATTEMPTS)
         return today;
     uint32_t age = millis() - ringEnqueueTime[slot];
-    if(csmaAgeStage(age) == 0)
+    bool is_ack = txRingFrameIsAck(ringBuffer[slot] + 2, ringBuffer[slot][0]);   // ACK-AGE-01
+    if(csmaAgeStageFor(age, is_ack) == 0)
         return today;
     uint8_t prio = ringPriority[slot];
     long jit = random(0, CSMA_AGE_SLOTS + 1);
-    unsigned long res = csmaApplyAgeFloor(today, age, prio, lora_time_on_air_ms(ringBuffer[slot][0]), jit);
+    unsigned long res = csmaApplyAgeFloorEx(today, age, prio, lora_time_on_air_ms(ringBuffer[slot][0]), jit, is_ack);
     if(bLORADEBUG && prio >= 1 && prio <= MSG_PRIO_NORMAL)
-        printfdeb("[MC-DBG] CSMA_AGED slot=%d age=%lu stage=%d hold=%lu\n", slot, (unsigned long)age, csmaAgeStage(age), res);
+        printfdeb("[MC-DBG] CSMA_AGED slot=%d age=%lu stage=%d hold=%lu ack=%d\n", slot, (unsigned long)age, csmaAgeStageFor(age, is_ack), res, is_ack ? 1 : 0);
     return res;
 }
 
