@@ -456,9 +456,68 @@ void test_ping_hold02_wiring(void)
     TEST_ASSERT_TRUE_MESSAGE(body.find("sendDisplay1306(false, true, 0, 0, (char*)\"#N\")", rd) - rd < 200, "redraw is not the #N re-transfer");
 }
 
+
+// The status line never shows a few seconds back: GPS with a fix and NTP can disagree by a second,
+// and the bench (T-Beam DK5EN-92, 2026-11-14) showed :52 :51 :52 when the source changed.
+void test_shown_time_never_runs_back_a_few_seconds(void)
+{
+    DispClkShown st = {false, 0};
+    auto T = [](int h, int m, int s) { return (long)h * 3600 + m * 60 + s; };
+    TEST_ASSERT_EQUAL(T(19,53,12), dispClkShownSod(st, T(19,53,12)));
+    TEST_ASSERT_EQUAL(T(19,53,13), dispClkShownSod(st, T(19,53,13)));
+    TEST_ASSERT_EQUAL_MESSAGE(T(19,53,13), dispClkShownSod(st, T(19,53,12)), "1 s back must hold the shown second");
+    TEST_ASSERT_EQUAL(T(19,53,13), dispClkShownSod(st, T(19,53,13)));
+    TEST_ASSERT_EQUAL(T(19,53,14), dispClkShownSod(st, T(19,53,14)));
+    TEST_ASSERT_EQUAL_MESSAGE(T(19,53,14), dispClkShownSod(st, T(19,53,4)), "10 s back must still hold");
+    TEST_ASSERT_EQUAL_MESSAGE(T(19,53,3), dispClkShownSod(st, T(19,53,3)), "11 s back is a correction, shown at once");
+}
+
+// Summer -> winter time (1 h back) is shown at once; midnight is a step forward, and 1 s back across
+// midnight is held like any other small step.
+void test_shown_time_dst_and_midnight(void)
+{
+    DispClkShown st = {false, 0};
+    auto T = [](int h, int m, int s) { return (long)h * 3600 + m * 60 + s; };
+    TEST_ASSERT_EQUAL(T(2,59,59), dispClkShownSod(st, T(2,59,59)));
+    TEST_ASSERT_EQUAL_MESSAGE(T(2,0,0), dispClkShownSod(st, T(2,0,0)), "DST step back not shown");
+    TEST_ASSERT_EQUAL(T(23,59,59), dispClkShownSod(st, T(23,59,59)));
+    TEST_ASSERT_EQUAL_MESSAGE(T(0,0,0), dispClkShownSod(st, T(0,0,0)), "midnight is forward");
+    TEST_ASSERT_EQUAL_MESSAGE(T(0,0,0), dispClkShownSod(st, T(23,59,59)), "1 s back across midnight must hold");
+}
+
+// Every status-line clock string goes through dispClkShownHms(): the clock line, the page main line
+// (both with the T-Echo variant) and the e-paper status line.
+void test_status_line_clock_uses_the_held_time(void)
+{
+    const std::string src = read_repo_file("src/loop_functions.cpp");
+    const char *raw = "%02i:%02i:%02i%s\", cstatus, meshcom_settings.node_date_hour";
+    TEST_ASSERT_TRUE_MESSAGE(src.find(raw) == std::string::npos, "a status line still prints node_date_* directly");
+    size_t n = 0;
+    for(size_t pos = src.find("dispClkShownHms(&dh, &dm, &ds);"); pos != std::string::npos;
+        pos = src.find("dispClkShownHms(&dh, &dm, &ds);", pos + 1))
+        n++;
+    TEST_ASSERT_EQUAL_MESSAGE(5, (int)n, "clock line x2, main line x2, e-paper status line");
+}
+
+// GPS without a fix must not set the clock while NTP is valid: the loop sets it from NTP on every pass,
+// the GPS module's own clock can be a second off, and the per-second clock line flickered between the two
+// (T-Beam DK5EN-92 after boot, 2026-11-14). Order: GPS with fix, NTP, GPS without fix.
+void test_gps_without_fix_leaves_ntp_time_alone(void)
+{
+    const std::string src = read_repo_file("src/gps_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("if(!bNTPDateTimeValid && gpsData.year > 2024 && gps.time.isValid()") != std::string::npos,
+                             "the no-fix GPS branch sets the clock even with valid NTP");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("if(gpsData.year > 2023 && gps.time.isValid()") != std::string::npos,
+                             "the GPS fix branch must still set the clock (GPS with fix wins over NTP)");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_shown_time_never_runs_back_a_few_seconds);
+    RUN_TEST(test_shown_time_dst_and_midnight);
+    RUN_TEST(test_status_line_clock_uses_the_held_time);
+    RUN_TEST(test_gps_without_fix_leaves_ntp_time_alone);
     RUN_TEST(test_exhaustive_differs_from_old_logic_only_by_gate15);
     RUN_TEST(test_display_track_clock_every_second_page_every_15s);
     RUN_TEST(test_clockline_decides_before_touching_pagetext);

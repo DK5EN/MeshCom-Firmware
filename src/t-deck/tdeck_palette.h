@@ -160,4 +160,11 @@ inline double tdeck_contrast(uint32_t a, uint32_t b)
     return (hi + 0.05) / (lo + 0.05);
 }
 
+// Header WLAN / BLE icon colour: white (hdr_on) with a link, yellow (hdr_err) switched on without a
+// link, grey (hdr_off) switched off (the caller also strikes it through).
+inline uint32_t tdeck_link_icon_colour(const TdeckPalette& p, bool on, bool link)
+{
+    return !on ? p.hdr_off : (link ? p.hdr_on : p.hdr_err);
+}
+
 #endif

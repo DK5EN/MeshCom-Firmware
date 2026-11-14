@@ -223,9 +223,26 @@ void test_theme_segments(void)
         TEST_ASSERT_EQUAL_UINT8(s, tdeck_theme_seg_to_setting(tdeck_theme_setting_to_seg(s)));
 }
 
+
+// WLAN / BLE header icons, both themes: link = white, on without link = yellow, off = grey; the three
+// states must differ (bench 2026-11-14: BLE stayed white after a phone disconnected).
+void test_link_icon_colour_three_states(void)
+{
+    for(int dark = 0; dark < 2; dark++)
+    {
+        const TdeckPalette& p = tdeck_palette(dark != 0);
+        TEST_ASSERT_EQUAL_HEX32(p.hdr_on,  tdeck_link_icon_colour(p, true, true));
+        TEST_ASSERT_EQUAL_HEX32(p.hdr_err, tdeck_link_icon_colour(p, true, false));
+        TEST_ASSERT_EQUAL_HEX32(p.hdr_off, tdeck_link_icon_colour(p, false, true));
+        TEST_ASSERT_EQUAL_HEX32(p.hdr_off, tdeck_link_icon_colour(p, false, false));
+        TEST_ASSERT_TRUE(p.hdr_on != p.hdr_err && p.hdr_err != p.hdr_off && p.hdr_on != p.hdr_off);
+    }
+}
+
 int main(int, char**)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_link_icon_colour_three_states);
     RUN_TEST(test_contrast_dark);
     RUN_TEST(test_contrast_light);
     RUN_TEST(test_contrast_function);

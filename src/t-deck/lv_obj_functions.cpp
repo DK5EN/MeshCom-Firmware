@@ -2688,45 +2688,44 @@ static void update_header_batt_indicator(float batt, int proz)
     text_color_set_if_changed(header_batt_icon, icon_color);
 }
 
-/* WiFi / Bluetooth status in header
- * - WiFi: green when connected (STA or AP), red when configured but not connected,
- *   white + cross when WiFi is disabled/unused.
- * - Bluetooth: green when a device is connected, red when advertising but no connection,
- *   white + cross when BLE is disabled.
+/* WiFi / Bluetooth status in header, one rule in the theme colours (TD-33):
+ *   hdr_on  (white)  link up: WLAN connected or AP active / phone connected over BLE
+ *   hdr_err (yellow) switched on, no link yet: WLAN not connected / BLE advertising
+ *   hdr_off (grey)   switched off (node_wifion / node_bleon), struck through (not colour alone, BITV)
+ * The icons stay visible and tappable (TD-30). Both are refreshed from tdeck_update_header_standby();
+ * the *_if_changed() helpers touch LVGL only when something really changes.
  */
 extern volatile bool deviceConnected; // from esp32_main.cpp (volatile since BLC-01)
 
+static void decor_set_if_changed(lv_obj_t *obj, lv_text_decor_t decor)
+{
+    if(obj == NULL || lv_obj_get_style_text_decor(obj, LV_PART_MAIN) == decor)
+        return;
+    lv_obj_set_style_text_decor(obj, decor, LV_PART_MAIN);
+}
+
+static void header_link_icon_apply(lv_obj_t *icon, const char *symbol, bool on, bool link)
+{
+    if(icon == NULL)
+        return;
+    const TdeckPalette &p = tdeck_theme_pal();
+    text_color_set_if_changed(icon, lv_color_hex(tdeck_link_icon_colour(p, on, link)));
+    label_set_if_changed(icon, symbol);
+    decor_set_if_changed(icon, on ? LV_TEXT_DECOR_NONE : LV_TEXT_DECOR_STRIKETHROUGH);
+    if(lv_obj_has_flag(icon, LV_OBJ_FLAG_HIDDEN))
+        lv_obj_clear_flag(icon, LV_OBJ_FLAG_HIDDEN);
+}
+
 static void update_header_wifi_indicator(void)
 {
-    if(header_wifi_icon == NULL)
-        return;
-
-    // TD-33: on = yellow (LIME), off = grey, always fully opaque. Same rule for BLE.
-    // The icon shows the switch the user toggles, so every tap flips it.
-    bool wifi_on = meshcom_settings.node_wifion;
-
-    if (bDEBUG)
-        Serial.printf("[TDECK]...update_header_wifi_indicator: node_wifion=%d, on=%d, WiFi.status=%d\n", (int)wifi_on, (int)wifi_on, (int)WiFi.status());
-
-    text_color_set_if_changed(header_wifi_icon, lv_color_hex(wifi_on ? tdeck_theme_pal().hdr_on : tdeck_theme_pal().hdr_off));
-    label_set_if_changed(header_wifi_icon, LV_SYMBOL_WIFI);
-    lv_obj_set_style_text_opa(header_wifi_icon, LV_OPA_COVER, LV_PART_MAIN);
-    // not colour alone (BITV): off keeps the strike-through, stays visible and tappable (TD-30)
-    lv_obj_set_style_text_decor(header_wifi_icon, wifi_on ? LV_TEXT_DECOR_NONE : LV_TEXT_DECOR_STRIKETHROUGH, LV_PART_MAIN);
-    lv_obj_clear_flag(header_wifi_icon, LV_OBJ_FLAG_HIDDEN);
+    const bool link = (WiFi.status() == WL_CONNECTED) ||
+                      (WiFi.getMode() == WIFI_MODE_AP) || (WiFi.getMode() == WIFI_MODE_APSTA);
+    header_link_icon_apply(header_wifi_icon, LV_SYMBOL_WIFI, meshcom_settings.node_wifion, link);
 }
 
 static void update_header_bt_indicator(void)
 {
-    if(header_bt_icon == NULL)
-        return;
-
-    // TD-33: on = yellow (LIME), off = grey, always fully opaque
-    bool ble_on = meshcom_settings.node_bleon;
-    text_color_set_if_changed(header_bt_icon, lv_color_hex(ble_on ? tdeck_theme_pal().hdr_on : tdeck_theme_pal().hdr_off));
-    label_set_if_changed(header_bt_icon, LV_SYMBOL_BLUETOOTH);
-    lv_obj_set_style_text_opa(header_bt_icon, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_text_decor(header_bt_icon, ble_on ? LV_TEXT_DECOR_NONE : LV_TEXT_DECOR_STRIKETHROUGH, LV_PART_MAIN);
+    header_link_icon_apply(header_bt_icon, LV_SYMBOL_BLUETOOTH, meshcom_settings.node_bleon, deviceConnected);
 }
 
 /* Public wrappers so other modules can trigger a header refresh */
@@ -2794,6 +2793,10 @@ void tdeck_update_header_standby(void)
         save_node_keyboardlock = kbl;
         header_lock_apply(kbl != 0);
     }
+
+    // WLAN and BLE icons follow the live link state (connect, disconnect, AP), not only switch taps.
+    update_header_wifi_indicator();
+    update_header_bt_indicator();
 }
 
 /* Pause/resume a small set of UI timers when the display is turned off/on.
