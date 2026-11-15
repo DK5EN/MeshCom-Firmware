@@ -65,8 +65,73 @@ static void test_both_loops_use_the_helpers(void)
         TEST_ASSERT_TRUE_MESSAGE(s.find("#include \"ping_budget.h\"") != std::string::npos, rel);
         TEST_ASSERT_TRUE_MESSAGE(s.find("pingBudgetOpen(") != std::string::npos, rel);
         TEST_ASSERT_TRUE_MESSAGE(s.find("pingCountAfterSend(") != std::string::npos, rel);
+        TEST_ASSERT_TRUE_MESSAGE(s.find("pingFailCheckDue(") != std::string::npos, rel);
+        TEST_ASSERT_TRUE_MESSAGE(s.find("pingFinalArmAfterSend(") != std::string::npos, rel);
         TEST_ASSERT_TRUE_MESSAGE(s.find("PongFail(meshcom_settings.node_pingcall)") != std::string::npos, rel);
     }
+}
+
+// LAST-PONG-01: the last ping of a run gets its fail verdict one interval after the last send.
+struct PingSim {
+    int count; bool waiting; bool armed; int fails;
+    void send() { bool had = pingBudgetOpen(60, "X", count); if (!had) return;
+        if (waiting) fails++;            // verdict for the previous ping (in-budget block)
+        armed = false;
+        int before = count; count = pingCountAfterSend(count, false, false);
+        waiting = true; armed = pingFinalArmAfterSend(before, count, true); }
+    void tick() {                        // interval elapsed
+        if (pingBudgetOpen(60, "X", count)) { send(); return; }
+        if (pingFailCheckDue(armed, false, true)) { armed = false; if (waiting) fails++; waiting = false; }
+    }
+};
+
+static void test_last_ping_without_pong_fails_exactly_once(void)
+{
+    PingSim s = {3, false, false, 0};
+    s.tick(); s.tick(); s.tick();        // N sends
+    TEST_ASSERT_EQUAL(0, s.count);
+    TEST_ASSERT_EQUAL(2, s.fails);       // verdicts for pings 1 and 2 only
+    s.tick();                            // final check tick
+    TEST_ASSERT_EQUAL(3, s.fails);
+    s.tick(); s.tick();
+    TEST_ASSERT_EQUAL(3, s.fails);       // nothing more
+}
+
+static void test_final_check_not_due_before_last_send_or_when_not_armed(void)
+{
+    TEST_ASSERT_FALSE(pingFailCheckDue(false, false, true));
+    TEST_ASSERT_FALSE(pingFailCheckDue(true, false, false));
+    TEST_ASSERT_FALSE(pingFailCheckDue(true, true, true));   // new run opened: no stale verdict
+    TEST_ASSERT_TRUE(pingFailCheckDue(true, false, true));
+    TEST_ASSERT_FALSE(pingFinalArmAfterSend(3, 2, true));
+    TEST_ASSERT_FALSE(pingFinalArmAfterSend(0, 0, true));
+    TEST_ASSERT_TRUE(pingFinalArmAfterSend(1, 0, true));
+}
+
+static void test_pong_received_no_fail(void)
+{
+    PingSim s = {1, false, false, 0};
+    s.tick();
+    s.waiting = false;                   // pong arrived
+    s.tick();
+    TEST_ASSERT_EQUAL(0, s.fails);
+}
+
+static void test_stop_clears_no_fail(void)
+{
+    PingSim s = {1, false, false, 0};
+    s.tick();
+    s.waiting = false; s.count = 0;      // --ping stop clears bPingSend (PING-STOP-01)
+    s.tick();
+    TEST_ASSERT_EQUAL(0, s.fails);
+}
+
+/* LAST-PONG-01 advisor item: a refused last send (PING_RING_REFUSED) uses budget but sets no
+ * bPingSend; arming on it gave the previous ping a second verdict. Only a queued send arms. */
+static void test_refused_last_send_does_not_arm(void)
+{
+    TEST_ASSERT_FALSE(pingFinalArmAfterSend(1, 0, false));
+    TEST_ASSERT_TRUE(pingFinalArmAfterSend(1, 0, true));
 }
 
 int main(int, char **)
@@ -77,5 +142,10 @@ int main(int, char **)
     RUN_TEST(test_ping_start_then_five_sends_then_closed);
     RUN_TEST(test_track_and_invalid_do_not_decrement);
     RUN_TEST(test_both_loops_use_the_helpers);
+    RUN_TEST(test_last_ping_without_pong_fails_exactly_once);
+    RUN_TEST(test_final_check_not_due_before_last_send_or_when_not_armed);
+    RUN_TEST(test_pong_received_no_fail);
+    RUN_TEST(test_stop_clears_no_fail);
+    RUN_TEST(test_refused_last_send_does_not_arm);
     return UNITY_END();
 }

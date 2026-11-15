@@ -23,6 +23,7 @@
 #include "node_position.h"    // DRY-01: hemisphere split / signed decode of the own position
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
 #include "batt_functions.h"
+#include "batt_info.h"       // --info battery line: factor vs multiplier
 #include "nbr_matrix.h"
 #include "nbr_views.h"      // W4b: --mheard/--path lesen nur noch ueber die Abfrageschicht
 #include <extudp_target.h>
@@ -8151,7 +8152,23 @@ void commandAction(char *umsg_text, bool ble)
             }
 
             #ifdef BATTERY_PIN
-                printfdeb("\n...BATTERY PIN %i factor %.4f\n", BATTERY_PIN, fBattFaktor);
+                {
+                    // new path uses the settable fBattFaktor, legacy path the ADC_MULTIPLIER
+                    #if defined(USE_NEW_BATT)
+                    const BattInfo bi = battInfoDecide(true, false, fBattFaktor, 0.0f);
+                    #elif defined(ADC_MULTIPLIER) && (defined(BOARD_HELTEC_V3) || defined(BOARD_STICK_V3) || defined(BOARD_HELTEC_V4))
+                    // only the switched-divider Heltec family measures with ADC_MULTIPLIER
+                    // (batt_function_old.cpp BATT_FAMILY_HELTEC_SWITCHED); other legacy boards
+                    // use their own constants and print no number
+                    const BattInfo bi = battInfoDecide(false, true, fBattFaktor, (float)ADC_MULTIPLIER);
+                    #else
+                    const BattInfo bi = battInfoDecide(false, false, fBattFaktor, 0.0f);
+                    #endif
+                    if (bi.show)
+                        printfdeb("\n...BATTERY PIN %i %s %.4f\n", BATTERY_PIN, bi.label, (double)bi.value);
+                    else
+                        printfdeb("\n...BATTERY PIN %i\n", BATTERY_PIN);
+                }
             #endif
 
             #ifndef BOARD_T_ECHO

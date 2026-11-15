@@ -11,6 +11,10 @@
 // No ESP-IDF include: the caller passes plain integers/strings, so the
 // function builds under `pio test -e native_safeboot`.
 //
+// Both the boot check and the OTA verify step (ElegantOTA.cpp, after Update.end() and before the session is
+// declared verified) go through checkAppImageValid() in main.cpp; a refusal there also points the boot
+// pointer back at the Safeboot partition.
+//
 // Log contract: a rejection is appended to the existing line as
 //   [SAFEBOOT];app;image;invalid;rc;<n>;why;<hdr|chip|segs|desc>
 // The "valid" line is unchanged.
@@ -56,6 +60,22 @@ inline AppCheck checkAppImage(uint16_t hdrChipId, uint16_t expectedChipId, uint8
     (void)projectName;
     if (!descValid || descMagic != APP_DESC_MAGIC) return AppCheck::BadDesc;
     return AppCheck::Ok;
+}
+
+// Raw-bytes variant, used by Safeboot for both the boot check and the OTA verify step: `head` is the first
+// APP_CHECK_HEAD_LEN bytes of the partition (image header 24 + first segment header 8 + the 4 bytes at 0x20
+// where esp_app_desc_t.magic_word sits). The magic word is compared here, on the bytes just read from
+// flash, so no IDF helper stands between the flash and the verdict. Reason order as checkAppImage();
+// a short or non-E9 head is BadHeader.
+constexpr size_t APP_CHECK_HEAD_LEN = 36;
+
+inline AppCheck checkAppImageHead(const uint8_t *head, size_t len, uint16_t expectedChipId)
+{
+    if (!head || len < APP_CHECK_HEAD_LEN || head[0] != 0xE9) return AppCheck::BadHeader;
+    const uint16_t chip = (uint16_t)(head[12] | (head[13] << 8)); // esp_image_header_t.chip_id
+    const uint32_t magic = (uint32_t)head[32] | ((uint32_t)head[33] << 8) | ((uint32_t)head[34] << 16) |
+                           ((uint32_t)head[35] << 24);
+    return checkAppImage(chip, expectedChipId, head[1], true, magic, nullptr);
 }
 
 } // namespace safeboot

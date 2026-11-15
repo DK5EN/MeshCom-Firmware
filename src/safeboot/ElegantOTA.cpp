@@ -10,6 +10,10 @@
 // Owned by main.cpp; driven from the handlers below (docs/safeboot-ota-contract.md).
 extern safeboot::OtaSession g_ota;
 extern portMUX_TYPE g_ota_mux;
+// Owned by main.cpp. checkAppImageValid() logs [SAFEBOOT];app;image;... (SB-06: why;chip|segs|desc|hdr).
+bool checkAppImageValid();
+bool setBootPartition_SAFEBOOT();
+void eraseAppSlotHead();
 
 // Maps the Updater error left behind by a failed Update.end() to the contract
 // abort reason, so a field report can tell a transfer problem (md5_mismatch)
@@ -546,13 +550,33 @@ void ElegantOTAClass::begin(ELEGANTOTA_WEBSERVER *server, const char * username,
                 // out. isFinished() is the last gate; onVerified() is the only
                 // place image_valid may become true.
                 bool finished = Update.isFinished();
+                // SB-06: Update.end() has already pointed the boot pointer at
+                // ota_0 and esp_image_verify() passed -- but that accepts any
+                // structurally valid image (the release bootloader.bin has no
+                // app desc). Judge it here, before the session is verified;
+                // on a refusal put the pointer back on Safeboot so the next
+                // boot cannot land in it. Reason not_bootable is the
+                // contract's existing "image problem" reason.
+                bool appOk = finished && checkAppImageValid();
+                if (finished && !appOk) {
+                    // Refusal: boot pointer back to Safeboot, and erase the
+                    // slot head so it cannot boot even if that pointer write
+                    // failed (a power cycle would otherwise run ota_0).
+                    setBootPartition_SAFEBOOT();
+                    eraseAppSlotHead();
+                }
                 portENTER_CRITICAL(&g_ota_mux);
-                g_ota.onVerified(millis(), finished,
-                                  finished ? safeboot::OtaSession::Reason::None
-                                           : safeboot::OtaSession::Reason::IncompleteUpload);
+                // app_valid_ is still true from boot until the loop drains the
+                // Abort that onVerified(false) queues; a cancel in that window
+                // would be accepted and queue RebootToApp. Clear it atomically
+                // with the verdict (same critical section).
+                if (finished && !appOk) g_ota.setAppValid(false);
+                g_ota.onVerified(millis(), appOk,
+                                  !finished ? safeboot::OtaSession::Reason::IncompleteUpload
+                                            : safeboot::OtaSession::Reason::NotBootable);
                 portEXIT_CRITICAL(&g_ota_mux);
                 Serial.printf("[SAFEBOOT];ota;verify;result;%s\n",
-                              finished ? "ok" : "unfinished");
+                              !finished ? "unfinished" : (appOk ? "ok" : "invalid"));
             }
         }else{
             return;

@@ -100,7 +100,7 @@ against this document in parallel. Change it here first, then everywhere.
   reason `apply_failed`.
 - `reason`: empty in `idle`/`receiving`/`done`; on `aborted` one of `stale_session`,
   `write_failed`, `client_disconnected`, `stalled`, `incomplete_upload`, `md5_mismatch`,
-  `not_bootable` (Updater could not enable/boot-check the written image), `activate_failed`
+  `not_bootable` (Updater could not enable/boot-check the written image, or the written image fails the SB-06 identity check at upload verify: `why;hdr|chip|segs|desc`), `activate_failed`
   (the boot partition switch rejected the image), `update_error` (any other `Update.end()`
   failure), `begin_failed`, `inflate_failed` (a `.autoupdate` upload whose zlib stream could not be
   unpacked: bad header, corrupt data or adler32 mismatch); `verifying` is the window between the last chunk and the `Update.end()` verdict.
@@ -158,9 +158,12 @@ the file name: the node decides from the **first byte of the upload body**.
 `[SAFEBOOT];wifi;event;<connected|disconnected|got_ip>;reason;<n>`,
 `[SAFEBOOT];ota;start`, `[SAFEBOOT];ota;abort;reason;<r>`, `[SAFEBOOT];ota;rearm;reason;<r>`,
 `[SAFEBOOT];ota;format;<raw|zlib>` (once per upload, when the first body byte is sniffed),
-`[SAFEBOOT];ota;verify;result;ok`, `[SAFEBOOT];ota;end;result;<success|error>`,
-`[SAFEBOOT];fallback;reason;<timeout|cancel>`, `[SAFEBOOT];app;image;<valid|invalid>;rc;<n>` (at boot
-and after every abort). When `esp_image_verify()` succeeded but an identity check rejects the image, the line is
+`[SAFEBOOT];ota;verify;result;<ok|unfinished|invalid>` (`invalid`: the identity check refused the image),
+`[SAFEBOOT];boot;pointer;safeboot;rc;<n>` (boot pointer put back on Safeboot after such a refusal),
+`[SAFEBOOT];ota;slot;erased;rc;<n>` (first 4 KB sector of `ota_0` erased after a refusal),
+`[SAFEBOOT];ota;end;result;<success|error>`,
+`[SAFEBOOT];fallback;reason;<timeout|cancel>`, `[SAFEBOOT];app;image;<valid|invalid>;rc;<n>` (at boot,
+at upload verify and after every abort). When `esp_image_verify()` succeeded but an identity check rejects the image, the line is
 `[SAFEBOOT];app;image;invalid;rc;0;why;<hdr|chip|segs|desc>`; the `valid` line and a plain verify failure
 (no `why`) are unchanged.
 
@@ -173,6 +176,19 @@ readable and its `magic_word` is `0xABCD5432`. Chip and segment count are also c
 was removed, SB-07). No SHA-256 by design. No `project_name` check (operator decision 2026-11-07): every Arduino-ESP32 build carries the generic
 `arduino-lib-builder`, so the check would not tell MeshCom from other Arduino images, and a framework switch
 that changes the name would make every Safeboot in the field refuse every new app.
+
+**Upload verify (SB-06-DESC):** `Update.end(true)` has already moved the boot pointer to `ota_0` and
+`esp_image_verify()` accepts any structurally valid image (the release `bootloader.bin` has no app desc).
+So the completion handler runs `checkAppImageValid()` before `onVerified()`. The check itself prints
+`app;image;invalid;rc;0;why;<...>` first. On refusal the handler then does the following: the boot pointer goes back to the Safeboot partition (`boot;pointer;safeboot`), the first 4 KB sector of
+`ota_0` is erased (`ota;slot;erased`; the slot can then never boot, even if the pointer write failed, and a
+later upload writes from offset 0 and re-creates it), `app_valid` is cleared in the same critical section as
+`onVerified(false, not_bootable)` (so a cancel in the window before the Abort is drained is refused), and
+`ota;verify;result;invalid` is printed. When the Abort is drained, the boot check prints a second
+`app;image;invalid;rc;<n>` line without `why`. A refused route to `ota_0` logs `fallback;result;app_invalid;rc;259`
+(259 = `ESP_ERR_INVALID_STATE`, chosen to tell it apart from `rc;-1`, no partition). Every route to `ota_0`
+(`SwitchPartition`, timeout/cancel `RebootToApp`) goes through `setBootPartition_APP()`, which re-runs the
+check and returns false (no restart) when it fails.
 
 ## State machine (host-testable, `src/safeboot/ota_state.h`)
 

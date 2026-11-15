@@ -12,6 +12,10 @@
 
 #include <string.h>
 
+#include <fstream>
+#include <sstream>
+#include <string>
+
 #include <safeboot/app_check.h>
 #include <safeboot/fw_apply.h>
 #include <safeboot/ota_state.h>
@@ -1249,6 +1253,110 @@ void test_app_check_reason_order_chip_first(void)
     TEST_ASSERT_EQUAL_STRING("hdr", safeboot::appCheckWhy(AppCheck::BadHeader));
 }
 
+// SB-06-DESC (bench 2026-11-15): the release asset bootloader.bin has a structurally valid ESP image header
+// (magic E9, 3 segments, chip id 0 = ESP32) and passes esp_image_verify, but carries no esp_app_desc_t at
+// image offset 0x20. First 36 bytes of that file: header 24 + first segment header 8 + the word at 0x20.
+static const uint8_t SB06_BOOTLOADER_HEAD[36] = {
+    0xe9, 0x03, 0x02, 0x20, 0x54, 0x05, 0x08, 0x40, 0xee, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x01,
+    0x30, 0x00, 0xff, 0x3f, 0xf4, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00};
+
+void test_app_check_head_refuses_bootloader_image_without_app_desc(void)
+{
+    TEST_ASSERT_EQUAL((int)AppCheck::BadDesc,
+                      (int)safeboot::checkAppImageHead(SB06_BOOTLOADER_HEAD, sizeof(SB06_BOOTLOADER_HEAD), 0));
+    TEST_ASSERT_EQUAL_STRING("desc", safeboot::appCheckWhy(AppCheck::BadDesc));
+}
+
+void test_app_check_head_accepts_header_with_app_desc_magic(void)
+{
+    uint8_t h[36];
+    memcpy(h, SB06_BOOTLOADER_HEAD, sizeof(h));
+    h[32] = 0x32; h[33] = 0x54; h[34] = 0xcd; h[35] = 0xab; // 0xABCD5432 little endian
+    TEST_ASSERT_EQUAL((int)AppCheck::Ok, (int)safeboot::checkAppImageHead(h, sizeof(h), 0));
+    // wrong expected chip: ChipMismatch comes first
+    TEST_ASSERT_EQUAL((int)AppCheck::ChipMismatch, (int)safeboot::checkAppImageHead(h, sizeof(h), 9));
+}
+
+void test_app_check_head_rejects_short_read_and_bad_magic_byte(void)
+{
+    uint8_t h[36];
+    memcpy(h, SB06_BOOTLOADER_HEAD, sizeof(h));
+    h[32] = 0x32; h[33] = 0x54; h[34] = 0xcd; h[35] = 0xab;
+    TEST_ASSERT_EQUAL((int)AppCheck::BadHeader, (int)safeboot::checkAppImageHead(h, 35, 0));
+    TEST_ASSERT_EQUAL((int)AppCheck::BadHeader, (int)safeboot::checkAppImageHead(nullptr, 36, 0));
+    h[0] = 0x00;
+    TEST_ASSERT_EQUAL((int)AppCheck::BadHeader, (int)safeboot::checkAppImageHead(h, sizeof(h), 0));
+}
+
+void test_app_check_head_segment_count_bounds(void)
+{
+    uint8_t h[36];
+    memcpy(h, SB06_BOOTLOADER_HEAD, sizeof(h));
+    h[32] = 0x32; h[33] = 0x54; h[34] = 0xcd; h[35] = 0xab;
+    h[1] = 0;
+    TEST_ASSERT_EQUAL((int)AppCheck::BadSegmentCount, (int)safeboot::checkAppImageHead(h, sizeof(h), 0));
+    h[1] = 17;
+    TEST_ASSERT_EQUAL((int)AppCheck::BadSegmentCount, (int)safeboot::checkAppImageHead(h, sizeof(h), 0));
+}
+
+// SB-06-DESC source pins (no ESP-IDF on the host, so the wiring in the firmware sources is pinned by text):
+// the upload-completion path must judge the image before onVerified() and fall back to Safeboot on refusal,
+// and the RebootToApp / SwitchPartition path must not point the boot pointer at ota_0 without the same check.
+static std::string sbSlurp(const char *rel)
+{
+    std::string file(__FILE__);
+    const std::string suffix = "test/test_safeboot_state/test_safeboot_state.cpp";
+    std::string root = file.substr(0, file.size() - suffix.size());
+    std::ifstream f((root + rel).c_str(), std::ios::binary);
+    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+void test_src_upload_completion_checks_image_before_onverified(void)
+{
+    std::string s = sbSlurp("src/safeboot/ElegantOTA.cpp");
+    size_t fin = s.find("bool finished = Update.isFinished()");
+    TEST_ASSERT_TRUE_MESSAGE(fin != std::string::npos, "isFinished gate");
+    size_t ver = s.find("g_ota.onVerified(", fin);
+    TEST_ASSERT_TRUE_MESSAGE(ver != std::string::npos, "onVerified after gate");
+    size_t chk = s.find("checkAppImageValid()", fin);
+    TEST_ASSERT_TRUE_MESSAGE(chk != std::string::npos && chk < ver, "checkAppImageValid() before onVerified");
+    size_t sb = s.find("setBootPartition_SAFEBOOT()", fin);
+    TEST_ASSERT_TRUE_MESSAGE(sb != std::string::npos && sb < ver, "setBootPartition_SAFEBOOT() on refusal, before onVerified");
+    size_t inv = s.find("setAppValid(false)", fin);
+    TEST_ASSERT_TRUE_MESSAGE(inv != std::string::npos && inv < ver, "app_valid cleared before onVerified (cancel race)");
+    size_t er = s.find("eraseAppSlotHead()", fin);
+    TEST_ASSERT_TRUE_MESSAGE(er != std::string::npos && er < ver, "ota_0 head erased on refusal");
+}
+
+void test_src_reboot_to_app_is_gated_by_image_check(void)
+{
+    std::string s = sbSlurp("src/safeboot/main.cpp");
+    size_t def = s.find(" bool setBootPartition_APP()\n");
+    TEST_ASSERT_TRUE_MESSAGE(def != std::string::npos, "setBootPartition_APP definition");
+    size_t set = s.find("esp_ota_set_boot_partition(partition)", def);
+    TEST_ASSERT_TRUE_MESSAGE(set != std::string::npos, "esp_ota_set_boot_partition in setBootPartition_APP");
+    size_t chk = s.find("checkAppImageValid()", def);
+    TEST_ASSERT_TRUE_MESSAGE(chk != std::string::npos && chk < set, "checkAppImageValid() before the boot pointer moves to ota_0");
+    size_t rb = s.find("case safeboot::OtaSession::ActionType::RebootToApp:");
+    TEST_ASSERT_TRUE_MESSAGE(rb != std::string::npos, "RebootToApp case");
+    size_t gate = s.find("if (!setBootPartition_APP())", rb);
+    size_t restart = s.find("ESP.restart();", rb);
+    TEST_ASSERT_TRUE_MESSAGE(gate != std::string::npos && gate < restart, "RebootToApp restarts only if setBootPartition_APP() succeeded");
+}
+
+void test_src_refusal_erases_slot_head_and_logs(void)
+{
+    std::string s = sbSlurp("src/safeboot/main.cpp");
+    size_t def = s.find("void eraseAppSlotHead()");
+    TEST_ASSERT_TRUE_MESSAGE(def != std::string::npos, "eraseAppSlotHead definition");
+    TEST_ASSERT_TRUE(s.find("esp_partition_erase_range(", def) != std::string::npos);
+    TEST_ASSERT_TRUE(s.find("[SAFEBOOT];ota;slot;erased;rc;%d", def) != std::string::npos);
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_good_path_reaches_done_with_one_switch_partition);
@@ -1311,5 +1419,12 @@ int main(int, char**) {
     RUN_TEST(test_app_check_rejects_missing_or_wrong_desc);
     RUN_TEST(test_app_check_ignores_project_name);
     RUN_TEST(test_app_check_reason_order_chip_first);
+    RUN_TEST(test_app_check_head_refuses_bootloader_image_without_app_desc);
+    RUN_TEST(test_app_check_head_accepts_header_with_app_desc_magic);
+    RUN_TEST(test_app_check_head_rejects_short_read_and_bad_magic_byte);
+    RUN_TEST(test_app_check_head_segment_count_bounds);
+    RUN_TEST(test_src_upload_completion_checks_image_before_onverified);
+    RUN_TEST(test_src_reboot_to_app_is_gated_by_image_check);
+    RUN_TEST(test_src_refusal_erases_slot_head_and_logs);
     return UNITY_END();
 }

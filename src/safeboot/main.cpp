@@ -380,10 +380,42 @@ void wifiConnect() {
      Serial.println("[SAFEBOOT];fallback;result;app_invalid;rc;-1");
      return false;
    }
+   // SB-06: esp_ota_set_boot_partition() only checks the image structure, which
+   // the release bootloader.bin also passes -- so every route to ota_0 (success
+   // switch, timeout/cancel RebootToApp) is gated by the identity check here.
+   if (!checkAppImageValid())
+   {
+     Serial.println("[SAFEBOOT];fallback;result;app_invalid;rc;259");
+     return false;
+   }
    esp_err_t rc = esp_ota_set_boot_partition(partition);
    bool ok = (rc == ESP_OK);
    Serial.printf("[SAFEBOOT];fallback;result;%s;rc;%d\n", ok ? "ok" : "app_invalid", (int)rc);
    return ok;
+ }
+
+ // Points the boot pointer back at this (factory) Safeboot partition. Used
+ // when the OTA verify step refuses an image after Update.end() already
+ // moved the pointer to ota_0 (the Updater activates the slot itself): the
+ // reboot that follows must land in Safeboot, not in a non-app image.
+ bool setBootPartition_SAFEBOOT()
+ {
+   const esp_partition_t *partition = esp_partition_find_first(esp_partition_type_t::ESP_PARTITION_TYPE_APP, esp_partition_subtype_t::ESP_PARTITION_SUBTYPE_APP_FACTORY, nullptr);
+   esp_err_t rc = partition ? esp_ota_set_boot_partition(partition) : ESP_ERR_NOT_FOUND;
+   Serial.printf("[SAFEBOOT];boot;pointer;safeboot;rc;%d\n", (int)rc);
+   return rc == ESP_OK;
+ }
+
+ // Erases the first 4 KB sector of ota_0 so a refused image can never boot,
+ // even if setBootPartition_SAFEBOOT() failed and ota_0 stays the boot
+ // partition: the header magic is gone, so the boot check reports "hdr" and
+ // the bootloader rejects the slot. A later upload writes from offset 0 and
+ // re-creates the sector. Called only after a refusal, never on a valid slot.
+ void eraseAppSlotHead()
+ {
+   const esp_partition_t *partition = esp_partition_find_first(esp_partition_type_t::ESP_PARTITION_TYPE_APP, esp_partition_subtype_t::ESP_PARTITION_SUBTYPE_APP_OTA_0, nullptr);
+   esp_err_t rc = partition ? esp_partition_erase_range(partition, 0, 4096) : ESP_ERR_NOT_FOUND;
+   Serial.printf("[SAFEBOOT];ota;slot;erased;rc;%d\n", (int)rc);
  }
 
  // Validates the ota_0 image without switching the boot pointer (bench
@@ -409,23 +441,22 @@ void wifiConnect() {
    esp_err_t rc = esp_image_verify(ESP_IMAGE_VERIFY_SILENT, &pos, &data);
    bool valid = (rc == ESP_OK);
    // SB-06: identity checks on top of the structural verdict (src/safeboot/
-   // app_check.h). The 24-byte header and the app desc are read from
-   // flash.
+   // app_check.h). The first 36 bytes of the slot (image header, first
+   // segment header, the word at 0x20 where esp_app_desc_t.magic_word sits)
+   // are read from flash and judged as raw bytes, the same view the "--id"
+   // reader (safeboot_id.h) takes. A structurally valid image without an app
+   // desc (the release bootloader.bin, bench 2026-11-15) is refused here.
    safeboot::AppCheck why = safeboot::AppCheck::Ok;
    if (valid)
    {
-     esp_image_header_t hdr;
-     esp_app_desc_t desc;
-     bool hdrOk = (esp_partition_read(partition, 0, &hdr, sizeof(hdr)) == ESP_OK);
-     bool descOk = (esp_ota_get_partition_description(partition, &desc) == ESP_OK);
+     uint8_t head[safeboot::APP_CHECK_HEAD_LEN];
+     bool headOk = (esp_partition_read(partition, 0, head, sizeof(head)) == ESP_OK);
 #if CONFIG_IDF_TARGET_ESP32S3
      const uint16_t expectedChip = ESP_CHIP_ID_ESP32S3;
 #else
      const uint16_t expectedChip = ESP_CHIP_ID_ESP32;
 #endif
-     why = hdrOk ? safeboot::checkAppImage((uint16_t)hdr.chip_id, expectedChip, hdr.segment_count, descOk,
-                                           desc.magic_word, desc.project_name)
-                 : safeboot::AppCheck::BadHeader;
+     why = headOk ? safeboot::checkAppImageHead(head, sizeof(head), expectedChip) : safeboot::AppCheck::BadHeader;
      valid = (why == safeboot::AppCheck::Ok);
    }
    if (valid)

@@ -1,0 +1,10 @@
+OK heltec_wifi_lora_32_V3 RAM: [==== ] 41.9% (used 137292 bytes from 327680 bytes) Flash: [===== ] 51.8% (used 1764393 bytes from 3403776 bytes) 
+OK ttgo_tbeam RAM: [= ] 8.2% (used 107456 bytes from 1310720 bytes) Flash: [===== ] 54.9% (used 1868333 bytes from 3403776 bytes) 
+OK t_deck_plus RAM: [===== ] 48.4% (used 158452 bytes from 327680 bytes) Flash: [== ] 19.0% (used 2391417 bytes from 12582912 bytes) 
+OK wiscore_rak4631 RAM: [==== ] 41.9% (used 104156 bytes from 248832 bytes) Flash: [======== ] 81.3% (used 662896 bytes from 815104 bytes) 
+OK E22-DevKitC RAM: [== ] 20.2% (used 107536 bytes from 532480 bytes) Flash: [===== ] 54.6% (used 1858785 bytes from 3403776 bytes) 
+OK ttgo_tbeam_supreme RAM: [==== ] 42.0% (used 137620 bytes from 327680 bytes) Flash: [===== ] 52.5% (used 1785629 bytes from 3403776 bytes) 
+OK t_deck RAM: [===== ] 48.4% (used 158452 bytes from 327680 bytes) Flash: [== ] 19.0% (used 2391665 bytes from 12582912 bytes) 
+OK esp32-safeboot RAM: [= ] 14.8% (used 48476 bytes from 327680 bytes) Flash: [== ] 20.3% (used 690431 bytes from 3403776 bytes) 
+OK esp32-S3-safeboot RAM: [= ] 13.4% (used 43756 bytes from 327680 bytes) Flash: [== ] 19.1% (used 651575 bytes from 3403776 bytes) 
+head 09663c44 + F-1a worktree
