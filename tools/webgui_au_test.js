@@ -371,6 +371,22 @@ async function mkPage(node, opts) {
     await flush();
     check('double click: exactly one updapply', node.fnCalls().filter((c) => c.indexOf('updapply') >= 0).length === 1, node.fnCalls().join());
     P.w.auPageLeave();
+    // AU-26: the node staged a newer image after the last poll; the label must carry the tag re-read at click time
+    const nodeS = mkNode(J('E'));
+    const S = await mkPage(nodeS);
+    await S.init();
+    nodeS.status = J('E').split('v4.40a.10.18').join('v4.40a.10.19');
+    await S.click();
+    const storedS = JSON.parse(S.w.sessionStorage.getItem('auF:dk5en-1.local') || 'null');
+    check('AU-26: staged changed after the last poll -> label and stored tag show the fresh v4.40a.10.19', /Installing v4.40a.10.19,/.test(S.view().msg) && storedS && storedS.tag === 'v4.40a.10.19', JSON.stringify([S.view().msg, storedS]));
+    S.w.auPageLeave();
+    const nodeD = mkNode(J('E'));
+    const D = await mkPage(nodeD);
+    await D.init();
+    nodeD.down = true;
+    await D.click();
+    check('AU-26: /austatus unreachable at click -> no install started, "No answer", button usable again', nodeD.fnCalls().length === 0 && /No answer from the node/.test(D.view().err) && !D.view().dis && D.w.sessionStorage.getItem('auF:dk5en-1.local') === null, JSON.stringify(D.view()));
+    D.w.auPageLeave();
     const node2 = mkNode(J('E'));
     node2.apply = 'failed';
     const Q = await mkPage(node2);

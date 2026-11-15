@@ -13,6 +13,10 @@
 //   pio test -e native_aprs -f test_txring
 
 #include <unity.h>
+#include <fstream>   // CET-AGE-LOG-01: source-shape check
+#include <sstream>
+#include <string>
+#include <unistd.h>
 
 #include <stdint.h>
 #include <string.h>
@@ -2696,6 +2700,46 @@ static void test_csma05_relay_backoff_meldet_jitter(void)
     TEST_ASSERT_TRUE_MESSAGE(maxB > 0, "case B never recorded a jitter");
 }
 
+// CET-AGE-LOG-01: RING_DROP_STALE printed age_s=4294448 for a {CET} drop before TX (DK5EN-98,
+// 2026-11-14 21:54:12): txRingDropStaleCet() swept with now_ms = 0, so (now - enqueue) wrapped.
+// The drop decision does not use the age on that path; only the debug line was wrong, and the
+// native shim swallows printfdeb, so the guard is on the call itself.
+static std::string read_txring_source(void)
+{
+    char cwd_buf[4096];
+    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
+    std::string dir(cwd_buf);
+    for (int hops = 0; hops < 16; hops++)
+    {
+        std::ifstream a((dir + "/src/txring_functions.cpp").c_str()), b((dir + "/platformio.ini").c_str());
+        if (a.good() && b.good())
+        {
+            std::stringstream ss;
+            ss << a.rdbuf();
+            return ss.str();
+        }
+        const size_t pos = dir.find_last_of('/');
+        if (pos == std::string::npos || pos == 0)
+            break;
+        dir = dir.substr(0, pos);
+    }
+    TEST_FAIL_MESSAGE("could not find src/txring_functions.cpp");
+    return std::string();
+}
+
+static void test_cet_age_log01_cet_sweep_uses_real_time(void)
+{
+    const std::string src = read_txring_source();
+    const size_t fn = src.find("void txRingDropStaleCet(const CetClock &clk)");
+    TEST_ASSERT_TRUE_MESSAGE(fn != std::string::npos, "txRingDropStaleCet() not found");
+    const size_t end = src.find("\n}", fn);
+    const std::string body = src.substr(fn, end - fn);
+    TEST_ASSERT_TRUE_MESSAGE(body.find("txRingSweep(0,") == std::string::npos,
+                             "CET-only sweep passes now_ms = 0: RING_DROP_STALE age_s wraps");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("millis()") != std::string::npos,
+                             "CET-only sweep must pass the real millis()");
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -2808,5 +2852,6 @@ int main(int argc, char **argv)
     RUN_TEST(test_csma05_idle_armed_rearm_retry_verkuerzt_wartezeit);
     RUN_TEST(test_csma05_rearm_retry_ohne_armed_wait_aendert_nichts);
     RUN_TEST(test_csma05_relay_backoff_meldet_jitter);
+    RUN_TEST(test_cet_age_log01_cet_sweep_uses_real_time);
     return UNITY_END();
 }

@@ -3367,7 +3367,7 @@ void sub_page_setup()
             web_client.printf("<button type=\"button\" class=\"mctab mcledbtn%s\" id=\"tddisp_%s\" aria-pressed=\"%s\" onclick=\"tdDisp('%s')\">%s</button>\n",
                               dispCur == i ? " mctab-on" : "", dispNames[i], dispCur == i ? "true" : "false", dispNames[i], dispNames[i]);
         web_client.println("</div></div>");
-        web_client.printf("<div class=\"mcsegrow\"><label for=\"tdbright\">T-Deck brightness</label><div><input type=\"range\" id=\"tdbright\" min=\"1\" max=\"16\" value=\"%d\" oninput=\"document.getElementById('tdbright_val').textContent=this.value\" onchange=\"tdBright(this.value)\"> <span id=\"tdbright_val\">%d</span></div></div>\n",
+        web_client.printf("<div class=\"mcsegrow\"><label for=\"tdbright\">T-Deck brightness</label><div class=\"mcsegval\"><input type=\"range\" id=\"tdbright\" min=\"1\" max=\"16\" value=\"%d\" oninput=\"document.getElementById('tdbright_val').textContent=this.value\" onchange=\"tdBright(this.value)\"> <span id=\"tdbright_val\">%d</span></div></div>\n",
                           (int)brightnessActiveLevel(), (int)brightnessActiveLevel());
         // TD2-HTML-END
     }

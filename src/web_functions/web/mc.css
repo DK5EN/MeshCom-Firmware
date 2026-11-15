@@ -121,6 +121,7 @@ input:where([type="checkbox"][role="switch"]):checked::before {left:1.8em;backgr
 /* selected segment: toggle-ON green fill, normal ink border (--mcgray from .mctab), label in the page background colour */
 /* setup: label left, segment group / slider right, one line spanning both grid columns */
 #content_inner .mcsegrow {grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+#content_inner .mcsegrow .mcsegval {display:flex;align-items:center;gap:6px;}
 #content_inner .mcsegrow input[type=range] {accent-color:var(--mcsw1);}
 #content_inner .mcledgrp .mctab-on {background-color:var(--mcsw1);color:var(--mcbg);}
 .mcbadge {font-size:var(--fs-s);font-weight:bold;margin-left:4px;}

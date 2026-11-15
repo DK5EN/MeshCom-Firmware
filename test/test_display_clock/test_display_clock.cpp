@@ -456,6 +456,33 @@ void test_ping_hold02_wiring(void)
     TEST_ASSERT_TRUE_MESSAGE(body.find("sendDisplay1306(false, true, 0, 0, (char*)\"#N\")", rd) - rd < 200, "redraw is not the #N re-transfer");
 }
 
+void test_track_mode_ping_frame_released_at_deadline(void)
+{
+    bool drawn = true;
+    const unsigned long until = dispClkFrameDeadline(1000UL, dispClkPingHoldMs(30UL));   // DisplayOffWait = 30 s
+    TEST_ASSERT_FALSE(dispClkTrackMayDraw(31000UL, drawn, until, 5000UL));    // inside the 10 s hold
+    TEST_ASSERT_TRUE(dispClkTrackMayDraw(31000UL, drawn, until, 11000UL));    // deadline reached: track page back
+    TEST_ASSERT_TRUE(dispClkTrackMayDraw(0UL, drawn, until, 5000UL));         // no display-off timer: unchanged
+    TEST_ASSERT_FALSE(dispClkTrackMayDraw(31000UL, drawn, 0UL, 99000UL));     // hold text (no deadline) keeps its time
+    TEST_ASSERT_FALSE(dispClkTrackMayDraw(31000UL, false, until, 99000UL));   // nothing drawn: DisplayOffWait rules
+}
+
+// TRACK-PING-01: in TRACK mode the page-update block used to wait for DisplayOffWait == 0, so a
+// ping/pong/fail frame stayed the full node_pingtime. It must also draw once the held frame's
+// deadline is reached (dispClkTrackMayDraw), force a rebuild, and consume the held state.
+void test_track_ping_frame_replaced_after_hold_wiring(void)
+{
+    const std::string src = code_only(read_repo_file("src/loop_functions.cpp"));
+    const size_t call = src.rfind("sendDisplayTrack(); // Show Track");   // last one: the non-WP_DISP branch
+    TEST_ASSERT_TRUE_MESSAGE(call != std::string::npos, "track branch of the page-update block not found");
+    const size_t from = src.rfind("#else", call);
+    const std::string blk = src.substr(from, call - from + 400);   // includes the post-draw consume
+    TEST_ASSERT_TRUE_MESSAGE(blk.find("dispClkTrackMayDraw(DisplayOffWait, bHeldFrameDrawn, heldFrameUntilMs, millis())") != std::string::npos,
+                             "TRACK branch does not release the ping frame at its hold deadline");
+    TEST_ASSERT_TRUE_MESSAGE(blk.find("bDisplayDirty") != std::string::npos, "expiry must force a track page rebuild");
+    TEST_ASSERT_TRUE_MESSAGE(blk.find("heldFrameUntilMs = 0") != std::string::npos, "expiry must consume the held state");
+}
+
 
 // The status line never shows a few seconds back: GPS with a fix and NTP can disagree by a second,
 // and the bench (T-Beam DK5EN-92, 2026-11-14) showed :52 :51 :52 when the source changed.
@@ -541,5 +568,7 @@ int main(int, char **)
     RUN_TEST(test_ping_frame_expiry_redraws_message_page_once);
     RUN_TEST(test_ping_frame_expiry_clock_page_unchanged);
     RUN_TEST(test_ping_hold02_wiring);
+    RUN_TEST(test_track_ping_frame_replaced_after_hold_wiring);
+    RUN_TEST(test_track_mode_ping_frame_released_at_deadline);
     return UNITY_END();
 }

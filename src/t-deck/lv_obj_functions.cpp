@@ -284,6 +284,10 @@ static bool compute_locator_from_settings(char *buffer, size_t len);
 static bool compute_maidenhead_locator(double lat, double lon, char *buffer, size_t len);
 static int clamp_int(int value, int min_val, int max_val);
 static void apply_tab_bar_styles(void);
+
+// TD-NAV-01: index of the GPS tab (t6 in setDisplayLayout()). Its tab-bar button is hidden;
+// the page is reached through the header satellite icon (header_sat_icon_event_cb).
+#define TDECK_TAB_GPS 4
 static const char DEFAULT_LOCATOR_TEXT[] = "JJ00AAAA";
 static void init_msg_tab_bar(lv_obj_t *parent);
 static void msg_tab_button_event_cb(lv_event_t * e);
@@ -778,6 +782,14 @@ static void header_wifi_icon_event_cb(lv_event_t *e)
     tdeck_wifi_set(!meshcom_settings.node_wifion);   // TD-32: same sequence as the setup checkbox
 }
 
+static void header_sat_icon_event_cb(lv_event_t *e)
+{
+    if(lv_event_get_code(e) != LV_EVENT_CLICKED)
+        return;
+    if(tv != NULL)
+        lv_tabview_set_act(tv, TDECK_TAB_GPS, LV_ANIM_OFF);   // TD-NAV-01: VALUE_CHANGED/refresh runs via tabview_event_cb
+}
+
 static void header_bt_icon_event_cb(lv_event_t *e)
 {
     if(lv_event_get_code(e) != LV_EVENT_CLICKED)
@@ -892,6 +904,9 @@ void setDisplayLayout(lv_obj_t *parent)
     lv_label_set_text(header_sat_icon, LV_SYMBOL_GPS); // Symbol stammt von WpZoom (CC BY-SA 3.0, siehe README)
     lv_obj_set_style_text_font(header_sat_icon, &mc_font_latin_18, LV_PART_MAIN);
     lv_obj_align_to(header_sat_icon, header_sat_label, LV_ALIGN_OUT_LEFT_MID, -6, 0);
+    lv_obj_add_flag(header_sat_icon, LV_OBJ_FLAG_CLICKABLE);   // TD-NAV-01
+    lv_obj_set_ext_click_area(header_sat_icon, 8);
+    lv_obj_add_event_cb(header_sat_icon, header_sat_icon_event_cb, LV_EVENT_CLICKED, NULL);
     
     /* wifi + bluetooth icons (left of battery) */
     header_wifi_icon = lv_label_create(tab_menu_header);
@@ -956,6 +971,19 @@ void setDisplayLayout(lv_obj_t *parent)
     lv_obj_set_scroll_dir(t1, LV_DIR_VER);
 
     lv_obj_add_event_cb(tv, tabview_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    {
+        // TD-NAV-01: hide the GPS tab button (the page and all indices stay). A hidden LVGL 8
+        // button still reserves its width unit, so give the others the maximum (15) and the
+        // hidden one the minimum (1): the visible 7 share ~99% of the bar. Swipe cannot land on
+        // the page: tab_content has LV_DIR_NONE scroll (set above).
+        lv_obj_t *tab_btns = lv_tabview_get_tab_btns(tv);
+        if(tab_btns != NULL)
+        {
+            for(uint16_t b = 0; b < 8; b++)
+                lv_btnmatrix_set_btn_width(tab_btns, b, (b == TDECK_TAB_GPS) ? 1 : 15);
+            lv_btnmatrix_set_btn_ctrl(tab_btns, TDECK_TAB_GPS, LV_BTNMATRIX_CTRL_HIDDEN);
+        }
+    }
     tdeck_hide_tab_menu();
     apply_tab_bar_styles();
 
@@ -2618,7 +2646,8 @@ static void update_header_sat_indicator(void)
         label_set_if_changed(header_sat_label, "0");
         text_color_set_if_changed(header_sat_icon, lv_color_hex(tdeck_theme_pal().hdr_off));
         lv_obj_add_flag(header_sat_label, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(header_sat_icon, LV_OBJ_FLAG_HIDDEN);
+        // TD-NAV-01: the icon stays (grey): it is the only way to the GPS page and SEND POS
+        lv_obj_clear_flag(header_sat_icon, LV_OBJ_FLAG_HIDDEN);
         return;
     }
 
@@ -4879,7 +4908,7 @@ void tdeck_add_system_message(const char *text)
  */
 void tdeck_refresh_track_view()
 {
-    if (lv_tabview_get_tab_act(tv) != 4) // GPS screen not active
+    if (lv_tabview_get_tab_act(tv) != TDECK_TAB_GPS) // GPS screen not active
         return;
 
     tdeckGpsSkyRefresh();   // GPS-SKY: no-op while the text view is shown

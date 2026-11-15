@@ -103,7 +103,7 @@ const pressed = (w) => names.map((n) => w.document.getElementById('tdtheme_' + n
     const wl = between(WF, 'WEBLOOK-HTML');
     for (const [id, txt] of [['tdfont_lbl', 'T-Deck font size'], ['tddisp_lbl', 'T-Deck display backlight']])
       check(id + ': row wrapper and label "' + txt + '"', td2.includes('<div class=\\"mcsegrow\\"><label id=\\"' + id + '\\">' + txt + '</label>'), id);
-    check('tdbright: row wrapper and label "T-Deck brightness"', td2.includes('<div class=\\"mcsegrow\\"><label for=\\"tdbright\\">T-Deck brightness</label><div>'), 'tdbright');
+    check('tdbright: row wrapper and label "T-Deck brightness"', td2.includes('<div class=\\"mcsegrow\\"><label for=\\"tdbright\\">T-Deck brightness</label><div class=\\"mcsegval\\">'), 'tdbright');
     check('web look theme and font rows use the same row wrapper', (wl.match(/<div class=\\"mcsegrow\\"><label id=\\"weblook_/g) || []).length === 2, 'weblook');
     const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'web_functions', 'web', 'mc.css'), 'utf8');
     const r = /#content_inner \.mcsegrow \{([^}]*)\}/.exec(css);

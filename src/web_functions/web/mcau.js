@@ -55,7 +55,13 @@ fetch('/austatus').then(function(r){if(r.status==404){var t=auEl('au_tr');if(t)t
 if(!auShown||!j)return;if(cpage!='info'||!auEl('au_row')){auPageLeave();return;}auApply(j);}).catch(function(){auInfl=false;auBusy=false;auRender();auSched();if(auShown&&!auF&&!auT.poll)auT.poll=setTimeout(auFetch,5000);});}
 function auApply(s){auS=s;auUpAt=Date.now();auBusy=false;auRender();auSched();}
 function auClick(){if(auBusy||auF||!auS)return;var b=auEl('au_btn'),a=b?b.getAttribute('data-act'):'';if(!a||b.disabled)return;
-auBusy=true;b.disabled=true;auLoc='';var fn=a=='apply'?'updapply':(a=='install'?'updinstall':'updcheck'),p=a=='ble'?'ble':'',tag=auS.staged;
+auBusy=true;b.disabled=true;auLoc='';
+if(a!='apply'){auGo(a,auS.staged);return;}
+clearTimeout(auT.poll);auT.poll=0;
+fetch('/austatus').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){
+if(!j||typeof j.staged!='string'||!j.staged){auApply(j&&typeof j.st=='string'?j:auS);return;}
+auS=j;auUpAt=Date.now();auGo(a,j.staged);}).catch(function(){auBusy=false;auLoc='No answer from the node';auRender();});}
+function auGo(a,tag){var fn=a=='apply'?'updapply':(a=='install'?'updinstall':'updcheck'),p=a=='ble'?'ble':'';
 fetch('/callfunction/?'+fn+'='+p).then(function(r){return r.json();}).then(function(j){
 if(a=='apply'&&j[fn]=='ok'){auFBegin({tag:tag,t0:Date.now(),etaS:auS.etaS||35,upBase:typeof auS.up=='number'?auS.up:undefined,upAt:auUpAt,img:typeof auS.img=='string'?auS.img:undefined});return;}
 if(j[fn]!='ok')auLoc=a=='apply'?'Install of '+tag+' failed':'The node did not start the job, try again in a minute';

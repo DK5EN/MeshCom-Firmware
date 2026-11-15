@@ -122,6 +122,7 @@ const attr = (w, a) => w.document.documentElement.getAttribute(a);
   const fids = ['tdfont_s', 'tdfont_m', 'tdfont_l'], dids = ['tddisp_auto', 'tddisp_light', 'tddisp_dark'];
   w = mount(td, [tdJs]);
   check('T-Deck section renders stored font m / display light / level 12', pr(w, fids) === 'false,true,false' && pr(w, dids) === 'false,true,false' && w.document.getElementById('tdbright').value === '12' && w.document.getElementById('tdbright_val').textContent === '12');
+  check('brightness value text shares a vertically centered flex row with the slider (Safari baseline nit)', w.document.getElementById('tdbright').parentElement === w.document.getElementById('tdbright_val').parentElement && w.document.getElementById('tdbright').parentElement.classList.contains('mcsegval') && /\.mcsegrow \.mcsegval \{[^}]*display:flex;[^}]*align-items:center/.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'web_functions', 'web', 'mc.css'), 'utf8')));
   check('slider range 1..16', w.document.getElementById('tdbright').min === '1' && w.document.getElementById('tdbright').max === '16');
   const order = [...w.document.querySelectorAll('[id$="_lbl"], label[for]')].map((e) => e.id || e.getAttribute('for'));
   check('order: font, display, brightness', order.join() === 'tdfont_lbl,tddisp_lbl,tdbright', order.join());

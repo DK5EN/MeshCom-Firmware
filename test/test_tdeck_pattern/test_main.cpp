@@ -1,6 +1,10 @@
 // DISP-PAT-01: --tdpattern colour generators and argument parser (LVGL-free).
 #include <stdio.h>
 #include <stdlib.h>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <unistd.h>
 #include <unity.h>
 #include <t-deck/tdeck_pattern.h>
 
@@ -87,6 +91,67 @@ static void test_parse_rejects(void)
     }
 }
 
+// TD-NAV-01: source pins on src/t-deck/lv_obj_functions.cpp (LVGL is not linked on the host).
+static std::string read_repo_file(const char *rel)
+{
+    const std::string self = "test/test_tdeck_pattern/test_main.cpp";
+    char cwd_buf[4096];
+    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
+    std::string dir(cwd_buf);
+    for(int hops = 0; hops < 16; hops++)
+    {
+        std::ifstream a((dir + "/" + self).c_str()), b((dir + "/platformio.ini").c_str());
+        if(a.good() && b.good())
+            break;
+        const size_t pos = dir.find_last_of('/');
+        if(pos == std::string::npos || pos == 0)
+            TEST_FAIL_MESSAGE("could not derive repo root");
+        dir = dir.substr(0, pos);
+    }
+    std::ifstream f((dir + "/" + rel).c_str());
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+static void test_nav01_sat_icon_opens_gps_tab(void)
+{
+    const std::string src = read_repo_file("src/t-deck/lv_obj_functions.cpp");
+    TEST_ASSERT_TRUE(src.size() > 1000);
+    TEST_ASSERT_TRUE(src.find("#define TDECK_TAB_GPS") != std::string::npos);
+    TEST_ASSERT_TRUE(src.find("lv_obj_add_flag(header_sat_icon, LV_OBJ_FLAG_CLICKABLE)") != std::string::npos);
+    TEST_ASSERT_TRUE(src.find("lv_obj_add_event_cb(header_sat_icon, header_sat_icon_event_cb, LV_EVENT_CLICKED") != std::string::npos);
+    const size_t cb = src.find("static void header_sat_icon_event_cb");
+    TEST_ASSERT_TRUE(cb != std::string::npos);
+    const std::string body = src.substr(cb, src.find("\n}\n", cb) - cb);
+    TEST_ASSERT_TRUE(body.find("lv_tabview_set_act(tv, TDECK_TAB_GPS") != std::string::npos);
+}
+
+// TD-NAV-01 (advisor): with the GPS tab button hidden, the header GPS icon is the only way to the GPS
+// page and its SEND POS button. It must stay visible (grey) when GPS is switched off.
+static void test_nav01_sat_icon_stays_visible_with_gps_off(void)
+{
+    const std::string src = read_repo_file("src/t-deck/lv_obj_functions.cpp");
+    const size_t fn = src.find("static void update_header_sat_indicator(void)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(fn != std::string::npos, "update_header_sat_indicator() not found");
+    const size_t off = src.find("if(!bGPSON)", fn);
+    TEST_ASSERT_TRUE_MESSAGE(off != std::string::npos, "GPS-off branch not found");
+    const size_t ret = src.find("return;", off);
+    const std::string branch = src.substr(off, ret - off);
+    TEST_ASSERT_TRUE_MESSAGE(branch.find("lv_obj_add_flag(header_sat_icon, LV_OBJ_FLAG_HIDDEN)") == std::string::npos,
+                             "GPS off hides the header GPS icon: GPS page and SEND POS become unreachable");
+    TEST_ASSERT_TRUE_MESSAGE(branch.find("lv_obj_clear_flag(header_sat_icon, LV_OBJ_FLAG_HIDDEN)") != std::string::npos,
+                             "GPS off must show the header GPS icon (grey)");
+}
+
+static void test_nav01_gps_tab_button_hidden(void)
+{
+    const std::string src = read_repo_file("src/t-deck/lv_obj_functions.cpp");
+    TEST_ASSERT_TRUE(src.find("LV_BTNMATRIX_CTRL_HIDDEN") != std::string::npos);
+    TEST_ASSERT_TRUE(src.find("TDECK_TAB_GPS, LV_BTNMATRIX_CTRL_HIDDEN") != std::string::npos);
+    TEST_ASSERT_TRUE(src.find("lv_tabview_get_tab_act(tv) != TDECK_TAB_GPS") != std::string::npos);
+}
+
 int main(int, char**)
 {
     UNITY_BEGIN();
@@ -95,5 +160,8 @@ int main(int, char**)
     RUN_TEST(test_ramps);
     RUN_TEST(test_parse);
     RUN_TEST(test_parse_rejects);
+    RUN_TEST(test_nav01_sat_icon_opens_gps_tab);
+    RUN_TEST(test_nav01_gps_tab_button_hidden);
+    RUN_TEST(test_nav01_sat_icon_stays_visible_with_gps_off);
     return UNITY_END();
 }

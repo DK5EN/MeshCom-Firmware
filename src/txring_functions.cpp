@@ -679,7 +679,8 @@ void txRingAgeBackground(uint32_t now_ms, const CetClock &clk)
 // Nur das {CET}-Gate, direkt vor dem Senden (doTX()).
 void txRingDropStaleCet(const CetClock &clk)
 {
-    txRingSweep(0, clk, true);
+    // CET-AGE-LOG-01: real time, only for the RING_DROP_STALE age_s print (the CET verdict does not use it)
+    txRingSweep((uint32_t)millis(), clk, true);
 }
 
 // ---- TXP W1c (D3, Konzept 5.4.1): Supersede in place -----------------------
