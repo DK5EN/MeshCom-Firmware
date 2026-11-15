@@ -1,0 +1,13 @@
+TBEAM-HEAP-01 counter-measurement, DK5EN-92 (T-Beam v1.2, ttgo_tbeam), gateway OFF, 2026-11-15
+Sequence: WEB-TX-01 as in b1-92-webtx01b-20261115 (>= 5 min idle, 10 rounds x 15 requests = 150: /, 10 ?page= fragments, mc.css, mc.js, mcrm.js, mcau.js; heap after; +2 min).
+Page set: identical on both images, nothing excluded. 11.08: 150 x 200, bad=0.
+Heap (--info HEAP free/min/blk, bytes):
+  image                        before (uptime)         after (uptime)          +2 min (uptime)
+  v4.40a.11.08 (build Nov 8)   61544/45632/55284 (348 s)   53628/35388/47092 (381 s)   56000/35388/49140 (506 s)
+  fork-dev f64ea131 (Nov 15)   60504/49780/53236 (364 s)   53300/35208/47092 (395 s)   55460/35208/49140 (519 s)
+  delta (11.08 - f64ea131)       +1040 free / -4148 min        +328 free / +180 min       +540 free / +180 min
+Drop over the 150 requests (free): 11.08 -7916 B, f64ea131 -7204 B. Blk after is identical (47092, 49140 at +2 min).
+Verdict: no regression since 11.08 within the noise (+-1 KB free, same blk); the ~10.7 KB gap to the 11-06 CI image (64016) is already present on the 11.08 image (53628 after), so it was introduced before 11.08 or is a measurement-condition difference (CI start 65728 vs 61544/60504 here), not a change since 11.08.
+Caveat: the CI reference of 11-06 was not re-measured; bisect further back (a build before 11.08) if the gap must be located.
+Logs: tbeamheap01-1108-20261115.log (this run), b1-92-webtx01b-20261115.log (f64ea131).
+Node restored: INSTRUMENT afaa2f40 (build Nov 15 2026 / 20:26:57), identity guard ok (DK5EN-92, 2 dBm), gateway off.

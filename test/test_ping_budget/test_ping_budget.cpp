@@ -134,6 +134,29 @@ static void test_refused_last_send_does_not_arm(void)
     TEST_ASSERT_TRUE(pingFinalArmAfterSend(1, 0, true));
 }
 
+/* PING-FAIL-REPEAT-01: after a send attempt that queued no new ping (refused ring, TRACK,
+ * invalid target) the stale bPingSend is cleared, so one unanswered ping is reported once.
+ * The clear sits AFTER sendPing(): clearing before it would let sendPing() draw "SENT" over the
+ * "PONG FAILED" frame on OLED boards (sendPing draws only while !bPingSend). The final check
+ * arms only for a queued send. */
+static void test_fail_verdict_clears_flag_and_arm_needs_queued(void)
+{
+    const char *files[] = {"src/esp32/esp32_main.cpp", "src/nrf52/nrf52_main.cpp"};
+    for (const char *rel : files) {
+        std::string s = slurp(rel);
+        TEST_ASSERT_TRUE_MESSAGE(s.find("pingResult == PING_QUEUED") != std::string::npos, rel);
+        const size_t send = s.find("PingResult pingResult = sendPing(");
+        TEST_ASSERT_TRUE_MESSAGE(send != std::string::npos, rel);
+        const size_t clr = s.find("if(pingResult != PING_QUEUED)", send);
+        TEST_ASSERT_TRUE_MESSAGE(clr != std::string::npos && clr - send < 1200, rel);
+        TEST_ASSERT_TRUE_MESSAGE(s.substr(clr, 80).find("bPingSend = false;") != std::string::npos, rel);
+        // no clear between the in-budget verdict and the new send
+        const size_t verdict = s.rfind("PongFail(meshcom_settings.node_pingcall);", send);
+        TEST_ASSERT_TRUE_MESSAGE(verdict != std::string::npos, rel);
+        TEST_ASSERT_TRUE_MESSAGE(s.substr(verdict, send - verdict).find("bPingSend = false;") == std::string::npos, rel);
+    }
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -147,5 +170,6 @@ int main(int, char **)
     RUN_TEST(test_pong_received_no_fail);
     RUN_TEST(test_stop_clears_no_fail);
     RUN_TEST(test_refused_last_send_does_not_arm);
+    RUN_TEST(test_fail_verdict_clears_flag_and_arm_needs_queued);
     return UNITY_END();
 }
