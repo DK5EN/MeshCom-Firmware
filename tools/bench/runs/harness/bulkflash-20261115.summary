@@ -1,0 +1,4 @@
+OK DK5EN-1 heltec_wifi_lora_32_V3 /dev/cu.usbserial-0001 0 compiled
+OK DK5EN-14 t_deck_plus /dev/cu.usbmodem2101 0 compiled
+OK DK5EN-90 wiscore_rak4631 /dev/cu.usbmodem1101 0 compiled
+head f64ea131

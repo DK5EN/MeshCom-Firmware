@@ -1,7 +1,7 @@
 # RESUME -- pick up here
 
-**Resume here: [campaign-release-train-20261115.md](campaign-release-train-20261115.md).** Next: bulk build and
-flash, then central bench **B-1** (list: [bench-b1-20261115.md](bench-b1-20261115.md)), fixes and release **F-1**. Deadline: upstream wave 2
+**Resume here: [campaign-release-train-20261115.md](campaign-release-train-20261115.md).** Bulk build and flash done;
+central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md)), fixes and release **F-1**. Deadline: upstream wave 2
 (Ping plus web GUI) on **2026-11-20**, which needs PING-NRF-01 and the browser rows from B-1.
 
 ## State 2026-11-15

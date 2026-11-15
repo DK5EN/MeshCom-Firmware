@@ -1,0 +1,5 @@
+B-1 follow-up 2026-11-15, DK5EN-1 INSTRUMENT (f64ea131), shots in the session scratchpad (shots/)
+PING-HOLD-02: msg page -> PONG image at +1.7 s and +8.2 s -> msg page again at +12.1 s (USB log: pong 18:30:21.7, [OLED];frame page 1 at 18:30:31.9)
+TRACK-PING-01: PONG image at +1.7 s and +8.0 s -> TRACK page ("GT 18:31:27") at +12.1 s (USB log: pong 18:31:17.2, [OLED];frame page 2 at 18:31:28.0 = 10.8 s)
+CLK-01 S2: 71 x [DISPCLK];skip;type0 while the message page was up (18:32:20-18:33:29), then draw every second (133 draws in 135 s, max gap 2 s)
+Display setting was off, set on for the shots, restored off.

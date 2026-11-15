@@ -1,0 +1,6 @@
+B-1 DK5EN-92 (T-Beam, fork-dev f64ea131 normal image), 2026-11-15
+WEB-TX-01: 10 of 10 rounds x 15 requests (/, 10 ?page= fragments, mc.css, mc.js, mcrm.js, mcau.js): all 200, constant size per page,
+  / ends with </html>, fragments end with a closing tag, assets Content-Length == body. ?page=messages has 4 <div vs 5 </div> in every round (stable).
+Heap (--info HEAP free): 60828 at 65 s uptime, 53100 right after first single pass of pages, 53108 before the 10 rounds, 52840 after (min 32424 -> 28860).
+  After reboot: 62408 at 53 s uptime (min 57768). CI image 11.06 reference (campaign-release-gate-20261106.md:113): T-Beam 65728 start, 64016 end; 11.01 68.7 KB.
+  => 62.4 KB fresh boot (3.3 KB below CI start), 52.8 KB after page loads (11.2 KB below CI end). Gateway turned on by someone else later: 57.8 KB.

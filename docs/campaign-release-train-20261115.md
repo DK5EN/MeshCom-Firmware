@@ -29,7 +29,7 @@ DK5EN-98 (production gateway) gets soak runs only, each with an explicit operato
 | 0    | done 2026-11-15            | decisions above; BACKLOG clean-up `b8544fd2`                                                                                                                                                                                                |
 | I-1  | done 2026-11-15 `b6d0da94` | CET-AGE-LOG-01, TRACK-PING-01, AU-26, TD-NAV-01, web brightness alignment, web assets README. WEB-LATLON-01 (`39536d0d`) and the TD-CHAT-01 web control were already done. Gate stage 1,2 PASS (3812 Unity cases), six board builds         |
 | I-2  | done 2026-11-15            | Triage of 7 older campaign docs -> [bench-b1-20261115.md](bench-b1-20261115.md); wave-2 content list [upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md); BACKLOG RM-DUP-01, RM-LOSTREPLY-01; PWR-01, SENS-04 to field |
-| B-1  | **next**                   | bulk build and flash, then central bench (today, 2026-11-15)                                                                                                                                                                                |
+| B-1  | **running** 2026-11-15     | bulk build and flash done (all four nodes); results so far in [bench-b1-20261115.md](bench-b1-20261115.md); findings LAST-PONG-01, TBEAM-HEAP-01, cosmetic `factor` print                                                                   |
 | F-1  | open                       | fixes, re-test, release                                                                                                                                                                                                                     |
 
 ## I-2 result (2026-11-15)

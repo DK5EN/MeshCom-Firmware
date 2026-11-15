@@ -1,0 +1,5 @@
+CSMA-03 B-1 2026-11-15, DK5EN-90 (RAK4631), build Nov 15 2026 17:30:14 (f64ea131)
+capture 17:52:29-18:17:25 = 24 min 56 s, USB serial, raw log b1-csma-03-20261115.log
+CAD_STALE_RECHECK: 0 occurrences
+RAK TX frames in window: 34 ([LOG] TX), cad attempt counter: 26 x cad=0, 6 x cad=1, 2 x cad=2
+traffic: 20 DMs to DK5EN-1 via web (25 s apart), 1 RM status, 3 pongs; quiet channel (util 0-1 %). Result: inconclusive (no stale CAD reached)

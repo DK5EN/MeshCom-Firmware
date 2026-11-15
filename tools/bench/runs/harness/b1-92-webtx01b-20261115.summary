@@ -1,0 +1,5 @@
+B-1 WEB-TX-01 heap re-measure, DK5EN-92, gateway OFF (Webserver on / Gateway off in --info), fork-dev f64ea131 normal image, 2026-11-15
+10 rounds x 15 requests (/, 10 ?page= fragments without mailbox, mc.css, mc.js, mcrm.js, mcau.js) = 150 requests, 150 x 200, bad=0, assets Content-Length == body.
+Heap (--info HEAP free/min/blk): before rounds 60504/49780/53236 (uptime 364 s; 62236/57540/57332 at 340 s, before 3 curl probes and one identity_guard read),
+  after rounds 53300/35208/47092 (uptime 395 s), +2 min 55460/35208/49140 (uptime 519 s).
+CI reference (campaign-release-gate-20261106.md:113): 65728 start, 64016 end. After-figure is 10.7 KB below CI end, same as the gateway-on run (52840).

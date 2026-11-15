@@ -1,0 +1,8 @@
+OK heltec_wifi_lora_32_V3 9s RAM: [==== ] 41.9% (used 137292 bytes from 327680 bytes) Flash: [===== ] 51.8% (used 1764213 bytes from 3403776 bytes) 
+OK ttgo_tbeam 8s RAM: [= ] 8.2% (used 107448 bytes from 1310720 bytes) Flash: [===== ] 54.9% (used 1868177 bytes from 3403776 bytes) 
+OK t_deck_plus 11s RAM: [===== ] 48.4% (used 158444 bytes from 327680 bytes) Flash: [== ] 19.0% (used 2391093 bytes from 12582912 bytes) 
+OK wiscore_rak4631 22s RAM: [==== ] 41.9% (used 104148 bytes from 248832 bytes) Flash: [======== ] 81.3% (used 662752 bytes from 815104 bytes) 
+OK E22-DevKitC 47s RAM: [== ] 20.2% (used 107528 bytes from 532480 bytes) Flash: [===== ] 54.6% (used 1858561 bytes from 3403776 bytes) 
+OK ttgo_tbeam_supreme 16s RAM: [==== ] 42.0% (used 137612 bytes from 327680 bytes) Flash: [===== ] 52.5% (used 1785485 bytes from 3403776 bytes) 
+OK t_deck 11s RAM: [===== ] 48.4% (used 158444 bytes from 327680 bytes) Flash: [== ] 19.0% (used 2391345 bytes from 12582912 bytes) 
+head f64ea131
