@@ -6,13 +6,20 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
 
 ## State 2026-11-15
 
-- **2026-11-15 evening:** B-1 mostly done ([bench-b1-20261115.md](bench-b1-20261115.md)); wave-2 rows all PASS.
-  F-1a `afaa2f40` (LAST-PONG-01, battery `--info` line, SB-06-DESC Safeboot fix, SB-06 re-bench PASS). CSMA-04 early
-  data point. Bench nodes DK5EN-1, -90, -92 run the `afaa2f40` INSTRUMENT image, DK5EN-14 the `f64ea131` bulk image.
-  Open for the next session: RM-DUP-01, full CSMA-01 run C, RM-LOSTREPLY-01 (gateways on the local mock server,
-  operator decision B); BLE-SET-01, NRF-BLEDFU (phone); TD-CHAT-01, TD-22, TD-34, BOOT-01 (operator eye); AU-24/25,
-  CLK-01 S3/S4, CET-AGE-01 (long runs); TBEAM-HEAP-01 on the previous image; PING-FAIL-REPEAT-01; then release and
-  `/submit-pr` wave 2 (operator answers to the five questions in the wave-2 content doc still open).
+- **2026-11-15 late (resume here):** B-1 done except TD-34 (`--disptest square 8`, needs the T-Deck on USB) and
+  BOOT-01 on the DK5EN-1 OLED (reboot after the night run). Results: [bench-b1-20261115.md](bench-b1-20261115.md).
+  Fixes on fork-dev: F-1a `afaa2f40` (LAST-PONG-01, battery `--info` line, SB-06-DESC Safeboot), F-1b `b4ae98e4`
+  (PING-FAIL-REPEAT-01). Mock-server rows done (RM-DUP-01 PASS, CSMA-01 run C 14/14), BLE-SET-01 and NRF-BLEDFU PASS,
+  TBEAM-HEAP-01 no regression since 11.08. RM-LOSTREPLY-01 reproduced, needs a short concept before a fix.
+- **Night run (started ~21:40, agent-driven):** CLK-01 S3 + CET-AGE-01 (2 h, DK5EN-1 + DK5EN-92, `--timesrc cet`), then
+  CLK-01 S4 (1 h, DK5EN-1 without WLAN). Results land in `tools/bench/runs/harness/night-clk-20261115.summary` and
+  `clock-*` files. First thing next session: read that summary, check both nodes are restored (WLAN on DK5EN-1,
+  `--timesrc all`, mesh/gps as before, identity guard), record verdicts in the bench doc and BACKLOG, commit.
+- **Fleet now:** DK5EN-1 and DK5EN-92 `afaa2f40` INSTRUMENT (night run), DK5EN-90 `b4ae98e4` normal (via BLE DFU),
+  DK5EN-14 `f64ea131` bulk image; all 2 dBm; DK5EN-92 gateway off (operator), DK5EN-1/-90 gateways on the real server.
+- **Next steps:** TD-34 and BOOT-01 OLED; RM-LOSTREPLY-01 concept; empty F0A0 service cleanup (BLE-SET-01);
+  operator answers to the five wave-2 questions (checklist "Welle 2"); `/release-firmware` (release note: Safeboot
+  only updates with a full install); `/submit-pr` wave 2 (Ping and Web as two PRs) by Fri 2026-11-20.
 - **I-2 done 2026-11-15:** B-1 list with the triage of older campaign docs, wave-2 PR content list
   ([upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md), operator questions open), PWR-01 and SENS-04
   to the field.
