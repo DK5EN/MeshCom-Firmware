@@ -1,6 +1,6 @@
 # Upstream-Releaseplan: geprüfter Code zuerst, je ein Feldtest dabei
 
-**Welle 1 (Uhr, T-Deck, drei Feldteile) ist am 14.11.2026 geschnitten und geht nach dem Bench am 17.11.2026 an upstream `dev`. Danach jede Woche ein PR; der LoRa-Kanalzugriff bleibt draußen, bis er stabil ist.**
+**Welle 1 (Uhr, T-Deck, drei Feldteile) ist erledigt: PR #1277, am 14.11.2026 unverändert gemergt, upstream als `v4.40a.11.14` getaggt, am 15.11.2026 in `fork-dev` übernommen. Danach jede Woche ein PR; der LoRa-Kanalzugriff bleibt draußen, bis er stabil ist.**
 
 Empfehlung: Web-Oberfläche als eigenen PR nach Absprache mit Kurt. Der Kanalzugriff läuft parallel durch eine Stabilisierung mit festen Ausstiegskriterien und geht frühestens am 29.01.2027 als Welle 7 raus.
 
