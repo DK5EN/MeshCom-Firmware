@@ -132,3 +132,7 @@ the TXP-01 bench ([campaign-tx-pool.md](campaign-tx-pool.md) W1d). A new soak fo
 | `heap-idle-v4.40a.10.25`  | release, esp_ping probe | DK5EN-92 STAT heap 64228 / 64228 / 63884 B: gate FAIL                                                          |
 | `heap-idle-v4.40a.10.25b` | release, raw probe      | DK5EN-92 STAT heap 69264 / 69264 / 68728 B: gate PASS (-604 B); `[WIFI];probe;armed` 60 s after boot           |
 | `td21c_bench`             | INSTRUMENT, raw probe   | DK5EN-14: wedge at 588 B free, heap released, 3 failed rounds, `ipdead;reconnect`, outage 2 min 0 s, no reboot |
+
+## Triage 2026-11-15
+
+Done: W1 to W6 bench runs (harness summaries). Open: the 24 h T-Deck soak (W4 and W6 soaks were stopped early) moves to the soak track on DK5EN-14; the on-device tab-eviction check is in B-1 under TD-22; the post-TD-22 image comes with the B-1 bulk flash. Open steps: [bench-b1-20261115.md](bench-b1-20261115.md).

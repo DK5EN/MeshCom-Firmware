@@ -77,3 +77,7 @@ then commit + push and update this doc, `docs/RESUME.md`, `docs/BACKLOG.md`.
 - BAT-04b: T-Deck Pro and T5 with and without a cell, on USB and on battery: `--info` charge state and current, BLE `IS2`.
 - WEB-PWD-01: set, change, clear the web password in Chrome; the open session lands on the login page after a change.
 - WEB-LED-01: Heltec V3 board LED off / flash / steady from the Setup page and console, survives reboot; an E22 S3 NeoPixel board stays white in steady; RM1 `led on/off` still overrides.
+
+## Triage 2026-11-15
+
+All ten bench lines are still open on 2026-11-15. BAT-05 failed once (`c7ae8e13`) before its fix `e7258f98`; the re-test is open. BAT-04b and TD-26 need a T-Deck Pro or T5 and moved to the field. The rest is in the B-1 table. Open steps: [bench-b1-20261115.md](bench-b1-20261115.md).

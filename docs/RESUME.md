@@ -1,12 +1,15 @@
 # RESUME -- pick up here
 
-**Resume here: [campaign-release-train-20261115.md](campaign-release-train-20261115.md).** Next wave **I-2** (bench
-preparation), then bulk build and flash, central bench **B-1**, fixes and release **F-1**. Deadline: upstream wave 2
+**Resume here: [campaign-release-train-20261115.md](campaign-release-train-20261115.md).** Next: bulk build and
+flash, then central bench **B-1** (list: [bench-b1-20261115.md](bench-b1-20261115.md)), fixes and release **F-1**. Deadline: upstream wave 2
 (Ping plus web GUI) on **2026-11-20**, which needs PING-NRF-01 and the browser rows from B-1.
 
 ## State 2026-11-15
 
-- **Branch `fork-dev`**, last wave I-1 committed as `b6d0da94` (CET-AGE-LOG-01, TRACK-PING-01, AU-26, TD-NAV-01 option 2,
+- **I-2 done 2026-11-15:** B-1 list with the triage of older campaign docs, wave-2 PR content list
+  ([upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md), operator questions open), PWR-01 and SENS-04
+  to the field.
+- **Branch `fork-dev`**, wave I-1 committed as `b6d0da94` (CET-AGE-LOG-01, TRACK-PING-01, AU-26, TD-NAV-01 option 2,
   web brightness alignment, web assets README). Gate stage 1,2 PASS (3812 Unity cases), six board builds green.
 - **Last fork release `v4.40a.11.08`** (Latest, tag on `bc05ea88`, 68 CI assets checked, web flasher and Pages on `.11.08`).
 - **Upstream:** PR #1277 (wave 1: clock, T-Deck, V4 GNSS/DHT22/T-Deck Pro field parts) merged 2026-11-14 unchanged and

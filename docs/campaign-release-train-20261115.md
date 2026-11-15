@@ -24,23 +24,25 @@ DK5EN-98 (production gateway) gets soak runs only, each with an explicit operato
 
 ## Wave log
 
-| Wave | State                      | Result                                                                                                                                                                                                                              |
-| ---- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0    | done 2026-11-15            | decisions above; BACKLOG clean-up `b8544fd2`                                                                                                                                                                                        |
-| I-1  | done 2026-11-15 `b6d0da94` | CET-AGE-LOG-01, TRACK-PING-01, AU-26, TD-NAV-01, web brightness alignment, web assets README. WEB-LATLON-01 (`39536d0d`) and the TD-CHAT-01 web control were already done. Gate stage 1,2 PASS (3812 Unity cases), six board builds |
-| I-2  | **next**                   | see below                                                                                                                                                                                                                           |
-| B-1  | open                       | central bench                                                                                                                                                                                                                       |
-| F-1  | open                       | fixes, re-test, release                                                                                                                                                                                                             |
+| Wave | State                      | Result                                                                                                                                                                                                                                      |
+| ---- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | done 2026-11-15            | decisions above; BACKLOG clean-up `b8544fd2`                                                                                                                                                                                                |
+| I-1  | done 2026-11-15 `b6d0da94` | CET-AGE-LOG-01, TRACK-PING-01, AU-26, TD-NAV-01, web brightness alignment, web assets README. WEB-LATLON-01 (`39536d0d`) and the TD-CHAT-01 web control were already done. Gate stage 1,2 PASS (3812 Unity cases), six board builds         |
+| I-2  | done 2026-11-15            | Triage of 7 older campaign docs -> [bench-b1-20261115.md](bench-b1-20261115.md); wave-2 content list [upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md); BACKLOG RM-DUP-01, RM-LOSTREPLY-01; PWR-01, SENS-04 to field |
+| B-1  | **next**                   | bulk build and flash, then central bench (today, 2026-11-15)                                                                                                                                                                                |
+| F-1  | open                       | fixes, re-test, release                                                                                                                                                                                                                     |
 
-## I-2: bench preparation (no hardware writes)
+## I-2 result (2026-11-15)
 
-- CSMA-04: build the INSTRUMENT image for the three-node measurement (separate from the bulk build). Recipe in the
-  CSMA-04 row; INSTRUMENT flashing per the `/bench` skill.
-- PWR-01: plan the INA226 current measurement on DK5EN-90 (relay-only config: no GPS, no display, BLE off).
-- Triage the bench lists of older campaign docs (below, "From campaign docs"): mark each step done or still open in its
-  own doc, so B-1 runs only open steps. Read-only work, fits `scout` agents.
-- Prepare the upstream wave-2 branch content list (Ping commits `b3b2bf0b`, `5583b177`; web GUI with option D) for
-  `/submit-pr`; the PR itself is cut after B-1.
+- B-1 working list incl. the open steps from older campaign docs: [bench-b1-20261115.md](bench-b1-20261115.md).
+- CSMA-04 INSTRUMENT image on DK5EN-1, -92, -90 (all on USB); built after the bulk build, kept as files, flashed last.
+- PWR-01 and SENS-04 moved to the field: no INA226 and no DHT22 on the bench; waiting for the field I2C scan and DHT22
+  feedback (operator 2026-11-15).
+- Wave-2 PR content: [upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md). Operator questions
+  before `/submit-pr` are in that doc (trim wave-3/4 code from `mc.js`/`mcrm.js`, drop the CSMA-03 loop poll, skip
+  `web_setup.cpp`, WEB-DUP-01 placement, one or two PRs).
+- Checked: the fork has no BLE `node_pingcall` sanitize because BLE-SET-01-FU (`68ee6dcf`) removed the whole nRF52 BLE
+  settings write path; not a gap.
 
 ## Bulk build and flash
 
@@ -49,15 +51,14 @@ DK5EN-98 (production gateway) gets soak runs only, each with an explicit operato
 
 ## B-1: central bench (TX at most 2 dBm, traffic only to TEST or own nodes)
 
-| Node                     | Rows                                                                                                                                           |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| DK5EN-1 (Heltec V3)      | BOOT-01, BAT-05, PING-HOLD-02, PING-STOP-01, TRACK-PING-01, WEB-LED-01, CLK-01 (S2-S4), CET-AGE-01                                             |
-| DK5EN-14 (T-Deck Plus)   | TD-THEME-01 (W4), TD-CHAT-01, TD-NAV-01, TD-22, TD-23, TD-27, TD-28, TD-29, TD-30, TD-32, TD-33, TD-34, BOOT-01                                |
-| DK5EN-92 (T-Beam v1.2)   | TBEAM-SLEEP-01, AU-14, QA review 8.6 ESP32 part; AU-24 and AU-25 need long uptime (soak table)                                                 |
-| DK5EN-90 (RAK4631)       | PING-NRF-01 (wave 2 needs it), ACK-AGE-01 (nRF52), CSMA-03, BLE-SET-01, NRF-BLEDFU, WEB-LATLON-01, WEB-GZ-01, PWR-01, QA review 8.6 nRF52 part |
-| Browser (Chrome, Safari) | WEB-DARK-01, WEB-DARK-02, WEB-A11Y-01, WEB-LED-02, WEB-DUP-01, WEB-PWD-01, WEB-GZ-01, WEB-TD-01, RM-Q-01 (all needed for wave 2)               |
-| Radio between nodes      | TXP-02, BLK-01, CSMA-01, CSMA-05, SNF-ACK-01 (optional), SB-06, CSMA-04 (INSTRUMENT image on three nodes, last), CSMA-02 (after CSMA-04)       |
-| Needs a sensor           | SENS-04 (DHT22 on the one-wire pin)                                                                                                            |
+| Node                     | Rows                                                                                                                                     |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| DK5EN-1 (Heltec V3)      | BOOT-01, BAT-05, PING-HOLD-02, PING-STOP-01, TRACK-PING-01, WEB-LED-01, CLK-01 (S2-S4), CET-AGE-01                                       |
+| DK5EN-14 (T-Deck Plus)   | TD-THEME-01 (W4), TD-CHAT-01, TD-NAV-01, TD-22, TD-23, TD-27, TD-28, TD-29, TD-30, TD-32, TD-33, TD-34, BOOT-01                          |
+| DK5EN-92 (T-Beam v1.2)   | TBEAM-SLEEP-01, AU-14, QA review 8.6 ESP32 part; AU-24 and AU-25 need long uptime (soak table)                                           |
+| DK5EN-90 (RAK4631)       | PING-NRF-01 (wave 2 needs it), ACK-AGE-01 (nRF52), CSMA-03, BLE-SET-01, NRF-BLEDFU, WEB-LATLON-01, WEB-GZ-01, QA review 8.6 nRF52 part   |
+| Browser (Chrome, Safari) | WEB-DARK-01, WEB-DARK-02, WEB-A11Y-01, WEB-LED-02, WEB-DUP-01, WEB-PWD-01, WEB-GZ-01, WEB-TD-01, RM-Q-01 (all needed for wave 2)         |
+| Radio between nodes      | TXP-02, BLK-01, CSMA-01, CSMA-05, SNF-ACK-01 (optional), SB-06, CSMA-04 (INSTRUMENT image on three nodes, last), CSMA-02 (after CSMA-04) |
 
 **From campaign docs** (triage in I-2):
 [campaign-open-items-20261102.md](campaign-open-items-20261102.md),

@@ -71,3 +71,7 @@ flash and test (W5). Nothing here is released; the release stays on hold until t
   reproduce. `RAK-PIN-01` found and fixed. Gate: Unity 101 envs 3587 cases, pytest 1490, 7 builds.
 - W5 RAK script (2026-11-06): 382 commands, 368 answered, no hang, 4 soft resets (`RESETREAS=0x4`), `--button gpio 1` refused.
   All four nodes restored and verified against the vault.
+
+## Triage 2026-11-15
+
+Done: Safeboot `/ota` page, manipulated `.autoupdate` (6 of 6 refused), BLE with a phone (release-gate-20261106). Still open: Heltec web GUI pass, reboot-attribution leftovers, T-Deck glyph review, WEB-TX-01 cause, AU-23 under the phone guard. RAK secrets with a phone is closed as covered by BLE-SET-01 (0xF0A1 removed). MCP23017 pin switching moved to the field. Note: the W5 status cell says done although these steps stayed open. Open steps: [bench-b1-20261115.md](bench-b1-20261115.md).

@@ -163,3 +163,7 @@ tools/heap_baseline.json --board ttgo_tbeam`) to `.claude/commands/release-firmw
 5. Superseded open list (kept for history): web message history empty after each update check on classic ESP32 (accepted
    or keep the history ring static); spectrum import ranges still refuse out-of-range backups; `{SET}`
    password question (spec open point); field confirmation of T-Echo, T114, T-ETH-Elite, DevKitC LED pins.
+
+## Triage 2026-11-15
+
+Done: DK5EN-92 heap and stack checks, LED readbacks, lock spot checks, release gate idle heap. Open and on the B-1 list: `[HEAP]` boot marks, RM `led`/`chgled` over LoRa, server-reply test on DK5EN-1 and -90, DK5EN-90 visual blink, LED in the phone app on DK5EN-14, deep-sleep LED, AU download stack. Moved: deep sleep to TBEAM-SLEEP-01, LED modes to WEB-LED-01, LED pins to LED-FIELD, LED-TRACKER, LED-V4R8. Open steps: [bench-b1-20261115.md](bench-b1-20261115.md).

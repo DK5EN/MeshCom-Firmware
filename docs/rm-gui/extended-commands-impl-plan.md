@@ -257,3 +257,7 @@ Findings:
   from the end of a flash-saving write.
 - Not established: why the Heltec TX ring waits minutes while the RAK waits seconds in gateway mode; why `txq`
   reports `q=30/20`.
+
+## Triage 2026-11-15
+
+Sections 9 and 10 are done except: RM-DUP-01 on hardware, the Heltec-to-RAK server path and driver holes, the empty-value restore on the RAK, RM-LOSTREPLY-01 and RAK4631 as sender (all on the B-1 list). T-Echo and T114 as target moved to the field; hostile NAME/APRS text stays host-tested (it would need a broadcast beacon). Open steps: [bench-b1-20261115.md](../bench-b1-20261115.md).

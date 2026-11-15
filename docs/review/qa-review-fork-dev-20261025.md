@@ -552,3 +552,6 @@ Board-Builds: 36 Nicht-native-Envs, je einmal, Baseline zuerst. 35 bauen auf bei
 
 Kein Fix war noetig, kein Fix-Commit auf dem Branch. Hardware ist nicht getestet; Bench-Liste siehe 8.6 (DK5EN-92, DK5EN-90).
 
+## Triage 2026-11-15
+
+No work package of 8.6 is done on hardware; WP17 is done on CI. WP4 is closed as covered by BLE-SET-01 (0xF0A1 removed). WP8's T114/T-Echo part moved to the field. All other WPs are on the B-1 list; WP9 (T-Deck glyphs, `dbb182e8`) is in no release yet. Open steps: [bench-b1-20261115.md](../bench-b1-20261115.md).
