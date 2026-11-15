@@ -1,0 +1,28 @@
+Night clock runs 2026-11-15/16, fork-dev b88e8834, nodes on afaa2f40 INSTRUMENT image. mesh off on both (already off, unchanged), 2 dBm, no airgap.
+Evidence: clock-t-beam-92-20261115-213652.{jsonl,summary}, clock-heltec-1-20261115-213652.{jsonl,summary}, clock-heltec-1-20261115-234540.{jsonl,summary}
+
+RUN 1 (21:36:52-23:37, 7200 s, --timesrc cet, T-Beam --gps off) = CLK-01 S3 + CET-AGE-01
+  Both nodes: 11 CET sets (one per ~607 s beacon, none missing) -> >= 5 beacons, not inconclusive.
+  DK5EN-1  (Heltec, WLAN+GPS on, gate cet): max |delta| 613 ms; drift -0.008 s total; lost_ms <= 6.  S3 PASS.
+  DK5EN-92 (T-Beam, WLAN on, GPS off):      deltas ms -1864 -5716 +5555 -2375 +3703 -1878 +2217 -2993 +1724 -3669 +3695;
+           8 of 11 above 2 s, multi-second steps alternate +/-; lost_ms <= 9, no growth.  S3 FAIL (|delta| <= 2 s not met).
+  CET-AGE-01: no whole-second step below -5 s on either node. One literal delta_ms < -5000 (T-Beam -5716): that is a
+           -5 s whole-second step (716 ms into the second), exactly the accepted boundary of cetStepAllowed (-5 s tolerated).
+           [CET];skip lines: NOT evidenced - clock_drift.py does not record [CET] lines (not in jsonl). No beacon was
+           without a [CLOCK];set, so 0 skips inferred. Backward-step guard never needed to act beyond the -5 s boundary.
+  Display gaps up to 1050 s on both nodes at 22:40-22:58 = [DISPCLK];skip;type0 (message page, F1 by design), not a clock fault.
+
+RUN 2 (23:45:40-00:46, 3600 s, DK5EN-1, SSID removed, GPS off, --timesrc cet, --offline-ok) = CLK-01 S4
+  First attempt aborted (BootWaitTimeout): offline boot never prints [BOOT];ready. Re-run with BOOT_READY patched to the
+  '[WIFI]...no connection possible' line via scratchpad wrapper (no tracked file edited).
+  6 CET sets (first at +132 s from an unset clock: +549877 ms, initial sync, excluded from the 2 s criterion), then
+  +3239 -708 -5449 +1694 +4271 ms. Max |delta| after initial sync 5449 ms.  S4 FAIL (|delta| <= 2 s not met).
+  -5449 = -5 s whole-second boundary step (tolerated); no step below -5 s.  [CET];skip not capturable (see above).
+  drift_total 552 s in the summary is the initial-sync step, not drift. lost_ms_last 3.
+
+Observation: with WLAN on, Heltec scatter was < 0.7 s while the T-Beam scattered +/- 2-6 s on the same beacons; with WLAN off the
+  Heltec scatters like the T-Beam. Hypothesis (not verified): the Heltec (gateway on) also gets {CET} fresh over the internet.
+
+RESTORED: --timesrc all (tool restore + explicit), T-Beam --gps on, Heltec --gps on + SSID back (USB, rebooted, start page
+  and 2323 at 192.168.68.57 unchanged), mesh off unchanged. identity_guard ok on both.
+ANOMALY: T-Beam --info BUTTON(38) was "off" before and is "on" after (not touched by me; left as is).
