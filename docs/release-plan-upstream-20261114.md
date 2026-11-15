@@ -25,12 +25,12 @@ Die bisherigen Wellen 1 bis 3 sind zusammengelegt und ohne Ping geschnitten. Pin
 - **Drin:** Uhr jede Sekunde (CLK-01, CLK-PING-01), CET-Filter (CET-AGE-01), T-Deck Theme, Chat und Setup-Tab (TD-THEME-01, TD-CHAT-01), GPS-Himmel auf T-Deck, T-Deck Pro und T114, Build ohne Exceptions und mit Debug-Level 0, schlankeres LVGL.
 - **Feldteile:** Heltec V4 GNSS (GPSV4-01), DHT22 (SENS-04, SENS-05 nur Prüfung beim Laden), T-Deck-Pro-Pins (GPIO-06, GPIO-08, GPIO-09).
 - **Draußen:** Ping (`b3b2bf0b`, `5583b177`), die T-Deck-Kopfzeilen-Umschalter für BLE und WLAN (TD-30, TD-33), die GPS-Schrift (TD-29), das INSTRUMENT-Testmuster (DISP-PAT-01) und alle INSTRUMENT-Uhr-Hooks.
-- **Offen, zu entscheiden:** die Web-Oberfläche. Upstream hat CSS und JS inline, der Fork lagert sie in `src/web_functions/web/` aus und erzeugt `web_assets.h` mit dem Fork-Tool `tools/gen_web_assets.py`. Empfehlung: Web als eigener PR, zuerst der Umbau nach Absprache mit Kurt.
+- **Entschieden 15.11.2026 (Option D):** Die Web-Oberfläche geht mit den ausgelagerten Dateien und `tools/gen_web_assets.py` upstream, dazu eine kurze README im Verzeichnis `src/web_functions/web/`. Kein CI-Bruch, weil `web_assets.h` eingecheckt ist und der Build das Skript nicht aufruft. Vorgeschichte: Upstream hat CSS und JS inline, der Fork lagert sie in `src/web_functions/web/` aus und erzeugt `web_assets.h` mit dem Fork-Tool `tools/gen_web_assets.py`. Empfehlung: Web als eigener PR, zuerst der Umbau nach Absprache mit Kurt.
 
 | Welle | PR an `dev`         | Thema                    | Feldteil (C)                      |
 | ----- | ------------------- | ------------------------ | --------------------------------- |
 | 1     | 17.11.2026          | Uhr, T-Deck              | Heltec V4 GNSS, DHT22, T-Deck Pro |
-| 2     | 20.11.2026          | Ping                     | keiner                            |
+| 2     | 20.11.2026          | Ping, Web-Oberfläche     | keiner                            |
 | 3     | 27.11.2026          | Pins-Seite               | freie GPIO, standardmäßig aus     |
 | 4     | 04.12.2026          | Fernverwaltung und Mesh  | RAK4631 mit L76K                  |
 | 5     | 11.12.2026          | Gateway                  | Vision Master E290                |
@@ -160,7 +160,7 @@ Ziel ist Welle 8. Sie beginnt erst, wenn alle Ausstiegskriterien erfüllt sind.
 
 **Ausstiegskriterien**
 
-1. **ACK-Wartezeit:** Relay-ACK der Prio 1 höchstens 8 s im Soak. Heute bis 24,8 s. Der Zielwert ist ein Vorschlag aus der RCA, nicht abgestimmt.
+1. **ACK-Wartezeit:** Relay-ACK der Prio 1 im Soak deutlich besser als in SOAK-1108 (Median 6,1 s, Maximum 24,8 s). Kein Zahlenziel, Betreiber-Entscheidung 15.11.2026; der frühere Vorschlag "höchstens 8 s" ist verworfen.
 2. **Messung:** CSMA-04 auf drei Knoten gelaufen, Slot nach CSMA-02 gesetzt.
 3. **nRF52:** CSMA-03-Schwelle aus der neuen p99 gesetzt. Der Strom mit dem 1-ms-Takt während einer Kanalabfrage ist gemessen und bewertet (PWR-01).
 4. **Soak:** 24 h ohne Neustart, ohne Ring-Verlust, mit nRF52-Knoten im Lauf.
