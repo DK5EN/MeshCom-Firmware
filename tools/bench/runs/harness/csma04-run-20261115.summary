@@ -1,0 +1,9 @@
+CSMA-04 run 2026-11-15 20:30-20:52 CET, fork-dev afaa2f40 INSTRUMENT, EU8 433.175 SF11 BW250, 2 dBm, --setlog on, LORADEBUG off during run
+traffic: 60 DMs, 1 per 20 s, ring DK5EN-1 > DK5EN-90 > DK5EN-92 > DK5EN-1 (web sendmessage), 60/60 accepted
+DK5EN-1: TX=67 tx+ median=0.8 p90=0.8 max=1.0 ms | free+ median=36.8 p90=45.0 ms | cad0/1/2+=93%/7%/0% (max 1) | CAD_STALE_RECHECK=0 (0.0%) | boots=1 rxlogs=274
+DK5EN-90: TX=59 tx+ median=2.0 p90=2.0 max=2.0 ms | free+ median=35.2 p90=43.9 ms | cad0/1/2+=54%/34%/12% (max 2) | CAD_STALE_RECHECK=0 (0.0%) | boots=0 rxlogs=251
+DK5EN-92: TX=58 tx+ median=2.1 p90=2.2 max=2.7 ms | free+ median=15.4 p90=16.2 ms | cad0/1/2+=86%/14%/0% (max 1) | CAD_STALE_RECHECK=0 (0.0%) | boots=1 rxlogs=270
+baseline (LORADEBUG on, DK5EN-90, 43 TX): tx+ 63.5 ms; target < 15 ms: met on all three (max 2.7 ms)
+CAD_STALE_RECHECK: debug line is gated by LORADEBUG (nrf52_main.cpp:1868) so it is not observable in this run; tx+ <= 2.0 ms on RAK shows no ~60 ms stale-wait occurred
+restored: --loradebug on on DK5EN-1 and DK5EN-90 (as before); DK5EN-92 untouched (loradebug off before); --setlog on was already on on all three
+raw logs: csma04-run-DK5EN-{1,90,92}-20261115.log

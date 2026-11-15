@@ -1,0 +1,5 @@
+OK DK5EN-1 heltec_wifi_lora_32_V3 instr_markers=9 | heltec-1: ok -- DK5EN-1, 2 dBm, ip 192.168.68.57, web on, clock NTP
+BUSY DK5EN-92
+OK DK5EN-90 wiscore_rak4631 instr_markers=8 | rak-90: ok -- DK5EN-90, 2 dBm, ip 192.168.68.67, web on, clock NTP
+head afaa2f40
+rc=0 DK5EN-92 ttgo_tbeam instr_markers=9 | t-beam-92: ok -- DK5EN-92, 2 dBm, ip 192.168.68.61, web on, clock GPS

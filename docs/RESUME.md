@@ -6,6 +6,13 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
 
 ## State 2026-11-15
 
+- **2026-11-15 evening:** B-1 mostly done ([bench-b1-20261115.md](bench-b1-20261115.md)); wave-2 rows all PASS.
+  F-1a `afaa2f40` (LAST-PONG-01, battery `--info` line, SB-06-DESC Safeboot fix, SB-06 re-bench PASS). CSMA-04 early
+  data point. Bench nodes DK5EN-1, -90, -92 run the `afaa2f40` INSTRUMENT image, DK5EN-14 the `f64ea131` bulk image.
+  Open for the next session: RM-DUP-01, full CSMA-01 run C, RM-LOSTREPLY-01 (gateways on the local mock server,
+  operator decision B); BLE-SET-01, NRF-BLEDFU (phone); TD-CHAT-01, TD-22, TD-34, BOOT-01 (operator eye); AU-24/25,
+  CLK-01 S3/S4, CET-AGE-01 (long runs); TBEAM-HEAP-01 on the previous image; PING-FAIL-REPEAT-01; then release and
+  `/submit-pr` wave 2 (operator answers to the five questions in the wave-2 content doc still open).
 - **I-2 done 2026-11-15:** B-1 list with the triage of older campaign docs, wave-2 PR content list
   ([upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md), operator questions open), PWR-01 and SENS-04
   to the field.
