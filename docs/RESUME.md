@@ -1,70 +1,40 @@
 # RESUME -- pick up here
 
-**Stand:** 2026-11-15, branch `fork-dev`. Release **`v4.40a.11.08`** published (Latest, tag on `bc05ea88`,
-68 assets built by CI, checked; web flasher and Pages on `.11.08`, `.11.06` pruned). It contains everything since `v4.40a.11.06`, incl. the official `v4.40a.11.07`
-merge (`da76033b`), GPIO-01..05, GPSV4-01 (hardware-untested), TD-THEME-01, TD-CHAT-01, and the BACKLOG-ROUND fixes
-(CLK-01, CET-AGE-01, ping display, nRF52 ping budget, CSMA-03, web setup page). No PR of ours is open: PR #1277 (upstream wave 1) was merged 2026-11-14 and synced 2026-11-15.
+**Resume here: [campaign-release-train-20261115.md](campaign-release-train-20261115.md).** Next wave **I-2** (bench
+preparation), then bulk build and flash, central bench **B-1**, fixes and release **F-1**. Deadline: upstream wave 2
+(Ping plus web GUI) on **2026-11-20**, which needs PING-NRF-01 and the browser rows from B-1.
 
-**Fleet on `v4.40a.11.08` CI images since 2026-11-08 20:37** (incl. DK5EN-98). **SOAK-1108 done** (2026-11-09 20:00, evaluated 2026-11-14): clean run, two findings in the BACKLOG as high priority, ACK-AGE-01 and DEDUP-OWN-01 ([soak-1108-auswertung-20261114.md](soak-1108-auswertung-20261114.md)). `--setlog on` is still set on DK5EN-98 (needs OK to switch off).
+## State 2026-11-15
 
-**DK5EN-98 runs a fork-dev build since 2026-11-14 21:44** (`aa8e1b45`, not a CI image): ACK frames reach the CSMA age stage 1 after 6 s (ACK-AGE-01). Log run evaluated 2026-11-15 ([ackage-auswertung-20261115.md](ackage-auswertung-20261115.md)): 17 relay ACKs, median 3.3 s, max 13.6 s (SOAK-1108: 6.1 / 24.8 s); stage 1 at 6 s fired as designed; quiet night, so a run under load and the nRF52 bench are still open. Side finding CET-AGE-LOG-01 (wrapped `age_s` in a debug line). The follow-up commits `d0ecf82f`/`5f9486a7` are not on DK5EN-98 (stats counter and T-Beam only). Also on fork-dev, not benched: T-Beam 3 s press = deep sleep (TBEAM-SLEEP-01).
+- **Branch `fork-dev`**, last wave I-1 committed as `b6d0da94` (CET-AGE-LOG-01, TRACK-PING-01, AU-26, TD-NAV-01 option 2,
+  web brightness alignment, web assets README). Gate stage 1,2 PASS (3812 Unity cases), six board builds green.
+- **Last fork release `v4.40a.11.08`** (Latest, tag on `bc05ea88`, 68 CI assets checked, web flasher and Pages on `.11.08`).
+- **Upstream:** PR #1277 (wave 1: clock, T-Deck, V4 GNSS/DHT22/T-Deck Pro field parts) merged 2026-11-14 unchanged and
+  tagged **`v4.40a.11.14`** by upstream; synced into `fork-dev` 2026-11-15 (`d4384eac`, all conflicts on the fork side).
+  No PR of ours is open; no `pr/*` branch or extra worktree exists. The next fork tag must not be `v4.40a.11.14`.
+- **Operator decisions 2026-11-15** (wave 0): listed in the campaign doc. In short: DEDUP-LAP-01 won't fix; ACK-AGE-01
+  exit = "clearly better than SOAK-1108"; web GUI goes upstream as is with the generator and a README, together with
+  Ping on 2026-11-20; TD-NAV-01 option 2.
 
-**Upstream sync 2026-11-14:** merged `upstream/dev` 520394fc (PRs #1274, #1275: BOARD_COUNTRY only as default, spectral scan 500 MHz split, Info page label `Gateway:`); gate stage 1,2 green, builds `wiscore_rak4631` and `heltec_wifi_lora_32_V3` green. PR feature list: [features-vs-upstream-20261114.md](features-vs-upstream-20261114.md).
+## Fleet
 
-**Upstream PR #1277 merged (2026-11-14 20:59 UTC), synced 2026-11-15** (`d4384eac`, merge of `upstream/dev` 70ae124d): upstream took the PR head `5616c8a1` unchanged and tagged it **`v4.40a.11.14`** (the next fork tag must not reuse that name). All 19 conflicts kept the fork-dev side (fork IDs in comments, INSTRUMENT, PING-HOLD, GPIO-01 repair, TD-30 icon switch); the only tree change is the Heltec V4 GNSS `static_assert` copy in `gps_functions.cpp`. Gate stage 1,2 PASS, builds Heltec V3/V4 and RAK4631 green; pushed. Branch `pr/uhr-tdeck` (local and fork remote) and worktree `../MeshCom-PR-next` removed 2026-11-15. Bench nodes DK5EN-1/-14/-90/-92 still run the PR build: back to `v4.40a.11.08` or on to the next fork build. Remaining fork-only vs upstream in these paths: TD-30 icon switch and the fork-only parts listed above. Upstream wave 1 of [release-plan-upstream-20261114.md](release-plan-upstream-20261114.md) is done (merged three days ahead of plan); next waves: Ping (wave 2), Safeboot (BOOT-01 "MeshCom 4.4" on the display).
-
-**I-1 done 2026-11-15** (first implementation wave of the checklist on the operator's desktop): CET-AGE-LOG-01, TRACK-PING-01, AU-26, TD-NAV-01 (option 2: header GPS icon opens the GPS tab, tab button hidden), web brightness alignment, README for the web assets (`src/web_functions/web/README.md`, for the upstream web PR). WEB-LATLON-01 and the TD-CHAT-01 web control turned out to be done already. Gate stage 1,2 PASS (3812 Unity cases), six board builds green. Bench rows for all of it are in BACKLOG "Bench test". Next: I-2 (CSMA-04 INSTRUMENT image, PWR-01 set-up), bulk build and flash, central bench B-1; upstream wave 2 (Ping plus web GUI) on 2026-11-20.
-
-This page is the current state only. Open work lives in [BACKLOG.md](BACKLOG.md) section 3.2; history in the
-archive journals (see "Where things are").
-
-## Next: the release train
-
-Defined in [BACKLOG.md](BACKLOG.md) 3.2 "Release train": implement the `impl` rows (running, see IMPL-TRAIN below), one bulk build, bulk flash
-of DK5EN-1, -14, -90, -92, one bulk bench session (28 `bench` rows plus the checks below), docs, then commit, push
-and `/release-firmware`. Soak on DK5EN-98 and field checks follow after the release.
+- **DK5EN-98** (production gateway): fork-dev build `aa8e1b45` since 2026-11-14 21:44 (ACK-AGE-01). `--setlog on`
+  stays until the ACK-AGE-01 run under load, then off (OK given 2026-11-15). Any other work on it needs an explicit OK.
+  ACK-AGE-01 night run evaluated: [ackage-auswertung-20261115.md](ackage-auswertung-20261115.md) (17 relay ACKs, median
+  3.3 s, max 13.6 s vs SOAK-1108 6.1 / 24.8 s; quiet night, load run still owed).
+- **DK5EN-1, -14, -90, -92** still run the PR #1277 build; the bulk flash before B-1 replaces it.
 
 ## Running campaigns
 
-- **IMPL-TRAIN:** coding done 2026-11-08 (W1 `d1ec388e`, W2 `2ade9625`, W3 `244cd0c6`, W4 `84eed6d5`), shipped in
-  `v4.40a.11.08`. Left: CLK-01 S2-S4 measurement. [campaign-impl-train-20261107.md](campaign-impl-train-20261107.md).
-
-- **BACKLOG-ROUND:** waves 1-4, bulk bench and release `v4.40a.11.08` (verified, web flasher live) done. Left: the
-  moved-out backlog rows (BACKLOG "Release train"). [campaign-backlog-round-20261108.md](campaign-backlog-round-20261108.md).
-
-- **TD-THEME-01:** W1-W3 done (last `f4c944e1`), upstream in #1277; W4 is the bench pass on DK5EN-14 (screenshots of both themes,
-  lock glyph against the bt/wifi icons, boot logo tab). [campaign-tdeck-theme.md](campaign-tdeck-theme.md).
-- **GPSV4-01:** released in `v4.40a.11.08`, upstream in #1277 (hardware-untested); next the groups.io reply and field reports.
-  [campaign-gpsv4-01-20261107.md](campaign-gpsv4-01-20261107.md).
-- **GPIO-01:** done, no bench test by decision; GPIO-06 (T-Deck Pro pin) is an `impl` row, GPIO-07 a field test.
-  [campaign-gpio-01-20261107.md](campaign-gpio-01-20261107.md).
-- **INA226-HELTEC-01:** INA226 enabled on Heltec V3, Wireless Stick and Wireless Tracker (`ca8da6f3`); upstream PR
-  [#1272](https://github.com/icssw-org/MeshCom-Firmware/pull/1272), build only, field test by users.
-  Merged upstream and synced 2026-11-13 (merge of `upstream/dev`, plus an upstream whitespace-only reindent in
-  `sendMessage`); `variant-macros.txt` golden regenerated for the three removed `ENABLE_INA226_DISABLED` macros.
-
-- **CLK-01:** fixed and benched 2026-11-08 (F1-F3, A3 via CET-AGE-01, A4 3.8 %); released in `v4.40a.11.08`; W4
-  upstream done in #1277.
-  [campaign-clk-01-20261107.md](campaign-clk-01-20261107.md).
-
-## Bench checks owed from campaign docs (add to the bulk bench)
-
-Not all of these have a backlog row; each campaign doc lists its own steps.
-
-- 2026-11-14: T-Beam 3 s press = deep sleep and wake by button on DK5EN-92 (TBEAM-SLEEP-01, BACKLOG); ACK-AGE-01 on a nRF52 node after the DK5EN-98 log evaluation.
-- Open items: operator bench checks, [campaign-open-items-20261102.md](campaign-open-items-20261102.md).
-- Bench fixes 2026-11-06: Safeboot `/ota` page, manipulated `.autoupdate`, BLE, RAK secrets with a real phone,
-  [campaign-bench-fixes-20261106.md](campaign-bench-fixes-20261106.md).
-- QA review: bench list in section 8.6 (DK5EN-92/-90), [qa-review-fork-dev-20261025.md](review/qa-review-fork-dev-20261025.md).
-- T-Deck heap/WiFi: new soak and GUI check, [campaign-tdeck-heap-wifi-20261025.md](campaign-tdeck-heap-wifi-20261025.md).
-- Fork hardening: LED and deep-sleep checks, [campaign-fork-hardening-20261018.md](campaign-fork-hardening-20261018.md).
-- RM extended commands: RM-DUP on hardware, [extended-commands-impl-plan.md](rm-gui/extended-commands-impl-plan.md) sections 6, 9, 10.
-- LRF: own beacons at prio 2 and the ping-target clean-up are host-tested only,
-  [campaign-logreport-fixes-20261101.md](campaign-logreport-fixes-20261101.md).
-
-Overnight or production (DK5EN-98, explicit OK): TX pool TTL decision ([campaign-tx-pool.md](campaign-tx-pool.md)),
-LoRa QRT night capture ([campaign-lora-qrt-20261018.md](campaign-lora-qrt-20261018.md)), DUP/OnRxDone and GWRX-01
-nights ([rca-brief-dup-onrxdone-20261013.md](rca-brief-dup-onrxdone-20261013.md)).
+- **Release train 2026-11-15:** [campaign-release-train-20261115.md](campaign-release-train-20261115.md) -- the active one.
+- **Channel access stabilisation** (ACK-AGE-01, ACK-CANCEL-01, CSMA-04/02, CSMA-03, PWR-01/02, soak): dates and exit
+  criteria in [release-plan-upstream-20261114.md](release-plan-upstream-20261114.md).
+- **Upstream waves 2-7:** [release-plan-upstream-20261114.md](release-plan-upstream-20261114.md).
+- **TD-THEME-01:** W4 bench on DK5EN-14 is part of B-1. [campaign-tdeck-theme.md](campaign-tdeck-theme.md).
+- **GPSV4-01, GPIO-01, INA226-HELTEC-01:** field feedback only (BACKLOG "Field").
+- Closed, history only: IMPL-TRAIN ([campaign-impl-train-20261107.md](campaign-impl-train-20261107.md), CLK-01 S2-S4
+  moved to B-1), BACKLOG-ROUND ([campaign-backlog-round-20261108.md](campaign-backlog-round-20261108.md)), CLK-01
+  ([campaign-clk-01-20261107.md](campaign-clk-01-20261107.md), upstream in #1277).
 
 ## Rules and recipes
 
@@ -76,9 +46,11 @@ nights ([rca-brief-dup-onrxdone-20261013.md](rca-brief-dup-onrxdone-20261013.md)
 
 ## Where things are
 
-- Open work: [BACKLOG.md](BACKLOG.md) 3.2. Full row history and closed rows:
+- Open work: [BACKLOG.md](BACKLOG.md) 3.2. Closed rows since 2026-11-15:
+  [archive/backlog-closed-20261115.md](archive/backlog-closed-20261115.md); full row history:
   [archive/backlog-rows-20261107.md](archive/backlog-rows-20261107.md), older
   [archive/backlog-closed-20261024.md](archive/backlog-closed-20261024.md).
+- Fork vs upstream feature list: [features-vs-upstream-20261114.md](features-vs-upstream-20261114.md).
 - Defect IDs: [architecture/08-defect-catalogue.md](architecture/08-defect-catalogue.md). Tests:
   [test-suite-map.md](test-suite-map.md).
 - Releases: [release-journal.md](release-journal.md), [release-notes.md](../release-notes.md). Plan view:

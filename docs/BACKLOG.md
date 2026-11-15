@@ -243,17 +243,11 @@ Verified against git and the code on 2026-11-07 (135 rows: 37 closed and moved, 
 
 #### Release train
 
-The next release (`v4.40a.11.08`) is a **reduced-scope release**, operator 2026-11-08. Moved out, after the release: GPIO-06/08/09 bench (no T-Deck Pro on the bench), DEDUP-LAP-01, TRACK-PING-01, the CSMA-03 threshold if tonight's re-bench is inconclusive, the CLK-01 W4 upstream PR, and the remaining bulk-bench rows listed in step 4. It carries the 2026-11-08 clock, ping, web setup page and nRF52 CSMA fixes. The full train is built in one pass:
-
-1. **Implement** every `impl` row. Wave W1 is done on `fork-dev` (committed 2026-11-07, coding only, no bench): BL-01, RM-NOANS-01 and TEST-OTA-01 closed; BLE-SET-01, SB-06, GPIO-06 and IDEE-04 moved to their bench, field and upstream tables. Wave W2 is done on `fork-dev` (2026-11-08, coding only): SENS-04 and CSMA-01 moved to the bench table. Waves W3 (CLK-01 instrumentation) and W4 (GOLDEN-MACROS-01 regenerated, closed, not gated by decision) are done 2026-11-08. Remaining (2): CLK-01 (W0 done; W1 before-measurement joins the bulk bench, then the fix wave), CSMA-03 (not in this train, operator 2026-11-07). The six W1 follow-up rows (BL-01-FU, BLE-SET-01-FU, GPIO-08, SB-07, CLK-TOOL-01, RM-TXT-02) and the two W2 follow-ups (CSMA-05, SENS-05) are optional.
-2. **Bulk build:** `tools/regression.sh --stage 1,2`, then every board env once (sequential, one `pio`).
-3. **Bulk flash:** DK5EN-1, -14, -90, -92 with that build (not DK5EN-98).
-4. **Bulk bench:** every `bench` row (32) in one session: SENS-04, CSMA-01, BLE-SET-01, SB-06, TD-22, TD-23, NRF-BLEDFU, SNF-ACK-01, CSMA-02, CSMA-04, TXP-02, BLK-01, AU-14, BAT-05, BOOT-01, TD-27, TD-28, TD-29, TD-30, TD-32, TD-33, WEB-DARK-01, WEB-DARK-02, WEB-A11Y-01, WEB-LED-01, WEB-LED-02, WEB-DUP-01, TD-34, RM-Q-01, TD-THEME-01, WEB-PWD-01, WEB-GZ-01.
-5. **Docs:** release notes, RESUME, campaign docs; move rows that closed to the archive.
-6. **Commit, push `fork-dev`, release** with `/release-firmware` (CI builds and publishes).
-
-Already on `fork-dev` and unreleased, so they ship with this train: GPIO-01..05, GPSV4-01 W1, TD-THEME-01 W1-W3, TD-CHAT-01, DISP-PAT-01, INA226-HELTEC-01.
-After the release: `soak` rows (DK5EN-98 with OK), the `upstream` PR, field checks when the hardware is there.
+Active campaign: [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (wave plan, node allocation
+for the central bench, operator decisions 2026-11-15). Steps: implementation waves without hardware (I-1 done
+`b6d0da94`, I-2 next), bulk build, bulk flash of DK5EN-1, -14, -90, -92, one central bench over every `bench` row
+below, fixes, `/release-firmware`. The previous train (reduced-scope release `v4.40a.11.08`) is history in
+[campaign-backlog-round-20261108.md](campaign-backlog-round-20261108.md).
 
 #### Implement (firmware and tooling) (3)
 
