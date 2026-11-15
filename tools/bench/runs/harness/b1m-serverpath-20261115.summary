@@ -1,0 +1,10 @@
+Server path DK5EN-1 -> DK5EN-90 with drained TX ring  2026-11-15 21:08-21:11  PASS
+Heltec ring at start: queued 0-4 of 20 (no BP lines). Gateways on the local mock (redistributing).
+junk frames: see b1m-rm-dup-01 (3 junk frames 1>90 each uplinked via the mock and counted once).
+DM: DK5EN-1 21:09:19 "TX-UDP 049 : xEA25A101 ... DK5EN-1>DK5EN-90:b1m-dm-210918{257"; DK5EN-90 21:09:19 "RX-UDP 049 : xEA25A101 ..." (server copy first);
+  ACK back by server at once: DK5EN-1 21:09:19 "[UDP-MSGID] ack_msg_id:EA25A101 ACK...02"; RF TX 21:09:25 "TX-LoRa 049 : xEA25A101"; RF copy at DK5EN-90 only via DK5EN-98 relay
+  21:09:51 "[LOG] 058 : xEA25A101 H03 S1 ... DUP:d" then "[REACK] dup from DK5EN-1 nnn:257". Accepted once. (RF DM to an own node only.)
+group TEST (server path only, nothing airs): --airgap on on BOTH nodes first ("airgap on DK5EN-1 True DK5EN-90 True"), then web send to TEST:
+  DK5EN-1 21:10:24 "TX-UDP 046 : xEA25A102 ... DK5EN-1>TEST:b1m-grp-211024{258" then "[AIRGAP] tx-dropped" (no TX-LoRa line);
+  DK5EN-90 21:10:24 "RX-UDP 046 : xEA25A102 ..." once, then "[AIRGAP] tx-dropped" at 21:10:26 (its gateway downlink to RF was dropped by the airgap).
+  --airgap off twice on both ("airgap off DK5EN-1 True DK5EN-90 True" x2) and query "[AIRGAP];off" on both.

@@ -1,0 +1,12 @@
+CSMA-01 run C  2026-11-15 21:22-21:28  PASS (14 of 14 samples)
+Method: gateways on the local mock with --no-redistribute (no server copy; every command and reply goes by RF only), airgap off, 2 dBm, EU8 433.175.
+  RM `status` alternating DK5EN-90>DK5EN-1 and DK5EN-1>DK5EN-90, 25 s apart, 7 per direction; the reply is the sample.
+  Per sample: command copy at the replier = RF only (paths ['rf'], no RX-UDP), verdict ok at the sender.
+Replier: first CAD timer (RX_TIMEOUT_FIRE wait) in ms and the reply TX line (prio, src, wait since enqueue, cad = attempt that found the channel free):
+  90>1  3350  prio=1 wait=3393 cad=0 | 3070 / 3119 / 0 | 3140 / 3194 / 0 | 3315 / 3365 / 0 | 3140 / 3190 / 0 | 3245 / 3299 / 0 | 3035 / 3087 / 0
+  1>90  3315  prio=1 wait=2826 cad=0 | 3315 / 2627 / 0 | 3245 / 2532 / 0 | 3140 / 2533 / 0 | 3140 / 2567 / 0 | 3245 / 2624 / 0 | 3280 / 2724 / 0
+  (RAK: reply enqueued about 0.5-0.8 s after RX end, so its TX wait since enqueue is lower; the CAD still sits at the shortened timer.)
+All 14 first-CAD timers are in 3035..3350 ms (expected 3000-3350), all 14 replies were prio 1 and found the channel free at the first CAD (cad=0).
+Before the change (2026-10-10) the first CAD sat at 4500-4850 ms. Quote: "21:22:47 [MC-DBG] RX_TIMEOUT_FIRE ts=3146486 wait=3350 delta=3353" then
+"21:22:46 [LOG] TX xEA25A1B8 : H04 prio=1 src=o wait=3393 q=1 cad=0 len=118".
+Per-sample table: scratchpad dd_res.json (not kept); raw: b1m-run-DK5EN-1-20261115.log, b1m-run-DK5EN-90-20261115.log.

@@ -1,0 +1,19 @@
+RM-LOSTREPLY-01  2026-11-15 21:14-21:18  PASS (reproduced: reply lost on a full ring, sender sees noanswer)
+Method: --airgap on at DK5EN-1 and DK5EN-90 (nothing airs; uploads go to the mock only). The TX ring of DK5EN-1 was filled with PRIO-1 own frames: a throwaway
+  UDP client registered at the mock as MOCK-01 injected DM frames DK5EN-90>DK5EN-1 (own source only, 8 per s, never on RF) -> DK5EN-1 answers each with a prio-1 ACK
+  ("NEW-ACK ... :ack"), ring held at 20/20. (DMs from DK5EN-90's web fill only to 16: its own backpressure refuses user messages at depth 16.)
+  Then RM `status` from DK5EN-90 (ctr 1794773697).
+DK5EN-1:
+  21:15:13 RX-UDP 070 : x91A43774 DK5EN-90>DK5EN-1:RM1 1794773697 status 056d15905a3d96fc
+  21:15:13 [RM];ok;ctr;1794773697
+  21:15:13 NEW-TXT 118 : xEA25A1A3 ... DK5EN-1>DK5EN-90:RM1 1794773697 ok v=4.40a ...
+  21:15:13 [MC-DBG] RING_WRITE slot=-1 type=3A status=FF len=118 msg_id=EA25A1A3 queued=20/20 src=user_msg
+  21:15:13 [MC-DBG] RING_DROP_NEW slot=-1 prio=1 type=3A msg_id=EA25A1A3 (queue full, no lower prio to evict)
+  21:15:13 [BP];nack;QTA;dst;DK5EN-90;...;txt;QTA NOT SENT - RM1 1794773697 ok v=4.40a ...
+  21:15:13 [RM];reply;send_failed;-2
+DK5EN-90 (rmstatus sent[]): ctr 1794773697 status -> st "noanswer", rep 0, ver 0 after 171.1 s ("VERDICT at 171.1 s").
+  No RM1RETRY line at DK5EN-90 (copy 1 never aired under airgap, so no repeat ladder ran): the reply was not recovered.
+Control (same method, ring not full at reply time, 21:12:52 and 21:14:11): reply written (queued=16/20, 19/20), verdict ok in 8-10 s.
+So: a full ring of prio-1 frames loses the RM reply for good (no evict, no retry); an earlier try with prio-3 filler (B-1 part 1) evicts instead.
+Decision for the fix stays open (retry of the reply, or reserve a slot for replies).
+Restore: --airgap off twice on both + query "[AIRGAP];off" on both (21:17:53 / 21:17:58 / 21:18:02 / 21:18:04).

@@ -1,0 +1,15 @@
+RM-DUP-01  2026-11-15 21:06-21:09  PASS  (fork-dev c9f1a940, both nodes afaa2f40 INSTRUMENT)
+Setup: both gateways pointed at the local mock on this Mac (--srvip), mock redistributing DATA as GATE; strict security on at the target (strikes exist only with it).
+Junk frame = plain DM "RM1 <ctr> status 0123456789abcdeN" (wrong tag), delivered by the server path (RX-UDP) and by its RF copy (LOG ... DUP:d).
+Result per junk frame: both copies arrived, exactly one "[RM];reject;tag" and rej_d 1; lock after the THIRD frame, not the second (before the fix: lock after the second).
+90>1 (target DK5EN-1):
+  frame 0 x91A43753: 21:06:58 RX-UDP ... RM1 1794767105 status ...abcde0 | 21:06:59 [LOG] ... DUP:d | 21:06:58 [RM];reject;tag | rej_d 1 lock 0
+  frame 1 x91A43754: RX-UDP 21:07:04, RF copy 21:07:04 DUP:d, one [RM];reject;tag, rej_d 1 lock 0   (no lock after two frames)
+  frame 2 x91A43755: RX-UDP 21:07:09, RF copy 21:07:14 DUP:d, one [RM];reject;tag, rej_d 1 lock 1 lockS 291
+1>90 (target DK5EN-90):
+  frame 0 xEA25A0FD: RX-UDP 21:08:01, RF copy 21:08:05 DUP:d, one reject;tag, rej_d 1 lock 0
+  frame 1 xEA25A0FE: RX-UDP 21:08:10, RF copy 21:08:15 DUP:d, one reject;tag, rej_d 1 lock 0
+  frame 2 xEA25A0FF: RX-UDP 21:08:20, RF copy 21:08:23 DUP:d, one reject;tag, rej_d 1 lock 1 lockS 293
+Note: the RF copy is now ring-dup (DUP:d, TXP-02 server-ingress dedup entry); on 2026-10-07 it was DUP:n. The strike count is correct either way.
+Restore: strict off on both (confirmed [RM];strict=off), RM at DK5EN-90 off again; locks expired / void with strict off.
+Raw: b1m-run-DK5EN-1-20261115.log, b1m-run-DK5EN-90-20261115.log (gitignored, passwords/ssid lines filtered).
