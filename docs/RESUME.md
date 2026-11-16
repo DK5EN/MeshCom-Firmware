@@ -6,18 +6,31 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
 
 ## State 2026-11-16
 
-- **2026-11-16 (resume here):** F-2 on fork-dev, pushed. Wave A `c34a05ac`: BLE F0A0 GATT service removed (UUID kept in
-  advertising), RM-LOSTREPLY-01 concept ([concept-rm-lostreply-01-20261116.md](concept-rm-lostreply-01-20261116.md), three
-  operator questions open), CET-SCATTER-01 concept ([concept-cet-scatter-01-20261116.md](concept-cet-scatter-01-20261116.md),
-  five questions open, defaults used), `clock_drift.py` records `[CET]`. Wave B `b08c5ea5`: CET Part A forward-only
-  filter. Wave C `72b2f9c6`: T-Deck SKY/TEXT side tabs (TD-SKYTAB-01). Wave D: CET Part B time-source rank (NTP > GPS > phone > RTC > CET; NTP/GPS block CET until reboot). Gateway re-stamping wanted (CET-RESTAMP-01, concept next).
-- **Operator decisions 2026-11-16 for upstream wave 2:** ship the full web GUI incl. wave-3/4 blocks (fail fast, staged
-  rollout reaches 3-5% first), keep the CSMA-03 loop poll, take the `web_setup.cpp` rewrite, WEB-DUP-01 inside the web
-  PR, keep the plan (Ping and Web PRs on 2026-11-20). Detail: [upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md).
-- **Fleet change:** DK5EN-14 runs `72b2f9c6` INSTRUMENT (T-Deck screenshots over `/screen.rgb565`).
-- **Operator this evening:** TD-34. BOOT-01 on a Heltec OLED checked by the operator 2026-11-16 (another node): fine.
-- **Next:** bench CLK-01 S4 (CET only) with Part A+B and a hold check on an NTP node, CET-RESTAMP-01 concept, RM-LOSTREPLY-01 fix after the operator
-  answers, `/release-firmware`, `/submit-pr` wave 2 by Fri 2026-11-20.
+- **2026-11-16 end of session (resume here):** `fork-dev` pushed, tree clean. Commits today:
+  - `c34a05ac` BLE F0A0 GATT service removed (UUID kept in advertising), concepts RM-LOSTREPLY-01 and CET-SCATTER-01,
+    `clock_drift.py` records `[CET]`.
+  - `b08c5ea5` CET-SCATTER-01 Part A (forward-only `{CET}` filter); `885fa3b3` Part B (rank NTP > GPS > phone > RTC >
+    CET; NTP/GPS block CET until reboot; GPS time without fix blocks too).
+  - `72b2f9c6` T-Deck SKY/TEXT side tabs (TD-SKYTAB-01); `a91d0e1d` RM-LOSTREPLY-01 (RM reply may evict the oldest
+    queued ACK, never for KISS clients).
+  - Docs: repo release plan removed (operator's Desktop HTML is the only plan), TD-THEME-01 W4 done, TD-LOCK-01 found,
+    NIGHTLY-01 decided and conceived ([concept-nightly-01-20261116.md](concept-nightly-01-20261116.md)), **parked** by
+    the operator.
+  - Every firmware wave: gate stage 1,2 PASS (last 3870 Unity cases), board builds, Opus advisor (CET Part B and
+    RM-LOSTREPLY-01 each needed one rework).
+- **Operator decisions 2026-11-16:** wave 2 ships the full web GUI incl. wave-3/4 blocks (fail fast), keeps the CSMA-03
+  loop poll, takes the `web_setup.cpp` rewrite, WEB-DUP-01 in the web PR, plan kept (Ping and Web PRs on 2026-11-20).
+  CET rank and CET-RESTAMP-01 wanted. RM-LOSTREPLY-01 option D2. NIGHTLY-01: 7 + 8 answers in the concept; Safeboot v4
+  is built but not enforced.
+- **Fleet:** DK5EN-14 runs `72b2f9c6` INSTRUMENT (T-Deck screenshots over `/screen.rgb565`, console `--tab`,
+  `--touch tap`); others unchanged.
+- **Open (next session):**
+  - Operator: TD-34.
+  - Bench: RM-LOSTREPLY-01 recheck (mock setup), CLK-01 S4 with CET Part A+B plus a hold check on an NTP node, BLE scan
+    on the RAK (no F0A0 service), WEB-GZ-01 second browser.
+  - Fix: TD-LOCK-01. Concept: CET-RESTAMP-01.
+  - `/release-firmware` (note: Safeboot only updates with a full install), `/submit-pr` wave 2 by Fri 2026-11-20.
+  - NIGHTLY-01 waves W1-W8 when the operator un-parks it.
 
 ## State 2026-11-15
 

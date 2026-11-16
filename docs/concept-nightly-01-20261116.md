@@ -23,7 +23,7 @@ ESP32 only: nRF52 has no auto update (`src/rm_au_none.cpp`). The nightly release
 These override the recommendations further down where they differ.
 
 1. **Healthy does not require WLAN.** A missing WLAN is recorded only, so a router that reboots at night cannot park a good node.
-2. **No Safeboot v4 requirement.** Opt-in works on Safeboot v3 with the app-side fallback (P2). Wave W5 (Safeboot v4) is dropped. Add a cap on the park cycle so flash-state writes stop after a bounded number of cycles.
+2. **New Safeboot v4 is built, but not enforced.** Wave W5 stays. Opt-in works on both: a node with Safeboot v4 gets the real park (P1); a node still on v3 gets the app-side fallback (P2), with a cap on the park cycle so the flash-state writes stop after a bounded number of cycles. The web page and `--info` say which of the two a node has and recommend the web-flasher install of v4.
 3. **Pre-download reboot only as the last resort, on every board type.** First the existing mitigations (drop BLE and the rest); only if they do not free enough RAM, reboot and try again. No board list.
 4. **Opt-in EXTUDP outcome line: yes.** One line to the configured EXTUDP address after each attempt, only when EXTUDP is on.
 5. **Keep every nightly for now.** The daily build of an unchanged `fork-nightly` is a test for some weeks. After that, CI builds only when `fork-nightly` has moved.
@@ -247,12 +247,12 @@ With H2, WLAN is recorded (`flags` bit 0) but does not count. Healthy not reache
 
 ### How Safeboot honours the park
 
-| Option                                                           | Effect                                                                                 | Cost                                                                                             | Verdict                          |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------- |
-| **P1. Safeboot v4 reads `hold` and suspends its 180 s fallback** | Node stays in Safeboot, page shows the park, "Release" clears `hold` and boots the app | Safeboot change, USB flash once per node (web flasher)                                           | **Recommended; opt-in needs v4** |
-| P2. App only: a held image goes straight back to Safeboot        | Works with Safeboot v3; node cycles app, Safeboot 180 s, app                           | About 480 otadata writes a day while parked; app code runs every cycle                           | Backstop only                    |
-| P3. ESP-IDF bootloader rollback (`PENDING_VERIFY`)               | Also catches a crash before `setup()`                                                  | New bootloader by USB, interacts with Safeboot's boot-partition writes and the AU-16 DIO history | Reject now, revisit later        |
-| P4. Count boots in Safeboot                                      | Safeboot sees every boot                                                               | Every reboot goes through Safeboot: slower, more flash writes                                    | Reject                           |
+| Option                                                                                                       | Effect                                                                                 | Cost                                                                                             | Verdict                        |
+| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------ |
+| **P1. Safeboot v4 reads `hold` and suspends its 180 s fallback**                                             | Node stays in Safeboot, page shows the park, "Release" clears `hold` and boots the app | Safeboot change, USB flash once per node (web flasher)                                           | **For v4 nodes; not enforced** |
+| P2. App only, for nodes still on v3 (operator: v4 not enforced): a held image goes straight back to Safeboot | Works with Safeboot v3; node cycles app, Safeboot 180 s, app                           | About 480 otadata writes a day while parked; app code runs every cycle                           | Backstop only                  |
+| P3. ESP-IDF bootloader rollback (`PENDING_VERIFY`)                                                           | Also catches a crash before `setup()`                                                  | New bootloader by USB, interacts with Safeboot's boot-partition writes and the AU-16 DIO history | Reject now, revisit later      |
+| P4. Count boots in Safeboot                                                                                  | Safeboot sees every boot                                                               | Every reboot goes through Safeboot: slower, more flash writes                                    | Reject                         |
 
 Leaving the park: a manual upload in Safeboot boots an image whose id differs from `hold`, so the app clears `hold` and boots normally. The automatic install stays off until the user switches it on again. The record keeps `parked` as history.
 
@@ -390,7 +390,7 @@ The nightly install path stays fork-only. Upstream builds have no dev channel, s
 - **Crash before `setup()`:** a crash in a static constructor is not counted, so the guard cannot catch it. Only the bootloader rollback (P3) would.
 - **Healthy floors and timeouts** (300 s, 600 s, 16 and 24 KB) are estimates; the bench sets them.
 - **Reset reasons:** a user's `--reboot` within 5 min of the install counts as a failed boot. Three are needed for a park; not tested.
-- **Safeboot v4** means a USB flash of every node that opts in. Nodes on v3 keep notify only.
+- **Safeboot v4** reaches a node only by a full USB or web-flasher install. It is recommended, not required: opted-in nodes on v3 fall back to P2 (operator 2026-11-16).
 - **OLED and T-Deck space** for the new lines was not checked on the screens.
 - **Sizes:** 44 bytes NVS is exact by layout; the RAM, flash and JS sizes in (A) are estimates, no build was run.
 - **Issue form prefill:** field prefill by URL parameter is documented by GitHub but not tested on this repository.
@@ -398,6 +398,8 @@ The nightly install path stays fork-only. Upstream builds have no dev channel, s
 - **Dev-channel notify users** see a new release every day. Not measured whether anyone besides the bench uses the dev channel.
 
 ## Open operator questions
+
+All eight were answered on 2026-11-16; see "Operator answers to the concept questions" near the top. The list below is kept as asked.
 
 1. **Healthy with or without WLAN (H2 or H3)?** H3 proves the node can be reached for a reinstall, but a router that reboots at night parks a good node. Recommended: H2, WLAN recorded only.
 2. **Safeboot v4 required for opt-in (P1)?** It means one USB flash per opted-in node; without it a parked node cycles every 3 min. Recommended: yes, v4 required.
