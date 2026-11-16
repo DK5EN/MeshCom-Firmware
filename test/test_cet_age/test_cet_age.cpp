@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "cet_age.h"
+#include "cet_filter.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -156,10 +157,123 @@ void test_step_guard(void)
 
     // Anchored on the CALL (not the include comment) and on the gate between call and set (advisor).
     long a = 0, g = 0, b = 0;
-    TEST_ASSERT_TRUE_MESSAGE(fileContains("src/loop_functions.cpp", "cetAllow = cetStepAllowed(cetDeltaS", &a), "{CET} set site does not call cetStepAllowed()");
-    TEST_ASSERT_TRUE_MESSAGE(fileContains("src/loop_functions.cpp", "if(cetAllow)", &g), "{CET} set is not gated by cetAllow");
+    TEST_ASSERT_TRUE_MESSAGE(fileContains("src/loop_functions.cpp", "cetFilterDecide(&s_cetFilter, (int32_t)cetDeltaS", &a), "{CET} set site does not call cetFilterDecide()");
+    TEST_ASSERT_TRUE_MESSAGE(fileContains("src/loop_functions.cpp", "if(cetVerdictApplies(cetV))", &g), "{CET} set is not gated by cetVerdictApplies");
     TEST_ASSERT_TRUE(fileContains("src/loop_functions.cpp", "MyClock.setCurrentTime(meshcom_settings.node_utcoff, Year", &b));
-    TEST_ASSERT_TRUE_MESSAGE(a < g && g < b, "call -> if(cetAllow) -> setCurrentTime order broken");
+    TEST_ASSERT_TRUE_MESSAGE(a < g && g < b, "call -> if(cetVerdictApplies) -> setCurrentTime order broken");
+}
+
+// ---- Forward-only {CET} filter (CET-SCATTER-01 Part A) ----
+static void refFilter(CetFilter *f) { cetFilterInit(f); TEST_ASSERT_EQUAL(CET_V_FIRST, cetFilterDecide(f, 0, 0)); }
+
+void test_filter_first_any_direction(void)
+{
+    CetFilter f, g;
+    cetFilterInit(&f); cetFilterInit(&g);
+    TEST_ASSERT_EQUAL(CET_V_FIRST, cetFilterDecide(&f, -114, 0));
+    TEST_ASSERT_EQUAL(CET_V_FIRST, cetFilterDecide(&g, 550, 0));
+}
+
+void test_filter_forward(void)
+{
+    CetFilter f; refFilter(&f);
+    TEST_ASSERT_EQUAL(CET_V_FWD, cetFilterDecide(&f, 1, 1000));
+    TEST_ASSERT_EQUAL(CET_V_FWD, cetFilterDecide(&f, 25, 2000));
+}
+
+void test_filter_band(void)
+{
+    CetFilter f; refFilter(&f);
+    const int32_t d[] = {0, -1, -4, -5};
+    for(size_t i = 0; i < 4; i++) TEST_ASSERT_EQUAL(CET_V_BAND, cetFilterDecide(&f, d[i], 1000));
+    TEST_ASSERT_EQUAL(CET_V_BACK, cetFilterDecide(&f, -6, 1000));
+}
+
+void test_filter_quorum(void)
+{
+    CetFilter f; refFilter(&f);
+    TEST_ASSERT_EQUAL(CET_V_BACK, cetFilterDecide(&f, -20, 0));
+    TEST_ASSERT_EQUAL(CET_V_BACK, cetFilterDecide(&f, -20, 600000));
+    TEST_ASSERT_EQUAL(CET_V_QUORUM, cetFilterDecide(&f, -20, 1200000));
+    TEST_ASSERT_EQUAL(CET_V_BACK, cetFilterDecide(&f, -20, 1800000));
+}
+
+void test_filter_quorum_needs_consecutive(void)
+{
+    CetFilter f; refFilter(&f);
+    cetFilterDecide(&f, -20, 0); cetFilterDecide(&f, -20, 1000);
+    TEST_ASSERT_EQUAL(CET_V_BAND, cetFilterDecide(&f, 0, 2000));
+    TEST_ASSERT_EQUAL(CET_V_BACK, cetFilterDecide(&f, -20, 3000));
+}
+
+void test_filter_fwd_resets_quorum(void)
+{
+    CetFilter f; refFilter(&f);
+    cetFilterDecide(&f, -20, 0); cetFilterDecide(&f, -20, 1000);
+    TEST_ASSERT_EQUAL(CET_V_FWD, cetFilterDecide(&f, 2, 2000));
+    TEST_ASSERT_EQUAL(CET_V_BACK, cetFilterDecide(&f, -20, 3000));
+}
+
+void test_filter_quorum_window(void)
+{
+    CetFilter f; refFilter(&f);
+    cetFilterDecide(&f, -20, 0); cetFilterDecide(&f, -20, 600000);
+    TEST_ASSERT_EQUAL(CET_V_BACK, cetFilterDecide(&f, -20, 1800001UL));
+}
+
+void test_filter_millis_wrap(void)
+{
+    CetFilter f; refFilter(&f);
+    const uint32_t t0 = 0xFFFFF000UL;
+    TEST_ASSERT_EQUAL(CET_V_BACK, cetFilterDecide(&f, -20, t0));
+    TEST_ASSERT_EQUAL(CET_V_BACK, cetFilterDecide(&f, -20, t0 + 600000UL));
+    TEST_ASSERT_EQUAL(CET_V_QUORUM, cetFilterDecide(&f, -20, t0 + 1200000UL));
+}
+
+struct ReplayOut { CetVerdict v[16]; int applies; int64_t c; };
+// Replay harness of the concept (int64 ms). useOld: cetStepAllowed(d, have, 607000) instead of the filter.
+static void replay(const long *ages, int n, bool useOld, ReplayOut *o)
+{
+    CetFilter f; cetFilterInit(&f);
+    int64_t c = 0; bool have = false; o->applies = 0;
+    for(int k = 0; k < n; k++)
+    {
+        const int64_t T = 1794779000000LL + (int64_t)k * 607000;
+        const int64_t pl = (T - ages[k]) / 1000, now = (T + c) / 1000;
+        const int32_t d = (int32_t)(pl - now);
+        bool ap;
+        if(useOld) { ap = cetStepAllowed(d, have, 607000UL); o->v[k] = ap ? CET_V_FWD : CET_V_BACK; }
+        else { o->v[k] = cetFilterDecide(&f, d, (uint32_t)(k * 607000)); ap = cetVerdictApplies(o->v[k]); }
+        if(ap) { c = pl * 1000 - T; have = true; o->applies++; }
+    }
+    o->c = c;
+}
+
+void test_filter_replay_tbeam_s3(void)
+{
+    const long ages[] = {2470, 8180, 2630, 5000, 1290, 3170, 950, 3940, 2210, 5950, 2180};
+    const CetVerdict e[] = {CET_V_FIRST, CET_V_BACK, CET_V_BAND, CET_V_BAND, CET_V_FWD, CET_V_BAND, CET_V_FWD, CET_V_BAND, CET_V_BAND, CET_V_BAND, CET_V_BAND};
+    ReplayOut o; replay(ages, 11, false, &o);
+    for(int i = 0; i < 11; i++) TEST_ASSERT_EQUAL_MESSAGE(e[i], o.v[i], "tbeam verdict");
+    TEST_ASSERT_EQUAL(3, o.applies);
+    TEST_ASSERT_EQUAL_INT64(-1000, o.c);
+}
+
+void test_filter_replay_heltec_s4(void)
+{
+    const long ages[] = {4710, 1470, 2180, 7630, 5940, 1670};
+    const CetVerdict e[] = {CET_V_FIRST, CET_V_FWD, CET_V_BAND, CET_V_BACK, CET_V_BAND, CET_V_BAND};
+    ReplayOut o; replay(ages, 6, false, &o);
+    for(int i = 0; i < 6; i++) TEST_ASSERT_EQUAL_MESSAGE(e[i], o.v[i], "heltec verdict");
+    TEST_ASSERT_EQUAL(2, o.applies);
+    TEST_ASSERT_EQUAL_INT64(-2000, o.c);
+}
+
+void test_old_rule_oracle_tbeam(void)
+{
+    const long ages[] = {2470, 8180, 2630, 5000, 1290, 3170, 950, 3940, 2210, 5950, 2180};
+    ReplayOut o; replay(ages, 11, true, &o);
+    TEST_ASSERT_EQUAL(10, o.applies);
 }
 
 int main(int, char **)
@@ -173,5 +287,16 @@ int main(int, char **)
     RUN_TEST(test_find_in_frame);
     RUN_TEST(test_frame_stale_truth_table);
     RUN_TEST(test_step_guard);
+    RUN_TEST(test_filter_first_any_direction);
+    RUN_TEST(test_filter_forward);
+    RUN_TEST(test_filter_band);
+    RUN_TEST(test_filter_quorum);
+    RUN_TEST(test_filter_quorum_needs_consecutive);
+    RUN_TEST(test_filter_fwd_resets_quorum);
+    RUN_TEST(test_filter_quorum_window);
+    RUN_TEST(test_filter_millis_wrap);
+    RUN_TEST(test_filter_replay_tbeam_s3);
+    RUN_TEST(test_filter_replay_heltec_s4);
+    RUN_TEST(test_old_rule_oracle_tbeam);
     return UNITY_END();
 }
