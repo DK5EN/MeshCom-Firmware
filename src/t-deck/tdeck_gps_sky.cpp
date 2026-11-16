@@ -11,17 +11,19 @@
 #include "gps_functions.h"           // gpsData
 #include "gps_skyplot.h"
 #include "tdeck_theme.h"
+#include "tdeck_gps_sky_layout.h"
 
 LV_FONT_DECLARE(mc_font_latin_12);
 
-// plot geometry inside the container (196 x 163)
-static const int kContW = 196, kContH = 163;
-static const int kCx = 98, kCy = 81, kR = 66;
+// plot geometry inside the card, all rects from tdeck_gps_sky_layout.h
+using skylayout::kCard;
+static const int kCx = skylayout::kCx, kCy = skylayout::kCy, kR = skylayout::kR;
 static const int kDot = 8;
 
 static lv_obj_t *s_cont = NULL;
 static lv_obj_t *s_text_view = NULL;
-static lv_obj_t *s_btn = NULL;
+static lv_obj_t *s_tab_sky = NULL;
+static lv_obj_t *s_tab_text = NULL;
 static lv_obj_t *s_info = NULL;
 static lv_obj_t *s_ring[3] = {NULL, NULL, NULL};
 static lv_obj_t *s_dot[GPS_SKY_MAX_SATS];
@@ -48,12 +50,15 @@ static bool sky_visible()
 }
 
 // rings carry a palette colour that no shared style provides; runs after every theme apply
+static void tabs_theme_async(void *);
+
 static void sky_theme_cb(void)
 {
     const TdeckPalette &p = tdeck_theme_pal();
     for(int i = 0; i < 3; i++)
         if(s_ring[i] != NULL)
             lv_obj_set_style_border_color(s_ring[i], lv_color_hex(p.muted), LV_PART_MAIN);
+    lv_async_call(tabs_theme_async, NULL);
 }
 
 static lv_obj_t *make_ring(lv_obj_t *parent, int radius)
@@ -80,28 +85,88 @@ static void make_label(lv_obj_t *parent, const char *txt, int cx, int cy)
     lv_obj_set_pos(l, cx - lv_obj_get_width(l) / 2, cy - lv_obj_get_height(l) / 2);
 }
 
-static void btn_event_cb(lv_event_t *e)
+// active tab: the visible card's own fill and border colour, border on top/right/bottom only (open towards the
+// card = the nose), overlapping the card border. Inactive tab: screen background, muted border and text, a gap to
+// the card (same border colour as the card, so the active tab never reads weaker). No button fill: the btn_off colour reads brown in dark mode.
+static void tab_apply(lv_obj_t *tab, bool active, const skylayout::Rect &r, lv_obj_t *card)
 {
-    if(lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED || s_cont == NULL || s_text_view == NULL)
+    const TdeckPalette &p = tdeck_theme_pal();
+    lv_obj_remove_style_all(tab);
+    lv_obj_set_style_radius(tab, 0, LV_PART_MAIN);
+    lv_obj_set_style_border_width(tab, skylayout::kBorder, LV_PART_MAIN);
+    lv_obj_set_style_border_opa(tab, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(tab, 0, LV_PART_MAIN);
+    if(active)
+    {
+        lv_obj_set_style_bg_color(tab, lv_obj_get_style_bg_color(card, LV_PART_MAIN), LV_PART_MAIN);
+        lv_obj_set_style_border_color(tab, lv_obj_get_style_border_color(card, LV_PART_MAIN), LV_PART_MAIN);
+        lv_obj_set_style_text_color(tab, lv_color_hex(p.text), LV_PART_MAIN);
+        lv_obj_set_style_border_side(tab, (lv_border_side_t)(LV_BORDER_SIDE_TOP | LV_BORDER_SIDE_RIGHT | LV_BORDER_SIDE_BOTTOM), LV_PART_MAIN);
+        lv_obj_set_pos(tab, r.x, r.y);
+        lv_obj_set_size(tab, r.w, r.h);
+    }
+    else
+    {
+        lv_obj_set_style_bg_color(tab, lv_color_hex(p.bg), LV_PART_MAIN);
+        lv_obj_set_style_border_color(tab, lv_obj_get_style_border_color(card, LV_PART_MAIN), LV_PART_MAIN);   // same weight as the card
+        lv_obj_set_style_text_color(tab, lv_color_hex(p.muted), LV_PART_MAIN);
+        lv_obj_set_style_border_side(tab, LV_BORDER_SIDE_FULL, LV_PART_MAIN);
+        lv_obj_set_pos(tab, r.x + skylayout::kTabInactiveDx, r.y);
+        lv_obj_set_size(tab, r.w - skylayout::kTabInactiveDx, r.h);
+    }
+}
+
+static void tabs_show(bool text)
+{
+    if(s_tab_sky == NULL || s_tab_text == NULL || s_cont == NULL || s_text_view == NULL)
         return;
-    const bool text = lv_obj_has_state(s_btn, LV_STATE_CHECKED);   // checked = text view shown
-    lv_obj_t *lbl = lv_obj_get_child(s_btn, 0);
-    if(text)
+    tab_apply(s_tab_sky, !text, skylayout::kTabSky, s_cont);
+    tab_apply(s_tab_text, text, skylayout::kTabText, s_text_view);
+    lv_obj_move_foreground(s_tab_sky);
+    lv_obj_move_foreground(s_tab_text);
+}
+
+// theme change: the cards restyle in their own callbacks, so the tabs copy their colours one LVGL cycle later
+static void tabs_theme_async(void *)
+{
+    if(s_cont != NULL)
+        tabs_show(lv_obj_has_flag(s_cont, LV_OBJ_FLAG_HIDDEN));
+}
+
+static void tab_event_cb(lv_event_t *e)
+{
+    if(lv_event_get_code(e) != LV_EVENT_CLICKED || s_cont == NULL || s_text_view == NULL)
+        return;
+    const bool want_text = (lv_event_get_target(e) == s_tab_text);
+    const bool is_text = lv_obj_has_flag(s_cont, LV_OBJ_FLAG_HIDDEN);
+    if(want_text == is_text)
+        return;   // active tab: nothing to do
+    if(want_text)
     {
         lv_obj_add_flag(s_cont, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(s_text_view, LV_OBJ_FLAG_HIDDEN);
-        if(lbl != NULL)
-            lv_label_set_text(lbl, "SKY");
     }
     else
     {
         lv_obj_clear_flag(s_cont, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_text_view, LV_OBJ_FLAG_HIDDEN);
-        if(lbl != NULL)
-            lv_label_set_text(lbl, "TEXT");
         s_hash_valid = false;   // force a redraw on the way back
     }
+    tabs_show(want_text);
     tdeckGpsSkyRefresh();
+}
+
+static lv_obj_t *make_tab(lv_obj_t *parent, const char *txt)
+{
+    lv_obj_t *t = lv_obj_create(parent);
+    lv_obj_clear_flag(t, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(t, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(t, tab_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *l = lv_label_create(t);
+    lv_label_set_text(l, txt);
+    lv_obj_center(l);
+    return t;
 }
 
 void tdeckGpsSkyCreate(lv_obj_t *tab, lv_obj_t *text_view)
@@ -116,8 +181,8 @@ void tdeckGpsSkyCreate(lv_obj_t *tab, lv_obj_t *text_view)
     lv_obj_set_style_border_width(s_cont, 2, LV_PART_MAIN);
     lv_obj_set_style_pad_all(s_cont, 0, LV_PART_MAIN);
     lv_obj_clear_flag(s_cont, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
-    lv_obj_set_size(s_cont, kContW, kContH);
-    lv_obj_set_pos(s_cont, 2, 1);
+    lv_obj_set_size(s_cont, kCard.w, kCard.h);
+    lv_obj_set_pos(s_cont, kCard.x, kCard.y);
 
     s_ring[0] = make_ring(s_cont, kR);               // horizon (elev 0)
     s_ring[1] = make_ring(s_cont, kR * 2 / 3);       // 30 deg
@@ -142,22 +207,15 @@ void tdeckGpsSkyCreate(lv_obj_t *tab, lv_obj_t *text_view)
         s_dot[i] = d;
     }
 
-    s_btn = lv_btn_create(tab);
-    lv_obj_set_pos(s_btn, 208, 28);
-    lv_obj_set_size(s_btn, 100, 20);
-    lv_obj_add_flag(s_btn, LV_OBJ_FLAG_CHECKABLE);
-    lv_obj_add_style(s_btn, &tdeck_style_btn_off, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_add_style(s_btn, &tdeck_style_btn_on, LV_PART_MAIN | LV_STATE_CHECKED);
-    lv_obj_add_event_cb(s_btn, btn_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_t *bl = lv_label_create(s_btn);
-    lv_label_set_text(bl, "TEXT");   // shows the view a press switches to; boot view is the sky plot
-    lv_obj_center(bl);
+    s_tab_sky = make_tab(tab, "SKY");
+    s_tab_text = make_tab(tab, "TEXT");
+    tabs_show(false);   // boot view is the sky plot
 
     s_info = lv_label_create(tab);
     lv_obj_add_style(s_info, &tdeck_style_text, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_info, &mc_font_latin_12, LV_PART_MAIN);
-    lv_obj_set_pos(s_info, 208, 54);
-    lv_obj_set_width(s_info, 100);
+    lv_obj_set_pos(s_info, skylayout::kInfo.x, skylayout::kInfo.y);
+    lv_obj_set_width(s_info, skylayout::kInfo.w);
     lv_label_set_text(s_info, "");
 
     lv_obj_add_flag(text_view, LV_OBJ_FLAG_HIDDEN);   // default view: sky plot

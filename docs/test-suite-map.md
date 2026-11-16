@@ -247,6 +247,9 @@ flashes whatever is attached.
 | test_udp_hold                | Unit          |    32 | native_udp_hold                                              | Server outage hold ring: text filter, release, replay, limits (`src/udp_hold.h`)                                                             |
 | test_oled_shot               | Regression    |     5 | native_oled_shot                                             | OLED screenshot: u8g2 frame buffer layout (`src/oled_shot.h`)                                                                                |
 | test_screen_shadow           | Regression    |     5 | native_screen_shadow                                         | T-Deck screenshot: LVGL flush copy, clipping                                                                                                 |
+| test_gps_skyplot             | Unit          |    28 | native_gps_skyplot                                           | GPS sky plot core: satellite positions and colours (`src/gps_skyplot.h`)                                                                     |
+| test_gps_sky_layout          | Regression    |     6 | native_gps_sky_layout                                        | T-Deck Position tab: SKY/TEXT side tabs with nose, SEND POS clearance (`src/t-deck/tdeck_gps_sky_layout.h`)                                  |
+| test_cet_age                 | Regression    |    19 | native_cet_age                                               | `{CET}` beacon: age guard and forward-only filter with quorum, night-run replays (`src/cet_filter.h`)                                        |
 | test_msgid_counter           | Unit          |     6 | native                                                       |
 | test_msgstore                | Unit          |    60 | native                                                       |
 | test_msgstore_hook           | Unit          |     6 | native_msgstore_hook                                         |

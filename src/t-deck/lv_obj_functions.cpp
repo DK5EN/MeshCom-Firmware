@@ -31,6 +31,7 @@
 #include "tdeck_sdmap.h"
 #include "tdeck_theme.h"   // TD-THEME-01
 #include "tdeck_gps_sky.h"   // GPS-SKY
+#include "tdeck_gps_sky_layout.h"   // GPS-SKY: Position tab geometry
 LV_IMG_DECLARE(mc_lock_img);
 LV_IMG_DECLARE(mc_logo_img);
 #include "tdeck_text_cover.h"
@@ -1936,23 +1937,25 @@ void setDisplayLayout(lv_obj_t *parent)
     lv_obj_set_style_pad_all(t6, 0, LV_PART_MAIN);
     lv_obj_set_scroll_dir(t6, LV_DIR_NONE);
     lv_obj_set_scrollbar_mode(t6, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_size(track_ta, 196, 163);
-    lv_obj_set_pos(track_ta, 2, 1);
+    lv_obj_set_size(track_ta, skylayout::kCard.w, skylayout::kCard.h);   // same frame as the sky card
+    lv_obj_set_pos(track_ta, skylayout::kCard.x, skylayout::kCard.y);
     lv_textarea_set_text(track_ta, "");
     lv_textarea_set_max_length(track_ta, 1000);
     lv_obj_add_style(track_ta, &tr_style, LV_PART_MAIN);
+    lv_obj_set_style_radius(track_ta, 0, LV_PART_MAIN);   // square like the sky card, so the tab nose lines up
     lv_obj_set_style_pad_hor(track_ta, 4, LV_PART_MAIN);
     lv_obj_set_style_pad_ver(track_ta, 2, LV_PART_MAIN);
     lv_obj_set_scrollbar_mode(track_ta, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_scroll_dir(track_ta, LV_DIR_NONE);
 
     lv_obj_t * btsendpos = lv_btn_create(t6);
-    lv_obj_set_pos(btsendpos, 208, 4);
-    lv_obj_set_size(btsendpos, 100, 20);
+    lv_obj_set_pos(btsendpos, skylayout::kSendPos.x, skylayout::kSendPos.y);
+    lv_obj_set_size(btsendpos, skylayout::kSendPos.w, skylayout::kSendPos.h);
     lv_obj_add_event_cb(btsendpos, btn_event_handler_sendpos, LV_EVENT_ALL, NULL);
 
     lv_obj_t * btnlabelsendpos = lv_label_create(btsendpos);
-    lv_label_set_text(btnlabelsendpos, "SEND POS");
+    lv_label_set_text(btnlabelsendpos, "SEND\nPOS");   // two lines: the 64 px side column cuts "SEND POS"
+    lv_obj_set_style_text_align(btnlabelsendpos, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_center(btnlabelsendpos);
 
     tdeckGpsSkyCreate(t6, track_ta);   // GPS-SKY: sky plot over the text view + SKY/TEXT toggle

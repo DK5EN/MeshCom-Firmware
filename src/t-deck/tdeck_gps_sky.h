@@ -8,8 +8,8 @@
 
 #include <lvgl.h>
 
-// Builds the sky container over the area of text_view and the SKY/TEXT toggle plus the SAT/AGE label in the
-// right column of tab. Default view after boot: sky plot.
+// Builds the sky card over the area of text_view, the SKY / TEXT side tabs attached to the card and the SAT/AGE
+// label in the right column of tab (geometry: tdeck_gps_sky_layout.h). Default view after boot: sky plot.
 void tdeckGpsSkyCreate(lv_obj_t *tab, lv_obj_t *text_view);
 // Redraws the plot when the satellites changed; no-op while the text view is shown.
 void tdeckGpsSkyRefresh();
