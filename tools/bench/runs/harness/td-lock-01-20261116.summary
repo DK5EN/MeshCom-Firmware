@@ -1,0 +1,8 @@
+TD-LOCK-01 lock glyph inside the keyboard button (DK5EN-14 T-Deck Plus)  2026-11-16 21:52  PASS
+Image: working tree on d76ba2b0 (TD-LOCK-01 fix), t_deck_plus INSTRUMENT, MC_AU_DEV_CHANNEL=1, flashed over USB
+(hash verified), build "Nov 16 2026 / 21:49:30". Identity guard ok after the flash (DK5EN-14, 2 dBm).
+--keylock on/off with --theme light and dark, screenshot over /screen.rgb565 each:
+  light locked:   lock in the 2nd header button, keyboard symbol hidden, BT icon free
+  light unlocked: keyboard symbol back, no lock
+  dark locked / unlocked: same
+PNGs: tdlock01-{light,dark}-{locked,unlocked}-20261116.png. Restore: theme light (as before), key lock off.

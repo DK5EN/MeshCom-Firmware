@@ -152,6 +152,22 @@ static void test_nav01_gps_tab_button_hidden(void)
     TEST_ASSERT_TRUE(src.find("lv_tabview_get_tab_act(tv) != TDECK_TAB_GPS") != std::string::npos);
 }
 
+// TD-LOCK-01: the lock glyph lives inside the keyboard button and swaps with the keyboard symbol; it must not be
+// placed in the header row right of the buttons, where the BT icon starts (overlap seen 2026-11-16 on DK5EN-14).
+static void test_lock01_glyph_inside_keyboard_button(void)
+{
+    const std::string src = read_repo_file("src/t-deck/lv_obj_functions.cpp");
+    TEST_ASSERT_TRUE(src.find("header_lock_icon = lv_img_create(tab_kbl_button);") != std::string::npos);
+    TEST_ASSERT_TRUE(src.find("header_lock_icon = lv_img_create(tab_menu_header);") == std::string::npos);
+    TEST_ASSERT_TRUE(src.find("lv_obj_align_to(header_lock_icon, tab_standby_button") == std::string::npos);
+    const size_t fn = src.find("static void header_lock_apply(bool locked)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(fn != std::string::npos, "header_lock_apply() not found");
+    const size_t end = src.find("\n}\n", fn);
+    const std::string body = src.substr(fn, end - fn);
+    TEST_ASSERT_TRUE(body.find("lv_obj_add_flag(tab_kbl_icon_label, LV_OBJ_FLAG_HIDDEN)") != std::string::npos);
+    TEST_ASSERT_TRUE(body.find("lv_obj_clear_flag(tab_kbl_icon_label, LV_OBJ_FLAG_HIDDEN)") != std::string::npos);
+}
+
 int main(int, char**)
 {
     UNITY_BEGIN();
@@ -163,5 +179,6 @@ int main(int, char**)
     RUN_TEST(test_nav01_sat_icon_opens_gps_tab);
     RUN_TEST(test_nav01_gps_tab_button_hidden);
     RUN_TEST(test_nav01_sat_icon_stays_visible_with_gps_off);
+    RUN_TEST(test_lock01_glyph_inside_keyboard_button);
     return UNITY_END();
 }

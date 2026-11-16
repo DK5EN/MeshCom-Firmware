@@ -6,6 +6,10 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
 
 ## State 2026-11-16 late
 
+- **T-Deck bench 21:47-21:53:** TD-34 `--disptest square 8` PASS on `72b2f9c6` (no reset, console kept); TD-LOCK-01
+  PASS on DK5EN-14 (lock glyph in the keyboard button, light and dark). DK5EN-14 now runs the TD-LOCK-01 INSTRUMENT
+  image (working tree on `d76ba2b0`), theme light, key lock off. TD-LOCK-01 row archived; TD-34 keeps only the icon
+  repaint. Detail: section "T-Deck bench 2026-11-16 late" in [bench-b1-20261115.md](bench-b1-20261115.md).
 - **Wave 2 trial build done (resume here for `/submit-pr` web):** scratch branch `scratch/web-trial-20261116`
   (worktree `../mc-web-trial`, local only) from `upstream/dev` with the fork's whole `src/web_functions/`. RAK4631,
   Heltec V3, T-Deck and T-Beam build and link. Flash is 29-35 KB smaller than `upstream/dev` on every env (gzip
@@ -34,7 +38,7 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
 - **Done after the bench, not committed yet:** TD-LOCK-01 fix (lock glyph replaces the keyboard symbol inside the
   keyboard button; test `test_lock01_glyph_inside_keyboard_button`, gate PASS 3871 cases), concept
   [concept-cet-restamp-01-20261116.md](concept-cet-restamp-01-20261116.md) (three operator questions).
-- **Open:** operator TD-34; TD-LOCK-01 commit and check on DK5EN-14; operator answers CET-RESTAMP-01; `/release-firmware`; `/submit-pr` wave 2 by
+- **Open:** TD-34 icon repaint (cosmetic); operator answers CET-RESTAMP-01; `/release-firmware`; `/submit-pr` wave 2 by
   Fri 2026-11-20; NIGHTLY-01 parked. The operator's Desktop checklist is kept current with every result.
 
 ## State 2026-11-16

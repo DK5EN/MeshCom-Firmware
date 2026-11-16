@@ -1,0 +1,6 @@
+TD-34 --disptest square 8 (DK5EN-14 T-Deck Plus, 72b2f9c6 INSTRUMENT)  2026-11-16 21:47  PASS
+Identity guard ok (DK5EN-14, 2 dBm). USB serial captured (DTR, no reset), command sent over the 2323 console.
+[DISPTEST];begin;phase;square;stride;8;w;320;h;240;steps;20 ... [DISPTEST];end;steps;20;ms;1377
+No reset: up_s 32613 -> 32703 continuous across the run. 2323 session alive afterwards (--info answered 90 s later),
+client disconnect only at our own close.
+Not covered: console wifi on/off icon repaint (cosmetic part of TD-34), stays open.
