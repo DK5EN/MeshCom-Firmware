@@ -14,6 +14,7 @@ Open-source MeshCom Firmware. We contribute via PRs against the **upstream DEV b
 ## Branch Model
 
 - `fork-dev` is the only working branch: `upstream/dev` plus the fork's docs, tests, tools, GitHub Pages **and fork-only firmware** (`src/`, `platformio.ini`, `variants/`) that is not upstream yet. New firmware lands on `fork-dev` first; upstream PRs are cut from `upstream/dev` later.
+- `fork-nightly` (planned, NIGHTLY-01, operator 2026-11-16): the stable release branch. It moves only with an explicit operator OK (fast-forward to a green `fork-dev` state), never on its own. CI will build and publish it every night as a normal `v4.40a.MM.DD` release, even when unchanged.
 - `fork-main`, `fork-neo`, `fork-neo-test` and `master` are retired (tag `archive/fork-neo-test-20261002`). Do not build on them.
 - Sync upstream by cherry-pick; never merge fork history into upstream.
 - After icssw-org squash-merges a PR of ours, **merge** `upstream/dev` (not rebase) to re-sync.
