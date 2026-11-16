@@ -4,7 +4,13 @@
 
 Recommendation: option D2 below (narrow ACK eviction for own RM replies), one wave on `fork-dev`, host test first, then one bench recheck on the mock setup of 2026-11-15. Backlog item `RM-LOSTREPLY-01`.
 
-Status 2026-11-16: concept, no code changed. Operator decisions open, see the last section.
+Status 2026-11-16: concept, no code changed. Operator decided all three questions on 2026-11-16 (see "Operator decisions 2026-11-16" below); ready for implementation as planned.
+
+## Operator decisions 2026-11-16
+
+1. **An RM reply may evict the oldest queued ACK** (option D2), only when nothing of lower priority can be evicted. A DM sender may repeat once; accepted.
+2. **No hold-and-retry now.** Build it only if the field shows `[RM];reply;send_failed` again.
+3. **The 2026-09-01 rule stays for RM replies on gateways:** what does not go on air is not uploaded to the server either.
 
 ## Key facts
 
