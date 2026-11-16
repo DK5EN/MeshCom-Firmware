@@ -86,9 +86,10 @@ secrets with a phone), [qa-review-fork-dev-20261025.md](review/qa-review-fork-de
   count night; TX pool TTL ([campaign-tx-pool.md](campaign-tx-pool.md)); LoRa QRT night
   ([campaign-lora-qrt-20261018.md](campaign-lora-qrt-20261018.md)); DUP/OnRxDone nights
   ([rca-brief-dup-onrxdone-20261013.md](rca-brief-dup-onrxdone-20261013.md)).
-- **Channel access stabilisation** (target upstream wave 7, earliest 2027-01-29), dates and exit criteria in
-  [release-plan-upstream-20261114.md](release-plan-upstream-20261114.md): ACK-AGE-01, ACK-CANCEL-01 (concept), CSMA-04/02,
-  CSMA-03 with PWR-01, PWR-02, 24 h soak 2027-01-11 to 01-19.
+- **Channel access stabilisation** (target upstream wave 7, earliest 2027-01-29): ACK-AGE-01, ACK-CANCEL-01 (concept),
+  CSMA-04/02, CSMA-03 with PWR-01, PWR-02, 24 h soak 2027-01-11 to 01-19. Exit criteria: relay ACK clearly better than
+  SOAK-1108 (median 6.1 s, max 24.8 s); CSMA-04 measured and slot set; CSMA-03 threshold from a new p99; 24 h soak with
+  an ESP32 gateway and an nRF52 node without reboot or ring loss.
 - **Upstream waves**: 2 Ping plus web GUI 2026-11-20; 3 pins page 11-27; 4 RM and mesh 12-04; 5 gateway 12-11;
   6 Auto Update and Safeboot 12-18 (only if AU-24/25 are explained); 7 channel access. ETH-04 after field confirmation.
 

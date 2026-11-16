@@ -60,8 +60,9 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
 
 - **Release train 2026-11-15:** [campaign-release-train-20261115.md](campaign-release-train-20261115.md) -- the active one.
 - **Channel access stabilisation** (ACK-AGE-01, ACK-CANCEL-01, CSMA-04/02, CSMA-03, PWR-01/02, soak): dates and exit
-  criteria in [release-plan-upstream-20261114.md](release-plan-upstream-20261114.md).
-- **Upstream waves 2-7:** [release-plan-upstream-20261114.md](release-plan-upstream-20261114.md).
+  criteria in the campaign doc, section "Parallel tracks".
+- **Upstream waves 2-7:** the release plan is the operator's Desktop HTML (Fassung 5, 2026-11-16), not a repo file; the
+  repo copy was removed 2026-11-16 (operator: double work, always outdated). Wave list also in the campaign doc.
 - **TD-THEME-01:** W4 bench on DK5EN-14 is part of B-1. [campaign-tdeck-theme.md](campaign-tdeck-theme.md).
 - **GPSV4-01, GPIO-01, INA226-HELTEC-01:** field feedback only (BACKLOG "Field").
 - Closed, history only: IMPL-TRAIN ([campaign-impl-train-20261107.md](campaign-impl-train-20261107.md), CLK-01 S2-S4
