@@ -112,7 +112,6 @@ extern volatile uint16_t g_task_event_type;
 #include <bluefruit.h>
 void init_ble(void);
 void init_ble_name(void);
-BLEService init_settings_characteristic(void);
 void restart_advertising(uint16_t timeout);
 void stop_advertising();
 extern BLEUart g_ble_uart;

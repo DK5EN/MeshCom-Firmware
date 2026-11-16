@@ -21,16 +21,22 @@ DK5EN-98 (production gateway) gets soak runs only, each with an explicit operato
 | Web GUI PR date                 | Together with Ping in upstream wave 2, 2026-11-20                                                        |
 | TD-NAV-01                       | Option 2: header GPS icon opens the GPS tab, tab button hidden, indices unchanged                        |
 | DEDUP-OWN-01, TD-22, WIFI-PS-01 | Already decided earlier (doc only / built / accepted)                                                    |
+| Wave-2 web scope (2026-11-16)   | Ship the full `mc.js`/`mcrm.js` incl. wave-3/4 blocks; fail fast, the rollout reaches only 3-5% at first |
+| CSMA-03 loop poll (2026-11-16)  | Keep it in `b3b2bf0b`                                                                                    |
+| `web_setup.cpp` (2026-11-16)    | Take the table-driven rewrite plus WEB-LATLON-01                                                         |
+| WEB-DUP-01 (2026-11-16)         | Inside the wave-2 web PR, no early separate PR                                                           |
+| Wave-2 timing (2026-11-16)      | Keep the plan: Ping and Web as two PRs on 2026-11-20                                                     |
 
 ## Wave log
 
-| Wave | State                      | Result                                                                                                                                                                                                                                      |
-| ---- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0    | done 2026-11-15            | decisions above; BACKLOG clean-up `b8544fd2`                                                                                                                                                                                                |
-| I-1  | done 2026-11-15 `b6d0da94` | CET-AGE-LOG-01, TRACK-PING-01, AU-26, TD-NAV-01, web brightness alignment, web assets README. WEB-LATLON-01 (`39536d0d`) and the TD-CHAT-01 web control were already done. Gate stage 1,2 PASS (3812 Unity cases), six board builds         |
-| I-2  | done 2026-11-15            | Triage of 7 older campaign docs -> [bench-b1-20261115.md](bench-b1-20261115.md); wave-2 content list [upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md); BACKLOG RM-DUP-01, RM-LOSTREPLY-01; PWR-01, SENS-04 to field |
-| B-1  | **almost done** 2026-11-15 | all rows except TD-34 and BOOT-01 OLED; [bench-b1-20261115.md](bench-b1-20261115.md); night clock run evaluated 2026-11-16 (CET-SCATTER-01 new)                                                                                             |
-| F-1  | **running**                | F-1a `afaa2f40`, F-1b `b4ae98e4`; open: RM-LOSTREPLY-01 concept, F0A0 cleanup, release, wave-2 PRs                                                                                                                                          |
+| Wave | State                      | Result                                                                                                                                                                                                                                          |
+| ---- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | done 2026-11-15            | decisions above; BACKLOG clean-up `b8544fd2`                                                                                                                                                                                                    |
+| I-1  | done 2026-11-15 `b6d0da94` | CET-AGE-LOG-01, TRACK-PING-01, AU-26, TD-NAV-01, web brightness alignment, web assets README. WEB-LATLON-01 (`39536d0d`) and the TD-CHAT-01 web control were already done. Gate stage 1,2 PASS (3812 Unity cases), six board builds             |
+| I-2  | done 2026-11-15            | Triage of 7 older campaign docs -> [bench-b1-20261115.md](bench-b1-20261115.md); wave-2 content list [upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md); BACKLOG RM-DUP-01, RM-LOSTREPLY-01; PWR-01, SENS-04 to field     |
+| B-1  | **almost done** 2026-11-15 | all rows except TD-34 and BOOT-01 OLED; [bench-b1-20261115.md](bench-b1-20261115.md); night clock run evaluated 2026-11-16 (CET-SCATTER-01 new)                                                                                                 |
+| F-1  | **running**                | F-1a `afaa2f40`, F-1b `b4ae98e4`; open: RM-LOSTREPLY-01 concept, F0A0 cleanup, release, wave-2 PRs                                                                                                                                              |
+| F-2  | **running** 2026-11-16     | wave A: BLE F0A0 cleanup, RM-LOSTREPLY-01 and CET-SCATTER-01 concepts, `clock_drift.py` `[CET]` capture; gate stage 1,2 PASS (3829 Unity cases), nRF52 builds green. Open: CET Part A, Part B firmware, T-Deck tab rework (operator 2026-11-16) |
 
 ## I-2 result (2026-11-15)
 

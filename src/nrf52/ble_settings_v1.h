@@ -471,8 +471,7 @@ bool bleSettingsV1MarkersOk(const s_ble_settings_v1 &img);
 
 /**
  * The one v1-sized scratch image of the nRF52 loop task. Users:
- * init_settings_characteristic() (nrf52_ble.cpp,
- * the image handed to write()/notify()), init_flash() and flash_reset()
+ * init_flash() and flash_reset()
  * (nrf52_flash.cpp, the legacy blob). All run in the loop task; flash_reset()
  * overwrites it, so init_flash() re-reads the blob into it after every
  * flash_reset() call. Never touch it from the BLE callback task or the LORA

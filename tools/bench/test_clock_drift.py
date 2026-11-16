@@ -178,6 +178,34 @@ class ClockDriftTest(unittest.TestCase):
         self.assertAlmostEqual(t % 1, 0.25, places=2)
 
 
+    def test_cet_lines_recorded(self) -> None:
+        lines = [
+            "[CET];rx;src;DK5EN-9;age_s;4.7;trusted;1;hop;2;path;1;ms;1000",
+            "[CET];rx;src;DK5EN-9;age_s;1.4;trusted;1;hop;1;path;0;ms;2000",
+            "[CET];rx;src;OE1ABC-1;age_s;na;trusted;0;hop;3;path;1;ms;2500",
+            "[CET];gw_rx;src;DK5EN-1;age_s;2.1;trusted;1;hop;0;ms;3000",
+            "[CET];apply;why;first;delta_s;3;src;DK5EN-9;ms;4000",
+            "[CET];apply;why;fwd;delta_s;2;src;DK5EN-9;ms;5000",
+            "[CET];hold;why;band;delta_s;0;src;DK5EN-9;ms;6000",
+            "[CET];hold;why;rank;by;GPS;held_s;120;src;DK5EN-9;ms;7000",
+            "[CET];skip;back_s;7;since_s;60;quorum;1;src;DK5EN-9;ms;8000",
+        ]
+        summ, _ = run(lines, self.tmp)
+        self.assertEqual(summ["malformed_lines"], 0)
+        self.assertEqual(summ["cet_by_kind"], {"rx": 3, "gw_rx": 1, "apply": 2, "hold": 2, "skip": 1})
+        self.assertEqual(summ["cet_by_why"], {"first": 1, "fwd": 1, "band": 1, "rank": 1})
+        self.assertEqual(summ["cet_rx_by_src"], {"DK5EN-9": 2, "OE1ABC-1": 1})
+        self.assertEqual(summ["cet_skip_back_count"], 1)
+        self.assertEqual([(a["why"], a["delta_s"], a["src"]) for a in summ["cet_apply"]],
+                         [("first", 3, "DK5EN-9"), ("fwd", 2, "DK5EN-9")])
+
+    def test_cet_skip_back_keeps_old_format(self) -> None:
+        summ, _ = run(["[CET];skip;back_s;7;since_s;60"], self.tmp)
+        self.assertEqual(summ["malformed_lines"], 0)
+        self.assertEqual(summ["cet_skip_back_count"], 1)
+        self.assertEqual(summ["cet_by_kind"], {"skip": 1})
+
+
 class _DripSerial:
     """Fake pyserial port: bytes arrive at scheduled host times; read() blocks like pyserial."""
 
@@ -315,6 +343,24 @@ class LiveHardeningTest(unittest.TestCase):
         ser2 = _RecSerial([READY])
         cd.run_live(self.sink(), ser2, 6.0, ["--timesrc all"], [], threading.Event(), clock=ser2.clock)
         self.assertEqual(ser2.commands(), ["--timesrc all"])
+
+    def test_offline_boot_releases_on_wifi_fail(self) -> None:
+        import threading
+        ser = _RecSerial([(0.1, b"rst:0x1 (POWERON_RESET)\n"),
+                          (8.0, b"[WIFI]...no connection possible\n")])
+        cd.run_live(self.sink(), ser, 12.0, ["--clockstat"], [], threading.Event(), clock=ser.clock,
+                    offline_ok=True)
+        self.assertEqual(ser.commands(), ["--clockstat"])
+        self.assertGreaterEqual(ser.now, 8.0)
+
+    def test_offline_marker_needs_offline_ok(self) -> None:
+        import threading
+        ser = _RecSerial([(0.1, b"rst:0x1 (POWERON_RESET)\n"),
+                          (8.0, b"[WIFI]...no connection possible\n")])
+        with self.assertRaises(cd.BootWaitTimeout):
+            cd.run_live(self.sink(), ser, 100.0, ["--clockstat"], [], threading.Event(), clock=ser.clock,
+                        boot_wait_s=20.0)
+        self.assertEqual(ser.commands(), [])
 
     def test_worker_closes_port_and_records_error(self) -> None:
         import threading

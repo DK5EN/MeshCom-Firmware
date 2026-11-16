@@ -33,6 +33,8 @@ whitespace separated, so printfdeb's space form parses too):
                                  SKIP_REASONS lists the known values; any other reason is counted
                                  in skip_reasons as is, never malformed.
   [OLEDSHOT];<w>x<h>;<base64>    u8g2 buffer, layout of GET /screen.oled (oled_screenshot.unpack)
+  [CET];<rx|gw_rx|tx|drop|apply|hold|skip|...>;k;v;...   any kind recorded (summary cet_*), never malformed;
+                                 old `[CET];skip;back_s;<n>;since_s;<n>` accepted.
   Info lines (recorded under "info_events" in the summary, not malformed):
   [CLOCK];timesrc;<all|cet|none>   [CLOCK];timesrc;err;<text>;now;<mode>
   [OLEDSHOT];err;<text>            [TDSHOT];err;<text>
@@ -82,7 +84,7 @@ SKIP_REASONS = ("type0", "hold", "setdisplay", "off", "ping", "gate15")
 TIMESRC_VALUES = ("all", "cet", "none")
 STAMP_ISO_RE = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?)\s{1,2}(.*)$")
 STAMP_UNIX_RE = re.compile(r"^(\d{9,11}(?:\.\d+)?)\s{1,2}(.*)$")
-EVENT_RE = re.compile(r"\[(CLOCK|DISPCLK|OLEDSHOT|TDSHOT)\][;\s]+(.*)$")
+EVENT_RE = re.compile(r"\[(CLOCK|DISPCLK|OLEDSHOT|TDSHOT|CET)\][;\s]+(.*)$")
 HMS_RE = re.compile(r"^\d{2}:\d{2}:\d{2}$")
 DIM_RE = re.compile(r"^(\d+)x(\d+)$")
 SEP_RE = re.compile(r"[;\s]+")
@@ -128,6 +130,19 @@ def _pairs(tokens: List[str]) -> Dict[str, str]:
     return {tokens[i]: tokens[i + 1] for i in range(0, len(tokens) - 1, 2)}
 
 
+def parse_cet_fields(kind: str, args: List[str]) -> Dict[str, Any]:
+    """Fields of a [CET];<kind>;k;v;... line. Numbers via _num, `na` and calls stay strings.
+
+    Any kind is accepted (never malformed). The older CET-AGE-01 skip line
+    `[CET];skip;back_s;<n>;since_s;<n>` has no quorum/src/ms fields and parses the same way.
+    """
+    out: Dict[str, Any] = {}
+    for k, v in _pairs(args).items():
+        n = _num(v)
+        out[k] = v if n is None or v.lower() in ("nan", "inf", "-inf") else (int(n) if n == int(n) else n)
+    return out
+
+
 def parse_event(text: str) -> Optional[Tuple[str, str, Dict[str, Any]]]:
     """Parse one text line into (tag, kind, fields), or None if it is not a well-formed event.
 
@@ -149,6 +164,8 @@ def parse_event(text: str) -> Optional[Tuple[str, str, Dict[str, Any]]]:
             return None
         return tag, "shot", {"w": int(dm.group(1)), "h": int(dm.group(2)), "b64": tok[1]}
     kind, args = tok[0], tok[1:]
+    if tag == "CET":
+        return tag, kind, parse_cet_fields(kind, args)
     if tag == "CLOCK" and kind == "stat":
         kv = _pairs(args)
         ep = _num(kv.get("epoch", ""))
@@ -285,12 +302,15 @@ class NodeStats:
     shot_errors: int = 0
     shots: List[str] = field(default_factory=list)
     info: List[Dict[str, Any]] = field(default_factory=list)
+    cet: List[Tuple[float, str, Dict[str, Any]]] = field(default_factory=list)   # (host t, kind, fields)
 
     def add_info(self, t: float, tag: str, kind: str, f: Dict[str, Any]) -> None:
         self.info.append({"t": round(t, 3), "tag": tag, "kind": kind, **f})
 
     def add(self, t: float, tag: str, kind: str, f: Dict[str, Any]) -> None:
-        if tag == "CLOCK" and kind == "stat":
+        if tag == "CET":
+            self.cet.append((t, kind, f))
+        elif tag == "CLOCK" and kind == "stat":
             self.stats.append((t, f))
         elif tag == "CLOCK" and kind == "set":
             self.sets.append((t, f))
@@ -343,6 +363,15 @@ class NodeStats:
             out["display_gap_max_s"] = None
         out["display_gap_threshold_s"] = gap_threshold_s
         out["skip_reasons"] = dict(sorted(self.skips.items()))
+        # [CET] lines (CET-SCATTER-01).
+        out["cet_by_kind"] = dict(Counter(k for _, k, _ in self.cet))
+        out["cet_by_why"] = dict(Counter(str(f["why"]) for _, k, f in self.cet
+                                         if k in ("apply", "hold") and "why" in f))
+        out["cet_rx_by_src"] = dict(Counter(str(f["src"]) for _, k, f in self.cet
+                                            if k == "rx" and "src" in f))
+        out["cet_skip_back_count"] = sum(1 for _, k, f in self.cet if k == "skip" and "back_s" in f)
+        out["cet_apply"] = [{"t": round(t, 3), "why": f.get("why"), "delta_s": f.get("delta_s"),
+                             "src": f.get("src")} for t, k, f in self.cet if k == "apply"]
         return out
 
 
@@ -363,7 +392,7 @@ class NodeSink:
         """Feed one stamped serial line."""
         with self._lock:
             if "[CLOCK]" not in text and "[DISPCLK]" not in text and "[OLEDSHOT]" not in text \
-                    and "[TDSHOT]" not in text:
+                    and "[TDSHOT]" not in text and "[CET]" not in text:
                 return
             ev = parse_event(text)
             if ev is None:
@@ -445,6 +474,7 @@ class BootWaitTimeout(RuntimeError):
 
 BOOT_MARKERS = (b"[BOOT]", b"CLIENT", b"rst:")
 BOOT_READY = b"[BOOT];ready"
+BOOT_READY_OFFLINE = b"[WIFI]...no connection possible"   # src/esp32/esp32_main.cpp: WiFi failed, node is up
 BOOT_WAIT_S = 45.0
 
 
@@ -458,7 +488,7 @@ def restore_timesrc(ser: Any) -> None:
 
 def run_live(sink: NodeSink, ser: Any, duration_s: float, startup: List[str], periodic: List[Tuple[float, str]],
              stop: threading.Event, clock: Callable[[], float] = time.time,
-             boot_wait_s: float = BOOT_WAIT_S) -> None:
+             boot_wait_s: float = BOOT_WAIT_S, offline_ok: bool = False) -> None:
     """Read `ser` for duration_s; send startup/periodic commands only once the node is up.
 
     Like identity_guard.read_info_serial: if boot output shows up (the port open reset the node),
@@ -487,7 +517,7 @@ def run_live(sink: NodeSink, ser: Any, duration_s: float, startup: List[str], pe
     try:
         while clock() < end and not stop.is_set():
             if not released and (pending or periodic):
-                ready = BOOT_READY in tail
+                ready = BOOT_READY in tail or (offline_ok and BOOT_READY_OFFLINE in tail)
                 if ready or (not boot_seen and clock() - t_start >= 3.0):
                     released = True
                     next_due = {c: clock() + e for c, e in every_of.items()}
@@ -518,12 +548,12 @@ def run_live(sink: NodeSink, ser: Any, duration_s: float, startup: List[str], pe
 
 def live_worker(sink: NodeSink, dev: str, duration_s: float, startup: List[str],
                 periodic: List[Tuple[float, str]], stop: threading.Event, errors: Dict[str, str],
-                opener: Optional[Callable[[str], Any]] = None) -> None:
+                opener: Optional[Callable[[str], Any]] = None, offline_ok: bool = False) -> None:
     """Open the port, run_live, always close the port; failures are recorded, not swallowed by the thread."""
     ser = None
     try:
         ser = (opener or open_port)(dev)
-        run_live(sink, ser, duration_s, startup, periodic, stop)
+        run_live(sink, ser, duration_s, startup, periodic, stop, offline_ok=offline_ok)
     except Exception as exc:  # noqa: BLE001
         errors[sink.stats.node] = f"{type(exc).__name__}: {exc}"
     finally:
@@ -642,7 +672,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             if args.shot_every:
                 periodic.append((args.shot_every, "--tdshot" if n.startswith("t-deck") else "--oledshot"))
             th = threading.Thread(target=live_worker, daemon=True,
-                                  args=(sinks[n], dev, args.duration, startup, periodic, stop, errors))
+                                  args=(sinks[n], dev, args.duration, startup, periodic, stop, errors, None, args.offline_ok))
             th.start()
             threads.append(th)
         try:

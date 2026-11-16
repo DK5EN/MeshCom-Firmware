@@ -66,12 +66,6 @@ BLEUart g_ble_uart;
 /** Device information service */
 BLEDis ble_dis;
 
-/** LoRa service 0xF0A0 */
-BLEService lora_service = BLEService(0xF0A0);
-// BLE-SET-01: the settings characteristic of this service was never reachable on air
-// (its fixed length exceeded the attribute limit) and is removed; the service itself
-// stays, it is advertised.
-
 // Connect callback
 void connect_callback(uint16_t conn_handle);
 // Disconnect callback
@@ -172,16 +166,15 @@ void init_ble(void)
 	g_ble_uart.begin();
 	g_ble_uart.setRxCallback(bleuart_rx_callback);
 
-	// Initialize the LoRa setting service
-	BLEService sett_service = init_settings_characteristic();
-
 	// Secondary Scan Response packet (optional)
   	// Since there is no room for 'Name' in Advertising packet
 	Bluefruit.ScanResponse.addName();
 
 	// Advertising packet
 	Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE); //
-	Bluefruit.Advertising.addService(sett_service);
+	// BLE-SET-01: the empty 0xF0A0 GATT service is gone, but its UUID stays in the
+	// advertising packet so scanners that filter on it still find the node.
+	Bluefruit.Advertising.addUuid(BLEUuid(0xF0A0));
 	Bluefruit.Advertising.addName();
 	Bluefruit.Advertising.addTxPower();
 
@@ -424,18 +417,6 @@ void nrf52BleServiceDisconnect(void)
 		ble_disconnect_requested = false;
 		Bluefruit.disconnect(Bluefruit.connHandle());
 	}
-}
-
-/**
- * @brief Start the LoRa service (no characteristic, see BLE-SET-01)
- *
- */
-BLEService init_settings_characteristic(void)
-{
-	// Initialize the LoRa setting service
-	lora_service.begin();
-
-	return lora_service;
 }
 
 #endif

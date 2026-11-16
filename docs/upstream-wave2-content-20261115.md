@@ -219,20 +219,23 @@ regenerate `web_assets.h` from the trimmed sources. Do not cherry-pick the fork 
 (16 added lines reference `webAuthSetPassword`) and 418 to `test_web_txbuf` (chunked output). The first can go with WEB-PWD-01; the second
 stays out with the chunking.
 
-## Open questions for the operator
+## Operator decisions 2026-11-16
 
-1. **Web scope.** Option D as decided cannot ship the end-state `mc.js` and `mcrm.js` without dead Pins, GPIO, charge-LED
-   and update-channel code that needs wave 3 and wave 4 backends. Recommend: trim those blocks for wave 2 and add them back
-   with waves 3 and 4 (the generator re-runs, so each wave is one regeneration). Alternative: ship them as they are; the
-   RM cards then show refusals on upstream nodes. Which?
-2. **CSMA-03 loop poll.** Recommend dropping it from `b3b2bf0b` (see above). OK?
-3. **`web_setup.cpp`.** Recommend leaving the table-driven rewrite out, and porting WEB-LATLON-01 (`web_coord.h`) separately
-   if it is wanted in wave 2. Is it?
-4. **WEB-DUP-01** is a one-word fix that upstream still lacks. Separate tiny PR now, or inside the wave-2 web PR?
-5. **Time.** The web part is a hand port of about 10 hunk groups plus regeneration, and it needs a full set of env builds
-   and Chrome/Safari passes before Fri 2026-11-20. Is one PR for Ping and one for Web acceptable, with Web slipping if
-   B-1 finds a browser defect?
-6. **Observation, outside this wave.** `upstream/dev:src/nrf52/nrf52_ble.cpp` calls `sanitize_ping_target(...)` before
-   `prodLockNormalise()` in the BLE settings write; `fork-dev` no longer does there (the call remains in
-   `nrf52_flash.cpp:421` and `esp32_flash.cpp:254`). Check whether the fork's BLE path still sanitises a pushed
-   `node_pingcall`.
+These answers replace the five open questions. They override the "out" and "open" verdicts in the tables above.
+
+1. **Web scope: ship everything.** The full end-state `mc.js` and `mcrm.js` go into wave 2, including the Pins, GPIO,
+   charge-LED and update-channel blocks. Reason: fail fast in the field. A new upstream release reaches only 3-5% of nodes
+   in its first days, so a gradual wave rollout limits the damage. RM cards may show refusals on upstream nodes until
+   waves 3 and 4 land.
+2. **CSMA-03 loop poll: keep it.** The 1 ms loop poll stays inside `b3b2bf0b` when that commit is ported.
+3. **`web_setup.cpp`: take the table-driven rewrite.** Port it together with WEB-LATLON-01 (`web_coord.h`, `test_web_coord`).
+4. **WEB-DUP-01: on the release schedule.** No separate early PR; the fix goes into the wave-2 web PR.
+5. **Time: keep the plan.** Two PRs (Ping and Web) on Fri 2026-11-20. If something breaks in the field, react quickly and
+   learn from it.
+
+## Remaining note
+
+- **Observation, outside this wave (closed in I-2, see the campaign doc).** `upstream/dev:src/nrf52/nrf52_ble.cpp` calls `sanitize_ping_target(...)` before
+  `prodLockNormalise()` in the BLE settings write; `fork-dev` no longer does there (the call remains in
+  `nrf52_flash.cpp:421` and `esp32_flash.cpp:254`). Check whether the fork's BLE path still sanitises a pushed
+  `node_pingcall`.
