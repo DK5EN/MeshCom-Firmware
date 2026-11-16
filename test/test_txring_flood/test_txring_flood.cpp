@@ -424,6 +424,174 @@ static void test_backpressure_qta_wenn_der_echte_ring_verwirft(void)
     TEST_ASSERT_EQUAL_INT(BP_NOTICE_NONE, bp.poll(txRingDepth(), millis()));
 }
 
+
+// ---- RM-LOSTREPLY-01 (D2): own RM reply may evict the oldest QUEUED ACK ------
+
+static BuiltFrame buildTextAckFrame(uint32_t id)
+{
+    // payload "<CALL 9>:ackNNN" -> txRingFrameIsAck() true, prio 1
+    static const char payload[] = "DK5EN-90 :ack123";
+    return buildFrame(MSG_TYPE_TEXT, id, 0x14, "DK5EN-1", "DK5EN-90",
+                      (const uint8_t *)payload, (uint16_t)(sizeof(payload) - 1));
+}
+
+static BuiltFrame buildRmReplyFrame(uint32_t id)
+{
+    static const char payload[] = "RM1 1794773697 ok v=4.40a 0123456789abcdef";
+    return buildFrame(MSG_TYPE_TEXT, id, 0x14, "DK5EN-1", "DK5EN-90",
+                      (const uint8_t *)payload, (uint16_t)(sizeof(payload) - 1));
+}
+
+static uint32_t slotMsgId(int slot)
+{
+    return ((uint32_t)ringBuffer[slot][6] << 24) | ((uint32_t)ringBuffer[slot][5] << 16) |
+           ((uint32_t)ringBuffer[slot][4] << 8) | (uint32_t)ringBuffer[slot][3];
+}
+
+// Age of slot i is ((i + 7) % MAX_RING + 1) s: the oldest is NOT slot 0.
+static int ackAgeIndex(int i) { return (i + 7) % MAX_RING; }
+static int oldestAckSlot(void)
+{
+    for (int i = 0; i < MAX_RING; i++)
+        if (ackAgeIndex(i) == 0) return i;
+    return -1;
+}
+static int newestAckSlot(void)
+{
+    for (int i = 0; i < MAX_RING; i++)
+        if (ackAgeIndex(i) == MAX_RING - 1) return i;
+    return -1;
+}
+
+// binary: true = 0x41 ACKs, false = text ACKs; skip = slot left out (-1: none)
+static void fillWithAcks(bool binary, int skip)
+{
+    for (int i = 0; i < MAX_RING; i++)
+    {
+        if (i == skip) continue;
+        mc_test_set_millis((uint32_t)(ackAgeIndex(i) + 1) * 1000UL);
+        BuiltFrame f = binary ? buildAckFrame(0x7000 + (uint32_t)i)
+                              : buildTextAckFrame(0x7000 + (uint32_t)i);
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntryOnce(f.bytes, f.len, "fill", 0));
+    }
+    mc_test_set_millis(100000UL);
+}
+
+static void assertReplyTookSlot(int expect_slot, uint32_t reply_id)
+{
+    BuiltFrame r = buildRmReplyFrame(reply_id);
+    int slot = addTxRingEntryRmReply(r.bytes, r.len, "user_msg");
+    TEST_ASSERT_EQUAL_INT(expect_slot, slot);
+    TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[expect_slot]);
+    TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[expect_slot][1]);
+    TEST_ASSERT_EQUAL_UINT32(reply_id, slotMsgId(expect_slot));
+    TEST_ASSERT_EQUAL_INT(MAX_RING, txRingDepth());
+}
+
+static void test_rm_reply_evicts_oldest_text_ack(void)
+{
+    fillWithAcks(false, -1);
+    TEST_ASSERT_NOT_EQUAL(0, oldestAckSlot());
+    assertReplyTookSlot(oldestAckSlot(), 0xA0000001UL);
+    TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_CRITICAL]);
+}
+
+static void test_rm_reply_evicts_binary_ack(void)
+{
+    fillWithAcks(true, -1);
+    assertReplyTookSlot(oldestAckSlot(), 0xA0000002UL);
+    TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_CRITICAL]);
+}
+
+static void test_rm_reply_prefers_lower_prio_victim(void)
+{
+    fillWithAcks(false, MAX_RING - 1);
+    mc_test_set_millis(50000UL);
+    BuiltFrame pos = buildPositionFrame(0x7100);
+    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, addTxRingEntry(pos.bytes, pos.len, RING_STATUS_READY, "fill"));
+    mc_test_set_millis(100000UL);
+    assertReplyTookSlot(MAX_RING - 1, 0xA0000003UL);
+    TEST_ASSERT_EQUAL_UINT16(1, stat_drop_count[MSG_PRIO_LOW]);
+    TEST_ASSERT_EQUAL_UINT16(0, stat_drop_count[MSG_PRIO_CRITICAL]);
+    for (int i = 0; i < MAX_RING - 1; i++)
+        TEST_ASSERT_EQUAL_UINT32(0x7000 + (uint32_t)i, slotMsgId(i));
+}
+
+static void test_rm_reply_skips_inflight_ack(void)
+{
+    fillWithAcks(false, -1);
+    int keep = newestAckSlot();
+    for (int i = 0; i < MAX_RING; i++)
+        if (i != keep) ringBuffer[i][1] = RING_STATUS_INFLIGHT;
+    assertReplyTookSlot(keep, 0xA0000004UL);
+    for (int i = 0; i < MAX_RING; i++)
+        if (i != keep)
+        {
+            TEST_ASSERT_EQUAL_UINT8(RING_STATUS_INFLIGHT, ringBuffer[i][1]);
+            TEST_ASSERT_EQUAL_UINT32(0x7000 + (uint32_t)i, slotMsgId(i));
+        }
+}
+
+static void test_rm_reply_never_evicts_non_ack_prio1(void)
+{
+    static const char payload[] = "hello{001}";
+    for (int i = 0; i < MAX_RING; i++)
+    {
+        mc_test_set_millis((uint32_t)(i + 1) * 1000UL);
+        BuiltFrame f = buildFrame(MSG_TYPE_TEXT, 0x7200 + (uint32_t)i, 0x14, "DK5EN-1", "DK5EN-90",
+                                  (const uint8_t *)payload, (uint16_t)(sizeof(payload) - 1));
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntry(f.bytes, f.len, RING_STATUS_READY, "fill"));
+        if (i % 2) ringBuffer[i][1] = RING_STATUS_SENT;
+    }
+    mc_test_set_millis(100000UL);
+    static uint8_t before[sizeof(ringBuffer)];
+    memcpy(before, ringBuffer, sizeof(ringBuffer));
+
+    BuiltFrame r = buildRmReplyFrame(0xA0000005UL);
+    TEST_ASSERT_EQUAL_INT(RING_ENQUEUE_FULL, addTxRingEntryRmReply(r.bytes, r.len, "user_msg"));
+    TEST_ASSERT_EQUAL_MEMORY(before, ringBuffer, sizeof(ringBuffer));
+}
+
+// Advisor 2026-11-16: queued (DONE) prio-1 frames that are not ACKs ({ping} DMs, an earlier RM reply) are never
+// evicted; pins the txRingFrameIsAck() filter in oldestQueuedAckSlot().
+static void test_rm_reply_never_evicts_queued_non_ack(void)
+{
+    static const char ping[] = "{ping}";
+    for (int i = 0; i < MAX_RING - 1; i++)
+    {
+        mc_test_set_millis((uint32_t)(i + 1) * 1000UL);
+        BuiltFrame f = buildFrame(MSG_TYPE_TEXT, 0x7300 + (uint32_t)i, 0x14, "DK5EN-1", "DK5EN-90",
+                                  (const uint8_t *)ping, (uint16_t)(sizeof(ping) - 1));
+        TEST_ASSERT_EQUAL_INT(i, addTxRingEntryOnce(f.bytes, f.len, "fill", 0));
+    }
+    mc_test_set_millis((uint32_t)MAX_RING * 1000UL);
+    BuiltFrame first = buildRmReplyFrame(0xA0000007UL);
+    TEST_ASSERT_EQUAL_INT(MAX_RING - 1, addTxRingEntryRmReply(first.bytes, first.len, "user_msg"));
+    for (int i = 0; i < MAX_RING; i++)
+    {
+        TEST_ASSERT_EQUAL_UINT8(RING_STATUS_DONE, ringBuffer[i][1]);
+        TEST_ASSERT_EQUAL_UINT8(MSG_PRIO_CRITICAL, ringPriority[i]);
+    }
+    mc_test_set_millis(100000UL);
+    static uint8_t before[sizeof(ringBuffer)];
+    memcpy(before, ringBuffer, sizeof(ringBuffer));
+
+    BuiltFrame r = buildRmReplyFrame(0xA0000008UL);
+    TEST_ASSERT_EQUAL_INT(RING_ENQUEUE_FULL, addTxRingEntryRmReply(r.bytes, r.len, "user_msg"));
+    TEST_ASSERT_EQUAL_MEMORY(before, ringBuffer, sizeof(ringBuffer));
+}
+
+static void test_ack_and_once_text_keep_tail_drop(void)
+{
+    fillWithAcks(false, -1);
+    BuiltFrame a = buildTextAckFrame(0xA0000006UL);
+    TEST_ASSERT_EQUAL_INT(RING_ENQUEUE_FULL, addTxRingEntryOnce(a.bytes, a.len, "ack", 0));
+    static const char ping[] = "{ping}";
+    BuiltFrame p = buildFrame(MSG_TYPE_TEXT, 0xA0000007UL, 0x14, "DK5EN-1", "DK5EN-90",
+                              (const uint8_t *)ping, (uint16_t)(sizeof(ping) - 1));
+    TEST_ASSERT_EQUAL_INT(RING_ENQUEUE_FULL, addTxRingEntryOnce(p.bytes, p.len, "user_msg", 0));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -438,5 +606,12 @@ int main(int, char **)
     RUN_TEST(test_txringdepth_folgt_dem_echten_ring);
     RUN_TEST(test_backpressure_qrt_an_der_echten_80_prozent_marke);
     RUN_TEST(test_backpressure_qta_wenn_der_echte_ring_verwirft);
+    RUN_TEST(test_rm_reply_evicts_oldest_text_ack);
+    RUN_TEST(test_rm_reply_evicts_binary_ack);
+    RUN_TEST(test_rm_reply_prefers_lower_prio_victim);
+    RUN_TEST(test_rm_reply_skips_inflight_ack);
+    RUN_TEST(test_rm_reply_never_evicts_non_ack_prio1);
+    RUN_TEST(test_ack_and_once_text_keep_tail_drop);
+    RUN_TEST(test_rm_reply_never_evicts_queued_non_ack);
     return UNITY_END();
 }
