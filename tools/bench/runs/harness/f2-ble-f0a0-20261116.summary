@@ -1,0 +1,5 @@
+BLE F0A0 cleanup (c34a05ac)  2026-11-16 19:33  PASS
+DK5EN-90 RAK4631 on dc08974f INSTRUMENT. Scan and GATT read from the Mac (bleak, CoreBluetooth), no write.
+Advertising: MC-690d-DK5EN-90, service UUIDs ['0000f0a0-0000-1000-8000-00805f9b34fb'] (UUID kept in advertising, as decided).
+GATT services: 1530 Device Firmware Update (1531/1532/1534), 180A Device Information (2a24-2a29), 6e400001 Nordic UART (0002/0003).
+No F0A0 service in the GATT table any more (2026-11-15 nRF Connect: "F0A0 has no Characteristics").

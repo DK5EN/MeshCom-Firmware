@@ -1,0 +1,23 @@
+CET-SCATTER-01 bench (Parts A b08c5ea5 + B 885fa3b3)  2026-11-16 19:30:41-20:31:40  PASS (both runs)
+Image: fork-dev dc08974f INSTRUMENT on both nodes, 2 dBm, mesh off, gateway off, identity guard ok before and after. No test traffic sent.
+Evidence: clock-heltec-1-20261116-193041.{jsonl,summary}, clock-t-beam-92-20261116-193041.{jsonl,summary}
+
+RUN S4, DK5EN-1 Heltec V3 (SSID removed, GPS off, --timesrc cet, --offline-ok, BOOT_READY wrapper as on 15.11.), 3600 s
+  Boot restored a stale time (src OTHER, about 767 s behind). 6 {CET} beacons from OE1XAR-33 (hop 2), every ~607 s:
+    19:41:15 apply why first  delta_s +767  -> [CLOCK];set;src;CET (initial sync from the stale clock)
+    19:51:22 hold  why band   delta_s -1
+    20:01:33 hold  why band   delta_s -4
+    20:11:36 hold  why band   delta_s  0
+    20:21:43 hold  why band   delta_s -1
+  After the first set: node clock 1.38-1.71 s behind host time over 50 min (73 clockstats), drift +0.3 s; lost_ms <= 20.
+  No step after the initial sync (15.11. same setup: 5 steps of +3239 -708 -5449 +1694 +4271 ms).  S4 PASS (|delta| <= 2 s).
+  Display gaps up to 1199 s are [DISPCLK];skip;type0 (2117, message page frozen by design, decision A1).
+HOLD CHECK, DK5EN-92 T-Beam (WLAN on, GPS off, --timesrc all), 3600 s, run starts with the port-open reboot
+  Boot: src OTHER (stale), NTP set +513.6 s at 7 s after boot, then NTP every 60 s (delta -9 ms). drift_total 0.33 s.
+  6 of 6 {CET} beacons (OE1XAR-33, age 0-5 s, trusted) -> [CET];hold;why;rank;by;NTP; 0 [CLOCK];set;src;CET.  PASS.
+  Not covered: a {CET} beacon arriving after the reboot but before NTP (NTP came first, 7 s after boot).
+Observation: after every boot the clock starts from a saved time that is minutes stale (Heltec 767 s, T-Beam 514 s) until
+  the first real source; on the offline Heltec that lasted 10 min until the first beacon. Expected behaviour, noted only.
+RESTORED 20:33-20:36: DK5EN-92 --gps on, --timesrc all; DK5EN-1 over USB --timesrc all, --gps on, --setssid ORBI63 (auto
+  reboot). identity_guard ok on both (DK5EN-1 clock NTP at 192.168.68.57, DK5EN-92 clock GPS at 192.168.68.61); mesh off,
+  gateway off, SSID back, GPS on, both unchanged from before the run. T-Beam BUTTON(38) on, as before.

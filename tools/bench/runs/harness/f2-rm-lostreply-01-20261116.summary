@@ -1,0 +1,17 @@
+RM-LOSTREPLY-01 recheck  2026-11-16 19:28-19:29  PASS (fix a91d0e1d works: reply evicts the oldest queued ACK, sender gets ok)
+Image: fork-dev dc08974f INSTRUMENT (firmware a91d0e1d), DK5EN-1 Heltec V3 (USB flash) and DK5EN-90 RAK4631 (USB DFU), 2 dBm, identity guard ok.
+Method: same as 2026-11-15 (b1m-rm-lostreply-01-20261115.summary): local mock on the Mac (UDP 1990), --srvip 192.168.68.58 on both,
+  DK5EN-1 gateway on only for the run (KEEP of both at the mock, nothing at the real server), --airgap on both, throwaway mock client
+  MOCK-01 injects DM frames DK5EN-90>DK5EN-1 (88 in 15 s); DK5EN-1 answers each with a prio-1 ACK; ring held at 20/20 prio-1.
+  Then RM `status` from DK5EN-90 (ctr 1794853686).
+DK5EN-1:
+  19:28:14 [RM];ok;ctr;1794853686
+  19:28:14 [RING] full, depth 20 of 20
+  19:28:14 [MC-DBG] RING_DROP_PRIO slot=4 prio=1 type=3A msg_id=EA25A2C4 replaced_by_prio=1 src=user_msg
+           (EA25A2C4 = NEW-ACK DK5EN-1>DK5EN-90 :ack703, queued 19:28:03, the oldest ACK in the ring)
+  no [RM];reply;send_failed, no "QTA NOT SENT"
+DK5EN-90: 19:28:15 [RM];reply;DK5EN-1;ctr;1794853686;verified;1 -> rmstatus st "ok", rep 1, ver 1 at 15.2 s after /rmsend
+  (reply "ok v=4.40a up=4 bat=90 heap=91 s=GtDmWl p=2/0/22 rs=0").
+Before the fix (2026-11-15): RING_DROP_NEW of the reply, send_failed;-2, sender noanswer after 171 s.
+Restore 19:28-19:29: --airgap off twice on both + query [AIRGAP];off on both; DK5EN-1 --gateway off then --srvip 0.0.0.0 (Gateway off,
+  Server off as before); DK5EN-90 --srvip 0.0.0.0 (gateway stays on, back on the real server, web shows "connected" 19:34). Mock stopped.

@@ -1,8 +1,24 @@
 # RESUME -- pick up here
 
-**Resume here: [campaign-release-train-20261115.md](campaign-release-train-20261115.md), wave F-2 (2026-11-16).** Bulk build and flash done;
+**Resume here: [campaign-release-train-20261115.md](campaign-release-train-20261115.md), wave F-2 (2026-11-16), bench rechecks done.** Bulk build and flash done;
 central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md)), fixes and release **F-1**. Deadline: upstream wave 2
 (Ping plus web GUI) on **2026-11-20**, which needs PING-NRF-01 and the browser rows from B-1.
+
+## State 2026-11-16 evening
+
+- **F-2 bench 19:20-20:36 (resume here):** DK5EN-1, -90, -92 flashed over USB with the INSTRUMENT image of `dc08974f`
+  (firmware `a91d0e1d`), identity guard ok, 2 dBm. All rechecks PASS, detail in
+  [bench-b1-20261115.md](bench-b1-20261115.md) section "F-2 bench" and `tools/bench/runs/harness/f2-*-20261116.summary`:
+  - RM-LOSTREPLY-01 on the local mock: the reply evicts the oldest queued ACK, sender `ok` after 15 s (was `noanswer`).
+  - BLE scan DK5EN-90: F0A0 only in the advertising, no F0A0 GATT service.
+  - WEB-GZ-01: Firefox cold cache on the RAK; ESP32 part confirmed by the operator.
+  - CLK-01 S4 (DK5EN-1, CET only): one initial set, then 4 beacons held, clock within 1.71 s for 50 min. NTP hold
+    check (DK5EN-92): 6 of 6 beacons `[CET];hold;why;rank;by;NTP`.
+  - Five rows closed: [archive/backlog-closed-20261116.md](archive/backlog-closed-20261116.md).
+- **Fleet now:** DK5EN-1, -90, -92 on `dc08974f` INSTRUMENT, settings as before the bench (DK5EN-1 and -92 gateway off,
+  DK5EN-90 gateway on the real server, mesh off, GPS on, WLAN on). DK5EN-14 unchanged (`72b2f9c6` INSTRUMENT).
+- **Open:** operator TD-34; fix TD-LOCK-01; concept CET-RESTAMP-01; `/release-firmware`; `/submit-pr` wave 2 by
+  Fri 2026-11-20; NIGHTLY-01 parked. The operator's Desktop checklist is kept current with every result.
 
 ## State 2026-11-16
 
@@ -92,7 +108,8 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
 
 ## Where things are
 
-- Open work: [BACKLOG.md](BACKLOG.md) 3.2. Closed rows since 2026-11-15:
+- Open work: [BACKLOG.md](BACKLOG.md) 3.2. Closed rows since 2026-11-16:
+  [archive/backlog-closed-20261116.md](archive/backlog-closed-20261116.md), since 2026-11-15
   [archive/backlog-closed-20261115.md](archive/backlog-closed-20261115.md); full row history:
   [archive/backlog-rows-20261107.md](archive/backlog-rows-20261107.md), older
   [archive/backlog-closed-20261024.md](archive/backlog-closed-20261024.md).

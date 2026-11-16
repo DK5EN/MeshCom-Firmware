@@ -1,0 +1,5 @@
+WEB-GZ-01 second browser  2026-11-16 19:34  PASS (RAK part by the agent; ESP32 part confirmed by the operator 2026-11-16)
+DK5EN-90 RAK4631 dc08974f INSTRUMENT, Firefox 160 headless with a fresh profile (cold cache), window 1280x900:
+  start page renders complete (styles, icons, JS-filled clock "2026-11-16 19:34:36 CET [NTP]", node table).
+  Firefox request headers (Accept-Encoding gzip, deflate, br, zstd): mc.css 4927 B, mc.js 9836 B, mcrm.js 15337 B, each
+  Content-Encoding gzip, Cache-Control public, max-age=31536000, immutable.
