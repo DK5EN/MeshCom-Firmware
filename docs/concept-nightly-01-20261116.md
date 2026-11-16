@@ -18,6 +18,19 @@ Status 2026-11-16: concept, no code changed. The seven operator decisions below 
 
 ESP32 only: nRF52 has no auto update (`src/rm_au_none.cpp`). The nightly release still carries the nRF52 assets for manual flashing.
 
+## Operator answers to the concept questions (2026-11-16, second interview)
+
+These override the recommendations further down where they differ.
+
+1. **Healthy does not require WLAN.** A missing WLAN is recorded only, so a router that reboots at night cannot park a good node.
+2. **No Safeboot v4 requirement.** Opt-in works on Safeboot v3 with the app-side fallback (P2). Wave W5 (Safeboot v4) is dropped. Add a cap on the park cycle so flash-state writes stop after a bounded number of cycles.
+3. **Pre-download reboot only as the last resort, on every board type.** First the existing mitigations (drop BLE and the rest); only if they do not free enough RAM, reboot and try again. No board list.
+4. **Opt-in EXTUDP outcome line: yes.** One line to the configured EXTUDP address after each attempt, only when EXTUDP is on.
+5. **Keep every nightly for now.** The daily build of an unchanged `fork-nightly` is a test for some weeks. After that, CI builds only when `fork-nightly` has moved.
+6. **Releases only via `fork-nightly`.** No more hand-cut `v*` tags from `fork-dev`.
+7. **The operator merges into `fork-nightly` himself.** No promotion gate run by the orchestrator; it only reports which `fork-dev` state passed its gate.
+8. **Upstream wave 6 decision is parked.** The nightly path is tested on the fork dev channel first; the operator wants to gain confidence before deciding what goes upstream.
+
 ## Key facts
 
 ### Install path today
