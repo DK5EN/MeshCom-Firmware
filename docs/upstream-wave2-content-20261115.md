@@ -239,3 +239,65 @@ These answers replace the five open questions. They override the "out" and "open
   `prodLockNormalise()` in the BLE settings write; `fork-dev` no longer does there (the call remains in
   `nrf52_flash.cpp:421` and `esp32_flash.cpp:254`). Check whether the fork's BLE path still sanitises a pushed
   `node_pingcall`.
+
+## Trial build 2026-11-16 (option A, real dependency list)
+
+Scratch branch `scratch/web-trial-20261116` (worktree `../mc-web-trial`, local only, not pushed) from `upstream/dev`
+`70ae124d`, unchanged since the last sync. Method: the fork's whole `src/web_functions/` copied in, then rebuilt until
+every env linked. Only the files and hunks needed for that were added. Out-of-scope code was put behind a switch
+(`MC_WEB_AU_SCHED`, off) and not ported. Six commits on the branch, one per step.
+
+### Builds
+
+Four envs build and link on the trial branch. The baseline is the same env on `upstream/dev`.
+
+| Env                      | Flash upstream | Flash trial | Delta   | RAM upstream | RAM trial | Delta  |
+| ------------------------ | -------------- | ----------- | ------- | ------------ | --------- | ------ |
+| `wiscore_rak4631`        | 693,628        | 664,712     | -28,916 | 99,348       | 102,948   | +3,600 |
+| `heltec_wifi_lora_32_V3` | 1,774,353      | 1,740,237   | -34,116 | 129,372      | 130,428   | +1,056 |
+| `t_deck`                 | 2,395,261      | 2,363,717   | -31,544 | 150,796      | 151,852   | +1,056 |
+| `ttgo_tbeam`             | 1,877,445      | 1,842,825   | -34,620 | 104,664      | 105,704   | +1,040 |
+
+The gzip assets pay for themselves: flash shrinks by 29-35 KB on every env. That answers the open flash question from
+part B. The nRF52 RAM growth (+3.6 KB) is not explained yet; check `web_txbuf` and the pin tables. Not built: E22,
+T-Beam Supreme, T-Deck Plus, and an env without a web server. All of these are needed for R2.
+
+### Must come along (compile-time, in scope)
+
+| Item                                                                                                                      | Size             | Why                                                |
+| ------------------------------------------------------------------------------------------------------------------------- | ---------------- | -------------------------------------------------- |
+| `pin_board.cpp/.h`, `pin_policy.h`, `pin_status_json.h`, `pin_assign_json.h`, `gpio_control.cpp/.h`, `gpio_status_json.h` | 1,579 lines, new | Pins page, `/pinstatus /pinassign /gpiostatus`     |
+| `meshcom_settings.h` + `settings_schema.h`: `node_gpioctl` (ESP32 block, persisted)                                       | 3 lines          | `gpio_control.cpp`; a new persisted setting        |
+| `settings_sanitize.h`: `mcPinReservedNrf52840`                                                                            | 7 lines          | `pin_policy.h`                                     |
+| `board_led.h`: `BOARD_LED_MODE_*`, `boardLedMode/Name/Decide/SteadyRearm`                                                 | 44 lines         | LED buttons in Setup and on the Pins page          |
+| `loop_functions.cpp` + `_extern.h`: `boardLedModeGet()`                                                                   | 7 lines          | same                                               |
+| `mcpout_refusal.h`                                                                                                        | 38 lines, new    | `web_setup.cpp` (WEB-PIN-01)                       |
+| `configuration_global.h`: `MESHCOM_VERSION_SHORT`                                                                         | 3 lines          | web logo; the other BOOT-01 places can stay behind |
+| `fw_update.h`: `fwBattOk` (QA-AU-09)                                                                                      | 5 lines          | `updapply` in `web_nodefunctioncalls.cpp`          |
+
+### Must come along (runtime only, the compiler does not see it)
+
+The build links without these, but the web buttons send console commands upstream does not know, so the click fails
+quietly. Not ported in the trial.
+
+| Item                                                                                                          | Where (fork-dev)                                             |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `--board led steady` row and `tg_post_board_led_flash/steady` (steady bit `node_sset4 0x4000`, free upstream) | `command_functions.cpp` 530-531, 689-691                     |
+| `boardLedTick` steady branch, RM hold, NeoPixel re-arm                                                        | `loop_functions.cpp` (about 40 lines)                        |
+| `--gpiocontrol on/off` and `--gpio list/<n> on/off/in/release`                                                | `command_functions.cpp` 2821-2890                            |
+| pin assign refusal and load repair (`pinCanAssign`, `pinRepairLoaded`, wind pin)                              | `command_functions.cpp`, `esp32_flash.cpp`, `esp32_main.cpp` |
+
+Checked and already upstream: `--charge led on/off`, `--rmstrictsecurity`, `--update check/install`, the T-Deck
+setters, every JS endpoint except the three Pins endpoints (served by the copied `web_functions.cpp`).
+
+### Fenced out (hand trim in the PR)
+
+| Item                                                                                                                      | Trim                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| AU install schedule (wave 6): `node_auday/audelay/autime`, `FWSCHED_*`, `fwNetSchedGet`, `auAppendSched`, `fw_schedule.h` | 5 blocks in `web_functions.cpp` (2) and `web_setup.cpp` (3); `mcau.js` degrades already |
+| `HAS_NRF_ETH` guard on line 1 of seven web `.cpp` files                                                                   | must go: without it the RAK fails to link (`startWebserver`, `loopWebserver` undefined) |
+| `web_oled_shot.*`, `oled_shot.h`                                                                                          | dropped; `/screen.*` endpoints are `INSTRUMENT_ENABLED` and compile out upstream        |
+
+Still to decide by hunk while porting: `web_rm_page.cpp` and `mcrm.js` call RM1 commands of wave 4. They compile, but
+upstream nodes refuse them (accepted in decision 1). `web_assets.h` stays consistent because the sources were not
+trimmed; regenerate it with `tools/gen_web_assets.py --check`, which has to come along too.

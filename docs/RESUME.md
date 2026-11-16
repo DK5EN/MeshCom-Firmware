@@ -4,6 +4,15 @@
 central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md)), fixes and release **F-1**. Deadline: upstream wave 2
 (Ping plus web GUI) on **2026-11-20**, which needs PING-NRF-01 and the browser rows from B-1.
 
+## State 2026-11-16 late
+
+- **Wave 2 trial build done (resume here for `/submit-pr` web):** scratch branch `scratch/web-trial-20261116`
+  (worktree `../mc-web-trial`, local only) from `upstream/dev` with the fork's whole `src/web_functions/`. RAK4631,
+  Heltec V3, T-Deck and T-Beam build and link. Flash is 29-35 KB smaller than `upstream/dev` on every env (gzip
+  assets), and RAK RAM is +3.6 KB. Real dependency list, runtime-only gaps (`--board led steady`, `--gpio`,
+  `--gpiocontrol`, pin load repair) and fenced items (AU schedule, `HAS_NRF_ETH` guard, OLED shot): section "Trial
+  build 2026-11-16" in [upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md).
+
 ## State 2026-11-16 evening
 
 - **F-2 bench 19:20-20:36 (resume here):** DK5EN-1, -90, -92 flashed over USB with the INSTRUMENT image of `dc08974f`
@@ -17,7 +26,15 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
   - Five rows closed: [archive/backlog-closed-20261116.md](archive/backlog-closed-20261116.md).
 - **Fleet now:** DK5EN-1, -90, -92 on `dc08974f` INSTRUMENT, settings as before the bench (DK5EN-1 and -92 gateway off,
   DK5EN-90 gateway on the real server, mesh off, GPS on, WLAN on). DK5EN-14 unchanged (`72b2f9c6` INSTRUMENT).
-- **Open:** operator TD-34; fix TD-LOCK-01; concept CET-RESTAMP-01; `/release-firmware`; `/submit-pr` wave 2 by
+- **Operator decision 2026-11-16 21:15 (wave 2, option A):** the web PR goes out as the fork's web files plus the Pins
+  page of former wave 3 (pins, GPIO control, board LED, `web_txbuf`), no hand trim. Parts without an upstream backend
+  (remote management, auto update) stay out and follow with waves 4 and 6. Wave 3 (27.11.) is a buffer. This replaces
+  decision 1 ("ship all JS"). First step: a one-hour trial build on a scratch branch from `upstream/dev` to get the real
+  dependency list. Plan: operator's Desktop HTML, Fassung 6.
+- **Done after the bench, not committed yet:** TD-LOCK-01 fix (lock glyph replaces the keyboard symbol inside the
+  keyboard button; test `test_lock01_glyph_inside_keyboard_button`, gate PASS 3871 cases), concept
+  [concept-cet-restamp-01-20261116.md](concept-cet-restamp-01-20261116.md) (three operator questions).
+- **Open:** operator TD-34; TD-LOCK-01 commit and check on DK5EN-14; operator answers CET-RESTAMP-01; `/release-firmware`; `/submit-pr` wave 2 by
   Fri 2026-11-20; NIGHTLY-01 parked. The operator's Desktop checklist is kept current with every result.
 
 ## State 2026-11-16
