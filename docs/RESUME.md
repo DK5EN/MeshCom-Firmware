@@ -15,7 +15,7 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
   rollout reaches 3-5% first), keep the CSMA-03 loop poll, take the `web_setup.cpp` rewrite, WEB-DUP-01 inside the web
   PR, keep the plan (Ping and Web PRs on 2026-11-20). Detail: [upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md).
 - **Fleet change:** DK5EN-14 runs `72b2f9c6` INSTRUMENT (T-Deck screenshots over `/screen.rgb565`).
-- **Operator this evening:** TD-34 and BOOT-01 OLED.
+- **Operator this evening:** TD-34. BOOT-01 on a Heltec OLED checked by the operator 2026-11-16 (another node): fine.
 - **Next:** bench CLK-01 S4 (CET only) with Part A+B and a hold check on an NTP node, CET-RESTAMP-01 concept, RM-LOSTREPLY-01 fix after the operator
   answers, `/release-firmware`, `/submit-pr` wave 2 by Fri 2026-11-20.
 
