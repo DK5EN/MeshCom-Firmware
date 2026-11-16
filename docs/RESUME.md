@@ -1,12 +1,27 @@
 # RESUME -- pick up here
 
-**Resume here: [campaign-release-train-20261115.md](campaign-release-train-20261115.md).** Bulk build and flash done;
+**Resume here: [campaign-release-train-20261115.md](campaign-release-train-20261115.md), wave F-2 (2026-11-16).** Bulk build and flash done;
 central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md)), fixes and release **F-1**. Deadline: upstream wave 2
 (Ping plus web GUI) on **2026-11-20**, which needs PING-NRF-01 and the browser rows from B-1.
 
+## State 2026-11-16
+
+- **2026-11-16 (resume here):** F-2 on fork-dev, pushed. Wave A `c34a05ac`: BLE F0A0 GATT service removed (UUID kept in
+  advertising), RM-LOSTREPLY-01 concept ([concept-rm-lostreply-01-20261116.md](concept-rm-lostreply-01-20261116.md), three
+  operator questions open), CET-SCATTER-01 concept ([concept-cet-scatter-01-20261116.md](concept-cet-scatter-01-20261116.md),
+  five questions open, defaults used), `clock_drift.py` records `[CET]`. Wave B `b08c5ea5`: CET Part A forward-only
+  filter. Wave C `72b2f9c6`: T-Deck SKY/TEXT side tabs (TD-SKYTAB-01). Wave D: CET Part B time-source rank (NTP > GPS > phone > RTC > CET; NTP/GPS block CET until reboot). Gateway re-stamping wanted (CET-RESTAMP-01, concept next).
+- **Operator decisions 2026-11-16 for upstream wave 2:** ship the full web GUI incl. wave-3/4 blocks (fail fast, staged
+  rollout reaches 3-5% first), keep the CSMA-03 loop poll, take the `web_setup.cpp` rewrite, WEB-DUP-01 inside the web
+  PR, keep the plan (Ping and Web PRs on 2026-11-20). Detail: [upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md).
+- **Fleet change:** DK5EN-14 runs `72b2f9c6` INSTRUMENT (T-Deck screenshots over `/screen.rgb565`).
+- **Operator this evening:** TD-34 and BOOT-01 OLED.
+- **Next:** bench CLK-01 S4 (CET only) with Part A+B and a hold check on an NTP node, CET-RESTAMP-01 concept, RM-LOSTREPLY-01 fix after the operator
+  answers, `/release-firmware`, `/submit-pr` wave 2 by Fri 2026-11-20.
+
 ## State 2026-11-15
 
-- **2026-11-15 late (resume here):** B-1 done except TD-34 (`--disptest square 8`, needs the T-Deck on USB) and
+- **2026-11-15 late:** B-1 done except TD-34 (`--disptest square 8`, needs the T-Deck on USB) and
   BOOT-01 on the DK5EN-1 OLED (reboot after the night run). Results: [bench-b1-20261115.md](bench-b1-20261115.md).
   Fixes on fork-dev: F-1a `afaa2f40` (LAST-PONG-01, battery `--info` line, SB-06-DESC Safeboot), F-1b `b4ae98e4`
   (PING-FAIL-REPEAT-01). Mock-server rows done (RM-DUP-01 PASS, CSMA-01 run C 14/14), BLE-SET-01 and NRF-BLEDFU PASS,

@@ -6,6 +6,9 @@
 
 #include "instrument.h"
 
+// CET-SCATTER-01 Part B: every set site announces its source; time_rank notes it (all builds).
+void timeRankNoteSrc(const char *src);
+
 #if INSTRUMENT_ENABLED
 #include <stdint.h>
 #include <time.h>
@@ -14,7 +17,7 @@
 // ("NTP", "GPS", "RTC", "CET", "PHONE", "CMD", "SER"). Consumed by that call; a set without an
 // announcement is logged as "OTHER" (boot restore, TZ re-anchor, topo restore, offset change).
 void clockInstrSrc(const char *src);
-#define CLK_SRC(s) clockInstrSrc(s)
+#define CLK_SRC(s) (clockInstrSrc(s), timeRankNoteSrc(s))
 
 // --timesrc gate, asked by Clock::setCurrentTime(): false = ignore this set.
 bool clockInstrAccept(void);
@@ -42,5 +45,5 @@ void clockInstrCmdTdshot(void);                    // --tdshot (T-Deck / T-Deck 
 void clockInstrDispDraw(int h, int m, int s, int type);
 void clockInstrDispSkip(const char *reason);
 #else
-#define CLK_SRC(s) ((void)0)
+#define CLK_SRC(s) timeRankNoteSrc(s)
 #endif

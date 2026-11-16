@@ -1335,6 +1335,15 @@ bool WZ_GPS_HasFix() {
     return gpsInitDone && gpsData.valid && gpsData.age_ms < 5000;
 }
 
+// CET-SCATTER-01: same validity tests as the no-fix clock branch in WZ_GPS_Loop(), plus freshness.
+// gpsData.* holds the last copy; TinyGPS date/time accessors are not read here (year() clears isUpdated).
+bool WZ_GPS_TimeLive() {
+    return bGPSON && gpsDetected && gps.date.isValid() && gps.time.isValid() && gps.time.age() < 5000
+        && gpsData.year > 2023
+        && gpsDatePlausible((int)gpsData.year, (int)gpsData.month, (int)gpsData.day)
+        && gpsTimePlausible((int)gpsData.hour, (int)gpsData.minute, (int)gpsData.second);
+}
+
 /**
  * @brief Maidenhead-Locator berechnen (6-stellig)
  * Nuetzlich fuer Amateurfunk-Anwendungen (z.B. MeshCom, APRS)

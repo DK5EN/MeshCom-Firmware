@@ -64,6 +64,22 @@ Offset below means `new` epoch of each `[CLOCK];set;src;CET` minus the host stam
 
 The decision code is shared (`src/loop_functions.cpp`), so ESP32 and nRF52 behave alike for `{CET}`. Differences sit in the higher sources: nRF52 NTP needs Ethernet and is not gated by GPS fix; the GPS-without-fix branch exists only on ESP32.
 
+## Operator decisions 2026-11-16
+
+These override the priority table and the open questions below where they differ.
+
+1. **Order: NTP > GPS > phone/`--settime`/serial > RTC > `{CET}` > boot restore.** NTP is the most consistent source; GPS depends on reception; the phone is good but below NTP.
+2. **NTP and GPS are premium; CET is a last resort.** Once NTP or GPS has set the clock since boot, `{CET}` never steps it again until the next reboot. No 6 h holdover for these two. The phone keeps its 1 h holdover; RTC stays as specified.
+3. **GPS module time without a fix blocks `{CET}`** like a fix does. CET is always late.
+4. **One convergence step above 2 s after boot is accepted**, because most nodes have no RTC.
+5. **Gateway re-stamping is wanted** as a premium feature: a separate item (BACKLOG CET-RESTAMP-01) with its own short concept, not part of this fix.
+6. **Quorum 3 stays**, and it only matters on nodes that have nothing but `{CET}`.
+
+Implemented 2026-11-16 (Part B, after one advisor rework): the priority table and holdover values below are superseded
+where they differ (NTP and GPS hold forever, NTP ranks first). Known, accepted: on ESP32 a phone or command set may run
+outside the loop task; a race on the one-byte rank state can at worst let one `{CET}` beacon through inside the
+phone's hour.
+
 ## Priority and overtake rules
 
 Higher rank always wins. A lower source may step the clock only after every higher rank's holdover has run out. Within its own rank, `{CET}` follows the filter below. The order among GPS, NTP, RTC and phone stays as the code has it today; only the `{CET}` side changes.

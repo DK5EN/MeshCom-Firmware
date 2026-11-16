@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "cet_age.h"
 #include "cet_filter.h"
+#include "time_rank.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -157,8 +158,8 @@ void test_step_guard(void)
 
     // Anchored on the CALL (not the include comment) and on the gate between call and set (advisor).
     long a = 0, g = 0, b = 0;
-    TEST_ASSERT_TRUE_MESSAGE(fileContains("src/loop_functions.cpp", "cetFilterDecide(&s_cetFilter, (int32_t)cetDeltaS", &a), "{CET} set site does not call cetFilterDecide()");
-    TEST_ASSERT_TRUE_MESSAGE(fileContains("src/loop_functions.cpp", "if(cetVerdictApplies(cetV))", &g), "{CET} set is not gated by cetVerdictApplies");
+    TEST_ASSERT_TRUE_MESSAGE(fileContains("src/loop_functions.cpp", "cetBeaconGate(cetRank, &s_cetFilter", &a), "{CET} set site does not call cetBeaconGate() (-> cetFilterDecide)");
+    TEST_ASSERT_TRUE_MESSAGE(fileContains("src/loop_functions.cpp", "if(cetG.action == CETG_FILTER && cetVerdictApplies(cetV))", &g), "{CET} set is not gated by cetVerdictApplies");
     TEST_ASSERT_TRUE(fileContains("src/loop_functions.cpp", "MyClock.setCurrentTime(meshcom_settings.node_utcoff, Year", &b));
     TEST_ASSERT_TRUE_MESSAGE(a < g && g < b, "call -> if(cetVerdictApplies) -> setCurrentTime order broken");
 }
@@ -276,6 +277,245 @@ void test_old_rule_oracle_tbeam(void)
     TEST_ASSERT_EQUAL(10, o.applies);
 }
 
+// ---- CET-SCATTER-01 Part B: time-source rank with holdover ----
+#define H6 (6UL * 3600UL * 1000UL)
+#define H1 (1UL * 3600UL * 1000UL)
+
+void test_rank_of(void)
+{
+    TEST_ASSERT_EQUAL(TR_GPS, timeRankOf("GPS"));
+    TEST_ASSERT_EQUAL(TR_NTP, timeRankOf("NTP"));
+    TEST_ASSERT_EQUAL(TR_RTC, timeRankOf("RTC"));
+    TEST_ASSERT_EQUAL(TR_CET, timeRankOf("CET"));
+    TEST_ASSERT_EQUAL(TR_MANUAL, timeRankOf("PHONE"));
+    TEST_ASSERT_EQUAL(TR_MANUAL, timeRankOf("CMD"));
+    TEST_ASSERT_EQUAL(TR_MANUAL, timeRankOf("SER"));
+    TEST_ASSERT_EQUAL(TR_NONE, timeRankOf(NULL));
+    TEST_ASSERT_EQUAL(TR_NONE, timeRankOf("OTHER"));
+}
+
+void test_rank_holdover_edges(void)
+{
+    TimeRankState s = {}; uint32_t h = 0;
+    // premium sources never expire (operator decision 2026-11-16)
+    timeRankNote(&s, TR_NTP, 0);
+    TEST_ASSERT_EQUAL(TR_NTP, timeRankBlockingCet(&s, H6 - 1, &h));
+    TEST_ASSERT_EQUAL_UINT32(H6 - 1, h);
+    TEST_ASSERT_EQUAL(TR_NTP, timeRankBlockingCet(&s, H6, &h));
+    TEST_ASSERT_EQUAL(TR_NTP, timeRankBlockingCet(&s, 40UL * H1, &h));
+    TimeRankState g = {};
+    timeRankNote(&g, TR_GPS, 0);
+    TEST_ASSERT_EQUAL(TR_GPS, timeRankBlockingCet(&g, H6 - 1, &h));
+    TEST_ASSERT_EQUAL(TR_GPS, timeRankBlockingCet(&g, H6, &h));
+    TEST_ASSERT_EQUAL(TR_GPS, timeRankBlockingCet(&g, 40UL * H1, &h));
+    TimeRankState m = {};
+    timeRankNote(&m, TR_MANUAL, 0);
+    TEST_ASSERT_EQUAL(TR_MANUAL, timeRankBlockingCet(&m, H1 - 1, &h));
+    TEST_ASSERT_EQUAL(TR_NONE, timeRankBlockingCet(&m, H1, &h));
+    TimeRankState r = {};
+    timeRankNote(&r, TR_RTC, 0);
+    TEST_ASSERT_EQUAL(TR_RTC, timeRankBlockingCet(&r, H6 - 1, &h));
+    TEST_ASSERT_EQUAL(TR_NONE, timeRankBlockingCet(&r, H6, &h));
+}
+
+void test_rank_highest_wins(void)
+{
+    TimeRankState s = {}; uint32_t h = 0;
+    // NTP outranks GPS, whichever was noted last
+    timeRankNote(&s, TR_NTP, 0);
+    timeRankNote(&s, TR_GPS, H1);
+    TEST_ASSERT_EQUAL(TR_NTP, timeRankBlockingCet(&s, 2 * H1, &h));
+    TEST_ASSERT_EQUAL_UINT32(2 * H1, h);
+    TimeRankState t = {};
+    timeRankNote(&t, TR_GPS, 0);
+    timeRankNote(&t, TR_NTP, H1);
+    TEST_ASSERT_EQUAL(TR_NTP, timeRankBlockingCet(&t, 2 * H1, &h));
+    // phone noted, then GPS: GPS outranks
+    TimeRankState p = {};
+    timeRankNote(&p, TR_MANUAL, 10); timeRankNote(&p, TR_GPS, 20);
+    TEST_ASSERT_EQUAL(TR_GPS, timeRankBlockingCet(&p, 30, &h));
+    TEST_ASSERT_TRUE(TR_NTP > TR_GPS && TR_GPS > TR_MANUAL && TR_MANUAL > TR_RTC && TR_RTC > TR_CET && TR_CET > TR_NONE);
+}
+
+void test_rank_cet_never_blocks(void)
+{
+    TimeRankState s = {}; uint32_t h = 0;
+    timeRankNote(&s, TR_CET, 0);
+    timeRankNote(&s, TR_NONE, 0);
+    TEST_ASSERT_EQUAL(TR_NONE, timeRankBlockingCet(&s, 1, &h));
+}
+
+void test_rank_wrap(void)
+{
+    TimeRankState s = {}; uint32_t h = 0;
+    timeRankNote(&s, TR_NTP, 0xFFFFF000UL);
+    TEST_ASSERT_EQUAL(TR_NTP, timeRankBlockingCet(&s, 0x00001000UL, &h));
+    TEST_ASSERT_EQUAL_UINT32(0x2000UL, h);
+}
+
+void test_rank_hook_anchor(void)
+{
+    long pos = 0;
+    const char *f = "src/clock_instrument.h";
+    TEST_ASSERT_TRUE(fileContains(f, "#define CLK_SRC(s) (clockInstrSrc(s), timeRankNoteSrc(s))", &pos));   // INSTRUMENT
+    TEST_ASSERT_TRUE(fileContains(f, "#define CLK_SRC(s) timeRankNoteSrc(s)", &pos));                      // normal
+    TEST_ASSERT_TRUE(fileContains("src/loop_functions.cpp", "cetBeaconGate(", &pos));
+    TEST_ASSERT_TRUE(fileContains("src/loop_functions.cpp", "[CET];skip;why;bad_payload;src;", &pos));
+    TEST_ASSERT_TRUE(fileContains("src/loop_functions.cpp", "[CET];hold;why;rank;by;", &pos));
+    // under --timesrc (INSTRUMENT) the set is discarded: it must not be noted either
+    TEST_ASSERT_TRUE(fileContains("src/loop_functions.cpp", "if(clockInstrGated()) return;", &pos));
+    // live GPS module time without a fix counts as a live GPS rank
+    TEST_ASSERT_TRUE(fileContains("src/loop_functions.cpp", "WZ_GPS_TimeLive()", &pos));
+    TEST_ASSERT_TRUE(fileContains("src/gps_functions.cpp", "bool WZ_GPS_TimeLive()", &pos));
+}
+
+// phone set the clock; inside its holdover the next CET is held, after it the beacon is filtered
+// (not FIRST, no free step back). NTP/GPS never expire: see test_rank_ntp_never_expires.
+void test_rank_ntp_lost_then_cet_behind_holds(void)
+{
+    TimeRankState s = {}; CetFilter f; cetFilterInit(&f);
+    timeRankNoteRef(&s, &f, TR_MANUAL, 1000);       // phone set; no CET seen since boot
+    CetGateOut o = cetBeaconGate(&s, &f, TR_NONE, true, true, -8, 600000UL);   // 10 min later, CET 8 s behind
+    TEST_ASSERT_EQUAL(CETG_HOLD_RANK, o.action);
+    TEST_ASSERT_EQUAL(TR_MANUAL, o.by);
+    // after the holdover: filtered, a backward beacon is BACK, not FIRST
+    o = cetBeaconGate(&s, &f, TR_NONE, true, true, -8, H1 + 5000UL);
+    TEST_ASSERT_EQUAL(CETG_FILTER, o.action);
+    TEST_ASSERT_EQUAL(CET_V_BACK, o.v);
+}
+
+void test_rank_ref_on_higher_set_only(void)
+{
+    TimeRankState s = {}; CetFilter f; cetFilterInit(&f);
+    timeRankNoteRef(&s, &f, TR_CET, 5);
+    TEST_ASSERT_FALSE(f.have_ref);
+    timeRankNoteRef(&s, &f, TR_GPS, 6);
+    TEST_ASSERT_TRUE(f.have_ref);
+}
+
+void test_rank_live_flag_blocks(void)
+{
+    TimeRankState s = {}; CetFilter f; cetFilterInit(&f);
+    CetGateOut o = cetBeaconGate(&s, &f, TR_GPS, true, true, 5, 100);
+    TEST_ASSERT_EQUAL(CETG_HOLD_RANK, o.action);
+    TEST_ASSERT_EQUAL(TR_GPS, o.by);
+    TEST_ASSERT_TRUE(f.have_ref);
+}
+
+// premium sources: NTP set, NTP lost, CET 7 h later (8 s ahead or behind): hold
+void test_rank_ntp_never_expires(void)
+{
+    const uint32_t t7h = 7UL * H1;
+    for(int d = -8; d <= 8; d += 16)
+    {
+        TimeRankState s = {}; CetFilter f; cetFilterInit(&f);
+        timeRankNoteRef(&s, &f, TR_NTP, 1000);
+        CetGateOut o = cetBeaconGate(&s, &f, TR_NONE, true, true, d, 1000 + t7h);
+        TEST_ASSERT_EQUAL(CETG_HOLD_RANK, o.action);
+        TEST_ASSERT_EQUAL(TR_NTP, o.by);
+    }
+}
+
+void test_rank_gps_never_expires(void)
+{
+    TimeRankState s = {}; CetFilter f; cetFilterInit(&f);
+    timeRankNoteRef(&s, &f, TR_GPS, 1000);
+    CetGateOut o = cetBeaconGate(&s, &f, TR_NONE, true, true, 8, 1000 + 7UL * H1);
+    TEST_ASSERT_EQUAL(CETG_HOLD_RANK, o.action);
+    TEST_ASSERT_EQUAL(TR_GPS, o.by);
+    o = cetBeaconGate(&s, &f, TR_NONE, true, true, -8, 1000 + 30UL * H1);
+    TEST_ASSERT_EQUAL(CETG_HOLD_RANK, o.action);
+}
+
+// phone keeps its 1 h holdover: 61 min later {CET} is filtered (fwd applies, back is BACK)
+void test_rank_phone_holdover_1h(void)
+{
+    TimeRankState s = {}; CetFilter f; cetFilterInit(&f);
+    timeRankNoteRef(&s, &f, TR_MANUAL, 1000);
+    CetGateOut o = cetBeaconGate(&s, &f, TR_NONE, true, true, 8, 1000 + 61UL * 60UL * 1000UL);
+    TEST_ASSERT_EQUAL(CETG_FILTER, o.action);
+    TEST_ASSERT_EQUAL(CET_V_FWD, o.v);
+    o = cetBeaconGate(&s, &f, TR_NONE, true, true, -8, 1000 + 62UL * 60UL * 1000UL);
+    TEST_ASSERT_EQUAL(CETG_FILTER, o.action);
+    TEST_ASSERT_EQUAL(CET_V_BACK, o.v);
+    // inside the hour it still holds
+    TimeRankState s2 = {}; CetFilter f2; cetFilterInit(&f2);
+    timeRankNoteRef(&s2, &f2, TR_MANUAL, 1000);
+    o = cetBeaconGate(&s2, &f2, TR_NONE, true, true, 8, 1000 + 59UL * 60UL * 1000UL);
+    TEST_ASSERT_EQUAL(CETG_HOLD_RANK, o.action);
+    TEST_ASSERT_EQUAL(TR_MANUAL, o.by);
+}
+
+// NTP outranks GPS in the gate, for live flags and for noted sources alike
+void test_rank_ntp_outranks_gps(void)
+{
+    TimeRankState s = {}; CetFilter f; cetFilterInit(&f);
+    timeRankNoteRef(&s, &f, TR_NTP, 10);
+    timeRankNoteRef(&s, &f, TR_GPS, 20);
+    CetGateOut o = cetBeaconGate(&s, &f, TR_GPS, true, true, 5, 100);   // GPS live, NTP noted
+    TEST_ASSERT_EQUAL(CETG_HOLD_RANK, o.action);
+    TEST_ASSERT_EQUAL(TR_NTP, o.by);
+    TimeRankState e = {}; CetFilter g; cetFilterInit(&g);
+    o = cetBeaconGate(&e, &g, TR_NTP, true, true, 5, 100);               // NTP live
+    TEST_ASSERT_EQUAL(TR_NTP, o.by);
+    TimeRankState e2 = {}; CetFilter g2; cetFilterInit(&g2);
+    timeRankNoteRef(&e2, &g2, TR_GPS, 5);
+    o = cetBeaconGate(&e2, &g2, TR_RTC, true, true, 5, 100);             // RTC live, GPS noted
+    TEST_ASSERT_EQUAL(TR_GPS, o.by);
+}
+
+// GPS module time valid without a fix: the loop passes TR_GPS as the live rank; CET holds
+void test_rank_gps_time_without_fix_holds(void)
+{
+    TimeRankState s = {}; CetFilter f; cetFilterInit(&f);
+    CetGateOut o = cetBeaconGate(&s, &f, TR_GPS, true, true, 8, 100);
+    TEST_ASSERT_EQUAL(CETG_HOLD_RANK, o.action);
+    TEST_ASSERT_EQUAL(TR_GPS, o.by);
+}
+
+// --timesrc cet: NTP/RTC sets repeat every pass but are discarded and not noted; a quorum must
+// still form. The set only refreshes have_ref, never n_back.
+void test_rank_set_keeps_quorum(void)
+{
+    TimeRankState bypass = {}, notes = {}; CetFilter f; cetFilterInit(&f);
+    timeRankNoteRef(&notes, &f, TR_NTP, 1);
+    CetGateOut o = cetBeaconGate(&bypass, &f, TR_NONE, true, true, -8, 1000);
+    TEST_ASSERT_EQUAL(CET_V_BACK, o.v);
+    timeRankNoteRef(&notes, &f, TR_NTP, 2000);   // repeated NTP set must not clear the quorum
+    TEST_ASSERT_EQUAL_UINT8(1, f.n_back);
+    o = cetBeaconGate(&bypass, &f, TR_NONE, true, true, -8, 3000);
+    TEST_ASSERT_EQUAL(CET_V_BACK, o.v);
+    o = cetBeaconGate(&bypass, &f, TR_NONE, true, true, -8, 4000);
+    TEST_ASSERT_EQUAL(CETG_FILTER, o.action);
+    TEST_ASSERT_EQUAL(CET_V_QUORUM, o.v);
+}
+
+// millis wrap hardening: noting any source clears holdover bits that have run out
+void test_rank_note_clears_expired(void)
+{
+    TimeRankState s = {};
+    timeRankNote(&s, TR_MANUAL, 0);
+    timeRankNote(&s, TR_RTC, H1 + 5);
+    TEST_ASSERT_EQUAL_UINT8(0, s.seen & (1u << TR_MANUAL));
+    TEST_ASSERT_NOT_EQUAL(0, s.seen & (1u << TR_RTC));
+    timeRankNote(&s, TR_NTP, 3UL * H6);   // RTC (6 h) expired too; NTP never does
+    TEST_ASSERT_EQUAL_UINT8(0, s.seen & (1u << TR_RTC));
+    TEST_ASSERT_NOT_EQUAL(0, s.seen & (1u << TR_NTP));
+}
+
+void test_cet_bad_payload_skips(void)
+{
+    TimeRankState s = {}; CetFilter f; cetFilterInit(&f);
+    CetGateOut o = cetBeaconGate(&s, &f, TR_NONE, false, true, 0, 100);
+    TEST_ASSERT_EQUAL(CETG_BAD_PAYLOAD, o.action);
+    TEST_ASSERT_FALSE(f.have_ref);   // does not count as a first beacon
+    // clock never set but payload fine: noteRef and apply as before
+    o = cetBeaconGate(&s, &f, TR_NONE, true, false, 0, 200);
+    TEST_ASSERT_EQUAL(CETG_FILTER, o.action);
+    TEST_ASSERT_EQUAL(CET_V_FIRST, o.v);
+    TEST_ASSERT_TRUE(f.have_ref);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -298,5 +538,22 @@ int main(int, char **)
     RUN_TEST(test_filter_replay_tbeam_s3);
     RUN_TEST(test_filter_replay_heltec_s4);
     RUN_TEST(test_old_rule_oracle_tbeam);
+    RUN_TEST(test_rank_of);
+    RUN_TEST(test_rank_holdover_edges);
+    RUN_TEST(test_rank_highest_wins);
+    RUN_TEST(test_rank_cet_never_blocks);
+    RUN_TEST(test_rank_wrap);
+    RUN_TEST(test_rank_hook_anchor);
+    RUN_TEST(test_rank_ntp_lost_then_cet_behind_holds);
+    RUN_TEST(test_rank_ref_on_higher_set_only);
+    RUN_TEST(test_rank_live_flag_blocks);
+    RUN_TEST(test_rank_ntp_never_expires);
+    RUN_TEST(test_rank_gps_never_expires);
+    RUN_TEST(test_rank_phone_holdover_1h);
+    RUN_TEST(test_rank_ntp_outranks_gps);
+    RUN_TEST(test_rank_gps_time_without_fix_holds);
+    RUN_TEST(test_rank_set_keeps_quorum);
+    RUN_TEST(test_rank_note_clears_expired);
+    RUN_TEST(test_cet_bad_payload_skips);
     return UNITY_END();
 }
