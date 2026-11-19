@@ -12,7 +12,15 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
   (`b6d0da94` hunks only), LAST-PONG-01 (`afaa2f40` ping part only), PING-FAIL-REPEAT-01 (`b4ae98e4`). 7 files,
   +223/-33. 35 of 36 envs build (`esp32-external-radio` needs its overlay); fork tests on the PR tree:
   `test_ping_budget` 11/11, display-clock ping cases pass, other failures are fork-only features. No PR-image flash.
-- **Open:** web PR by Fri 2026-11-20; flash check of both PR images.
+- **Web PR ready, not submitted yet:** branch `pr/web-gui` (worktree `../MeshCom-PR-web`, local) from `upstream/dev`
+  `70ae124d`, three commits (board LED steady, pin policy + GPIO control, web GUI). 35 envs build, flash 27-31 KB below
+  `dev`, upstream host tests 264/264, browser PASS on DK5EN-1 and DK5EN-90 with the PR image. Body
+  `~/WebDev/pr-web-gui-body.md`. Open: RAK RAM +3.6 KB unexplained.
+- **Found in the web PR bench and fixed on fork-dev:** WEB-LOAD-01 (RAK refuses parallel asset requests, page without
+  mc.js; retry loader `mcRe`) and WEB-NAV-01 (nav bar scrollbar squeezes the icons). Rows in
+  [archive/backlog-closed-20261119.md](archive/backlog-closed-20261119.md).
+- **Bench now:** DK5EN-1 and DK5EN-90 run the `pr/web-gui` image; flash them back to fork-dev after the PR is out.
+- **Open:** submit the web PR by Fri 2026-11-20; ping PR #1280 not flashed as its own image.
 
 ## State 2026-11-16 late
 

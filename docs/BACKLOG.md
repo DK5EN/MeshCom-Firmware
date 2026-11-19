@@ -19,6 +19,7 @@ there, what is still open. The dated campaign journal (2026-08-18 to 2026-09-29)
   cases, 1500 pytest (release gate of `v4.40a.11.06`). Inventory: [`test-suite-map.md`](test-suite-map.md).
 - **Open work:** section 3.2, the release train first, then one short table per kind (implement, bench, soak,
   field, waiting, upstream, studies, ideas). Closed rows move to the archive: since 2026-11-16
+  [`archive/backlog-closed-20261119.md`](archive/backlog-closed-20261119.md), since 2026-11-16
   [`archive/backlog-closed-20261116.md`](archive/backlog-closed-20261116.md), since 2026-11-15
   [`archive/backlog-closed-20261115.md`](archive/backlog-closed-20261115.md), before that since 2026-11-07
   [`archive/backlog-rows-20261107.md`](archive/backlog-rows-20261107.md) (also the full text of every open row),

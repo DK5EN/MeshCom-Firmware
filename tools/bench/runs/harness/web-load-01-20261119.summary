@@ -1,0 +1,9 @@
+WEB-LOAD-01 / WEB-NAV-01 bench 2026-11-19 (DK5EN-90 RAK4631 + RAK13800, DK5EN-1 Heltec V3; identity guard ok, 2 dBm)
+Parallel curl, 4 asset requests at once, 3 rounds, RAK at 192.168.68.56 (gateway on):
+  PR image pr/web-gui (before fix):   2 of 4 refused per round (http 000 after ~1 s), sequential requests all complete and byte-identical to the Heltec copy
+  fork-dev image 2fffd8a7 (before fix): same, 2 of 4 refused per round -> pre-existing since the gzip asset split (591a9e76)
+Browser, operator (Safari/Chrome):
+  PR image before fix: RAK theme switch, card toggles, LoRa queue dead (mc.js missing); Heltec ok; nav bar squeezed by its scrollbar on both
+  fork-dev + fix (mcRe/mcLate loader, nav scrollbar hidden), private windows, cold cache, wide and narrow window: RAK and Heltec PASS
+  PR image pr/web-gui 2ff40cb4 with the fix: RAK and Heltec PASS
+Gate fork-dev with the fix: tools/regression.sh --stage 1,2 PASS, 3871 Unity cases, webgui_load_test 18 checks (fails 5 before the fix)

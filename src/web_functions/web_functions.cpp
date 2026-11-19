@@ -1544,6 +1544,21 @@ String decodeURLPercentCoding(String input)
 #define AU_LP_INIT ""
 #endif
 
+// WEB-LOAD-01: the RAK4631 (W5100S, 4 sockets, some held by the gateway UDP and NTP) refuses part of the parallel
+// asset requests a browser makes for the scaffold head; a refused script left the page without mc.js (no theme
+// switch, no card toggles, no queue chart). Every asset tag calls mcRe(this) on error: the element is replaced by a
+// fresh copy after 250 ms x attempt, at most 8 attempts. mcLate() catches up what ran while the script was missing
+// (the clock tick of DOMContentLoaded, the Auto Update row of the info page; auPageInit() starts with auPageLeave(),
+// so a second call is harmless). The scripts may arrive in any order, so every late load runs both catch-ups.
+// WEBLOAD-JS-BEGIN
+static const char WEB_LOAD_JS[] =
+    "function mcRe(e){var n=(e.mcN||0)+1;if(n>8)return;var c=e.tagName=='LINK',x=document.createElement(c?'link':'script');x.mcN=n;"
+    "x.onerror=function(){mcRe(x);};if(c){x.rel='stylesheet';x.href=e.href;}else{x.src=e.src;x.onload=mcLate;}"
+    "setTimeout(function(){if(e.parentNode)e.parentNode.replaceChild(x,e);else document.head.appendChild(x);},250*n);}"
+    "function mcLate(){if(typeof mcClockTick=='function')mcClockTick();"
+    "if(typeof cpage!='undefined'&&cpage=='info'&&typeof auPageInit=='function')auPageInit();}";
+// WEBLOAD-JS-END
+
 /**
  * ###########################################################################################################################
  * delivers the WebUI scaffold including the info page
@@ -1562,8 +1577,11 @@ void deliver_scaffold(bool bget_password)
     // tools/gen_web_assets.py from src/web_functions/web/). The ?v= tag is their content hash. mc.js comes first:
     // it wraps fetch() with the X-MC header. Sub-pages are injected with innerHTML, their <script> never runs,
     // so every script a sub-page needs is loaded here, in the head.
-    web_client.println("<link rel=\"stylesheet\" href=\"/mc.css?v=" WEB_MC_CSS_TAG "\">");
-    web_client.println("<script src=\"/mc.js?v=" WEB_MC_JS_TAG "\"></script>");
+    web_client.print("<script>");
+    web_client.print(WEB_LOAD_JS);   // WEB-LOAD-01: before the first asset tag
+    web_client.println("</script>");
+    web_client.println("<link rel=\"stylesheet\" href=\"/mc.css?v=" WEB_MC_CSS_TAG "\" onerror=\"mcRe(this)\">");
+    web_client.println("<script src=\"/mc.js?v=" WEB_MC_JS_TAG "\" onerror=\"mcRe(this)\"></script>");
     // Inline: what depends on the build or on the headers (rmLen, the AU hook in loadPage, the mailbox refresh)
     web_client.println("<script type=\"text/javascript\">\n");
     rmScaffoldJs(); // var rmLen=...: mcrm.js reads it while it loads
@@ -1576,9 +1594,9 @@ void deliver_scaffold(bool bget_password)
     web_client.println("function loadPage(page,sender,useSpinner) {" AU_LP_LEAVE "if(typeof rmPageLeave=='function')rmPageLeave();if(typeof pinsLeave=='function')pinsLeave();cpage=page;csender=sender;if(useSpinner){document.getElementById(\"content_layer\").innerHTML=\"<span class=\\\"loader\\\"></span>\"};var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange=function(){if(this.readyState==4 && this.status==200){document.getElementById(\"content_layer\").innerHTML=this.responseText;if(typeof mcLoginFocus=='function')mcLoginFocus();if(typeof mcClockTick=='function')mcClockTick();mcRenderQueue();if(page=='messages' && document.getElementById('messages_panel'))mcRenderHistory();if(page=='remote'&&cpage=='remote')rmPageInit();if(page=='pins'&&cpage=='pins'&&typeof pinsInit=='function')pinsInit();" AU_LP_INIT "if(page=='setup'&&typeof raSt=='function')raSt();if(page=='setup'&&typeof mcLookMark=='function')mcLookMark();}else if(this.readyState==4&&useSpinner)document.getElementById('content_layer').innerHTML='Node did not answer completely. Please reload.';};xhttp.open(\"GET\",\"?page=\"+page,true);xhttp.send();Array.from(document.querySelectorAll('.nav_button.nbactive ')).forEach((el) => el.classList.remove('nbactive')); sender.classList.add('nbactive');}\n");
     web_client.println("</script>\n");
 #if defined(ESP32)
-    web_client.println("<script src=\"/mcau.js?v=" WEB_MC_AU_JS_TAG "\"></script>"); // AU web GUI: Info page Auto update row
+    web_client.println("<script src=\"/mcau.js?v=" WEB_MC_AU_JS_TAG "\" onerror=\"mcRe(this)\"></script>"); // AU web GUI: Info page Auto update row
 #endif
-    web_client.println("<script src=\"/mcrm.js?v=" WEB_MC_RM_JS_TAG "\"></script>\n"); // RM GUI W2b: Remote page scripts
+    web_client.println("<script src=\"/mcrm.js?v=" WEB_MC_RM_JS_TAG "\" onerror=\"mcRe(this)\"></script>\n"); // RM GUI W2b: Remote page scripts
 
     // scaffold body
     web_client.println("</head>\n<body>\n");
