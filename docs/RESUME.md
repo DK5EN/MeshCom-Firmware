@@ -4,6 +4,16 @@
 central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md)), fixes and release **F-1**. Deadline: upstream wave 2
 (Ping plus web GUI) on **2026-11-20**, which needs PING-NRF-01 and the browser rows from B-1.
 
+## State 2026-11-19
+
+- **Ping PR submitted:** [icssw-org #1280](https://github.com/icssw-org/MeshCom-Firmware/pull/1280), branch
+  `pr/ping-hold-budget` (worktree `../MeshCom-PR-next`, pushed to origin) from `upstream/dev` `70ae124d`. Five commits:
+  PING-HOLD-01/PING-NRF-01/CSMA-03 loop poll (`b3b2bf0b`), PING-HOLD-02/PING-STOP-01 (`5583b177`), TRACK-PING-01
+  (`b6d0da94` hunks only), LAST-PONG-01 (`afaa2f40` ping part only), PING-FAIL-REPEAT-01 (`b4ae98e4`). 7 files,
+  +223/-33. 35 of 36 envs build (`esp32-external-radio` needs its overlay); fork tests on the PR tree:
+  `test_ping_budget` 11/11, display-clock ping cases pass, other failures are fork-only features. No PR-image flash.
+- **Open:** web PR by Fri 2026-11-20; flash check of both PR images.
+
 ## State 2026-11-16 late
 
 - **T-Deck bench 21:47-21:53:** TD-34 `--disptest square 8` PASS on `72b2f9c6` (no reset, console kept); TD-LOCK-01
