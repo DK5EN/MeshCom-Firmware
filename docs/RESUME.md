@@ -1,26 +1,30 @@
 # RESUME -- pick up here
 
-**Resume here: [campaign-release-train-20261115.md](campaign-release-train-20261115.md), wave F-2 (2026-11-16), bench rechecks done.** Bulk build and flash done;
+**Resume here: section "State 2026-11-19" below (upstream wave 2: #1280 merged, #1281 open); campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md).** Bulk build and flash done;
 central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md)), fixes and release **F-1**. Deadline: upstream wave 2
 (Ping plus web GUI) on **2026-11-20**, which needs PING-NRF-01 and the browser rows from B-1.
 
 ## State 2026-11-19
 
-- **Ping PR submitted:** [icssw-org #1280](https://github.com/icssw-org/MeshCom-Firmware/pull/1280), branch
-  `pr/ping-hold-budget` (worktree `../MeshCom-PR-next`, pushed to origin) from `upstream/dev` `70ae124d`. Five commits:
-  PING-HOLD-01/PING-NRF-01/CSMA-03 loop poll (`b3b2bf0b`), PING-HOLD-02/PING-STOP-01 (`5583b177`), TRACK-PING-01
-  (`b6d0da94` hunks only), LAST-PONG-01 (`afaa2f40` ping part only), PING-FAIL-REPEAT-01 (`b4ae98e4`). 7 files,
-  +223/-33. 35 of 36 envs build (`esp32-external-radio` needs its overlay); fork tests on the PR tree:
-  `test_ping_budget` 11/11, display-clock ping cases pass, other failures are fork-only features. No PR-image flash.
-- **Web PR ready, not submitted yet:** branch `pr/web-gui` (worktree `../MeshCom-PR-web`, local) from `upstream/dev`
-  `70ae124d`, three commits (board LED steady, pin policy + GPIO control, web GUI). 35 envs build, flash 27-31 KB below
-  `dev`, upstream host tests 264/264, browser PASS on DK5EN-1 and DK5EN-90 with the PR image. Body
-  `~/WebDev/pr-web-gui-body.md`. Open: RAK RAM +3.6 KB unexplained.
-- **Found in the web PR bench and fixed on fork-dev:** WEB-LOAD-01 (RAK refuses parallel asset requests, page without
-  mc.js; retry loader `mcRe`) and WEB-NAV-01 (nav bar scrollbar squeezes the icons). Rows in
-  [archive/backlog-closed-20261119.md](archive/backlog-closed-20261119.md).
-- **Bench now:** DK5EN-1 and DK5EN-90 run the `pr/web-gui` image; flash them back to fork-dev after the PR is out.
-- **Open:** submit the web PR by Fri 2026-11-20; ping PR #1280 not flashed as its own image.
+- **Upstream wave 2 out (resume here):**
+  - Ping: [icssw-org #1280](https://github.com/icssw-org/MeshCom-Firmware/pull/1280) **merged** 2026-11-19 14:12 UTC
+    by oe1kbc as merge commit `4cfa2ac2` (two parents, our five commits unchanged). Next: `/sync-upstream` (merge,
+    fork side wins), then remove worktree `../MeshCom-PR-next` and branch `pr/ping-hold-budget` (local and origin).
+  - Web: [icssw-org #1281](https://github.com/icssw-org/MeshCom-Firmware/pull/1281) open, ready for review. Branch
+    `pr/web-gui` (worktree `../MeshCom-PR-web`, pushed) from `upstream/dev` `70ae124d`, three commits (board LED
+    steady, pin policy + GPIO control, web GUI). 48 files, +7277/-1984. 35 envs build, flash 27-31 KB below `dev`,
+    upstream host tests 264/264, browser PASS on DK5EN-1 and DK5EN-90 with the PR image (cold cache, Chrome and
+    Safari). Open: RAK RAM +3.6 KB unexplained. Body `~/WebDev/pr-web-gui-body.md`.
+  - Out of the web PR: RM1 commands (wave 4), AU install schedule (wave 6), bench screenshot endpoints,
+    `NRF52_NO_ETH`. The PR's `mcrm.js` already has the wave-4 cards; upstream nodes refuse those commands.
+- **Found in the web PR bench, fixed on fork-dev `029eb2f5`:** WEB-LOAD-01 (the RAK refuses parallel asset requests,
+  page without mc.js; retry loader `mcRe`) and WEB-NAV-01 (nav bar scrollbar squeezes the icons). Gate PASS 3871
+  cases. Rows in [archive/backlog-closed-20261119.md](archive/backlog-closed-20261119.md). Both fixes are in #1281.
+- **Fleet now:** DK5EN-1 and DK5EN-90 run fork-dev `029eb2f5` (normal build, USB), DK5EN-98 runs `029eb2f5` since
+  2026-11-19 15:35 CET (OTA, operator OK; was `aa8e1b45`), gateway connected after the flash. DK5EN-14 and -92
+  unchanged.
+- **Open:** `/sync-upstream` for #1280; answer maintainer questions on #1281; TD-34 icon repaint; CET-RESTAMP-01
+  answers; `/release-firmware` (read AU-24 first); RAK RAM +3.6 KB of the web PR.
 
 ## State 2026-11-16 late
 

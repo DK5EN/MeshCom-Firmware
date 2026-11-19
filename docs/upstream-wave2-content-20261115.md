@@ -219,6 +219,17 @@ regenerate `web_assets.h` from the trimmed sources. Do not cherry-pick the fork 
 (16 added lines reference `webAuthSetPassword`) and 418 to `test_web_txbuf` (chunked output). The first can go with WEB-PWD-01; the second
 stays out with the chunking.
 
+## Outcome 2026-11-19
+
+- Ping went up as #1280 (`pr/ping-hold-budget`): the three commits of part A plus LAST-PONG-01 (ping part of
+  `afaa2f40`) and PING-FAIL-REPEAT-01 (`b4ae98e4`). Merged 2026-11-19 as `4cfa2ac2`.
+- Web went up as #1281 (`pr/web-gui`) from the trial branch: the "must come along" lists above, the runtime console
+  commands (`--board led steady`, `--gpio`, `--gpiocontrol`, pin refusal and load repair), `gen_web_assets.py`,
+  updated `test_web_auth`/`test_web_txbuf`. The AU schedule, `HAS_NRF_ETH` guards and the screenshot endpoints are
+  removed, not fenced. The bench added WEB-LOAD-01 and WEB-NAV-01 (fixed on fork-dev first, `029eb2f5`).
+- Porting trap: `git apply --3way --recount` of a hunk subset of `command_functions.cpp` swapped the button and
+  analog refusal blocks (same context lines); the build caught it. Compare a hand port per file against fork-dev.
+
 ## Operator decisions 2026-11-16
 
 These answers replace the five open questions. They override the "out" and "open" verdicts in the tables above.
