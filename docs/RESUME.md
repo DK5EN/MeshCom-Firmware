@@ -8,8 +8,9 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
 
 - **Upstream wave 2 out (resume here):**
   - Ping: [icssw-org #1280](https://github.com/icssw-org/MeshCom-Firmware/pull/1280) **merged** 2026-11-19 14:12 UTC
-    by oe1kbc as merge commit `4cfa2ac2` (two parents, our five commits unchanged). Next: `/sync-upstream` (merge,
-    fork side wins), then remove worktree `../MeshCom-PR-next` and branch `pr/ping-hold-budget` (local and origin).
+    by oe1kbc as merge commit `4cfa2ac2` (two parents, our five commits unchanged). Synced into fork-dev 2026-11-19 by
+    merge, all seven PR paths on the fork side, tree unchanged. Next: remove worktree `../MeshCom-PR-next` and branch
+    `pr/ping-hold-budget` (local and origin).
   - Web: [icssw-org #1281](https://github.com/icssw-org/MeshCom-Firmware/pull/1281) open, ready for review. Branch
     `pr/web-gui` (worktree `../MeshCom-PR-web`, pushed) from `upstream/dev` `70ae124d`, three commits (board LED
     steady, pin policy + GPIO control, web GUI). 48 files, +7277/-1984. 35 envs build, flash 27-31 KB below `dev`,
@@ -23,7 +24,7 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
 - **Fleet now:** DK5EN-1 and DK5EN-90 run fork-dev `029eb2f5` (normal build, USB), DK5EN-98 runs `029eb2f5` since
   2026-11-19 15:35 CET (OTA, operator OK; was `aa8e1b45`), gateway connected after the flash. DK5EN-14 and -92
   unchanged.
-- **Open:** `/sync-upstream` for #1280; answer maintainer questions on #1281; TD-34 icon repaint; CET-RESTAMP-01
+- **Open:** clean up the #1280 worktree and branch; answer maintainer questions on #1281; TD-34 icon repaint; CET-RESTAMP-01
   answers; `/release-firmware` (read AU-24 first); RAK RAM +3.6 KB of the web PR.
 
 ## State 2026-11-16 late
