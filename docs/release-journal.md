@@ -1,6 +1,6 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261108`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261120`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
@@ -8,6 +8,66 @@ Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `releas
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
 
 ---
+
+## Release v4.40a.11.20 (Freitag, 2026-11-20)
+
+Gebaut und veröffentlicht von GitHub CI (`MeshCom CI`, Tag `v4.40a.11.20`, `MC_BUILD_TAG` und `MC_AU_DEV_CHANNEL=1` gesetzt), Struktur wie `v4.40a.11.08` (68 Assets erwartet, nach dem Tag zu prüfen).
+`FLASH_VERSION` 20261120, `FLASH_STRUCT_VERSION` 20260724 unverändert, die Einstellungen bleiben erhalten; das Release bringt keine neue Einstellung. Safeboot bleibt Fähigkeit v3; der Safeboot-Fix SB-06-DESC kommt nur über den Web-Flasher auf einen Knoten.
+Basis ist das offizielle `v4.40a.11.14` (2026-11-14, `upstream/dev` 70ae124d, enthält unseren PR #1277), gemerged als `d4384eac`. Das Release ist **nicht** byte-gleich mit einem offiziellen Release, auch nicht mit `v4.40a.11.14`; der Flash-Stempel in `--info` (`FLASH_VERSION 20261120`, `tag=v4.40a.11.20`) unterscheidet es.
+Upstream hat am 2026-11-19 unsere PRs #1280 (Ping, `4cfa2ac2`) und #1281 (Web-GUI, Pins-Seite, GPIO-Steuerung, Board-LED, `45f66dc7`) gemerged, aber noch nicht released. Dieses Release enthält beides, das offizielle `v4.40a.11.14` nicht.
+Dies ist das letzte Release, das direkt aus `fork-dev` geschnitten wird. Ab dem nächsten kommt es aus dem geplanten stabilen Zweig `fork-nightly` (NIGHTLY-01), den der Betreiber selbst nachzieht.
+
+Inhalt, neu gegenüber `v4.40a.11.08`:
+
+- Uhr: `{CET}` darf die Uhr nur vorwärts stellen (CET-SCATTER-01 Teil A), Rang der Zeitquellen NTP, GPS, Telefon, RTC, `{CET}` (Teil B), GPS-Zeit ohne Fix überschreibt keine NTP-Zeit mehr, die angezeigte Zeit läuft nicht um bis zu 10 s zurück (beides aus PR #1277), CET-AGE-LOG-01 (Alter verworfener `{CET}`-Frames).
+- Ping (upstream #1280): letzter Ping eines `--ping start`-Laufs bekommt sein PONG FAILED (LAST-PONG-01), ein Fail-Urteil je unbeantwortetem Ping (PING-FAIL-REPEAT-01), TRACK-Seite ersetzt den Ping-Frame nach 10 s (TRACK-PING-01).
+- Funk: weitergeleitete ACKs erreichen Altersstufe 1 nach 6 s statt 20 s (ACK-AGE-01, `CSMA_AGE_STAGE1_ACK_MS`), Log-Regel 6.14 zu `RX_DEDUP_NEW` mit `OWN:e` (DEDUP-OWN-01, nur Doku).
+- Fernverwaltung: eine RM1-Antwort auf vollem Sendering darf das älteste eingereihte ACK verdrängen (RM-LOSTREPLY-01).
+- T-Deck: SKY- und TEXT-Reiter an der Positionsseite (TD-SKYTAB-01), GPS-Symbol im Kopf öffnet den GPS-Reiter (TD-NAV-01), Sperrsymbol in der Tastatur-Taste (TD-LOCK-01), Kopf-Symbole für WLAN und BLE zeigen ihren Zustand, GPS-Seite passt (TD-29), `--disptest` ohne Reset (TD-34, nur INSTRUMENT). T-Deck Pro: Himmelsansicht auf Bildschirm 3, GPS-Bildschirm friert nicht mehr ein.
+- T114 und GPS (offizielles `v4.40a.11.14`, DH1FR, #1264 bis #1267): Statusseite mit GPS, Zeitquelle und Funkwerten, grafische GPS-Seite mit Himmelsansicht, Tasten alle 10 ms abgefragt, Tiefschlaf-Anzeige, kein Bootloader nach dem Aufwecken; gemeinsamer Himmelsansicht-Kern für T114, T-Deck und T-Deck Pro.
+- Boards: T-Beam Taste 3 s halten für Tiefschlaf (TBEAM-SLEEP-01), INA226 auf Heltec V3, Wireless Stick und Wireless Tracker (#1272), `BOARD_COUNTRY` als Vorgabe statt Überschreibung (#1273), Spektralscan 500-MHz-Grenze und Watchdog (#1268), Info-Seite "Gateway:" (#1258), `--info`-Batteriezeile zeigt den wirklich genutzten Wert, leerer BLE-Dienst F0A0 entfernt (UUID bleibt im Advertising), kleinere ESP32- und T-Deck-Images (`-fno-exceptions`, `CORE_DEBUG_LEVEL=0`, ungenutzte LVGL-Widgets, seit `v4.40a.11.06`).
+- Safeboot: ein Image, das keine Anwendung ist, wird abgelehnt, der Boot-Zeiger geht zurück auf Safeboot (SB-06-DESC).
+- Web: Seite lädt auf dem RAK4631 vollständig, abgelehnte Asset-Anfragen werden wiederholt (WEB-LOAD-01), Navigationsleiste ohne Scrollbalken (WEB-NAV-01), `wsParams`-Tabelle im Flash statt im RAM (RAM-WSP-01, RAK -880 B, Heltec V3 -1008 B), Auto-Update-Karte installiert den angezeigten Tag (AU-26), Helligkeitswert mittig, README zum Erzeugen von `web_assets.h`, Lesetest für setlat/setlon (P-0124).
+- Werkzeuge: `clock_drift.py` zeichnet `[CET]` auf, `webgui_load_test.js`, `producer_match_lint.py` verlangt die `constexpr`-Tabelle, neue Host-Envs `native_gps_skyplot` und `native_gps_sky_layout`.
+  Kampagnen: `docs/campaign-release-train-20261115.md`, `docs/campaign-gps-skyplot-20261112.md`, `docs/concept-cet-scatter-01-20261116.md`, `docs/concept-rm-lostreply-01-20261116.md`, `docs/concept-nightly-01-20261116.md`.
+
+Handlungsbedarf: T-Beam: wer die Taste 3 s hält, schickt den Knoten in den Tiefschlaf (Aufwecken mit der Taste; 1W braucht `--button on`). Wer von vor `v4.40a.11.08` kommt: nRF52 pingt nur nach `--ping start`, Heltec V4 hat I2C auf SDA 4 und SCL 3.
+
+Betreiber-Entscheidungen 2026-11-15 bis 2026-11-16: Abschlusskriterium von ACK-AGE-01 ist "Relay-ACK deutlich besser als SOAK-1108" (Median 6,1 s, Maximum 24,8 s); DEDUP-LAP-01 wird nicht behoben; TD-NAV-01 Option 2; Rang der Zeitquellen (NTP > GPS > Telefon > RTC > `{CET}`); RM-LOSTREPLY-01 Option D2 (Antwort verdrängt das älteste eingereihte ACK, kein Wiederholen); NIGHTLY-01 beschlossen, vorerst geparkt.
+
+### Was für dieses Release auf Hardware geprüft wurde
+
+- Bench auf INSTRUMENT- und Bulk-Builds früherer `fork-dev`-Stände, nicht auf den Release-Images: DK5EN-1 (Heltec V3), DK5EN-14 (T-Deck Plus), DK5EN-90 (RAK4631), DK5EN-92 (T-Beam), je 2 dBm, Identity-Guard vorher.
+- F-2-Bench 2026-11-16 (DK5EN-1, -90, -92, INSTRUMENT-Image von `dc08974f`): RM-LOSTREPLY-01 auf lokalem Mock mit Ring 20 von 20, Antwort verdrängt das älteste ACK, Absender `ok` nach 15,2 s (vorher `noanswer` nach 171 s).
+- CET-SCATTER-01: DK5EN-1 (ohne WLAN, GPS aus, nur `{CET}`, 60 min) ein erster Satz, 4 Beacons gehalten, Uhr 1,38 bis 1,71 s hinter dem Host; DK5EN-92 (WLAN an) NTP nach 7 s, 6 von 6 Beacons durch den Rang gehalten, kein `{CET}`-Satz.
+- Nachtlauf 2026-11-15/16 (2 h, DK5EN-1 und -92): Knotenuhr hält, kein Schritt unter -5 s (CET-AGE-01); die Streuung von 2 bis 6 s je LoRa-Beacon führte zu CET-SCATTER-01.
+- B-1-Bench 2026-11-15: PING-NRF-01 auf DK5EN-90 (5 Pings im Abstand von 60 s, danach 3 min Ruhe, `--ping stop` hält 140 s); PING-STOP-01, PING-HOLD-02, TRACK-PING-01 (Pong-Bild +1,7 s und +8,0 s, Track-Seite +12,1 s) auf DK5EN-1.
+- B-1, Mock-Server: RM-DUP-01 (ein Strike je Junk-Frame), CSMA-01 Lauf C 14 von 14 (erstes CAD bei 3035 bis 3350 ms), Serverpfad Heltec zu RAK.
+- SB-06-DESC auf DK5EN-92 (Safeboot über USB neu geschrieben): `bootloader.bin` abgelehnt mit `why;desc` und HTTP 400 `not_bootable`, Safeboot-Web bleibt oben; ein Image für den falschen Chip wird ebenfalls abgelehnt.
+- BLE auf DK5EN-90: BLE-SET-01 mit der Telefon-App, NRF-BLEDFU mit nRF Connect (663 KB in etwa 5 min), Scan 2026-11-16: F0A0 nur im Advertising.
+- T-Deck DK5EN-14: TD-THEME-01 W4 jeder Reiter hell und dunkel per Screenshot (2026-11-16), TD-LOCK-01 hell und dunkel, gesperrt und frei, TD-34 `--disptest square 8` (20 Schritte in 1,4 s, kein Reset), SKY/TEXT-Reiter per Screenshot; Betreiber 2026-11-15: Chat-Textgrößen, Reiter-Obergrenze, Hintergrundlicht, Kopf-Symbole, Bootbild.
+- TBEAM-SLEEP-01 auf DK5EN-92 (Betreiber, 2026-11-15): Taste 3 s, Tiefschlaf, Aufwecken mit der Taste.
+- ACK-AGE-01 auf DK5EN-98 (`aa8e1b45`, 14,2 h ab 2026-11-14 21:45): 17 Relay-ACKs, Median 3,3 s, Maximum 13,6 s; ruhige Nacht (1,9 % Kanalauslastung), kein Beweis unter Last.
+- Web-PR-Bench 2026-11-19 (DK5EN-1, -90): WEB-LOAD-01 (vier parallele Asset-Anfragen, 2 von 4 abgelehnt) und WEB-NAV-01 gefunden, behoben, Betreiber-Prüfung in Safari und Chrome mit leerem Cache, breit und schmal: PASS.
+- Produktions-Gateway DK5EN-98: `029eb2f5` (dieses Release ohne RAM-WSP-01) seit 2026-11-19 15:35 CET per OTA, Betreiber-OK, Gateway danach wieder verbunden.
+- Host-Gate `tools/regression.sh --stage 1,2` auf `fork-dev` `938f0031`: PASS, 3871 Unity-Testfälle in 110 Envs. Builds für RAK4631, Heltec V3, T114, T-Echo, T-Deck und T-Beam grün. Release-Check (CI-Run, 68 Assets, 28 .autoupdate) und Web-Flasher folgen nach dem Tag.
+
+### Was ausdrücklich NICHT geprüft wurde
+
+- Idle-Heap-Messung auf dem T-Beam DK5EN-92 mit dem Release-Image: entfallen, der T-Beam war nicht erreichbar, Betreiber-Entscheidung 2026-11-20.
+- GPSV4-01, RAK4631-L76K-Erkennung, GPIO-01 bis GPIO-04 (Jumper-Test, Feldtest nach dem Release, GPIO-07), T-Deck-Pro-Pins und Himmelsansicht auf Bildschirm 3 (GPIO-06, GPIO-08, GPIO-09): kein Heltec V4, kein L76K, kein T-Deck Pro auf der Bench, nur Host-Tests und Builds.
+- T114-Seiten und -Tasten (DH1FR), INA226 auf Heltec (#1272), Spektralscan, `BOARD_COUNTRY`: kein T114, kein INA226-Modul, nur Builds.
+- TBEAM-SLEEP-01: nur das T-Beam v1.2 geprüft; AXP192, Supreme und 1W gebaut und per Quelltext-Test, 1W braucht `--button on`.
+- ACK-AGE-01 unter Last: die Nacht war ruhig. ACK-CANCEL-01 (ein eingereihtes Relay-ACK wird nicht gestrichen, wenn ein Nachbar es zuerst sendet) ist offen und braucht ein Konzept.
+- CET-RESTAMP-01 ist nur ein Konzept: ein Gateway mit NTP würde die eigene Zeit kurz vor dem Senden in den `{CET}`-Beacon schreiben. Es ändert, was auf der Luft liegt; kein Code.
+- CSMA-05 und IDEE-04 nur Host-Tests; CSMA-01 nur gegen den Mock. SENS-04: kein DHT22 auf der Bench. RM1 `pins` und `gpio` und die Queues-Karte (RM-Q-01) ohne Funk, `txq`, `mbox`, `maxhop` antworteten `ok`.
+- SB-06-DESC auf einem Knoten geprüft; Knoten ohne Web-Flasher-Installation behalten ein älteres Safeboot ohne diese Prüfung.
+- TD-34: Umschalten von WLAN am Konsolen-Befehl lässt das Kopf-Symbol eventuell unverändert (kosmetisch). TD-NAV-01: das Tippen auf das GPS-Symbol hat keinen eigenen Eintrag; kleine Mängel (3-px-Rest in der Reiterleiste, kein Reiter hervorgehoben auf der GPS-Seite, Klickfläche überlappt das WLAN-Symbol).
+- TRACK-Anzeige: nach den 10 s bleibt die Track-Seite bis zum Ende der Ping-Zeit stehen.
+- RAM-WSP-01 nur Build-Messung und Host-Gate, auf keinem laufenden Knoten.
+- AU-24 (T-Beam, Download nach Stunden Laufzeit abgelehnt mit `lowheap_tls`, Ursache unbekannt) und AU-25 (Download bricht bei etwa 54 % mit `nomem` ab, DK5EN-1 nach 3 h Laufzeit) sind offen; Neustart und neuer Versuch hilft. TBEAM-HEAP-01: T-Beam hält nach 150 Web-Anfragen 53,3 KB, auf dem Release-Image von `v4.40a.11.08` genauso, also keine Regression.
+- Web-Kontrast: Label auf Grün im hellen Theme 5,08:1, unter dem Ziel von 7:1.
+- Aus früheren Releases weiter offen: RM-NVS-01, AU-14 (nur die LoRa-Hälfte ohne Neustart gesehen, der Download wurde nicht gefahren), HV4-VEXT-01 (keine Strommessung im Tiefschlaf), UV, Wind und Ladezustand nicht wiederholt, E290, Wireless Paper, E213, T-Echo und T114 nicht auf der Bench.
 
 ## Release v4.40a.11.08 (Sonntag, 2026-11-08)
 
