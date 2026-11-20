@@ -19,6 +19,11 @@ campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md
   11.20.
 - **RAM-WSP-01** (`938f0031`): `wsParams` in flash, RAK -880 B, Heltec V3 -1,008 B; goes upstream with wave 4. Not yet
   run on a node.
+- **Upstream sync 2026-11-21:** #1269 (APRS-IS weather over Wi-Fi, Mateusz-Krajewski, merged by Kurt 2026-11-20)
+  merged into fork-dev as `6731af6c`; both conflicts kept both sides, merge diff = upstream PR diff. Fork test pins
+  and the variant-ini golden followed. Known upstream issue: the `--aprswx on/off` rows fall through into the status
+  rung (BLE gets no node settings); fork fix `632aa9b3` `temp(aprswx)`, revert when upstream fixes it. Gate: 3898 Unity
+  cases, selftest green, Heltec V3, T-Beam, T-Deck, RAK build. Not in `v4.40a.11.20`.
 - **Fleet:** unchanged on `029eb2f5` (DK5EN-1, -90, -98); nobody runs the release image yet.
 - **Open:** flash the bench fleet with the release (DK5EN-98 only with an explicit OK); remove worktrees and branches
   `../MeshCom-PR-web` / `pr/web-gui` and `../mc-web-trial` / `scratch/web-trial-20261116`; CET-RESTAMP-01 answers;
