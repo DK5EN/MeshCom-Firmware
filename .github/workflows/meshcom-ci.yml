@@ -134,7 +134,7 @@ jobs:
       # make_autoupdate.py refuses any input without the 0xE9 app magic, so no support file slips in.
       run: |
         set -e
-        apps=$(ls .pio/build/*/*.bin | grep -v -E '/firmware\.bin$|/(bootloader|bootloader-s3|partitions|otadata|safeboot|safeboot-s3)\.bin$|/esp32-(S3-)?safeboot/')
+        apps=$(ls .pio/build/*/*.bin | grep -v -E '/firmware\.bin$|/(bootloader|bootloader-s3|bootloader-s3-4|partitions|otadata|safeboot|safeboot-s3)\.bin$|/esp32-(S3-)?safeboot/')
         echo "$apps"
         n=$(echo "$apps" | wc -l)
         echo "ESP32 app images: $n"
@@ -226,10 +226,10 @@ jobs:
           gh api -H "Accept: application/octet-stream" "repos/${{ github.repository }}/releases/assets/$id" > "$RUNNER_TEMP/rel/$name"
         done < "$RUNNER_TEMP/assets.txt"
         # (stage headroom ran on the build dirs above; the release dir has one partitions.bin only)
-        # 28 app bins + 28 .autoupdate + 3 zip + 3 uf2 + 6 safeboot/bootloader/partitions/otadata
+        # 28 app bins + 28 .autoupdate + 3 zip + 3 uf2 + 7 safeboot/bootloader/bootloader-s3-4/partitions/otadata
         tag_arg=""
         if [[ "${{ github.ref_name }}" == v* ]]; then tag_arg="--tag ${{ github.ref_name }}"; fi
-        python3 tools/verify_release_assets.py "$RUNNER_TEMP/rel" $tag_arg --pairs 28 --total 68
+        python3 tools/verify_release_assets.py "$RUNNER_TEMP/rel" $tag_arg --pairs 28 --total 69
 
     - name: Publish release
       # v* only; ci-proof-* stays a draft
