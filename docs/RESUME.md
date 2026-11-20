@@ -1,8 +1,29 @@
 # RESUME -- pick up here
 
-**Resume here: section "State 2026-11-19" below (upstream wave 2: #1280 and #1281 merged and synced); campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md).** Bulk build and flash done;
-central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md)), fixes and release **F-1**. Deadline: upstream wave 2
-(Ping plus web GUI) on **2026-11-20**, which needs PING-NRF-01 and the browser rows from B-1.
+**Resume here: section "State 2026-11-20" below (fork release `v4.40a.11.20` out; upstream wave 2 merged and synced);
+campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md).**
+
+## State 2026-11-20
+
+- **Release `v4.40a.11.20`** (Latest since 2026-11-20 21:36 UTC), tag on `1156953a`, the last release cut straight from
+  `fork-dev` (operator 2026-11-20); later releases come from `fork-nightly` (NIGHTLY-01). 69 assets: upstream added the
+  4 MB T3-S3 bootloader `bootloader-s3-4.bin` on 2026-11-08, CI made a bogus `.autoupdate` twin of it and the verify
+  step left the release a draft; twin deleted by hand, `verify_release_assets.py --pairs 28 --total 69` ok, published
+  with the same PATCH as the CI publish step. CI fixed for the next release in `1db054d9`. Gate PASS 3871 Unity cases.
+  Idle-heap check on DK5EN-92 waived by the operator (T-Beam unreachable), stated in the notes.
+- **Web flasher** offers only `v4.40a.11.20` (31 boards, `gh-pages` `8917823c`, 11.08 pruned). Root `safeboot*.bin`
+  = published CI build of the tag (Safeboot changed with SB-06-DESC, `afaa2f40`). The first flasher push `e1e6d5f7`
+  carried the 11.08 Safeboot because `publish` takes it from the repo root; `check` caught it (28 mismatches),
+  re-published with the CI Safeboot. Order for next time: root safeboot = CI asset first, then `publish`.
+- **Pages:** PR history at 76 merged PRs in ten rounds (round 10: #1272, #1277, #1280, #1281), index release card
+  11.20.
+- **RAM-WSP-01** (`938f0031`): `wsParams` in flash, RAK -880 B, Heltec V3 -1,008 B; goes upstream with wave 4. Not yet
+  run on a node.
+- **Fleet:** unchanged on `029eb2f5` (DK5EN-1, -90, -98); nobody runs the release image yet.
+- **Open:** flash the bench fleet with the release (DK5EN-98 only with an explicit OK); remove worktrees and branches
+  `../MeshCom-PR-web` / `pr/web-gui` and `../mc-web-trial` / `scratch/web-trial-20261116`; CET-RESTAMP-01 answers;
+  TD-34 icon repaint; BACKLOG rows that lag the bench docs (SB-06, CSMA-01, TBEAM-SLEEP-01, TD-NAV-01 still say "not
+  benched" or "bench pending"); wave 4 trial branch from 2026-11-30; NIGHTLY-01 parked.
 
 ## State 2026-11-19
 
