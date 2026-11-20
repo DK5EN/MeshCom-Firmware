@@ -711,8 +711,11 @@ static const ToggleRow COMMAND_TOGGLES[] =
 #endif
 #if defined(ESP32)
     // MCFW-WX1: APRS-IS weather. node_aprswx is a plain 0/1 int; Wi-Fi comes up through the service block in esp32loop()
-    { "--aprswx on",          &bAPRSWX,              &meshcom_settings.node_aprswx,   0xFFFFFFFF,   0x0001,       tg_post_aprswx_on,             TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN | TG_FLAG_TRUE },
-    { "--aprswx off",         &bAPRSWX,              &meshcom_settings.node_aprswx,   0xFFFFFFFE,   0x00000000,   tg_post_aprswx_off,            TG_DIRTY_NODE,   TG_SAVE | TG_BRETURN },
+    // temp(aprswx): no TG_BRETURN (upstream #1269 has it): the second ladder's status rung "aprswx" would
+    // catch "aprswx on/off" and return before the tail, so BLE never gets the node settings. Revert when
+    // upstream fixes it (toggle_table_lint check 9).
+    { "--aprswx on",          &bAPRSWX,              &meshcom_settings.node_aprswx,   0xFFFFFFFF,   0x0001,       tg_post_aprswx_on,             TG_DIRTY_NODE,   TG_SAVE | TG_FLAG_TRUE },
+    { "--aprswx off",         &bAPRSWX,              &meshcom_settings.node_aprswx,   0xFFFFFFFE,   0x00000000,   tg_post_aprswx_off,            TG_DIRTY_NODE,   TG_SAVE },
 #endif
 #if defined(ENABLE_LTR390)
     { "--uv on",              &bUVON,                &meshcom_settings.node_wx_flags, 0xFFFFFFFF,   0x0001,       tg_post_uv_on,                 TG_DIRTY_SENS,   TG_SAVE | TG_BRETURN | TG_FLAG_TRUE },
