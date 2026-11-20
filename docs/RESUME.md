@@ -16,7 +16,8 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
     of `029eb2f5` covers it). Worktree `../MeshCom-PR-web` and branch `pr/web-gui` (local and origin) still exist.
     RAK RAM +3.6 KB of the PR explained 2026-11-20: two nRF52 static JSON buffers (2,712 B, deliberate) and the
     `wsParams` table in RAM instead of flash (880 B RAK, 1,000 B ESP32); section "RAM delta of #1281" in
-    [upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md). Open: move `wsParams` to flash or not.
+    [upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md). `wsParams` moved to flash on fork-dev
+    2026-11-20 (RAM-WSP-01, RAK -880 B, Heltec V3 -1,008 B, gate PASS 3871); goes upstream with wave 4.
   - Out of the web PR: RM1 commands (wave 4), AU install schedule (wave 6), bench screenshot endpoints,
     `NRF52_NO_ETH`. The PR's `mcrm.js` already has the wave-4 cards; upstream nodes refuse those commands.
 - **Found in the web PR bench, fixed on fork-dev `029eb2f5`:** WEB-LOAD-01 (the RAK refuses parallel asset requests,
@@ -26,7 +27,7 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
   2026-11-19 15:35 CET (OTA, operator OK; was `aa8e1b45`), gateway connected after the flash. DK5EN-14 and -92
   unchanged.
 - **Open:** remove worktree and branch of #1281; TD-34 icon repaint; CET-RESTAMP-01
-  answers; `/release-firmware` (read AU-24 first); decide whether `wsParams` moves to flash.
+  answers; `/release-firmware` (read AU-24 first); RAM-WSP-01 into the wave 4 PR.
 
 ## State 2026-11-16 late
 

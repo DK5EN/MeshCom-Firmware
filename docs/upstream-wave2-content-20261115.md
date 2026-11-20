@@ -338,6 +338,8 @@ sitting in RAM on every board. The Heltec `nm` list also shows the gzip assets a
 them in `.flash.rodata`, so they cost no RAM. At 102,956 of 248,832 bytes the RAK keeps about 146 KB for heap and
 stacks; nothing here is urgent.
 
-Levers, open for an operator decision: move `wsParams` to flash (about 880-1,000 bytes on every board, small change
-in `web_setup.cpp`); share one buffer between the two pin handlers (512 bytes, nRF52); allocate the buffers per
-request instead (2,712 bytes static, costs heap fragmentation risk).
+Fixed on fork-dev 2026-11-20 (RAM-WSP-01): the rows store a type-tagged address instead of a lambda (nRF52 builds
+gnu++11, where a lambda-to-pointer conversion is no constant expression), and the table is `static constexpr`.
+`wsParams` now sits in `.text` (RAK) and `.flash.rodata` (Heltec V3, T-Beam); RAM -880 B on RAK, -1,008 B on Heltec
+V3. `producer_match_lint.py` refuses a table that is not `constexpr` (fails on the old file, passes on the new). Goes
+upstream with wave 4. The two pin buffers stay as they are (recommendation A; wave 2 was scoped to `wsParams`).

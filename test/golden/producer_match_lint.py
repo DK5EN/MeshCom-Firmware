@@ -564,9 +564,20 @@ class Producer:
         return [render("on"), render("off")] if has_s else [render("")]
 
 
-# Table-driven setParam rungs: `static const WsParam wsParams[] = {` ... `};`. Only the settable
+# Table-driven setParam rungs: `static constexpr WsParam wsParams[] = {` ... `};`. Only the settable
 # macros (WSP_ONOFF/INT/FLOAT/STR) are handlers; the read-only WSP_*_RO rows answer getParam only.
-_PARAMTABLE_RE = re.compile(r"^static\s+const\s+WsParam\s+wsParams\s*\[\s*\]\s*=\s*\{", re.MULTILINE)
+# RAM-WSP-01: only `constexpr` matches on purpose. A plain `static const` table compiled into RAM
+# (.data) on nRF52 and ESP32; falling back to it makes every table rung a VIOLATION here.
+_PARAMTABLE_RE = re.compile(r"^static\s+constexpr\s+WsParam\s+wsParams\s*\[\s*\]\s*=\s*\{", re.MULTILINE)
+_ANYTABLE_RE = re.compile(r"\bWsParam\s+wsParams\s*\[", re.MULTILINE)
+
+
+def _require_constexpr_table(tbl, blanked: str) -> None:
+    """RAM-WSP-01: a wsParams table that is not `static constexpr` must fail loudly, not vanish."""
+    if tbl is None and _ANYTABLE_RE.search(blanked):
+        raise RuntimeError("wsParams table is not `static constexpr` (RAM-WSP-01: it would sit in RAM)")
+
+
 _PARAMROW_RE = re.compile(r'^[ \t]*WSP_(?:ONOFF|INT|FLOAT|STR)\s*\(\s*"([^"]*)"', re.MULTILINE)
 # The command a settable row sends: the second string literal, `WSP_INT   ("name", "cmd", ...`.
 _PARAMCMD_RE = re.compile(r'^[ \t]*WSP_(?:ONOFF|INT|FLOAT|STR)\s*\(\s*"[^"]*"\s*,\s*"([^"]*)"', re.MULTILINE)
@@ -659,6 +670,7 @@ def scan_producers_text(text: str, relpath: str) -> List[Producer]:
                 ))
     # web_setup.cpp parameter table: every settable row sends "--<cmd> <value>" through the engine
     tbl = _PARAMTABLE_RE.search(blanked)
+    _require_constexpr_table(tbl, blanked)
     if tbl is not None:
         tend = re.compile(r"^\};", re.MULTILINE).search(blanked, tbl.end())
         for m in _PARAMCMD_RE.finditer(blanked, tbl.end(), tend.start() if tend else len(blanked)):
@@ -891,6 +903,7 @@ def scan_handlers(text: str) -> List[Handler]:
         out.append(Handler(param=m.group(1), guard=guards[lineno], line=lineno))
     # the parameter table lives above setParam and ends at its own column-0 `};`
     tbl = _PARAMTABLE_RE.search(blanked)
+    _require_constexpr_table(tbl, blanked)
     if tbl is not None:
         tend = re.compile(r"^\};", re.MULTILINE).search(blanked, tbl.end())
         tbl_end = tend.start() if tend else len(blanked)
@@ -1137,7 +1150,7 @@ def self_test() -> int:
     # -- table rungs: settable WSP_* rows count as handlers (with their #if guard), the read-only
     #    WSP_*_RO rows (getParam side only) and everything outside the table do not --------------
     table_fixture = (
-        "static const WsParam wsParams[] = {\n"
+        "static constexpr WsParam wsParams[] = {\n"
         "    #if defined(FEAT)\n"
         '    WSP_ONOFF ("bmp", "bmp", bBMPON),\n'
         "    #else\n"
@@ -1160,6 +1173,12 @@ def self_test() -> int:
         "}\n"
     )
     tscanned = scan_handlers(table_fixture)
+    try:
+        scan_handlers(table_fixture.replace("static constexpr WsParam", "static const WsParam"))
+        const_refused = False
+    except RuntimeError:
+        const_refused = True
+    expect("a `static const` wsParams table is refused (RAM-WSP-01), not skipped", const_refused)
     expect("scan_handlers() reads the settable table rows with their guards, not the _RO rows",
            sorted((h.param, h.guard) for h in tscanned)
            == [("bmp", "(defined(FEAT))"), ("maxv", ""), ("track", ""), ("txpower", "")])
