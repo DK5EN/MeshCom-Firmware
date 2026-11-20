@@ -22,7 +22,8 @@ campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md
 - **Upstream sync 2026-11-21:** #1269 (APRS-IS weather over Wi-Fi, Mateusz-Krajewski, merged by Kurt 2026-11-20)
   merged into fork-dev as `6731af6c`; both conflicts kept both sides, merge diff = upstream PR diff. Fork test pins
   and the variant-ini golden followed. Known upstream issue: the `--aprswx on/off` rows fall through into the status
-  rung (BLE gets no node settings); fork fix `632aa9b3` `temp(aprswx)`, revert when upstream fixes it. Gate: 3898 Unity
+  rung (BLE gets no node settings); fork fix `632aa9b3` `temp(aprswx)`, revert when upstream fixes it. Reported on #1269
+  (comment 2026-11-20, issuecomment-7053480377). Gate: 3898 Unity
   cases, selftest green, Heltec V3, T-Beam, T-Deck, RAK build. Not in `v4.40a.11.20`.
 - **Fleet:** unchanged on `029eb2f5` (DK5EN-1, -90, -98); nobody runs the release image yet.
 - **Open:** flash the bench fleet with the release (DK5EN-98 only with an explicit OK); remove worktrees and branches
