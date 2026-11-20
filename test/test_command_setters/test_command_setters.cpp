@@ -873,7 +873,7 @@ static void test_au_tick_and_wifi_gate_are_wired_in_esp32_main()
     const std::string m = read_repo_file("src/esp32/esp32_main.cpp");
 
     // D15: AU starts WiFi only with an SSID set and not in AP mode (wifi_start_gate.h, truth-table test)
-    const size_t gate = m.find("if(wifiStartWanted(bGATEWAY, bEXTUDP, bWEBSERVER, bNETCONSOLE, meshcom_settings.node_autoupd, bWIFIAP, meshcom_settings.node_ssid))");
+    const size_t gate = m.find("if(wifiStartWanted(bGATEWAY, bEXTUDP, bWEBSERVER, bNETCONSOLE, meshcom_settings.node_autoupd, bWIFIAP, meshcom_settings.node_ssid, bAPRSWX))");   // + MCFW-WX1 (upstream #1269)
     TEST_ASSERT_TRUE_MESSAGE(gate != std::string::npos, "WiFi STA gate does not include the D15 AU rule (wifiStartWanted)");
     TEST_ASSERT_TRUE_MESSAGE(m.find("fwTimerInit(s_auTimer") != std::string::npos, "fwTimerInit is not called");
     TEST_ASSERT_TRUE_MESSAGE(m.find("fwTick(s_auTimer") != std::string::npos, "fwTick is not called");
