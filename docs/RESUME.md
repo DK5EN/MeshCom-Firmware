@@ -1,6 +1,6 @@
 # RESUME -- pick up here
 
-**Resume here: section "State 2026-11-19" below (upstream wave 2: #1280 merged, #1281 open); campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md).** Bulk build and flash done;
+**Resume here: section "State 2026-11-19" below (upstream wave 2: #1280 and #1281 merged and synced); campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md).** Bulk build and flash done;
 central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md)), fixes and release **F-1**. Deadline: upstream wave 2
 (Ping plus web GUI) on **2026-11-20**, which needs PING-NRF-01 and the browser rows from B-1.
 
@@ -10,11 +10,11 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
   - Ping: [icssw-org #1280](https://github.com/icssw-org/MeshCom-Firmware/pull/1280) **merged** 2026-11-19 14:12 UTC
     by oe1kbc as merge commit `4cfa2ac2` (two parents, our five commits unchanged). Synced into fork-dev 2026-11-19 by
     merge, all seven PR paths on the fork side, tree unchanged. Worktree `../MeshCom-PR-next` and branch `pr/ping-hold-budget` removed (local and origin).
-  - Web: [icssw-org #1281](https://github.com/icssw-org/MeshCom-Firmware/pull/1281) open, ready for review. Branch
-    `pr/web-gui` (worktree `../MeshCom-PR-web`, pushed) from `upstream/dev` `70ae124d`, three commits (board LED
-    steady, pin policy + GPIO control, web GUI). 48 files, +7277/-1984. 35 envs build, flash 27-31 KB below `dev`,
-    upstream host tests 264/264, browser PASS on DK5EN-1 and DK5EN-90 with the PR image (cold cache, Chrome and
-    Safari). Open: RAK RAM +3.6 KB unexplained. Body `~/WebDev/pr-web-gui-body.md`.
+  - Web: [icssw-org #1281](https://github.com/icssw-org/MeshCom-Firmware/pull/1281) **merged** 2026-11-19 23:03 UTC
+    by oe1kbc as merge commit `45f66dc7` (our three commits unchanged: board LED steady, pin policy + GPIO control, web
+    GUI). Synced into fork-dev 2026-11-20 by merge `ffb080a5`, all PR paths on the fork side, tree unchanged (the gate
+    of `029eb2f5` covers it). Worktree `../MeshCom-PR-web` and branch `pr/web-gui` (local and origin) still exist.
+    Open from the PR: RAK RAM +3.6 KB unexplained.
   - Out of the web PR: RM1 commands (wave 4), AU install schedule (wave 6), bench screenshot endpoints,
     `NRF52_NO_ETH`. The PR's `mcrm.js` already has the wave-4 cards; upstream nodes refuse those commands.
 - **Found in the web PR bench, fixed on fork-dev `029eb2f5`:** WEB-LOAD-01 (the RAK refuses parallel asset requests,
@@ -23,7 +23,7 @@ central bench **B-1** running (list: [bench-b1-20261115.md](bench-b1-20261115.md
 - **Fleet now:** DK5EN-1 and DK5EN-90 run fork-dev `029eb2f5` (normal build, USB), DK5EN-98 runs `029eb2f5` since
   2026-11-19 15:35 CET (OTA, operator OK; was `aa8e1b45`), gateway connected after the flash. DK5EN-14 and -92
   unchanged.
-- **Open:** answer maintainer questions on #1281; TD-34 icon repaint; CET-RESTAMP-01
+- **Open:** remove worktree and branch of #1281; TD-34 icon repaint; CET-RESTAMP-01
   answers; `/release-firmware` (read AU-24 first); RAK RAM +3.6 KB of the web PR.
 
 ## State 2026-11-16 late
