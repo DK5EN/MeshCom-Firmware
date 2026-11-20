@@ -270,7 +270,7 @@ Four envs build and link on the trial branch. The baseline is the same env on `u
 | `ttgo_tbeam`             | 1,877,445      | 1,842,825   | -34,620 | 104,664      | 105,704   | +1,040 |
 
 The gzip assets pay for themselves: flash shrinks by 29-35 KB on every env. That answers the open flash question from
-part B. The nRF52 RAM growth (+3.6 KB) is not explained yet; check `web_txbuf` and the pin tables. Not built: E22,
+part B. The nRF52 RAM growth (+3.6 KB) is explained in section "RAM delta of #1281 (2026-11-20)" below. Not built: E22,
 T-Beam Supreme, T-Deck Plus, and an env without a web server. All of these are needed for R2.
 
 ### Must come along (compile-time, in scope)
@@ -312,3 +312,32 @@ setters, every JS endpoint except the three Pins endpoints (served by the copied
 Still to decide by hunk while porting: `web_rm_page.cpp` and `mcrm.js` call RM1 commands of wave 4. They compile, but
 upstream nodes refuse them (accepted in decision 1). `web_assets.h` stays consistent because the sources were not
 trimmed; regenerate it with `tools/gen_web_assets.py --check`, which has to come along too.
+
+## RAM delta of #1281 (2026-11-20)
+
+Measured, not estimated: `wiscore_rak4631` and `heltec_wifi_lora_32_V3` built at `4cfa2ac2` (upstream before #1281)
+and `45f66dc7` (after), then `nm -S` over the `.data`/`.bss` symbols of both ELFs, diffed per symbol (`objdump -t` for
+the sections). Throwaway worktree pinned to each SHA, removed afterwards.
+
+| Env                      | RAM before | RAM after | PIO delta | Symbol delta |
+| ------------------------ | ---------- | --------- | --------- | ------------ |
+| `wiscore_rak4631`        | 99,356     | 102,956   | +3,600    | +3,607       |
+| `heltec_wifi_lora_32_V3` | 129,380    | 130,436   | +1,056    | (below)      |
+
+| Symbol                   | RAK    | Heltec V3 | Section                 | Cause                                                                                                                                                                                                                                       |
+| ------------------------ | ------ | --------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sub_pin_status()::body` | +2,200 | 0         | `.bss`                  | `static char body[PIN_STATUS_JSON_MAX]`, nRF52 only (`web_functions.cpp`, `#if defined(NRF52_SERIES)`); on ESP32 the buffer is on the stack. Deliberate: 8 KB loop stack.                                                                   |
+| `wsParams`               | +880   | +1,000    | `.data` / `.dram0.data` | the new `static const WsParam wsParams[]` table in `web_setup.cpp` lands in RAM, not flash, on both chips. Likely the captureless-lambda function pointers of the `WSP_*` macros stop constant initialisation into `.rodata`; not verified. |
+| `sub_pin_assign()::body` | +512   | 0         | `.bss`                  | `static char body[PIN_ASSIGN_JSON_MAX]`, nRF52 only, same reason as above.                                                                                                                                                                  |
+| `s_tx` (`WebTxBuf`)      | +16    | +16       | `.bss`                  | three diagnostic counters.                                                                                                                                                                                                                  |
+| `s_gpio`                 | 0      | +32       | `.bss`                  | GPIO control, ESP32 only.                                                                                                                                                                                                                   |
+
+Result: the RAK delta is fully accounted for (2,200 + 880 + 512 + 16 = 3,608). The ESP32 delta is almost all `wsParams`.
+Two thirds of the RAK growth are the two deliberate nRF52 static JSON buffers; the one unintended item is `wsParams`
+sitting in RAM on every board. The Heltec `nm` list also shows the gzip assets as data symbols, but `objdump` puts
+them in `.flash.rodata`, so they cost no RAM. At 102,956 of 248,832 bytes the RAK keeps about 146 KB for heap and
+stacks; nothing here is urgent.
+
+Levers, open for an operator decision: move `wsParams` to flash (about 880-1,000 bytes on every board, small change
+in `web_setup.cpp`); share one buffer between the two pin handlers (512 bytes, nRF52); allocate the buffers per
+request instead (2,712 bytes static, costs heap fragmentation risk).
