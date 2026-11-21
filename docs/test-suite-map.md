@@ -92,6 +92,13 @@ refuses the Safeboot handover with `bootloader_dio`; fails on the pre-fix `comma
 `tools/tests/test_nimble_patch.py` (5 cases, AU-19: the build-time NimBLE `ble_hs_timer_reset()` patch of
 `tools/nimble_patch.py` -- original to stop-only, idempotent, unknown or doubled text raises, path and `lib_deps` check).
 
+Added 2026-11-21 (wave 3 fixes W1, `c22cb3d2`, campaign-wave3-fixes-20261122.md): new envs `native_eth_dns`
+(`test_eth_dns`, 7 cases, RAK-ETH-DNS-01), `native_netmode_label` (`test_netmode_label`, 4, RAK-NETMODE-01) and
+`native_rf_pa` (`test_rf_pa`, 3, TBEAM1W-PWR-01); pytest site pins `tools/tests/test_nrf_eth_dns_sites.py` (4) and
+`tools/tests/test_info_netmode_site.py` (3). Extended: `test_nrf52_settings_paths` 32 -> 37 and `test_mask_secret`
+6 -> 13 (SEC-DUMP-01), `test_udp_frame_twin` +4 (GW-GROUP-01, GW-DM-01, D2, D4), `test_regex_call` to 20
+(GW-CALL-01 hint), `test_command_setters` +1 (WEB-TEMPOFF-01). Gate after the wave: Unity 119 envs, 4047 cases.
+
 The per-suite sums were recomputed from the tree on 2026-10-04 (every
 `RUN_TEST` under `test/test_*`). The totals before that date were stale: the
 old header said 96 suites / 1563 cases, while the table below already listed

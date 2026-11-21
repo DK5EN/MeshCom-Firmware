@@ -7,6 +7,9 @@ Fassung 9; working checklist: operator's Desktop `MeshCom-Checkliste-20261115.md
 
 ## Now (2026-11-21 late)
 
+- **Wave 3 fix campaign running:** [campaign-wave3-fixes-20261122.md](campaign-wave3-fixes-20261122.md) (resume
+  point: section "Next"). Wave 1 committed `c22cb3d2`: #1291, #1289, #1290, #1296, #1301 fixed and gated, bench
+  pending. Waves 2-4 (GPS/OTA/DHT, APRS/TDECK, display paging), then the bench.
 - **Wave 3 by 2026-11-26 (operator 2026-11-21):** 2-4 topical PRs from `upstream/dev` (network/gateway,
   commands/APRS, display/position, update/sensors). Content: fork fixes already done (ETH-06, `temp(aprswx)` as a
   real fix, CMD-DASH-01, AU-27, TD-LOCK-01, TBEAM-SLEEP-01) plus the ticket fixes that pass gate and bench by

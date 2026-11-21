@@ -182,3 +182,11 @@ five-line change in `update_header_batt_indicator()`).
 - [x] Upstream: `git show upstream/dev:src/t-deck/lv_obj_functions.cpp`, `:src/loop_functions.cpp`, `:src/loop_functions_extern.h`.
 - [ ] Not verified: header width on the real panel (bench step 5); that no `.cpp` in the T-Deck envs overrides `bDisplayVolt`
       (grep found none); nothing was built or run in this session.
+
+## Operator decisions 2026-11-21
+
+- Open question 1: the T-Deck header shows the voltage with one decimal, `%.1fV` (e.g. `3.9V`), against the
+  recommendation.
+- Open question 2: one formatting helper shared with the OLED volt display, against the recommendation. The helper takes
+  the precision; the OLED keeps two decimals (`%5.2fV`, `loop_functions.cpp` three sites), so OLED boards show no
+  visible change.
