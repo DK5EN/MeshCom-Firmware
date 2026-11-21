@@ -5,6 +5,12 @@
 
 ## State 2026-11-21
 
+- **Firmware ticket triage 2026-11-21** ([campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.md)): the 59
+  open firmware tickets of the telegram incident desk with a 2026-11-21 check verdict. 33 closed in the desk as
+  already-implemented with linked fix commits; 3 closure proposals (P-0053, P-0104, P-0125) wait for the operator;
+  P-0159 and P-0258 stay open. The 21 open defects got 10 advisor-reviewed fix plans (`docs/plan-*-20261121.md`)
+  and 21 Implement rows (SEC-DUMP-01 first, P-0380); desk status ready. Nothing implemented; operator decisions
+  listed in the campaign doc.
 - **Release `v4.40a.11.22`** (Latest since 2026-11-21, CI run `44939256914` green), tag on `be631284`, cut from
   `fork-dev` by operator decision. Content: ETH-06 (RAK main loop hang after a W5100S reset), AppLink (APPLINK-01,
   off by default, memory taken only while on), CMD-DASH-01, WEB-NAV-02, PONG-SIGN-01. Gate PASS (4012 Unity in 116

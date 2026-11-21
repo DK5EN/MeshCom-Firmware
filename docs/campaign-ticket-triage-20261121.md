@@ -16,10 +16,10 @@ orchestrator at the gates only.
 
 ## Waves
 
-| Wave | Content                                                                                        | State   |
-| ---- | ---------------------------------------------------------------------------------------------- | ------- |
-| 1    | Haiku recon: B/C fix commits and closure evidence, A re-verify at HEAD; Sonnet plan for P-0380 | done    |
-| 2    | Sonnet plans per group: display, possym, aprs, ethnet, gwroute, ota, misc                      | running |
+| Wave | Content                                                                                        | State |
+| ---- | ---------------------------------------------------------------------------------------------- | ----- |
+| 1    | Haiku recon: B/C fix commits and closure evidence, A re-verify at HEAD; Sonnet plan for P-0380 | done  |
+| 2    | Sonnet plans per group: display, possym, aprs, ethnet, gwroute, ota, misc                      | done  |
 
 Wave 2 groups: display (P-0021 0384 0345 0059), possym (P-0166 0167 0383 0081), aprs (P-0044
 0386 0179), ethnet (P-0154 0163), gwroute (P-0381 0382 0210), ota (P-0209), misc (P-0030 0351
@@ -43,10 +43,32 @@ Wave 1 (2026-11-21, HEAD `c85e5805`):
 - P-0380: plan `plan-nrf52-dumpsettings-secrets-20261121.md`, advisor rework applied (BLE image row was stale, AppLink
   row, test counts 32 -> 36), backlog row SEC-DUMP-01, desk status ready.
 
+Wave 2 (2026-11-21):
+
+- Nine plans for the other 20 open tickets, two Opus advisor passes. Six approved with minor edits; display paging and
+  autosymbol/NEXT reworked (browse depth none for slot 5 and an out-of-bounds write at boot; two wrong test values).
+- 20 Implement rows in `BACKLOG.md` 3.2; desk status ready with plan and backlog id for all 20 tickets.
+
+| Plan                                        | Tickets -> backlog id                                                            |
+| ------------------------------------------- | -------------------------------------------------------------------------------- |
+| plan-nrf52-dumpsettings-secrets-20261121.md | P-0380 SEC-DUMP-01                                                               |
+| plan-display-paging-20261121.md             | P-0021 DISP-PAGE-01, P-0384 DISP-PAGE-02, P-0059 DISP-PAGE-03, P-0345 BTN-OFF-01 |
+| plan-gps-autosymbol-nextpos-20261121.md     | P-0383 GPS-AUTOSYM-01, P-0166 -02, P-0167 -03, P-0081 POSINFO-NEXT-01            |
+| plan-aprs-text-limits-20261121.md           | P-0044 APRS-TXT-01, P-0386 -02, P-0179 -03                                       |
+| plan-rak-eth-dns-netmode-20261121.md        | P-0154 RAK-ETH-DNS-01, P-0163 RAK-NETMODE-01                                     |
+| plan-gateway-routing-20261121.md            | P-0381 GW-GROUP-01, P-0382 GW-DM-01, P-0210 GW-CALL-01                           |
+| plan-ota-safeboot-gate-20261121.md          | P-0209 OTA-SAFEBOOT-01                                                           |
+| plan-tbeam1w-txpower-20261121.md            | P-0030 TBEAM1W-PWR-01                                                            |
+| plan-dht-probe-20261121.md                  | P-0351 DHT-PROBE-01                                                              |
+| plan-web-tempoffsetoutdoor-20261121.md      | P-0385 WEB-TEMPOFF-01                                                            |
+
 ## Open / needs operator
 
 - P-0159 (T-Deck flush): not closed. Only a workaround exists (NOP flush, `tdeck_main.cpp:597`), root cause unknown.
 - P-0258: not closed. "not-ours" holds only for McApp; the request (group filter in the node's own web message list,
   `web_functions.cpp` ~3850-3917) is an unmet firmware feature. Suggest needs-info or a feature row.
-- P-0167: problem file says duplicate of P-0166, desk status new; closed in the desk as duplicate at gate 2.
+- P-0167: problem file says closed as duplicate of P-0166, but the defect needs its own fix (GPS-AUTOSYM-03); desk set to
+  ready. Reopen the problem file at the next sync?
+- Plan decisions: each plan has a Decisions section (gateway D1-D5, OTA D1-D5, APRS D1-D4, DHT D1-D2, display,
+  autosymbol, Ethernet). P-0030 bench above 2 dBm needs an explicit OK (conducted into a dummy load).
 - P-0380: mask `bt_code` in the dump (plan default) although `--info` shows it (CQ-01)? Include the legacy `node_pwd`?
