@@ -1,10 +1,18 @@
 # RESUME -- pick up here
 
-**Resume here: section "State 2026-11-21" below (fork release `v4.40a.11.21` out, Latest; upstream PRs #1285 (REVIEW.md) and #1286
+**Resume here: section "State 2026-11-21" below (fork release `v4.40a.11.22` out, Latest; upstream PR #1286
 (nav buttons, pong id) open); campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md).**
 
 ## State 2026-11-21
 
+- **Release `v4.40a.11.22`** (Latest since 2026-11-21, CI run `44939256914` green), tag on `be631284`, cut from
+  `fork-dev` by operator decision. Content: ETH-06 (RAK main loop hang after a W5100S reset), AppLink (APPLINK-01,
+  off by default, memory taken only while on), CMD-DASH-01, WEB-NAV-02, PONG-SIGN-01. Gate PASS (4012 Unity in 116
+  envs, 1632 pytest); T-Beam idle heap 65,860 B (baseline 64,016 B). Assets verified: 69, names as 11.21, 28
+  `.autoupdate` with `78 da` and byte-exact re-inflate, tag string in the Heltec V3 image, T-Deck field commands
+  `mute=2 stat=1 udplog=1 injectraw=0`. Web flasher published with `--keep 1` (11.21 pruned), Pages synced.
+  Release safeboot identical to the repo root. Bench nodes DK5EN-1, -90, -92 run local release-candidate images of the
+  same commit. Open: app side of AppLink with the app maintainer; field confirmation of ETH-06 on DB0AIS-12 (DG3FBL).
 - **Bench 2026-11-21:** new Heltec V3 flashed as DK5EN-1 (chip erased first: it ran a foreign TNC firmware whose NVS
   left MeshCom unable to save), WiFi .80; RAK DK5EN-90 on an INSTRUMENT image, .78. ETH-06 verified on hardware with
   the new bench hook `--ethdrop hw` (forces the DB0AIS DHCP-fail chip reset); AppLink verified on both boards incl. a
