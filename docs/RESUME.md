@@ -5,6 +5,9 @@
 
 ## State 2026-11-21
 
+- **Upstream sync 2026-11-21:** `upstream/dev` `5698913a` (our #1285, REVIEW.md) merged into fork-dev as `29d9d65c`;
+  only REVIEW.md changed, now byte-identical to upstream. Gate PASS (4012 Unity, 1631 pytest). Merged PR worktrees and branches
+  `pr/review-november`, `pr/web-gui` removed (local and origin); `pr/nav-pong` (#1286, open) and `../mc-web-trial` kept.
 - **AppLink (APPLINK-01) merged into fork-dev** (from worktree `MeshCom-Firmware-applink`, now removed): WebSocket
   phone link on port 8002 for ESP32 and RAK4631+RAK13800, setting `node_sset2` 0x0010 + marker 0x2000, `hw` sent as
   board name, `applinkChipReset()` and `alOwnsSock()` on the RAK (ETH-06 interaction, advisor rework). Gate PASS,
@@ -37,7 +40,7 @@ injectraw=0`. Gate PASS 3900 Unity cases in 111 envs. Idle heap on DK5EN-92 waiv
 - **Upstream PR [icssw-org #1285](https://github.com/icssw-org/MeshCom-Firmware/pull/1285)** open since 2026-11-21:
   `REVIEW.md` November additions (F-13 downgrade, H-17 command prefix, R1 two representations, R2 release files, R3
   web across browsers and on the RAK, F-06 to F-09, T114), branch `pr/review-november`, worktree `../MeshCom-PR-next`.
-  After the merge: `/sync-upstream`, then remove worktree and branch.
+  **Merged upstream 2026-11-21** (`5698913a`), synced as `29d9d65c`; worktree and branch removed (local and origin).
 - **Reply to DK1TCP** drafted (Desktop `antwort-pit-20261121.html`); open: his answer A (keep 60 px nav buttons) or B
   (shrink).
 - **AU-27 fixed on fork-dev (field report DK1TCP, Heltec V3):** after an AU install of `v4.40a.11.20` and an OTA-flasher
@@ -68,7 +71,7 @@ injectraw=0`. Gate PASS 3900 Unity cases in 111 envs. Idle heap on DK5EN-92 waiv
     import); lowercase hemisphere from T-Deck/T-Deck Pro setup; dead map-centre fallback `esp32_main.cpp` ~4966.
 - **Merged upstream 2026-11-21 09:31 UTC** (`cd89e6e0`), synced into fork-dev as `0110fd3c`: no-op merge, the merged
   tree equals the pre-merge tree (fork-dev carried the whole PR in `99186bd2` and `b5ac3476`).
-- **Open:** remove worktree `../MeshCom-PR-next` and branch `pr/track-hemisphere` (local and origin).
+- Worktree `../MeshCom-PR-next` and branch `pr/track-hemisphere` are gone.
 
 ## State 2026-11-20
 
@@ -107,7 +110,7 @@ injectraw=0`. Gate PASS 3900 Unity cases in 111 envs. Idle heap on DK5EN-92 waiv
   - Web: [icssw-org #1281](https://github.com/icssw-org/MeshCom-Firmware/pull/1281) **merged** 2026-11-19 23:03 UTC
     by oe1kbc as merge commit `45f66dc7` (our three commits unchanged: board LED steady, pin policy + GPIO control, web
     GUI). Synced into fork-dev 2026-11-20 by merge `ffb080a5`, all PR paths on the fork side, tree unchanged (the gate
-    of `029eb2f5` covers it). Worktree `../MeshCom-PR-web` and branch `pr/web-gui` (local and origin) still exist.
+    of `029eb2f5` covers it). Worktree `../MeshCom-PR-web` and branch `pr/web-gui` removed 2026-11-21 (local and origin).
     RAK RAM +3.6 KB of the PR explained 2026-11-20: two nRF52 static JSON buffers (2,712 B, deliberate) and the
     `wsParams` table in RAM instead of flash (880 B RAK, 1,000 B ESP32); section "RAM delta of #1281" in
     [upstream-wave2-content-20261115.md](upstream-wave2-content-20261115.md). `wsParams` moved to flash on fork-dev
