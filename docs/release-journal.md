@@ -1,11 +1,41 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261120`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261121`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
 Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `release.md` im
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
+
+---
+
+## Release v4.40a.11.21 (Samstag, 2026-11-21)
+
+Gebaut und veröffentlicht von GitHub CI (`MeshCom CI`, Tag `v4.40a.11.21`, `MC_BUILD_TAG` und `MC_AU_DEV_CHANNEL=1` gesetzt), 69 Assets wie `v4.40a.11.20`.
+`FLASH_VERSION` 20261121, `FLASH_STRUCT_VERSION` 20260724 unverändert, die Einstellungen bleiben erhalten. Die sechs neuen APRS-IS-Einstellungen starten mit ihren Vorgaben (Funktion aus); ESP32 und nRF52 speichern Einstellungen nach Namen, die neuen Zeilen verschieben nichts. Safeboot unverändert seit `v4.40a.11.20`.
+Basis ist `upstream/dev` vom 2026-11-21 mit unserem PR #1284 (`cd89e6e0`), gesynct als `0110fd3c` ohne Änderung am Baum. Upstream hat seit dem offiziellen `v4.40a.11.14` #1280, #1281, #1269 und #1284 gemerged, aber nichts davon released. Der Flash-Stempel in `--info` (`FLASH_VERSION 20261121`, `tag=v4.40a.11.21`) unterscheidet dieses Release.
+Noch einmal direkt aus `fork-dev` geschnitten, Betreiber-Entscheidung 2026-11-21; der stabile Zweig `fork-nightly` (NIGHTLY-01) bleibt geplant.
+
+Inhalt, neu gegenüber `v4.40a.11.20`:
+
+- Auto Update (AU-27, nur Fork): ein von Hand zurückgestufter Knoten bekommt das neuere Release wieder angeboten. Die Sperre "zuletzt installierter Tag" (NVS `fwstage/last`) gilt nur noch für ein Image ohne Datum in der Version. Feldmeldung: Heltec V3, Auto Update auf 11.20, Rückstufung auf 11.08 per OTA-Flasher, danach meldete Auto Update "aktuell" (`a43dd28e`).
+- GPS und TRACK (upstream #1284, schließt #1279 und #1278): der TRACK-Wendebeacon behält W und S, der RAK4631 speichert die eigene Position als Betrag mit Buchstabe, acht Leser der eigenen Position und fünf T-Deck-Kartenrückfälle rechnen vorzeichenrichtig (`99186bd2`, `b5ac3476`).
+- APRS-IS-Wetter über WLAN (upstream #1269, Mateusz-Krajewski): `--aprswx`, `--aprswxint`, `--aprswxcall`, `--aprsis server`, `--aprsis pass`; aus per Vorgabe, eigenes WX-Rufzeichen Pflicht (`6731af6c`). Fork-Fix `632aa9b3` `temp(aprswx)`: `--aprswx on/off` antwortet dem Telefon über BLE wieder mit den Einstellungen; zurücknehmen, wenn upstream es behebt (gemeldet auf #1269).
+- Bekannt und akzeptiert: unter Linux mit klassischem Scrollbalken wirken die Navigationsknöpfe seit 11.20 fast doppelt so groß (WEB-NAV-01, Sollgröße 60 px statt vorher etwa 45 px). Rückfrage beim Melder, ob verkleinert werden soll.
+
+Handlungsbedarf: keiner. Wer von vor `v4.40a.11.20` kommt, liest die Kästen in den Release Notes (T-Beam-Tiefschlaf, nRF52-Ping, Heltec-V4-I2C).
+
+### Was für dieses Release auf Hardware geprüft wurde
+
+- Produktions-Gateway DK5EN-98: `v4.40a.11.20` per Auto Update über die Web-Seite seit 2026-11-21 10:50, Betreiber-OK, Gateway danach wieder verbunden. Das neue Release läuft dort noch nicht.
+- Host-Gate `tools/regression.sh --stage 1,2` auf dem getaggten Stand: PASS, 3900 Unity-Testfälle in 111 Envs. Heltec V3 lokal gebaut nach der letzten Code-Änderung. AU-27 mit Test, der auf dem alten Code scheitert; W/S mit acht Pins, die auf dem alten Quelltext scheitern. Beide Fixes vor dem Commit unabhängig geprüft.
+
+### Was ausdrücklich NICHT geprüft wurde
+
+- Idle-Heap-Messung auf dem T-Beam DK5EN-92 mit dem Release-Image: entfallen, Betreiber-Entscheidung 2026-11-21.
+- AU-27: die Rückstufung selbst nicht auf einem Knoten nachgestellt.
+- W/S: kein Knoten westlich oder südlich, kein TRACK-Beacon auf der Luft geprüft.
+- APRS-IS-Wetter: nicht auf unserem Bench, nur Host-Tests und Builds.
 
 ---
 
