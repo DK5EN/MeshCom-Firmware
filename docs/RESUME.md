@@ -20,6 +20,9 @@ campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md
     rounds. Not benched: no node west/south, no on-air TRACK check.
   - **Left out, follow-ups:** negative `node_lat` writers (T-Deck position entry `event_functions.cpp`, `config_json.h`
     import); lowercase hemisphere from T-Deck/T-Deck Pro setup; dead map-centre fallback `esp32_main.cpp` ~4966.
+- **Pre-synced:** `fork-dev` already carries the whole PR (`99186bd2` firmware, `b5ac3476` `.gitignore` ends exactly like
+  the PR's). `git merge-tree fork-dev pr/track-hemisphere` is clean and the merged tree equals `fork-dev` (2026-11-21),
+  so the post-merge sync should be a no-op merge commit.
 - **Open:** after merge `/sync-upstream` (merge path), then remove worktree `../MeshCom-PR-next` and branch
   `pr/track-hemisphere` (local and origin).
 
