@@ -28,6 +28,16 @@ The category is the header comment's own claim. Many unit suites also cite a
 defect id; "Regression" is used only where the incident is the suite's sole
 reason to exist.
 
+Added with the AppLink campaign (2026-11-21, `docs/campaign-applink-20261121.md`; source unbuilt, counts are
+`RUN_TEST` counts): `test_applink_ws` (RFC 6455 handshake, frame codec, SHA-1/base64), `test_applink_auth` (HMAC
+login), `test_applink_conn` (connection engine on a fake io: upgrade, login, heartbeat, timeouts, output buffer),
+`test_phone_link` (the BLE/NET phone-link selector). Extended: `test_ble_phone_harness` (+3 NET sink tests: mtu 0 never
+counts truncated, busy keeps the frame and resends, link down never pops), `test_ble_session` (+3 `keepPhone`
+session-reset tests), `test_config_json` (+3 `test_applink_*`: the persisted `node_sset2` 0x0010 bit and 0x2000
+CONFIGURED marker survive normalise and the config round trip and toggle rows, a stale `--gpsdebug` bit is off),
+`test_charge_led_mode` (the `node_sset2` in-use bit list gains 0x0010 and 0x2000; no new case); pytest
+`tools/tests/test_applink_client.py` (12 cases, the `tools/bench/applink_client.py` bench client).
+
 Added with the NTP/TZ/RTC campaign (2026-10-04, `docs/ntp-tz-rtc-wave-plan.md`):
 `test_rtc_offset` (RTC-1..3: UTC round trip, refresh gate; Regression),
 `test_tz_rule` (TZ-01 POSIX rule parser against the host `localtime_r` oracle;
@@ -174,10 +184,13 @@ flashes whatever is attached.
 | test_batt_detect             | Regression    |    31 | native_batt_detect                                           |
 | test_batt_pipeline           | Unit          |    67 | native_batt_pipeline                                         |
 | test_beacon_rate             | Regression    |     9 | native                                                       |
+| test_applink_auth            | Unit          |    18 | native_applink_auth                                          |
+| test_applink_conn            | Unit          |    21 | native_applink_conn                                          |
+| test_applink_ws              | Contract      |    31 | native_applink_ws                                            |
 | test_ble_json_frame          | Regression    |     8 | native                                                       |
 | test_ble_phone_frame         | Contract      |     8 | native_ble_phone_frame                                       |
-| test_ble_session             | Regression    |    14 | native_ble_session                                           |
-| test_ble_phone_harness       | Integration   |    25 | native_ble_phone_harness                                     |
+| test_ble_session             | Regression    |    17 | native_ble_session                                           |
+| test_ble_phone_harness       | Integration   |    28 | native_ble_phone_harness                                     |
 | test_ble_settings_v1         | Contract      |    10 | native_ble_settings_v1                                       |
 | test_blocked_calls           | Unit          |    31 | native_blocked_calls                                         |
 | test_bp_echo_guard           | Regression    |    10 | native                                                       |
@@ -192,7 +205,7 @@ flashes whatever is attached.
 | test_command_toggles         | Unit          |    37 | native_command_toggles                                       |
 | test_compress                | Unit          |    12 | native                                                       |
 | test_conf_frame              | Unit          |    12 | native_conf_frame                                            |
-| test_config_json             | Contract      |    25 | native_config                                                |
+| test_config_json             | Contract      |    35 | native_config                                                |
 | test_country_twin            | Twin          |     5 | native_country_esp32, native_country_nrf52                   |
 | test_csma_timing             | Unit          |    10 | native                                                       |
 | test_daylight                | Unit          |    11 | native_daylight                                              |
@@ -228,6 +241,7 @@ flashes whatever is attached.
 | test_fw_update_http          | Unit          |    13 | native_fw_update_http                                        |
 | test_hmac_sha256             | Unit          |    20 | native_hmac_sha256                                           |
 | test_kiss_frame              | Unit          |    18 | native_kiss_frame                                            |
+| test_phone_link              | Unit          |    11 | native_phone_link                                            |
 | test_pong_format             | Unit          |     7 | native_pong_format                                           |
 | test_loop_breadcrumb         | Unit          |    11 | native                                                       |
 | test_loop_scheduler          | Twin          |    26 | native_loop_scheduler                                        |

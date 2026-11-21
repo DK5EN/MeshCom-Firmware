@@ -2584,6 +2584,100 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_applink_auth": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-I test/support",
+   "-Wall",
+   "-Wextra",
+   "-g",
+   "-fsanitize=address,undefined",
+   "-fno-omit-frame-pointer"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<hmac_sha256.cpp>"
+  ],
+  "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_applink_auth"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_applink_conn": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-I test/support",
+   "-Wall",
+   "-Wextra",
+   "-g",
+   "-fsanitize=address,undefined",
+   "-fno-omit-frame-pointer"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<sha1_base64.cpp>",
+   "+<applink_ws.cpp>",
+   "+<applink_conn.cpp>",
+   "+<hmac_sha256.cpp>"
+  ],
+  "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_applink_conn"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_applink_ws": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-I test/support",
+   "-Wall",
+   "-Wextra",
+   "-g",
+   "-fsanitize=address,undefined",
+   "-fno-omit-frame-pointer"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<sha1_base64.cpp>",
+   "+<applink_ws.cpp>"
+  ],
+  "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_applink_ws"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_aprs": {
   "build_flags": [
    "-std=gnu++17",
@@ -4276,6 +4370,32 @@
    "test_decodeaprspos",
    "test_checkvia",
    "test_pos_tag_nan"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_phone_link": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-I test/support",
+   "-Wall",
+   "-Wextra",
+   "-g",
+   "-fsanitize=address,undefined",
+   "-fno-omit-frame-pointer"
+  ],
+  "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_phone_link"
   ],
   "test_framework": "unity"
  },

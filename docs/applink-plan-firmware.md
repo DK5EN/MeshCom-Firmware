@@ -1,6 +1,6 @@
 # AppLink: implementation plan, firmware
 
-**Status:** draft, 2026-11-21. Contract: `docs/applink-api-contract.md`. App side:
+**Status:** implemented on feat/applink (uncommitted, unbuilt), 2026-11-21. Contract: `docs/applink-api-contract.md`. App side:
 `docs/applink-plan-app.md`.
 
 ## Goal
@@ -136,3 +136,19 @@ sink (no MTU cap, BUSY on a full TCP buffer). Register the envs in `tools/regres
 | RAK socket starvation                          | rule 4, W0 census, W6 combined load test                            |
 | Android background drops the WebSocket         | app side (foreground service); firmware just sees a 45 s timeout    |
 | Upstream reluctance (ext-UDP already exists)   | issue #1276 discussion first; the PR stays off by default and small |
+
+## Implementation state
+
+Deviations from this plan:
+
+- The engine is `src/applink_conn.*` (plus `applink_ws.*`, `applink_auth.h`, `phone_link.h`), not `applink_session.h`.
+- The setting is `node_sset2` bit 0x0010 (value) plus 0x2000 (CONFIGURED marker), not an `sset4` bit
+  (`src/applink.h`; a stale 0x0010 without the marker reads as off). Accepted residual risk (operator,
+  2026-11-21): a node that left both `--gpsdebug on` and the released v4.35p `--checkmesh on` set boots
+  with AppLink on if `--passwd` is set; the boot log says `[APPLINK] on (port 8002)`.
+- RAK glue (`src/nrf52/applink_nrf52.cpp`) calls `EthernetServer::begin()` once and uses `EthernetClient(idx)`,
+  because the library's `socket*` functions are private. The MSS clamp is shared in `src/nrf52/eth_mss.h`.
+- Inbound frames bypass the BLE queue: the glue calls `readPhoneCommand(frame, PL_NET)` in the loop.
+
+Still open: full pio gate, builds of every board env, RAM/flash per board, the RAK socket census, the bench
+(plan W6), and the app side with the app maintainer. Nothing here has been built or run on hardware.

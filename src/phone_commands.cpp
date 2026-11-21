@@ -3,6 +3,8 @@
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include <phone_commands.h>
+#include "phone_link.h"
+#include "applink.h"
 #include <regex_functions.h>
 #include <debugconf.h>
 #include <configuration.h>
@@ -108,6 +110,12 @@ static void blePhoneDrainReport(const char *ring, BlePhoneDrain r, const BlePhon
 	}
 }
 
+/** AppLink sink: one phone frame as one WebSocket binary message (mtu 0 = no clamp). */
+static BlePhoneSend applinkPhoneSink(void *, const uint8_t *buf, uint16_t len)
+{
+    return applinkSendFrame(buf, len);
+}
+
 /**
  * @brief Method to send incoming LoRa messages to BLE connected device
  * 
@@ -124,7 +132,26 @@ void sendToPhone()
 
     ble_busy_flag = true;
 
-    if(g_ble_uart_is_connected && isPhoneReady == 1)
+    BlePhoneSinkFn sinkFn = NULL;
+    uint16_t sinkMtu = 0;
+    bool drainOk = false;
+    switch(g_phoneLink.owner)
+    {
+        case PL_BLE:
+            drainOk = g_ble_uart_is_connected && isPhoneReady == 1;
+            sinkFn = blePhoneSink;
+            sinkMtu = blePhoneMtu();
+            break;
+        case PL_NET:
+            drainOk = applinkSessionUp() && isPhoneReady == 1;
+            sinkFn = applinkPhoneSink;
+            sinkMtu = 0;
+            break;
+        default:   // PL_NONE: frames wait like on a DOWN sink
+            break;
+    }
+
+    if(drainOk)
     {
 		// The drain (src/ble_phone_drain.h) peeks the ring cell, frames it
 		// (blePhoneFrame(): text gets the 0x40 tag, 0x44 JSON and 0x91 MH go
@@ -136,7 +163,7 @@ void sendToPhone()
 		BlePhoneDrainInfo info;
 
 		BlePhoneDrain r = blePhoneDrainOne(&phoneRing, &s_phoneDrain, &g_blePhoneStats,
-		                                   blePhoneSink, NULL, blePhoneMtu(),
+		                                   sinkFn, NULL, sinkMtu,
 		                                   toPhoneBuff, sizeof(toPhoneBuff), &info);
 
 		blePhoneDrainReport("msg", r, info);
@@ -174,7 +201,26 @@ void sendComToPhone()
 
     ble_busy_flag = true;
 
-    if(g_ble_uart_is_connected && isPhoneReady == 1)
+    BlePhoneSinkFn sinkFn = NULL;
+    uint16_t sinkMtu = 0;
+    bool drainOk = false;
+    switch(g_phoneLink.owner)
+    {
+        case PL_BLE:
+            drainOk = g_ble_uart_is_connected && isPhoneReady == 1;
+            sinkFn = blePhoneSink;
+            sinkMtu = blePhoneMtu();
+            break;
+        case PL_NET:
+            drainOk = applinkSessionUp() && isPhoneReady == 1;
+            sinkFn = applinkPhoneSink;
+            sinkMtu = 0;
+            break;
+        default:   // PL_NONE: frames wait like on a DOWN sink
+            break;
+    }
+
+    if(drainOk)
     {
 		// Same drain as sendToPhone(), own retry state. The producer clamps
 		// to 245, the ring takes up to 255.
@@ -182,7 +228,7 @@ void sendComToPhone()
 		BlePhoneDrainInfo info;
 
 		BlePhoneDrain r = blePhoneDrainOne(&phoneComRing, &s_phoneComDrain, &g_blePhoneStats,
-		                                   blePhoneSink, NULL, blePhoneMtu(),
+		                                   sinkFn, NULL, sinkMtu,
 		                                   ComToPhoneBuff, sizeof(ComToPhoneBuff), &info);
 
 		blePhoneDrainReport("com", r, info);
@@ -230,7 +276,19 @@ static void hash_pin(uint32_t pin_code, uint8_t out_hash[32])
 #endif
 }
 
-void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE])
+/** Phone session of `who` ended (loop task only): release the owner and reset the phone-session flags. */
+void phoneSessionEnded(PhoneLinkOwner who)
+{
+	if(phoneLinkRelease(&g_phoneLink, who))
+	{
+		isPhoneReady = 0;
+		config_to_phone_prepare = false;
+		conffin_sent = false;
+		bAckInfo = false;
+	}
+}
+
+void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE], PhoneLinkOwner src)
 {
 	/**
 	 * Config Messages
@@ -301,7 +359,12 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE])
 				// of the zero-padded 6-digit PIN string at conf_data[4..35] (32 bytes).
 				// If bt_code == 0 the original open hello is accepted.
 				bool auth_ok = false;
-				if(meshcom_settings.bt_code > 0 && meshcom_settings.bt_code <= 999999)
+				if(src == PL_NET)
+				{
+					// AppLink login already authenticated this session: no PIN hash.
+					auth_ok = true;
+				}
+				else if(meshcom_settings.bt_code > 0 && meshcom_settings.bt_code <= 999999)
 				{
 					if(msg_len >= 35)
 					{
@@ -337,6 +400,13 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE])
 
 				if(auth_ok)
 				{
+					if(src == PL_BLE && phoneLinkOwnedBy(&g_phoneLink, PL_NET))
+						applinkClose(4409, "taken over by BLE");   // calls phoneSessionEnded(PL_NET)
+
+					PhoneLinkOwner prev = phoneLinkClaim(&g_phoneLink, src);
+					if(prev == PL_BLE)
+						ble_disconnect_requested = true;   // drop the BLE central
+
 					isPhoneReady = 1;
 					config_to_phone_prepare = true;
 					conffin_sent = false;

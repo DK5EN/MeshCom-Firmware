@@ -855,6 +855,10 @@ itself. What is actually decided for implementation (not yet done):
 
 ## 4. BLE phone protocol
 
+The same frames also travel over AppLink (WebSocket, port 8002): one binary message is one frame including its two
+trailing zero bytes, the BLE 244-byte limit does not apply, and the PIN is not used (AppLink has its own HMAC
+login). See [`docs/applink-api-contract.md`](../applink-api-contract.md).
+
 GATT: Nordic UART Service, `SERVICE_UUID 6E400001-B5A3-F393-E0A9-E50E24DCCA9E`,
 phone→node writes on `…0002`, node→phone notifications on `…0003`
 (`src/esp32/esp32_main.cpp:1644`; nRF52 uses the Adafruit BLE UART service

@@ -96,6 +96,7 @@ To set a parameter to the node, use:
 	/setparam/?setowngw=XXX.XXX.XXX.XXX sets a gateway
 	/setparam/?extudpip=XXX.XXX.XXX.XXX sets an external UDP adress
 	/setparam/?extudp=on|off 			Enables the usage of an ext. UDP adres
+	/setparam/?applink=on|off 			Enables the AppLink WebSocket phone link (port 8002; ESP32 and RAK4631+RAK13800; on the RAK AppLink and ext. UDP exclude each other, "on" is refused while extudp is on; read-only on boards without AppLink)
 	/setparam/?kiss=on|off 				Enables the KISS/TCP interface (ESP32, port 8001)
 	/setparam/?kisstx=on|off 			Allows transmit from connected KISS clients
 	/setparam/?kissmeta=on|off 			Sends RSSI/SNR RxMeta frames (KISS port 1)

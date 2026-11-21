@@ -893,6 +893,8 @@ std::atomic<uint32_t> stat_util_tx_5m{0};  // TX-Luftzeit im 5-min-Fenster (ms)
 // (txring_functions.cpp), im STAT-Druck zurueckgesetzt.
 std::atomic<uint8_t> stat_ring_max{0};
 
+PhoneLinkState g_phoneLink = { PL_NONE, 0 };   // phone-link owner (BLE or AppLink); changed in the loop task only
+bool bAPPLINK = false;     // --applink on, restored at boot (applinkSettingOn, node_sset2)
 int isPhoneReady = 0;      // flag we receive from phone when itis ready to receive data
 bool bAckInfo = false;     // --ackinfo on: volatile session flag, reset on BLE disconnect, never in flash
 
@@ -1036,7 +1038,7 @@ void addBLEOutBuffer(uint8_t *buffer, uint16_t len)
  */
 void addBLEComToOutBuffer(uint8_t *buffer, uint16_t len)
 {
-    if (!g_ble_uart_is_connected && !bWEBSERVER)
+    if (!g_ble_uart_is_connected && !bWEBSERVER && !phoneLinkOwnedBy(&g_phoneLink, PL_NET))
         return;
 
     if (len > 245)

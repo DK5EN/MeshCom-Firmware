@@ -5,7 +5,12 @@
 
 ## State 2026-11-21
 
-- **ETH-06 fixed on fork-dev, uncommitted (field log DB0AIS-12, DG3FBL):** the RAK4631 main loop hung for 52 h after a
+- **AppLink (APPLINK-01) merged into fork-dev** (from worktree `MeshCom-Firmware-applink`, now removed): WebSocket
+  phone link on port 8002 for ESP32 and RAK4631+RAK13800, setting `node_sset2` 0x0010 + marker 0x2000, `hw` sent as
+  board name, `applinkChipReset()` and `alOwnsSock()` on the RAK (ETH-06 interaction, advisor rework). Gate PASS,
+  35 of 36 board envs build (`esp32-external-radio` needs a build overlay). Not benched, not released. Resume at
+  [campaign-applink-20261121.md](campaign-applink-20261121.md).
+- **ETH-06 fixed on fork-dev (`e8188e3c`, pushed) (field log DB0AIS-12, DG3FBL):** the RAK4631 main loop hung for 52 h after a
   W5100S hardware reset (DHCP failed twice): the EXTUDP socket stayed latched and `socketSendUDP()` waited forever.
   `initETH_HW()` now drops the EXTUDP socket before the reset and `getExternUDP()` reopens it when Ethernet is up;
   `tools/w5100s_patch.py` bounds the library wait at 3 s. Gate PASS 3918 Unity, 1616 pytest; 5 board envs build.

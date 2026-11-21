@@ -221,6 +221,40 @@ static void test_session_reset_skips_null_members(void)
     TEST_ASSERT_FALSE(a);
 }
 
+static void test_session_reset_keep_phone_only_resets_link(void)
+{
+    int ready = 1; bool u = true, a = true, p = true, f = true, d = true;
+    BleSessionFlags fl = { &ready, &u, &a, &p, &f, &d };
+    bleSessionReset(fl, true);
+    TEST_ASSERT_FALSE(u);
+    TEST_ASSERT_FALSE(d);
+    TEST_ASSERT_EQUAL_INT(1, ready);
+    TEST_ASSERT_TRUE(a);
+    TEST_ASSERT_TRUE(p);
+    TEST_ASSERT_TRUE(f);
+}
+
+static void test_session_reset_keep_phone_false_is_full_reset(void)
+{
+    int ready = 1; bool u = true, a = true, p = true, f = true, d = true;
+    BleSessionFlags fl = { &ready, &u, &a, &p, &f, &d };
+    bleSessionReset(fl, false);
+    TEST_ASSERT_EQUAL_INT(0, ready);
+    TEST_ASSERT_FALSE(u);
+    TEST_ASSERT_FALSE(a);
+    TEST_ASSERT_FALSE(p);
+    TEST_ASSERT_FALSE(f);
+    TEST_ASSERT_FALSE(d);
+}
+
+static void test_session_reset_keep_phone_skips_null_members(void)
+{
+    int ready = 1;
+    BleSessionFlags fl = { &ready, nullptr, nullptr, nullptr, nullptr, nullptr };
+    bleSessionReset(fl, true);
+    TEST_ASSERT_EQUAL_INT(1, ready);
+}
+
 // ---- classification --------------------------------------------------------
 
 static void test_classify_nimble_and_raw_hci_codes(void)
@@ -332,6 +366,9 @@ int main(int, char **)
     RUN_TEST(test_session_reset_skips_null_members);
     RUN_TEST(test_classify_nimble_and_raw_hci_codes);
     RUN_TEST(test_classify_does_not_confuse_0x208_with_other_codes);
+    RUN_TEST(test_session_reset_keep_phone_only_resets_link);
+    RUN_TEST(test_session_reset_keep_phone_false_is_full_reset);
+    RUN_TEST(test_session_reset_keep_phone_skips_null_members);
     RUN_TEST(test_connect_and_adv_counters);
     RUN_TEST(test_reason_text_table);
     RUN_TEST(test_format_exact);

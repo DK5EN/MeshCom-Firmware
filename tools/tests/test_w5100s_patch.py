@@ -133,3 +133,44 @@ def test_firmware_reopens_after_the_chip_reset():
     assert "extudp_on_chip_reset(hasExternIPaddress" in drop
     assert "hasExternIPaddress = false;" in drop
     assert not re.search(r"UdpExtern\.(stop|begin|beginPacket|endPacket|write)\(", drop)
+
+
+def test_firmware_drops_applink_socket_before_the_chip_reset():
+    # ETH-06 x AppLink: the reset runs inside one loop pass, so applinkLoop() never sees "no IP"; afterwards
+    # s_sock may name a socket the chip handed to someone else (gateway UDP) -- AppLink must forget it first.
+    eth = (REPO / "src/nrf52/nrf_eth.cpp").read_text()
+    body = _func_body(eth, "void NrfETH::initETH_HW()")
+    assert "applinkChipReset();" in body
+    assert body.index("applinkChipReset();") < body.index("digitalWrite(WB_IO3, LOW)")
+
+
+def test_applink_chip_reset_never_touches_the_chip():
+    src = (REPO / "src/nrf52/applink_nrf52.cpp").read_text()
+    body = _func_body(src, "void applinkChipReset()")
+    assert not re.search(r"W5100\.|execCmdSn|SPI\.|EthernetClient|s_srv\.", body)
+    # the index is forgotten before the session close, whose alIoClose -> alCloseSocket() would CLOSE it on the chip
+    assert body.index("s_sock = 0xFF;") < body.index("alConnClose(")
+    assert "s_staleSweep = false;" in body  # the reset closed every chip socket; nothing stale to sweep
+    hdr = (REPO / "src/applink.h").read_text()
+    assert "void applinkChipReset();" in hdr
+    assert "static inline void applinkChipReset() {}" in hdr  # no-op where there is no W5100S (ESP32, T114)
+
+
+def test_applink_checks_socket_ownership_before_chip_access():
+    # Advisor finding 2026-11-21: a session socket that went CLOSED can be handed to the web server, the gateway UDP
+    # socket, DHCP or NTP by Ethernet.socketBegin() (it zeroes EthernetServer::server_port[s]) while AppLink still
+    # holds the number. Every chip access must first check the RAM claim server_port[s_sock] == AL_PORT.
+    src = (REPO / "src/nrf52/applink_nrf52.cpp").read_text()
+    assert "static bool alOwnsSock()" in src
+    own = _func_body(src, "static bool alOwnsSock()")
+    assert "EthernetServer::server_port[s_sock] == AL_PORT" in own
+    close = _func_body(src, "static void alCloseSocket()")
+    assert close.index("alOwnsSock()") < close.index("execCmdSn")
+    # another user's claim is never cleared
+    assert "EthernetServer::server_port[s_sock] = 0;" not in close.replace("if (owned)\n        EthernetServer::server_port[s_sock] = 0;", "")
+    write = _func_body(src, "static int alIoWrite(")
+    assert write.index("alOwnsSock()") < write.index("EthernetClient c(s_sock)")
+    loop = _func_body(src, "void applinkLoop()")
+    assert loop.index("alOwnsSock()") < loop.index("EthernetClient cl(s_sock)")
+    reset = _func_body(src, "void applinkChipReset()")
+    assert "alOwnsSock()" in reset

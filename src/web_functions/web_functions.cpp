@@ -21,6 +21,7 @@
 #include "esp32/netif_mtu.h" // NMTU-01 (lwIP part ESP32 only)
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
+#include <applink.h>      // HAS_APPLINK, bAPPLINK: AppLink switch and info line
 #include <time.h>
 #include <vector>
 #include <lora_setchip.h>
@@ -231,6 +232,7 @@ unsigned long web_previousTime = 0;       // Previous time
 bool bweb_server_running = false;
 
 #if defined(BOARD_RAK4630)
+#include "nrf52/eth_mss.h"   // ethMssTarget / ethSockCount / ethPrewriteClosedMss (shared with AppLink)
 /**
  * Issue #1183: the W5100S has no path-MTU discovery and sends full 1460-byte MSS
  * segments with DF set. Behind a tunnel with a path MTU below 1500 (HAMNET) the
@@ -250,22 +252,14 @@ bool bweb_server_running = false;
  */
 static void webApplyEthMss()
 {
-    int mtu = meshcom_settings.node_ethmtu;
+    const uint16_t mss = ethMssTarget(meshcom_settings.node_ethmtu);
 
-    if (mtu < 1280) mtu = 1280;
-    if (mtu > 1500) mtu = 1500;
-
-    const uint16_t mss = (uint16_t)(mtu - 40);
-
-    // same cap as EthernetServer::available(): W5100S/W5100 have 4 sockets, and
     // chip 0 means no Ethernet hardware (no SPI traffic then)
     const uint8_t chip = W5100.getChip();
     if (!chip)
         return;
 
-    uint8_t nsock = MAX_SOCK_NUM;
-    if (nsock > 4 && (chip == 50 || chip == 51))
-        nsock = 4;
+    const uint8_t nsock = ethSockCount(chip);
 
     bool closedStale = false;
 
@@ -295,15 +289,7 @@ static void webApplyEthMss()
         return;
 
     // pass B: the socket just closed must hold the target before it is re-opened
-    for (uint8_t i = 0; i < nsock; i++)
-    {
-        SPI.beginTransaction(SPI_ETHERNET_SETTINGS);
-
-        if (W5100.readSnSR(i) == SnSR::CLOSED && W5100.readSnMSSR(i) != mss)
-            W5100.writeSnMSSR(i, mss);
-
-        SPI.endTransaction();
-    }
+    ethPrewriteClosedMss(mss, nsock);
 
     web_server.begin();   // socketBegin() takes the first CLOSED index and latches its MSSR
 }
@@ -3559,6 +3545,9 @@ void sub_page_setup()
     _create_setup_switch_element("netmode", "Ethernet Mode", "switch between WiFi and Ethernet", meshcom_settings.node_netmode == 1);
     #endif
     _create_setup_switch_element("extudp", "ext UDP", "enable ext. UDP", bEXTUDP); // create Switch-Element inclucing Label and Description
+    #if defined(HAS_APPLINK)
+    _create_setup_switch_element("applink", "AppLink", "app over LAN (port 8002, needs --passwd; RAK: not together with ext UDP)", bAPPLINK);
+    #endif
     #if !defined(BOARD_RAK4630) && !defined(DISABLE_NET_CONSOLE)
     _create_setup_switch_element("netconsole", "net console", "enable net console (port 2323, HMAC auth)", bNETCONSOLE); // create Switch-Element inclucing Label and Description
     #endif
@@ -4171,6 +4160,9 @@ void sub_page_info()
     web_client.printf("Ethernet Mode: %s<br>", (meshcom_settings.node_netmode == 1 ? "on" : "off"));
     #endif
     web_client.printf("ext UDP: %s<br>", (bEXTUDP ? "on" : "off"));
+    #if defined(HAS_APPLINK)
+    web_client.printf("AppLink: %s<br>", (bAPPLINK ? "on" : "off"));
+    #endif
     #if !defined(BOARD_RAK4630) && !defined(DISABLE_NET_CONSOLE)
     web_client.printf("net console: %s<br>", (bNETCONSOLE ? "on" : "off"));
     #endif

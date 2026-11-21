@@ -771,6 +771,75 @@ void test_old_logic_wraps_the_length_of_a_max_text_frame(void)
     TEST_ASSERT_EQUAL_UINT16_MESSAGE(1, phone.rx_len[0], "old logic: 255+2 wrapped to 1 byte");
 }
 
+// --- NET sink (AppLink WebSocket): same drain, mtu = 0 ---------------------------
+
+struct NetSink
+{
+    int busy_calls;
+    bool down;
+    int calls;
+    std::vector<uint16_t> rx_len;
+};
+static NetSink netsink;
+
+static BlePhoneSend net_sink(void *, const uint8_t *, uint16_t len)
+{
+    if (netsink.down)
+        return BLE_SEND_DOWN;
+    netsink.calls++;
+    if (netsink.busy_calls > 0)
+    {
+        netsink.busy_calls--;
+        return BLE_SEND_BUSY;
+    }
+    netsink.rx_len.push_back(len);
+    return BLE_SEND_SENT;
+}
+
+static BlePhoneDrain net_drain(void)
+{
+    uint8_t wire[MAX_MSG_LEN_PHONE];
+    return blePhoneDrainOne(&phoneRingT, &phoneState, &st, net_sink, NULL, 0, wire, sizeof(wire), NULL);
+}
+
+void test_net_sink_mtu0_never_counts_truncated(void)
+{
+    netsink = NetSink();
+    TEST_ASSERT_EQUAL_INT(0, push_msg(make_frame(':', 251, 9), 0xDEADBEEFu));
+    TEST_ASSERT_EQUAL_INT(BLE_DRAIN_SENT, net_drain());
+    TEST_ASSERT_EQUAL_UINT32(1, (uint32_t)netsink.rx_len.size());
+    TEST_ASSERT_EQUAL_UINT16(257, netsink.rx_len[0]);
+    TEST_ASSERT_EQUAL_UINT32(0, st.truncated);
+    TEST_ASSERT_EQUAL_UINT32(1, st.sent);
+}
+
+void test_net_sink_busy_keeps_frame_and_resends(void)
+{
+    netsink = NetSink();
+    netsink.busy_calls = 1;
+    TEST_ASSERT_EQUAL_INT(0, push_msg(make_frame(':', 20, 3), 1));
+    BlePhoneDrain r = net_drain();
+    TEST_ASSERT_NOT_EQUAL(BLE_DRAIN_SENT, r);
+    TEST_ASSERT_EQUAL_UINT32(0, (uint32_t)netsink.rx_len.size());
+    TEST_ASSERT_FALSE(bf_empty(&phoneRingT));
+    TEST_ASSERT_EQUAL_INT(BLE_DRAIN_SENT, net_drain());
+    TEST_ASSERT_EQUAL_UINT32(1, (uint32_t)netsink.rx_len.size());
+    TEST_ASSERT_TRUE(bf_empty(&phoneRingT));
+}
+
+void test_net_sink_down_never_pops(void)
+{
+    netsink = NetSink();
+    netsink.down = true;
+    TEST_ASSERT_EQUAL_INT(0, push_msg(make_frame(':', 20, 4), 1));
+    for (int i = 0; i < 5; i++)
+        TEST_ASSERT_EQUAL_INT(BLE_DRAIN_DOWN, net_drain());
+    TEST_ASSERT_FALSE(bf_empty(&phoneRingT));
+    netsink.down = false;
+    TEST_ASSERT_EQUAL_INT(BLE_DRAIN_SENT, net_drain());
+    TEST_ASSERT_TRUE(bf_empty(&phoneRingT));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -797,6 +866,9 @@ int main(int, char **)
     RUN_TEST(test_overrun_flood_5_per_s_burst_intact_no_eviction);
     RUN_TEST(test_overrun_flood_10_per_s_burst_intact_evicts);
     RUN_TEST(test_overrun_flood_20_per_s_burst_intact_evicts);
+    RUN_TEST(test_net_sink_mtu0_never_counts_truncated);
+    RUN_TEST(test_net_sink_busy_keeps_frame_and_resends);
+    RUN_TEST(test_net_sink_down_never_pops);
     RUN_TEST(test_old_logic_loses_a_frame_on_busy);
     RUN_TEST(test_old_logic_wraps_the_length_of_a_max_text_frame);
     return UNITY_END();

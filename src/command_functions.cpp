@@ -43,6 +43,7 @@
 #include "ntp_async.h"
 #include "ble_json_frame.h"
 #include "ble_phone_drain.h"   // BLE-N1/N2: blePhoneStatsFormat(), g_blePhoneStats
+#include "applink.h"           // AppLink: bAPPLINK, applinkSetPassword/ApplySetting/Status, APPLINK_SSET_WORD / APPLINK_SSET_BIT
 #include "ble_session.h"       // BLC-03: BleStats, g_bleStats, bleStatsFormat()
 #include "rm_runtime.h"       // RM-06: RmStats, g_rmStats for the --info RM line
 #include "board_led.h"       // LED-04/09/10: boardLedPinFree, ledFitted, ledNotFittedList
@@ -782,6 +783,9 @@ void nodePasswdApply(const char *pw)
         #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
         kissSetPassword("");
         #endif
+        applinkSetPassword("");
+        if(bAPPLINK)
+            printfdeb("...AppLink stopped: no password\n");
         printfdeb("...net console password cleared (open access)\n");
         meshcom_settings.node_rm = 0;
         Serial.printf("[RM];off;passwd_cleared\n");
@@ -795,6 +799,7 @@ void nodePasswdApply(const char *pw)
         #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
         kissSetPassword(meshcom_settings.node_passwd);
         #endif
+        applinkSetPassword(meshcom_settings.node_passwd);
     }
 
     rmRuntimeReceiverUnlock();
@@ -1801,6 +1806,7 @@ void commandAction(char *umsg_text, bool ble)
             #if defined(ESP32) && !defined(DISABLE_KISS_TCP)
             printdeb("--kiss on/off           KISS/TCP port 8001\n--kiss tx on/off        KISS may transmit\n--kiss meta on/off      KISS metadata frames\n--kiss auth on/off      KISS authentication\n");
             #endif
+            printdeb("--applink on/off       AppLink (app over LAN, port 8002)\n--applink              AppLink status\n");
             #if defined(ESP32) || defined(NRF52_SERIES)
             printdeb("--udplog on/off         one [UDP] line per datagram\n");
             #endif
@@ -3635,6 +3641,75 @@ void commandAction(char *umsg_text, bool ble)
     }
     else
     #endif
+    // AppLink: "applink on"/"applink off" first, the bare form (status) last. The web switch reaches
+    // this through commandAction("--applink on|off"), so refusals and persistence are the same.
+    // Boards without AppLink (T114, T-Echo: no WiFi, no Ethernet) answer "not available" (operator 2026-11-21).
+    if(commandCheck(msg_text+2, (char*)"applink on") == 0)
+    {
+        #if !defined(HAS_APPLINK)
+        printfdeb("...AppLink not available on this board\n");
+        #else
+        bool _pwEmpty = true;
+        for(size_t _i = 0; _i < sizeof(meshcom_settings.node_passwd) && meshcom_settings.node_passwd[_i] != 0x00; _i++)
+        {
+            if(meshcom_settings.node_passwd[_i] != ' ')
+            {
+                _pwEmpty = false;
+                break;
+            }
+        }
+        if(_pwEmpty)
+        {
+            printfdeb("...AppLink needs a password: set --passwd first\n");
+        }
+        #if defined(NRF52_SERIES)
+        else if(bEXTUDP)
+        {
+            printfdeb("...RAK: --extudp off first (4 Ethernet sockets)\n");
+        }
+        #endif
+        else
+        {
+            bAPPLINK = true;
+            APPLINK_SSET_WORD(meshcom_settings) = applinkSettingWrite(APPLINK_SSET_WORD(meshcom_settings), true);
+            save_settings();
+            applinkApplySetting();
+            if(ble)
+                sendNodeSetting();
+            printfdeb("...AppLink on (port 8002)\n");
+        }
+        #endif
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"applink off") == 0)
+    {
+        #if !defined(HAS_APPLINK)
+        printfdeb("...AppLink not available on this board\n");
+        #else
+        bAPPLINK = false;
+        APPLINK_SSET_WORD(meshcom_settings) = applinkSettingWrite(APPLINK_SSET_WORD(meshcom_settings), false);
+        save_settings();
+        applinkApplySetting();
+        if(ble)
+            sendNodeSetting();
+        printfdeb("...AppLink off\n");
+        #endif
+        return;
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"applink") == 0)
+    {
+        #if !defined(HAS_APPLINK)
+        printfdeb("...AppLink not available on this board\n");
+        #else
+        char _alst[160];
+        applinkStatus(_alst, sizeof(_alst));
+        printfdeb("...%s\n", _alst);
+        #endif
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"webserver on") == 0)
     {
         #if defined(NRF52_NO_ETH)
@@ -3760,6 +3835,12 @@ void commandAction(char *umsg_text, bool ble)
         {
             printfdeb("\nPlease set EXPUDP IP first\n");
         }
+        #if defined(NRF52_SERIES)
+        else if(bAPPLINK)
+        {
+            printfdeb("...RAK: --applink off first (4 Ethernet sockets)\n");
+        }
+        #endif
         else
         {
             bEXTUDP=true;
@@ -8245,6 +8326,13 @@ void commandAction(char *umsg_text, bool ble)
             // than MTU-3, e unread frames evicted from a phone ring, mtu = last MTU seen.
             char bleTxStats[72];
             blePhoneStatsFormat(&g_blePhoneStats, bleTxStats, sizeof(bleTxStats));
+
+            {
+                char _alst[160];
+                applinkStatus(_alst, sizeof(_alst));
+                if(_alst[0])
+                    printfdeb("...%s\n", _alst);
+            }
 
             printfdeb("...APRSMC: %s\n...ATXT: %s\n...NAME: %s\n...BLE : %s %s\n...DISPLAY %s\n...CTRY %s\n...FREQ %.4f MHz TXPWR %i dBm RXBOOST %s\n",
                     meshcom_settings.node_aprsmc, meshcom_settings.node_atxt, meshcom_settings.node_name, (bBLElong?"long":"short"), bleTxStats, (bDisplayOff?"off":"on"),

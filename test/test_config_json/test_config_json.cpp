@@ -28,6 +28,7 @@
 #include <config_json.h>
 #include <crc32_util.h>
 #include <prod_lock.h>   // prodLockNormalise(): what the import path runs after configImportJson
+#include <applink.h>     // APPLINK_SSET_WORD / APPLINK_SSET_BIT: the persisted "--applink on" bit
 
 #include <ArduinoJson.h>
 
@@ -924,6 +925,84 @@ static void test_prod_lock_import_ranges(void)
     }
 }
 
+/* AppLink: the persisted "--applink on" bit must survive every path that rewrites the settings word:
+ * the production normaliser (runs on every settings load and on a config import) and the config JSON
+ * export/import (which clamps the sset words to 0..65535, config_json.h). A bit the normaliser retired
+ * (sset4 0x0100) or one above bit 15 silently turned AppLink off after a reboot. */
+static void test_applink_bit_survives_normalise_and_config_roundtrip(void)
+{
+    TEST_ASSERT_TRUE_MESSAGE((APPLINK_SSET_BIT & (APPLINK_SSET_BIT - 1)) == 0 && APPLINK_SSET_BIT > 0, "one bit");
+    TEST_ASSERT_TRUE_MESSAGE(APPLINK_SSET_BIT <= 0x8000, "above bit 15 the config import clamps the word to 65535");
+
+    /* production and INSTRUMENT */
+    for (int instrument = 0; instrument < 2; instrument++)
+    {
+        wipe_settings();
+        APPLINK_SSET_WORD(meshcom_settings) |= APPLINK_SSET_BIT;
+        prodLockNormalise(meshcom_settings, instrument != 0, true);
+        TEST_ASSERT_TRUE_MESSAGE((APPLINK_SSET_WORD(meshcom_settings) & APPLINK_SSET_BIT) != 0,
+                                 "prodLockNormalise() cleared the AppLink bit");
+    }
+
+    /* export -> wipe -> import -> normalise (the sub_config_upload order) */
+    fill_settings();
+    APPLINK_SSET_WORD(meshcom_settings) |= APPLINK_SSET_BIT;
+    const std::string doc = do_export();
+    wipe_settings();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(CFG_IMP_OK, do_import(doc), g_err);
+    TEST_ASSERT_TRUE_MESSAGE((APPLINK_SSET_WORD(meshcom_settings) & APPLINK_SSET_BIT) != 0, "config import lost the AppLink bit");
+    prodLockNormalise(meshcom_settings, false, true);
+    TEST_ASSERT_TRUE_MESSAGE((APPLINK_SSET_WORD(meshcom_settings) & APPLINK_SSET_BIT) != 0,
+                             "normalise after the import cleared the AppLink bit");
+
+    /* not set by default */
+    wipe_settings();
+    TEST_ASSERT_TRUE((APPLINK_SSET_WORD(meshcom_settings) & APPLINK_SSET_BIT) == 0);
+}
+
+/* Stale bit: until v4.35p (2026-04) "--gpsdebug on" wrote node_sset2 0x0010. A node upgraded with
+ * that bit still set must NOT come up with AppLink on: only a word written by "--applink on|off"
+ * (which also sets the CONFIGURED marker) counts. Same pattern as the charge LED marker. */
+static void test_applink_stale_gpsdebug_bit_is_off(void)
+{
+    TEST_ASSERT_FALSE_MESSAGE(applinkSettingOn(APPLINK_SSET_BIT), "stale --gpsdebug bit switched AppLink on");
+    TEST_ASSERT_FALSE(applinkSettingOn(0));
+    TEST_ASSERT_FALSE(applinkSettingOn(APPLINK_SSET_MARK));            /* configured, off */
+    TEST_ASSERT_TRUE(applinkSettingOn(applinkSettingWrite(0, true)));
+    TEST_ASSERT_TRUE(applinkSettingOn(applinkSettingWrite(APPLINK_SSET_BIT, true)));
+    TEST_ASSERT_FALSE(applinkSettingOn(applinkSettingWrite(APPLINK_SSET_BIT, false)));  /* off clears the stale bit */
+    TEST_ASSERT_EQUAL_HEX(0x4001 | APPLINK_SSET_MARK | APPLINK_SSET_BIT, applinkSettingWrite(0x4001, true));  /* other bits kept */
+    TEST_ASSERT_TRUE((APPLINK_SSET_MARK & APPLINK_SSET_BIT) == 0 && APPLINK_SSET_MARK <= 0x8000);
+    /* ACCEPTED residual risk (operator 2026-11-21, src/applink.h): --gpsdebug (0x0010, until 2026-04)
+     * plus --checkmesh (0x2000, released v4.35p May-June 2026) both left on reads as "on". Pinned here
+     * so a change of this rule is a deliberate decision, not an accident. */
+    TEST_ASSERT_TRUE(applinkSettingOn(0x0010 | 0x2000));
+    TEST_ASSERT_FALSE(applinkSettingOn(0x2000));   /* --checkmesh alone: off */
+}
+
+#define APPLINK_STR2(x) #x
+#define APPLINK_STR(x) APPLINK_STR2(x)
+
+/* The AppLink bit is not a bit another writer owns: no toggle-table row of that word may clear it (a row
+ * mask such as 0xFFFFFFEF, or any 16-bit AND mask, would wipe it on an unrelated --xyz off). */
+static void test_applink_bit_not_cleared_by_toggle_rows(void)
+{
+    const std::string src = read_file("src/command_functions.cpp");
+    const std::string word = std::string("&meshcom_settings.") + APPLINK_STR(APPLINK_SSET_FIELD) + ",";
+    int rows = 0;
+    size_t pos = 0;
+    while ((pos = src.find(word, pos)) != std::string::npos)
+    {
+        size_t eol = src.find('\n', pos);
+        std::string line = src.substr(pos, eol - pos);
+        const unsigned long mask = strtoul(line.c_str() + word.size(), nullptr, 16);
+        TEST_ASSERT_TRUE_MESSAGE((mask & APPLINK_SSET_BIT) != 0 && (mask & APPLINK_SSET_MARK) != 0, line.c_str());
+        rows++;
+        pos = eol;
+    }
+    TEST_ASSERT_TRUE_MESSAGE(rows > 5, "no toggle rows of the AppLink word found, the scan is broken");
+}
+
 /* A config file from a build before the production lock holds ptime 1800 / pingtime 5000 / pingmax 100
  * (the old setter ceilings). The import must succeed (not lock the operator out of a restore), and the
  * normaliser that sub_config_upload and the boot load run afterwards must end at legal values. */
@@ -1121,6 +1200,9 @@ int main(int, char **)
     RUN_TEST(test_import_autoupd_zero_is_accepted);
     RUN_TEST(test_import_autoupd_two_is_normalised_to_one);
     RUN_TEST(test_prod_lock_import_ranges);
+    RUN_TEST(test_applink_bit_survives_normalise_and_config_roundtrip);
+    RUN_TEST(test_applink_bit_not_cleared_by_toggle_rows);
+    RUN_TEST(test_applink_stale_gpsdebug_bit_is_off);
     RUN_TEST(test_prod_lock_import_old_values_are_repaired);
     RUN_TEST(test_oversized_string_is_refused);
     RUN_TEST(test_power_sentinel_is_accepted);

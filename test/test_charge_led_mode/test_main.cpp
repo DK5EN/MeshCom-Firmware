@@ -22,9 +22,9 @@ static bool oldBoot(int sset3) { return (sset3 & 0x0001) != 0; }
 
 // sset2 bits in use in src/ (command_functions.cpp toggle rows and setters), documented here instead of grepped:
 //   0x0001 0x0002 0x0004 0x0008 0x0020 0x0040 0x0080 0x0100 0x0200 0x0400 0x0800 0x1000 0x4000
-// 0x2000 is a commented-out placeholder (bTRACK_old) and stays free; 0x8000 is the charge LED marker.
-static const int SSET2_BITS_IN_USE = 0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0020 | 0x0040 | 0x0080 | 0x0100 |
-                                     0x0200 | 0x0400 | 0x0800 | 0x1000 | 0x4000;
+// plus AppLink (src/applink.h): 0x0010 value bit and 0x2000 CONFIGURED marker. 0x8000 is the charge LED marker.
+static const int SSET2_BITS_IN_USE = 0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020 | 0x0040 | 0x0080 |
+                                     0x0100 | 0x0200 | 0x0400 | 0x0800 | 0x1000 | 0x2000 | 0x4000;
 
 static void test_fresh_node_follows_charging(void)
 {

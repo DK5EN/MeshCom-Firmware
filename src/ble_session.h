@@ -28,8 +28,16 @@ struct BleSessionFlags
     bool *discRequested;  // ble_disconnect_requested (wrong-PIN hello of the previous central)
 };
 
-inline void bleSessionReset(const BleSessionFlags &f)
+// keepPhone: the phone session is owned by AppLink (LAN); only the BLE link
+// state (uartConnected, discRequested) is reset, the phone-session flags stay.
+inline void bleSessionReset(const BleSessionFlags &f, bool keepPhone = false)
 {
+    if(keepPhone)
+    {
+        if(f.uartConnected) *f.uartConnected = false;
+        if(f.discRequested) *f.discRequested = false;
+        return;
+    }
     if(f.isPhoneReady)  *f.isPhoneReady  = 0;
     if(f.uartConnected) *f.uartConnected = false;
     if(f.ackInfo)       *f.ackInfo       = false;

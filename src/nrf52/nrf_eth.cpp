@@ -18,6 +18,7 @@
 #include <lora_setchip.h>
 #include <lora_functions.h>
 #include <extudp_functions.h>
+#include "applink.h"   // ETH-06: applinkChipReset()
 
 #include "ntp_async.h"
 #include <time.h>
@@ -832,6 +833,7 @@ void NrfETH::initETH_HW()
   // ETH-06: the reset below wipes every socket in the chip. Drop the EXTUDP socket first, or the next datagram
   // waits forever in socketSendUDP() (DB0AIS-12, 2026-11-14). No-op at boot (no socket open yet).
   externUdpChipReset();
+  applinkChipReset();     // same for the AppLink listener/session socket (no-op without AppLink)
   pinMode(WB_IO2, OUTPUT);
   digitalWrite(WB_IO2, HIGH); // Enable power supply.
 

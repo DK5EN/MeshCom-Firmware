@@ -217,8 +217,11 @@ void stop_advertising()
 
 	// disconnect
 	g_ble_uart_is_connected = false;
-	isPhoneReady = 0;
-	bAckInfo = false;
+	if(!phoneLinkOwnedBy(&g_phoneLink, PL_NET))   // AppLink keeps the phone session
+	{
+		isPhoneReady = 0;
+		bAckInfo = false;
+	}
 	Bluefruit.setTxPower(0);
 	DEBUG_MSG("BLE", "Disconnected");
 }
@@ -244,10 +247,13 @@ void connect_callback(uint16_t conn_handle)
 	// BLE link established — app auth not yet done.
 	// isPhoneReady and config_to_phone_prepare are set only after
 	// successful app-layer PIN authentication via the hello message.
-	isPhoneReady = 0;
-	bAckInfo = false;
-	config_to_phone_prepare = false;
-	conffin_sent = false;
+	if(!phoneLinkOwnedBy(&g_phoneLink, PL_NET))   // AppLink keeps the phone session
+	{
+		isPhoneReady = 0;
+		bAckInfo = false;
+		config_to_phone_prepare = false;
+		conffin_sent = false;
+	}
 	ble_disconnect_requested = false;	// BLC-01: a wrong-PIN request of the previous central
 	g_ble_uart_is_connected = true;
 
@@ -265,10 +271,13 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason)
 	s_discReason = reason;
 	s_discPending = true;	// printed by nrf52BleTick() in the Main Loop task
 	g_ble_uart_is_connected = false;
-	isPhoneReady = 0;
-	bAckInfo = false;
-	config_to_phone_prepare = false;
-	conffin_sent = false;
+	if(!phoneLinkOwnedBy(&g_phoneLink, PL_NET))   // AppLink keeps the phone session
+	{
+		isPhoneReady = 0;
+		bAckInfo = false;
+		config_to_phone_prepare = false;
+		conffin_sent = false;
+	}
 	ble_disconnect_requested = false;
 	Bluefruit.setTxPower(0);
 	DEBUG_MSG("BLE", "Disconnected");
@@ -304,6 +313,10 @@ void nrf52BleTick(void)
 	{
 		const uint8_t reason = s_discReason;
 		s_discPending = false;
+		// A new central may have connected and finished its hello since this drop (the loop drains bleQueue
+		// before this tick): its link is up now and its session stays (phone_link.h).
+		if(phoneLinkBleDownEndsSession(&g_phoneLink, g_ble_uart_is_connected))
+			phoneSessionEnded(PL_BLE);   // loop task: release the owner
 		if(bBLEDEBUG)
 		{
 			char line[64];

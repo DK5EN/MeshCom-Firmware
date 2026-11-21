@@ -17,6 +17,11 @@
 // compiles cleanly for every TU that includes this extern header.
 #include "setlog_lines.h"
 
+// AppLink phone-link owner (BLE or NET), defined in loop_functions.cpp.
+#include "phone_link.h"
+extern PhoneLinkState g_phoneLink;
+extern bool bAPPLINK;
+
 extern bool gpsDetected;
 extern bool gpsInitDone;
 

@@ -154,6 +154,8 @@ Arduino_GFX *gfx = new Arduino_ST7796(
 #include <command_functions.h>
 #include "nbr_matrix.h"    // --nbrdebug: nbrLogSnapshot()/nbrMatrix fuer den 15-Minuten-Takt
 #include <phone_commands.h>
+#include "phone_link.h"
+#include "applink.h"
 #include "ble_phone_drain.h"   // BLE-N1/N2: BlePhoneSend, g_blePhoneStats
 #include "ble_session.h"       // BLC-01: per-session reset, disconnect classes, counters
 #include <aprs_functions.h>
@@ -362,7 +364,8 @@ static inline void bleSessionResetAll()
 {
     BleSessionFlags f = { &isPhoneReady, &g_ble_uart_is_connected, &bAckInfo,
                           &config_to_phone_prepare, &conffin_sent, &ble_disconnect_requested };
-    bleSessionReset(f);
+    // AppLink owns the phone session: only the BLE link state is reset, the session flags stay.
+    bleSessionReset(f, phoneLinkOwnedBy(&g_phoneLink, PL_NET));
 }
 
 // The NimBLE host task has a 3 KB stack: printfdeb() needs about 900 B of frame,
@@ -1586,6 +1589,7 @@ void esp32setup()
     #ifndef DISABLE_KISS_TCP
     kissSetPassword(meshcom_settings.node_passwd);
     #endif
+    applinkSetPassword(meshcom_settings.node_passwd);
     // NOTE: externalRadioSetup() runs later, AFTER lora_setcountry() has applied
     // the effective freq/bw/sf/cr/preamble, so the bridge config snapshot is built
     // from the same effective radio settings the local radio path would use.
@@ -1643,6 +1647,10 @@ void esp32setup()
     bKISSMETA = meshcom_settings.node_sset4 & 0x0040;
     bKISSAUTH = meshcom_settings.node_sset4 & 0x0080;
     #endif
+    bAPPLINK = applinkSettingOn(APPLINK_SSET_WORD(meshcom_settings));
+    if(bAPPLINK)
+        Serial.println("[APPLINK] on (port 8002)");   // visible: the setting may be a stale pair of old bits (applink.h)
+    applinkApplySetting();
 
     if(strlen(meshcom_settings.node_aprsmc) < 4)
     {
@@ -4612,7 +4620,11 @@ void esp32loop()
         // loop-owned flag is cleared here (the loop sets it while connected), and
         // only if no new central connected in the meantime.
         if(!deviceConnected)
+        {
             g_ble_uart_is_connected = false;
+            if(phoneLinkBleDownEndsSession(&g_phoneLink, deviceConnected))
+                phoneSessionEnded(PL_BLE);   // no-op unless BLE owned the phone session; loop task
+        }
         if(bBLEDEBUG)
             Serial.printf("[BLE ];edge;down;ms;%lu\n", (unsigned long)millis());
 
@@ -5491,6 +5503,9 @@ void esp32loop()
         kissStop();
     }
     #endif
+
+    // AppLink (LAN phone link): own lifecycle like KISS, outside the service block
+    applinkLoop();
 
     // Net console stop, same reason as KISS above: with the console as the only
     // service the block below is skipped after "--netconsole off", and the

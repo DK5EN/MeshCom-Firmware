@@ -153,6 +153,8 @@ void sendHeartbeat();
 #include <udp_functions.h>
 #include <web_functions/web_functions.h>
 #include <phone_commands.h>
+#include "phone_link.h"
+#include "applink.h"
 #include <mh_phone.h>
 #include <topo_ui.h>
 #include <clock.h>
@@ -829,6 +831,22 @@ void nrf52setup()
     bNBRCANCEL = (meshcom_settings.node_sset4 & 0x1000) != 0;
     // --nbrsym on|off (Stufe 2): 0x2000 invertiert gespeichert, siehe command_functions.cpp.
     bNBRSYM = (meshcom_settings.node_sset4 & 0x2000) == 0;
+
+    // AppLink (LAN phone link): RAK shares the one Ethernet SPI bus with ext-UDP, one or the other.
+#if defined(HAS_APPLINK)
+    bAPPLINK = applinkSettingOn(APPLINK_SSET_WORD(meshcom_settings));
+#else
+    bAPPLINK = false;   // T114 / T-Echo: no Ethernet, a stale or imported bit means nothing
+#endif
+    if(bAPPLINK && bEXTUDP)
+    {
+        bAPPLINK = false;
+        Serial.println("[APPLINK] off: ext-UDP is on (RAK: one or the other)");
+    }
+    if(bAPPLINK)
+        Serial.println("[APPLINK] on (port 8002)");   // visible: the setting may be a stale pair of old bits (applink.h)
+    applinkSetPassword(meshcom_settings.node_passwd);
+    applinkApplySetting();
 
     bDisplayInfo = bLORADEBUG;
 
@@ -2898,6 +2916,13 @@ void nrf52loop()
         }
 
     }
+
+    // AppLink: own lifecycle (not inside the webserver/ext-UDP block above), runs every
+    // pass so it also stops the server after --applink off. Takes the SPI guard itself.
+    bSPI_ETH_Active = true;   // SPI guard: Ethernet owns bus
+    { INSTR_SECTION("applink_loop"); applinkLoop(); }
+    bSPI_ETH_Active = false;  // SPI guard: release bus
+    if(bPendingRadioRx) { bPendingRadioRx = false; startRadioReceive(); }
 #endif
 
     if (resendPing == 0)

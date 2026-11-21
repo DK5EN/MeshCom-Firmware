@@ -10,6 +10,7 @@ This file contains all web-based setup functions
 #include <regex_functions.h>
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
+#include <applink.h> // HAS_APPLINK, bAPPLINK: the "applink" row
 #include <fw_schedule.h> // install schedule: fwSchedParseDelay/Day/Time (ESP32 setters audelay, auday, autime)
 #if defined(ENABLE_MSGSTORE)
 #include <msgstore_api.h> // stage 3 store node: store/storecall/storetime/storeslots/storenotice setparam mapping
@@ -190,6 +191,13 @@ static constexpr WsParam wsParams[] = {
     WSP_STR   ("setownntp", "setownntp", meshcom_settings.node_ownntp),
     WSP_STR   ("extudpip", "extudpip", meshcom_settings.node_extern),
     WSP_ONOFF ("extudp", "extudp", bEXTUDP),
+    // AppLink: the write goes through "--applink on|off" (commandAction), so the password / RAK refusals
+    // and the persistence are the console's; a refused "on" reads back "off" and the GUI shows FAIL.
+    #if defined(HAS_APPLINK)
+    WSP_ONOFF ("applink", "applink", bAPPLINK),
+    #else
+    WSP_ONOFF_RO("applink", bAPPLINK),
+    #endif
     #ifndef DISABLE_NET_CONSOLE
     WSP_ONOFF ("netconsole", "netconsole", bNETCONSOLE),
     #else
