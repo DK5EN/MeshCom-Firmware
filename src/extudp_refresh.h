@@ -43,4 +43,25 @@ static inline ExtudpRefreshAction extudp_refresh_decide(bool requested, bool bEX
     return mayOpenHere ? EXTUDP_REFRESH_START : EXTUDP_REFRESH_DROP;
 }
 
+// ETH-06 (DB0AIS-12, 2026-11-14): a W5100S hardware reset (nrf_eth.cpp initETH_HW(), after two failed DHCP
+// attempts or a stalled static reopen) wipes every socket in the chip. The EXTUDP socket stayed latched open
+// (hasExternIPaddress), the next datagram went to a socket the chip no longer had, and the library's
+// socketSendUDP() waited forever for SEND_OK/TIMEOUT: main loop dead for 52 h, RX still running.
+//
+// extudp_on_chip_reset(): called right before the reset. true = the socket was open, so the latch must drop
+// (every send path gates on it); lostByReset remembers that the reset, not the operator, closed it.
+// extudp_reopen_after_chip_reset(): getExternUDP() reopens such a socket as soon as Ethernet has an address
+// again (never on a chip without one, N-20), instead of waiting for the 15-minute web tick.
+static inline bool extudp_on_chip_reset(bool socketOpen, bool &lostByReset)
+{
+    if(socketOpen)
+        lostByReset = true;
+    return socketOpen;
+}
+
+static inline bool extudp_reopen_after_chip_reset(bool lostByReset, bool bEXTUDP, bool socketOpen, bool ethUp)
+{
+    return lostByReset && bEXTUDP && !socketOpen && ethUp;
+}
+
 #endif

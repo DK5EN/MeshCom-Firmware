@@ -16,6 +16,8 @@ void queueExtern(char *src_type, uint8_t buffer[264], uint16_t buflen, int16_t r
 void flushExternQueue();
 void sendExternHeartbeat();
 void resetExternUDP();
+// ETH-06: nRF52 W5100S builds: drop the EXTUDP socket before a chip hardware reset (nrf_eth.cpp initETH_HW()).
+void externUdpChipReset();
 // EXT-PEER-01: --extudpip (command path, web setparam goes through it) changed node_extern. Any task may call this;
 // getExternUDP() re-resolves the peer (resetExternUDP()) when the socket is open. No-op stub on EXT_NO_SOCKET builds.
 void extudpRequestPeerRefresh();

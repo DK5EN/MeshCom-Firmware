@@ -61,7 +61,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -186,7 +187,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -315,7 +317,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -446,7 +449,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -576,7 +580,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -703,7 +708,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -829,7 +835,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -984,7 +991,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1115,7 +1123,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1290,7 +1299,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1398,7 +1408,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1523,7 +1534,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1763,7 +1775,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1874,7 +1887,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -1997,7 +2011,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -2125,7 +2140,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -2247,7 +2263,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -2393,7 +2410,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -2488,7 +2506,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -2588,7 +2607,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2631,7 +2651,8 @@
   "build_type": "debug",
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2653,7 +2674,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2674,7 +2696,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -2698,7 +2721,8 @@
   "build_type": "debug",
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2729,7 +2753,8 @@
   "build_type": "debug",
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2753,7 +2778,8 @@
   "build_type": "debug",
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2773,7 +2799,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2802,7 +2829,8 @@
   "build_type": "debug",
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2822,7 +2850,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2874,7 +2903,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2894,7 +2924,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2919,7 +2950,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2948,7 +2980,8 @@
   "build_type": "debug",
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2968,7 +3001,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2988,7 +3022,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3008,7 +3043,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3028,7 +3064,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3049,7 +3086,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3069,7 +3107,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3094,7 +3133,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3122,7 +3162,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -3150,7 +3191,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3176,7 +3218,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3196,7 +3239,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3225,7 +3269,8 @@
   "build_type": "debug",
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3245,7 +3290,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3285,7 +3331,8 @@
   "build_type": "debug",
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3321,7 +3368,8 @@
   "build_type": "debug",
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3345,7 +3393,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3365,7 +3414,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -3394,7 +3444,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -3413,7 +3464,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -3436,7 +3488,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3456,7 +3509,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3476,7 +3530,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3496,7 +3551,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3523,7 +3579,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3546,7 +3603,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3566,7 +3624,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -3585,7 +3644,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3609,7 +3669,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3629,7 +3690,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3654,7 +3716,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3678,7 +3741,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3703,7 +3767,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3729,7 +3794,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3753,7 +3819,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3778,7 +3845,8 @@
   "build_type": "debug",
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3803,7 +3871,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3823,7 +3892,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3848,7 +3918,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -3874,7 +3945,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3894,7 +3966,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3915,7 +3988,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3940,7 +4014,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3963,7 +4038,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3986,7 +4062,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4007,7 +4084,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4031,7 +4109,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4057,7 +4136,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4077,7 +4157,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4097,7 +4178,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4151,7 +4233,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -4180,7 +4263,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -4206,7 +4290,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -4225,7 +4310,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -4244,7 +4330,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4264,7 +4351,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4284,7 +4372,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4309,7 +4398,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4335,7 +4425,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4360,7 +4451,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4380,7 +4472,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4400,7 +4493,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4425,7 +4519,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4445,7 +4540,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4465,7 +4561,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4485,7 +4582,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4505,7 +4603,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4525,7 +4624,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "lib_ldf_mode": "chain+",
   "platform": "native",
@@ -4548,7 +4648,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -4573,7 +4674,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4600,7 +4702,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4632,7 +4735,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4663,7 +4767,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4687,7 +4792,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4713,7 +4819,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4733,7 +4840,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4753,7 +4861,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4776,7 +4885,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4796,7 +4906,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4816,7 +4927,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4849,7 +4961,8 @@
   "build_type": "debug",
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4872,7 +4985,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4909,7 +5023,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -4937,7 +5052,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4961,7 +5077,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5006,7 +5123,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5026,7 +5144,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -5057,7 +5176,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5083,7 +5203,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5103,7 +5224,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5123,7 +5245,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5143,7 +5266,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5168,7 +5292,8 @@
   "build_type": "debug",
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5193,7 +5318,8 @@
   "build_type": "debug",
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5218,7 +5344,8 @@
   "build_type": "debug",
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5245,7 +5372,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "lib_deps": [
    "https://github.com/leethomason/tinyxml2"
@@ -5300,7 +5428,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -5425,7 +5554,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -5568,7 +5698,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -5682,7 +5813,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -5830,7 +5962,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -5941,7 +6074,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -6065,7 +6199,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -6189,7 +6324,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -6313,7 +6449,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -6438,7 +6575,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -6564,7 +6702,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -6682,7 +6821,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -6796,7 +6936,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -6909,7 +7050,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -7021,7 +7163,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"
@@ -7145,7 +7288,8 @@
   ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
-   "pre:tools/nimble_patch.py"
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
   ],
   "framework": [
    "arduino"

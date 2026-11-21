@@ -103,6 +103,48 @@ static void test_peer_refresh_opens_a_closed_socket_where_allowed(void)
     TEST_ASSERT_EQUAL(EXTUDP_REFRESH_DROP,  extudp_refresh_decide(true, true, false, false));
 }
 
+// ETH-06 (DB0AIS 2026-11-14): a W5100S hardware reset wipes every socket in the chip. The EXTUDP socket stayed
+// latched "open", the next datagram went to a socket the chip no longer had, and socketSendUDP() waited forever for
+// SEND_OK/TIMEOUT: main loop dead for 52 h. Before the reset the latch must drop (no send on the stale socket), and the
+// socket must come back as soon as Ethernet has an address again -- not at the 15-minute web tick.
+static void test_chip_reset_drops_open_socket(void)
+{
+    bool lost = false;
+    TEST_ASSERT_TRUE(extudp_on_chip_reset(true, lost));    // open socket: the latch must be dropped
+    TEST_ASSERT_TRUE(lost);
+    bool lost2 = false;
+    TEST_ASSERT_FALSE(extudp_on_chip_reset(false, lost2)); // nothing open (boot, EXTUDP off): nothing to drop
+    TEST_ASSERT_FALSE(lost2);
+    bool lost3 = true;                                     // a second reset before the reopen keeps the request
+    TEST_ASSERT_FALSE(extudp_on_chip_reset(false, lost3));
+    TEST_ASSERT_TRUE(lost3);
+}
+
+static void test_chip_reset_reopen_decision(void)
+{
+    // reopen only for a socket the reset took, with EXTUDP on, the socket closed and Ethernet up
+    TEST_ASSERT_TRUE(extudp_reopen_after_chip_reset(true, true, false, true));
+    TEST_ASSERT_FALSE(extudp_reopen_after_chip_reset(true, true, false, false));  // no IP yet: N-20, wait
+    TEST_ASSERT_FALSE(extudp_reopen_after_chip_reset(true, true, true, true));    // already reopened
+    TEST_ASSERT_FALSE(extudp_reopen_after_chip_reset(true, false, false, true));  // EXTUDP switched off meanwhile
+    TEST_ASSERT_FALSE(extudp_reopen_after_chip_reset(false, true, false, true));  // closed for another reason
+}
+
+// The DB0AIS sequence: socket open, DHCP fails twice, hardware reset, DHCP succeeds, next EXTUDP pass.
+static void test_chip_reset_sequence_never_sends_on_stale_socket(void)
+{
+    bool socketOpen = true, lost = false;
+    if(extudp_on_chip_reset(socketOpen, lost))
+        socketOpen = false;                   // what externUdpChipReset() does with hasExternIPaddress
+    TEST_ASSERT_FALSE(socketOpen);            // every send path gates on it: no datagram to the stale socket
+    bool ethUp = false;
+    TEST_ASSERT_FALSE(extudp_reopen_after_chip_reset(lost, true, socketOpen, ethUp));
+    ethUp = true;                             // dhcp_acquired_late
+    TEST_ASSERT_TRUE(extudp_reopen_after_chip_reset(lost, true, socketOpen, ethUp));
+    socketOpen = true; lost = false;          // startExternUDP() latched and cleared the request
+    TEST_ASSERT_FALSE(extudp_reopen_after_chip_reset(lost, true, socketOpen, ethUp));
+}
+
 // WEB-PIN-01 (web GUI mcpout<P>): validate the port first, refuse an input pin
 // without running --setout. io bit set == OUTPUT (command_functions.cpp --setout).
 static void test_mcpout_refusal(void)
@@ -140,6 +182,9 @@ int main(int, char **)
     RUN_TEST(test_parser_is_strict);
     RUN_TEST(test_peer_refresh_decision);
     RUN_TEST(test_peer_refresh_opens_a_closed_socket_where_allowed);
+    RUN_TEST(test_chip_reset_drops_open_socket);
+    RUN_TEST(test_chip_reset_reopen_decision);
+    RUN_TEST(test_chip_reset_sequence_never_sends_on_stale_socket);
     RUN_TEST(test_mcpout_refusal);
     return UNITY_END();
 }

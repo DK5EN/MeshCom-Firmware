@@ -5,6 +5,12 @@
 
 ## State 2026-11-21
 
+- **ETH-06 fixed on fork-dev, uncommitted (field log DB0AIS-12, DG3FBL):** the RAK4631 main loop hung for 52 h after a
+  W5100S hardware reset (DHCP failed twice): the EXTUDP socket stayed latched and `socketSendUDP()` waited forever.
+  `initETH_HW()` now drops the EXTUDP socket before the reset and `getExternUDP()` reopens it when Ethernet is up;
+  `tools/w5100s_patch.py` bounds the library wait at 3 s. Gate PASS 3918 Unity, 1616 pytest; 5 board envs build.
+  Not benched, not released. Details: defect catalogue 2n. Report for DG3FBL:
+  `docs/log-reports/2026-11-16-db0ais-14d/db0ais_14d.html` (Desktop copy for DG3FBL).
 - **CMD-DASH-01 on fork-dev (discussion #1042, DL4OCE):** a command written with minus signs (U+2212, as the
   command web page had them) or an en/em dash (phone keyboards) answered "wrong command". `src/command_dash.h` folds
   such a dash run to `--` at both `commandAction()` entries, only at a word start and only before a lowercase letter,

@@ -76,6 +76,10 @@ IPAddress apip;
 #else
   IPAddress extern_node_ip;
   EthernetUDP UdpExtern;
+  // ETH-06: true while the EXTUDP socket is closed because a W5100S hardware reset took it
+  // (externUdpChipReset()); getExternUDP() reopens it as soon as Ethernet is up, startExternUDP() clears it.
+  #define EXT_W5100S_SOCKET 1
+  static bool s_extLostByReset = false;
 #endif
 #endif // !EXT_NO_SOCKET
 #endif // !NATIVE_BUILD
@@ -374,6 +378,13 @@ void startExternUDP()
   Serial.printf("[EXT]...now sending   to IP %s, UDP port %d\n",  str_ip.c_str(), EXTERN_PORT);
 
   hasExternIPaddress=true;
+  #ifdef EXT_W5100S_SOCKET
+  if(s_extLostByReset)          // ETH-06: reopened after a W5100S hardware reset, by whichever path
+  {
+    Serial.printf("[EXT];event;reopened_after_chip_reset;ms;%lu\n", (unsigned long)millis());
+    s_extLostByReset = false;
+  }
+  #endif
 
   sendExternHeartbeat();
 }
@@ -624,6 +635,16 @@ void getExternUDP()
     startExternUDP();
     return;
   }
+
+  #ifdef EXT_W5100S_SOCKET
+  // ETH-06: the W5100S hardware reset took the socket; open it again once Ethernet has an address,
+  // not at the 15-minute web tick (nrf52_main.cpp) -- until then every send path stays gated off.
+  if(extudp_reopen_after_chip_reset(s_extLostByReset, bEXTUDP, hasExternIPaddress, mayOpenHere))
+  {
+    startExternUDP();   // retried on every pass until it latches; says so once when it does (below)
+    return;
+  }
+  #endif
 
   if(!hasExternIPaddress)
     return;
@@ -1426,8 +1447,29 @@ void resetExternUDP()
     startExternUDP();
   }
 }
+
+// ETH-06: nrf_eth.cpp initETH_HW() calls this right before it hardware-resets the W5100S. The reset wipes
+// every socket in the chip; a datagram to the old socket afterwards raises neither SEND_OK nor TIMEOUT and
+// socketSendUDP() never returned (DB0AIS-12, 2026-11-14: main loop dead for 52 h). Drop the latch so no send
+// path touches the socket, and forget its index without a CLOSE: no SPI access here, the chip may be the
+// reason for the reset, and the reset closes the socket anyway. getExternUDP() reopens it once Ethernet is up.
+void externUdpChipReset()
+{
+  #ifdef EXT_W5100S_SOCKET
+  if(!extudp_on_chip_reset(hasExternIPaddress, s_extLostByReset))
+    return;
+  UdpExtern = EthernetUDP();   // sockindex back to MAX_SOCK_NUM: the object no longer names a chip socket
+  hasExternIPaddress = false;
+  extRegReset();               // a register query in flight has lost its peer, as with resetExternUDP()
+  Serial.printf("[EXT];event;chip_reset;socket;dropped;ms;%lu\n", (unsigned long)millis());
+  #endif
+}
 #else
 void resetExternUDP()
+{
+}
+
+void externUdpChipReset()
 {
 }
 #endif // EXT_NO_SOCKET

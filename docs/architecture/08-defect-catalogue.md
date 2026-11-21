@@ -1771,6 +1771,34 @@ Evidence: [`txp-own-msg-echo-release-20261024.md`](../txp-own-msg-echo-release-2
   the 20-slot ring sooner.
 - **Tests:** `test_phone_echo_origin` (6 cases), EXTUDP case fails before, passes after.
 
+## 2n. ETH-06 — RAK4631 main loop hangs after a W5100S hardware reset (2026-11-14)
+
+**FIXED** on fork-dev 2026-11-21 (not committed at the time of writing, not released, not benched). Field report and
+evidence: [`log-reports/2026-11-16-db0ais-14d/db0ais_14d.html`](../log-reports/2026-11-16-db0ais-14d/db0ais_14d.html)
+(DB0AIS-12, DG3FBL, RAK4631 with RAK13800, Ethernet gateway with EXTUDP to MeshDash).
+
+- **Symptom:** after 14.5 clean days the node stopped sending for 52 h (2026-11-14 05:43 to 2026-11-16 ~12:00): no
+  LoRa TX, no gateway keepalive, log clock frozen, RX still running, TX ring full (733 relay texts dropped). mcmap
+  `gateway_availability` shows the same window offline.
+- **Mechanism:** the HAMNET server was silent for 4 h 41 min, `resetDHCP()` failed twice, `resetDHCP()` then
+  hardware-reset the W5100S (`initETH_HW()`, `hw_reset;reason;dhcp_fail`). The reset wipes every chip socket. The
+  gateway socket was reopened, the EXTUDP socket stayed latched (`hasExternIPaddress`, and `startExternUDP()` returns
+  early on that latch). The next `sendExtern()` sent on a socket the chip no longer had; RAK13800-W5100S
+  `socketSendUDP()` (socket.cpp:518) waits for SEND_OK or TIMEOUT without a bound of its own, and neither came.
+- **Fix, firmware:** `initETH_HW()` calls `externUdpChipReset()` before the reset pin: it drops the latch and forgets
+  the socket index without touching the chip (`src/extudp_functions.cpp`); `getExternUDP()` reopens it as soon as
+  Ethernet has an address (`extudp_reopen_after_chip_reset()`, `src/extudp_refresh.h`). Log lines
+  `[EXT];event;chip_reset;socket;dropped` and `[EXT];event;reopened_after_chip_reset`.
+- **Fix, library:** pre-script `tools/w5100s_patch.py` (pattern of `nimble_patch.py`) gives the `socketSendUDP()` wait a
+  3 s deadline (the chip's own ARP timeout measured 1.6 s), so any other stuck socket costs 3 s, not the node.
+- **Tests:** `test_extudp_target` +3 cases (fail to build before), `tools/tests/test_w5100s_patch.py` (11, incl. source
+  pins for the `initETH_HW()` hook and the reopen); golden `variant-ini-effective.json` regenerated (only the new
+  pre-script in 144 envs). Gate PASS 3918 Unity cases in 112 envs, 1616 pytest; RAK4631, T114, T-Echo, Heltec V3 and
+  T-ETH-Elite build.
+- **Left out:** a hardware watchdog on nRF52 (feeding across the long blocking calls DHCP, flash, DFU needs its own
+  design); the web server socket after a chip reset is restarted only on the 15-minute web tick (no hang, only
+  unreachable); an on-bench repro of the hang (needs a forced DHCP failure on a RAK with Ethernet).
+
 ## 3. Refuted claims — do not re-investigate
 
 | Claim                                                                                                                           | Refuting evidence                                                                                                                                                                                                                                                                                                                                                   |
