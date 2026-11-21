@@ -281,6 +281,16 @@ navLines.forEach((l) => {
 check('no nav SVG hard-codes a #fff fill/stroke', hard.length === 0, hard.join(','));
 check('nav SVGs use currentColor', navLines.every((l) => /currentColor/.test(l)), navLines.filter((l) => !/currentColor/.test(l)).length + ' without');
 check('nav_button sets an explicit colour', lookup(['.nav_button'], 'color', 'light') !== undefined);
+// WEB-NAV-01: buttons are 75 % of the bar, right-aligned so the active one still touches the content area; bar keeps a hidden scrollbar
+check('nav_button width is 75% of the bar', lookup(['.nav_button'], 'width', 'light') === '75%', lookup(['.nav_button'], 'width', 'light'));
+check('nav_button is right-aligned (margin-left auto, right 0)', /^calc\(.*\) 0(px)? calc\(.*\) auto$/.test(lookup(['.nav_button'], 'margin', 'light') || ''), lookup(['.nav_button'], 'margin', 'light'));
+// 75 % of a 42 px bar (--widthfactor 0.7, windows up to 800 px) left 7 px for the icon while border and
+// padding stayed fixed at 6 px; both must scale with the bar so the icon keeps its share at every width
+check('nav_button border scales with --widthfactor', /calc\(6px\*var\(--widthfactor\)\)/.test(lookup(['.nav_button'], 'border', 'light') || ''), lookup(['.nav_button'], 'border', 'light'));
+check('nav_button padding scales with --widthfactor', /var\(--widthfactor\)/.test(lookup(['.nav_button'], 'padding', 'light') || ''), lookup(['.nav_button'], 'padding', 'light'));
+check('nav_button sizes border and padding inside its 75% (box-sizing border-box)', lookup(['.nav_button'], 'box-sizing', 'light') === 'border-box', lookup(['.nav_button'], 'box-sizing', 'light'));
+check('nav_layer hides the scrollbar (scrollbar-width:none)', lookup(['#nav_layer'], 'scrollbar-width', 'light') === 'none');
+check('nav_layer hides the WebKit scrollbar (display:none)', lookup(['#nav_layer::-webkit-scrollbar'], 'display', 'light') === 'none');
 
 // ---- stray hard-coded colours in the CSS (should be palette variables) -------------------------------------------------
 const hardCss = [];
