@@ -879,6 +879,17 @@ static void test_should_install_reinstall_loop_untagged_release(void)
     TEST_ASSERT_TRUE(fwShouldInstall(running, V("v4.40b.11.01"), "v4.40b.11.01", lastInstalled));
 }
 
+static void test_should_install_after_downgrade_dated_running(void)
+{
+    // AU installed 11.20 (last = 11.20), then the node was downgraded to the dated 11.08
+    // with the OTA flasher (NVS kept): a dated running image cannot loop, so offer 11.20.
+    TEST_ASSERT_TRUE(fwShouldInstall(V("v4.40a.11.08"), V("v4.40a.11.20"), "v4.40a.11.20", "v4.40a.11.20"));
+    // dated running equal to the candidate: nothing newer
+    TEST_ASSERT_FALSE(fwShouldInstall(V("v4.40a.11.20"), V("v4.40a.11.20"), "v4.40a.11.20", "v4.40a.11.20"));
+    // undated running keeps the reinstall-loop guard
+    TEST_ASSERT_FALSE(fwShouldInstall(V("4.40a"), V("v4.40a.11.20"), "v4.40a.11.20", "v4.40a.11.20"));
+}
+
 // ------------------------------------------------------------- wrap latch
 
 static void test_latch_check_survives_25_days_without_wifi(void)
@@ -1847,6 +1858,7 @@ int main(int, char **)
     RUN_TEST(test_should_install_basic);
     RUN_TEST(test_should_install_blocks_already_installed_tag);
     RUN_TEST(test_should_install_reinstall_loop_untagged_release);
+    RUN_TEST(test_should_install_after_downgrade_dated_running);
     RUN_TEST(test_latch_check_survives_25_days_without_wifi);
     RUN_TEST(test_latch_check_survives_for_every_blocker);
     RUN_TEST(test_go_handover_ready);

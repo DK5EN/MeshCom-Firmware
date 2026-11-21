@@ -6,6 +6,18 @@ campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md
 
 ## State 2026-11-21
 
+- **AU-27 fixed on fork-dev (field report DK1TCP, Heltec V3):** after an AU install of `v4.40a.11.20` and an OTA-flasher
+  downgrade to `v4.40a.11.08`, Auto Update said "current" and never offered 11.20 again. Cause: the reinstall guard
+  (NVS `fwstage/last`) blocked the tag even on a dated running image. Now `fwShouldInstall()` applies it only while the
+  running image is undated (`src/fw_update.h`). Pin: `test_should_install_after_downgrade_dated_running` (fails on the
+  old code). Gate PASS 3900 Unity cases; Opus advisor approved (no unattended reflash path: `AU_AUTO_INSTALL` is fixed
+  0). Not benched: no downgrade repro on a node. Not in any release yet.
+- **Same report, WEB-NAV-01 side effect:** on Linux with classic scrollbars (Vivaldi/Ubuntu) the nav buttons grew from
+  about 45 to 60 px with 11.20, because the hidden scrollbar no longer eats 15 px. 60 px is the design size. Open:
+  keep, or shrink the buttons; DK1TCP asked (A keep / B shrink).
+- **Fleet:** DK5EN-98 runs `v4.40a.11.20` since 2026-11-21 10:50 (Auto Update from the web UI, operator OK), gateway
+  connected after the reboot.
+
 - **Upstream PR [icssw-org #1284](https://github.com/icssw-org/MeshCom-Firmware/pull/1284)** open since 2026-11-21,
   branch `pr/track-hemisphere` (worktree `../MeshCom-PR-next`, base `upstream/dev` `015beb78`), 4 commits, 11 files
   +49/-27, `Closes #1279`, `Closes #1278`. Fork side: `99186bd2`.
