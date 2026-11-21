@@ -15,7 +15,7 @@
       "board": "t_deck_plus",
       "family": "esp32",
       "usb_serial": "E0:72:A1:AD:65:E0",
-      "host": "192.168.68.72",
+      "host": "192.168.68.77",
       "last_ip_verified": "2026-11-15 (identity_guard over USB)"
     },
     "t-beam-92": {

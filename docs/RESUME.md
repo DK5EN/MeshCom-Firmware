@@ -11,8 +11,8 @@
   envs, 1632 pytest); T-Beam idle heap 65,860 B (baseline 64,016 B). Assets verified: 69, names as 11.21, 28
   `.autoupdate` with `78 da` and byte-exact re-inflate, tag string in the Heltec V3 image, T-Deck field commands
   `mute=2 stat=1 udplog=1 injectraw=0`. Web flasher published with `--keep 1` (11.21 pruned), Pages synced.
-  Release safeboot identical to the repo root. Bench nodes DK5EN-1, -90, -92 run local release-candidate images of the
-  same commit. Open: app side of AppLink with the app maintainer; field confirmation of ETH-06 on DB0AIS-12 (DG3FBL).
+  Release safeboot identical to the repo root. DK5EN-98 (production) and DK5EN-14 (now 192.168.68.77) run the CI
+  image via OTA; DK5EN-1, -90, -92 run local release-candidate images of the same commit. Open: app side of AppLink with the app maintainer; field confirmation of ETH-06 on DB0AIS-12 (DG3FBL).
 - **Bench 2026-11-21:** new Heltec V3 flashed as DK5EN-1 (chip erased first: it ran a foreign TNC firmware whose NVS
   left MeshCom unable to save), WiFi .80; RAK DK5EN-90 on an INSTRUMENT image, .78. ETH-06 verified on hardware with
   the new bench hook `--ethdrop hw` (forces the DB0AIS DHCP-fail chip reset); AppLink verified on both boards incl. a
