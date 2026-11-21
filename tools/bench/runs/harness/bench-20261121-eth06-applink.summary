@@ -94,3 +94,26 @@ node: call=DK5EN-90 fw=4.40a hw=RAK4631 v=1
 login ok, mtu=257
 frames rx: 20
 ## eth06b-extudp-peer-20261121-190043.jsonl:        5 datagrams (2 before, 0 during the 33 s without IP, 2 after the reset)
+
+## Release candidate v4.40a.11.22 (AppLink memory on demand), 2026-11-21
+    "idle_free": 64016,
+    "delta": 1844,
+    "tolerance": 3072,
+    "result": "pass"
+  }
+}
+    1.753 ...AppLink off
+    6.429 ...AppLink on (port 8002)
+    7.472 ...AppLink on :8002 listening
+    9.437 [APPLINK] session up 192.168.68.58
+   15.460 [APPLINK] session closed
+   32.750 ...AppLink off
+   34.098 ...AppLink off
+   38.428 ...AppLink on (port 8002)
+   41.743 [APPLINK] session up 192.168.68.58
+   46.815 [APPLINK] session closed
+   72.601 ...AppLink off
+smoke-rak-a-20261121-200446.jsonl: rx=5 node: call=DK5EN-90 fw=4.40a hw=RAK4631 v=1
+smoke-rak-b-20261121-200446.jsonl: rx=3 node: call=DK5EN-90 fw=4.40a hw=RAK4631 v=1
+smoke-v3-a-20261121-200336.jsonl: rx=9 node: call=DK5EN-1 fw=4.40a hw=HELTEC_V3 v=1
+smoke-v3-b-20261121-200336.jsonl: rx=6 node: call=DK5EN-1 fw=4.40a hw=HELTEC_V3 v=1

@@ -174,3 +174,29 @@ def test_applink_checks_socket_ownership_before_chip_access():
     assert loop.index("alOwnsSock()") < loop.index("EthernetClient cl(s_sock)")
     reset = _func_body(src, "void applinkChipReset()")
     assert "alOwnsSock()" in reset
+
+
+def test_applink_costs_no_static_ram_while_off():
+    # T-Beam idle-heap gate 2026-11-21: AppLink held 5.4 kB of static RAM (connection state, receive buffer,
+    # handshake scratch) on every node, also with AppLink off: idle heap 3,360 B below the baseline.
+    # The memory now comes from the heap while AppLink is wanted, and only applinkLoop() frees it (a command
+    # arriving over AppLink runs inside alConnRx and must never pull the memory out from under it).
+    eng = (REPO / "src/applink_conn.cpp").read_text()
+    assert not re.search(r"static\s+(uint8_t|char)\s+\w+\[", eng)
+    for path, ensure, release in (("src/esp32/applink_esp32.cpp", "memEnsure()", "memRelease()"),
+                                  ("src/nrf52/applink_nrf52.cpp", "alMemEnsure()", "alMemRelease()")):
+        src = (REPO / path).read_text()
+        assert not re.search(r"^static\s+AlConn\s", src, re.M), path
+        assert not re.search(r"^static\s+uint8_t\s+\w+\[\s*(AL_RX_CHUNK|APPLINK_OUT_BUF|APPLINK_HTTP_MAX)", src, re.M), path
+        assert "static AlMem *s_mem = nullptr;" in src
+        loop = _func_body(src, "void applinkLoop()")
+        assert ensure in loop and release in loop, path
+        # allocation and release appear nowhere else than their own definitions and applinkLoop()
+        rest = re.sub(r"//[^\n]*", "", src.replace(loop, ""))  # names in comments do not count
+        rest = re.sub(r"static bool " + re.escape(ensure) + r"\s*\{.*?\n\}", "", rest, flags=re.S)
+        rest = re.sub(r"static void " + re.escape(release) + r"\s*\{.*?\n\}", "", rest, flags=re.S)
+        assert ensure not in rest and release not in rest, path
+        # exactly one free, and it sits inside the release function (a direct free elsewhere is the
+        # nested-command use-after-free this test exists for; advisor mutation 2026-11-21)
+        assert src.count("free(s_mem)") == 1 and src.count("calloc(1, sizeof(AlMem))") == 1, path
+        assert "free(s_mem)" in _func_body(src, "static void " + release), path

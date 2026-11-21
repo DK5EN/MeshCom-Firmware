@@ -1,5 +1,6 @@
 // AppLink connection engine, see applink_conn.h.
 #include "applink_conn.h"
+#include <stdlib.h>   // malloc/free: handshake scratch
 #include <string.h>
 
 static void alFinish(AlConn *c, uint16_t code)
@@ -265,29 +266,43 @@ static void alHttpRx(AlConn *c, const uint8_t *buf, size_t len, const AlConnInfo
     while (end + 4 <= c->http_len && memcmp(c->u.http + end, "\r\n\r\n", 4) != 0)
         end++;
     end += 4;
-    // Static, not on the stack: the nRF52 loop task has 4 KB of stack in total.
-    // Loop task only and never nested (the tail is consumed before this returns).
-    static uint8_t tail[APPLINK_HTTP_MAX];
+    // Handshake scratch: not on the stack (the nRF52 loop task has 4 KB in total) and not static either
+    // (1.25 KB of RAM on every node that never uses AppLink, T-Beam idle-heap gate 2026-11-21). One heap
+    // block per handshake, freed before this returns.
+    struct Scratch
+    {
+        uint8_t tail[APPLINK_HTTP_MAX];
+        char json[256];
+    };
+    Scratch *sc = (Scratch *)malloc(sizeof(Scratch));
+    if (!sc)
+        return alFinish(c, 1011);
     size_t tail_len = c->http_len > end ? c->http_len - end : 0;
     if (tail_len)
-        memcpy(tail, c->u.http + end, tail_len);
+        memcpy(sc->tail, c->u.http + end, tail_len);
 
     c->out_off = c->out_len = 0;
     size_t a = alHttpAccept(&req, (char *)c->out, APPLINK_OUT_BUF);
-    static char json[256];   // static for the same stack reason
-    size_t jl = a ? alAuthChallengeJson(c->nonce, info ? info->call : "", info ? info->fw : "", info ? info->hw : "", json, sizeof(json)) : 0;
-    if (!a || !jl)
+    size_t jl = a ? alAuthChallengeJson(c->nonce, info ? info->call : "", info ? info->fw : "", info ? info->hw : "", sc->json, sizeof(sc->json)) : 0;
+    bool ok = a && jl;
+    if (ok)
+    {
+        c->out_len = (uint16_t)a;
+        ok = alQueueText(c, sc->json, jl);
+    }
+    if (!ok)
+    {
+        free(sc);
         return alFinish(c, 1011);
-    c->out_len = (uint16_t)a;
-    if (!alQueueText(c, json, jl))
-        return alFinish(c, 1011);
+    }
     alWsDecoderInit(&c->u.dec);  // overwrites the HTTP buffer, which is consumed
     c->state = ALC_CHAL;
     alPump(c);
+    if (c->state != ALC_IDLE && tail_len)
+        alWsRx(c, sc->tail, tail_len, info, lock, now);
+    free(sc);
     if (c->state == ALC_IDLE)
         return;
-    if (tail_len)
-        alWsRx(c, tail, tail_len, info, lock, now);
     if (n < len && c->state >= ALC_CHAL)
         alWsRx(c, buf + n, len - n, info, lock, now);
 }

@@ -46,7 +46,15 @@ extern NrfETH neth;   // nrf52_main.cpp
 
 static void applinkBindIo(AlConnIo *io);
 
-static AlConn s_conn;
+// Connection state and receive buffer live on the heap only while AppLink is wanted: alMemEnsure() and
+// alMemRelease() run in applinkLoop() alone, never in a function the engine reaches through a command
+// (--applink off, --passwd none, --ethdrop hw arrive inside alConnRx). Idle-heap gate 2026-11-21.
+struct AlMem
+{
+    AlConn conn;
+    uint8_t rx[AL_RX_CHUNK];
+};
+static AlMem *s_mem = nullptr;
 static AlLockout s_lock;
 static bool s_inited = false;
 static char s_pw[16] = {0};
@@ -58,7 +66,6 @@ static bool s_gotNoSockLog = false;
 static uint32_t s_lastNoSockLog = 0;
 static uint8_t s_peer[4] = {0, 0, 0, 0};
 static uint32_t s_upSince = 0;
-static uint8_t s_rxbuf[AL_RX_CHUNK];
 // PHY link, read ONCE per applinkLoop pass (Ethernet.linkStatus(): one SPI register read).
 // alIoWrite refuses while it is false: EthernetClient::write() -> socketSend() spins on
 // SEND_OK without a bound, so a pulled cable (hasIPaddress still true) would block the loop.
@@ -95,12 +102,32 @@ static void alEnsureInit()
 {
     if (s_inited)
         return;
+    alLockoutInit(&s_lock);
+    s_inited = true;
+}
+
+// true when the connection memory is there (allocates it on first use)
+static bool alMemEnsure()
+{
+    if (s_mem)
+        return true;
+    s_mem = (AlMem *)calloc(1, sizeof(AlMem));
+    if (!s_mem)
+        return false;
     AlConnIo io;
     memset(&io, 0, sizeof(io));
     applinkBindIo(&io);
-    alLockoutInit(&s_lock);
-    alConnInit(&s_conn, &io);
-    s_inited = true;
+    alConnInit(&s_mem->conn, &io);
+    return true;
+}
+
+// applinkLoop() only, after the session is closed and the socket forgotten
+static void alMemRelease()
+{
+    if (!s_mem || s_sock != 0xFF || alConnActive(&s_mem->conn))
+        return;
+    free(s_mem);
+    s_mem = nullptr;
 }
 
 // MSS: same rule as webApplyEthMss (web_functions.cpp): Sn_MSSR is latched at OPEN, so
@@ -333,8 +360,8 @@ void applinkSetPassword(const char *pw)
     if (n)
         memcpy(s_pw, pw, n);
     s_pw[n] = 0;
-    if (n == 0 && s_inited && alConnActive(&s_conn))
-        alConnClose(&s_conn, 4403, "password removed");
+    if (n == 0 && s_mem && alConnActive(&s_mem->conn))
+        alConnClose(&s_mem->conn, 4403, "password removed");
 }
 
 void applinkApplySetting()
@@ -345,12 +372,12 @@ void applinkApplySetting()
 
 void applinkClose(uint16_t code, const char *reason)
 {
-    if (!s_inited)
+    if (!s_mem)
         return;
-    if (alConnActive(&s_conn))
+    if (alConnActive(&s_mem->conn))
     {
         SpiGuard g;
-        alConnClose(&s_conn, code, reason);
+        alConnClose(&s_mem->conn, code, reason);
     }
 }
 
@@ -366,21 +393,21 @@ void applinkChipReset()
         Serial.printf("[APPLINK];event;chip_reset;socket;dropped;ms;%lu\n", (unsigned long)millis());
     }
     s_staleSweep = false;   // the reset closed every chip socket: nothing stale to sweep
-    if (s_inited && alConnActive(&s_conn))
-        alConnClose(&s_conn, 1006, NULL);   // 1006: no close frame on the wire
+    if (s_mem && alConnActive(&s_mem->conn))
+        alConnClose(&s_mem->conn, 1006, NULL);   // 1006: no close frame on the wire
     s_nextOpen = 0;   // new listener on the first pass with IP and link
 }
 
 bool applinkSessionUp()
 {
-    return s_inited && alConnAuthed(&s_conn);
+    return s_mem && alConnAuthed(&s_mem->conn);
 }
 
 BlePhoneSend applinkSendFrame(const uint8_t *buf, uint16_t len)
 {
-    if (!s_inited || !alConnAuthed(&s_conn))
+    if (!s_mem || !alConnAuthed(&s_mem->conn))
         return BLE_SEND_DOWN;
-    return alConnSendFrame(&s_conn, buf, len, millis());
+    return alConnSendFrame(&s_mem->conn, buf, len, millis());
 }
 
 size_t applinkStatus(char *out, size_t out_size)
@@ -396,13 +423,15 @@ size_t applinkStatus(char *out, size_t out_size)
         n = snprintf(out, out_size, "AppLink off (no password)");
     else if (!neth.hasIPaddress)
         n = snprintf(out, out_size, "AppLink on, waiting for Ethernet");
-    else if (s_inited && alConnAuthed(&s_conn))
+    else if (s_mem && alConnAuthed(&s_mem->conn))
         n = snprintf(out, out_size, "AppLink on :%d session %u.%u.%u.%u up %lus in %lu out %lu", AL_PORT, s_peer[0],
                      s_peer[1], s_peer[2], s_peer[3], (unsigned long)((uint32_t)(millis() - s_upSince) / 1000UL),
-                     (unsigned long)s_conn.st.frames_in, (unsigned long)s_conn.st.frames_out);
-    else if (s_inited && alConnActive(&s_conn))
+                     (unsigned long)s_mem->conn.st.frames_in, (unsigned long)s_mem->conn.st.frames_out);
+    else if (s_mem && alConnActive(&s_mem->conn))
         n = snprintf(out, out_size, "AppLink on :%d login from %u.%u.%u.%u", AL_PORT, s_peer[0], s_peer[1], s_peer[2],
                      s_peer[3]);
+    else if (!s_mem)
+        n = snprintf(out, out_size, "AppLink on :%d no memory", AL_PORT);
     else if (s_sock == 0xFF)
         n = snprintf(out, out_size, "AppLink on :%d no free socket", AL_PORT);
     else
@@ -425,9 +454,10 @@ void applinkLoop()
         s_linkUp = false;
         if (s_sock != 0xFF)
             s_staleSweep = true;   // the chip may still hold it in LISTEN/ESTABLISHED
-        if (s_inited && alConnActive(&s_conn))
-            alConnClose(&s_conn, 1006, NULL);
+        if (s_mem && alConnActive(&s_mem->conn))
+            alConnClose(&s_mem->conn, 1006, NULL);
         alCloseSocket();
+        alMemRelease();
         return;
     }
 
@@ -439,15 +469,15 @@ void applinkLoop()
     if (!s_linkUp)
     {
         // cable out while hasIPaddress is still true: a write would block in socketSend()
-        if (alConnActive(&s_conn))
-            alConnClose(&s_conn, 1006, NULL);   // no wire write; alIoClose frees the socket
+        if (s_mem && alConnActive(&s_mem->conn))
+            alConnClose(&s_mem->conn, 1006, NULL);   // no wire write; alIoClose frees the socket
         return;
     }
 
     if (!alWanted())
     {
-        if (alConnActive(&s_conn))
-            alConnClose(&s_conn, 1001, NULL);
+        if (s_mem && alConnActive(&s_mem->conn))
+            alConnClose(&s_mem->conn, 1001, NULL);
         alCloseSocket();
         // AppLink was switched off (or lost its password / ext-UDP took over) while the IP was
         // gone: the forgotten chip socket on 8002 is not reached by alOpenListener()'s sweep.
@@ -456,6 +486,19 @@ void applinkLoop()
         {
             alCloseStaleListeners(alSockCount());
             s_staleSweep = false;
+        }
+        alMemRelease();
+        return;
+    }
+
+    if (!alMemEnsure())
+    {
+        // no listener without the memory to serve it; retried every pass, said every 30 s
+        if (!s_gotNoSockLog || (uint32_t)(now - s_lastNoSockLog) > 30000UL)
+        {
+            Serial.printf("[APPLINK] no memory, retry\n");
+            s_gotNoSockLog = true;
+            s_lastNoSockLog = now;
         }
         return;
     }
@@ -466,7 +509,7 @@ void applinkLoop()
             alOpenListener(now);
         if (s_sock == 0xFF)
         {
-            alConnPoll(&s_conn, now);
+            alConnPoll(&s_mem->conn, now);
             return;
         }
     }
@@ -477,9 +520,9 @@ void applinkLoop()
         Serial.printf("[APPLINK];event;socket_taken;ms;%lu\n", (unsigned long)now);
         s_sock = 0xFF;
         s_nextOpen = 0;
-        if (alConnActive(&s_conn))
-            alConnClose(&s_conn, 1006, NULL);   // alIoClose -> alCloseSocket: s_sock already gone, no chip access
-        alConnPoll(&s_conn, now);
+        if (alConnActive(&s_mem->conn))
+            alConnClose(&s_mem->conn, 1006, NULL);   // alIoClose -> alCloseSocket: s_sock already gone, no chip access
+        alConnPoll(&s_mem->conn, now);
         return;
     }
 
@@ -491,12 +534,12 @@ void applinkLoop()
         s_srSince = now;
     }
 
-    const bool active = alConnActive(&s_conn);
+    const bool active = alConnActive(&s_mem->conn);
 
     if (sr == SnSR::LISTEN)
     {
         if (active)   // our session socket fell back to LISTEN: dead
-            alConnClose(&s_conn, 1006, NULL);
+            alConnClose(&s_mem->conn, 1006, NULL);
     }
     else if (sr == SnSR::ESTABLISHED || sr == SnSR::CLOSE_WAIT)
     {
@@ -512,7 +555,7 @@ void applinkLoop()
                 if (alNonce(nonce))
                 {
                     alReadPeer();
-                    alConnOpen(&s_conn, nonce, now);
+                    alConnOpen(&s_mem->conn, nonce, now);
                     memset(nonce, 0, sizeof(nonce));
                 }
                 else if ((uint32_t)(now - s_srSince) > AL_NONCE_MS)
@@ -526,7 +569,7 @@ void applinkLoop()
             int avail = cl.available();
             if (avail > 0)
             {
-                int got = cl.read(s_rxbuf, avail < AL_RX_CHUNK ? (size_t)avail : (size_t)AL_RX_CHUNK);
+                int got = cl.read(s_mem->rx, avail < AL_RX_CHUNK ? (size_t)avail : (size_t)AL_RX_CHUNK);
                 if (got > 0)
                 {
                     AlConnInfo info;
@@ -538,23 +581,23 @@ void applinkLoop()
                     info.fw = fw;
                     info.hw = hw;
                     info.password = s_pw;
-                    alConnRx(&s_conn, s_rxbuf, (size_t)got, &info, &s_lock, now);
+                    alConnRx(&s_mem->conn, s_mem->rx, (size_t)got, &info, &s_lock, now);
                 }
             }
-            if (alConnActive(&s_conn) && sr == SnSR::CLOSE_WAIT && cl.available() <= 0)
-                alConnClose(&s_conn, 1001, NULL);
+            if (alConnActive(&s_mem->conn) && sr == SnSR::CLOSE_WAIT && cl.available() <= 0)
+                alConnClose(&s_mem->conn, 1001, NULL);
         }
     }
     else
     {
         // CLOSED, FIN_WAIT, LAST_ACK, CLOSING, TIME_WAIT, INIT, SYNRECV ...
         if (active)
-            alConnClose(&s_conn, 1006, NULL);
+            alConnClose(&s_mem->conn, 1006, NULL);
         else if (sr == SnSR::CLOSED || (uint32_t)(now - s_srSince) > AL_STUCK_MS)
             alCloseSocket();
     }
 
-    alConnPoll(&s_conn, now);
+    alConnPoll(&s_mem->conn, now);
 }
 
 #endif   // HAS_APPLINK && NRF52_SERIES

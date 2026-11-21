@@ -31,7 +31,6 @@
 #define AL_SLOTS 2
 
 static int s_listen_fd = -1;
-static AlConn s_conn[AL_SLOTS];
 static int s_fd[AL_SLOTS] = {-1, -1};
 static char s_ip[AL_SLOTS][16];
 static uint32_t s_authedAt[AL_SLOTS];
@@ -41,7 +40,15 @@ static char s_pw[15];
 static bool s_inited = false;
 static uint32_t s_retryAt = 0;
 static uint32_t s_logAt = 0;
-static uint8_t s_rx[APPLINK_OUT_BUF];
+// Connection state and receive buffer (about 4 KB) live on the heap only while AppLink is wanted:
+// memEnsure()/memRelease() in applinkLoop(), never in a function the engine can reach through a
+// command (--applink off, --passwd none arrive inside alConnRx). T-Beam idle-heap gate 2026-11-21.
+struct AlMem
+{
+    AlConn conn[AL_SLOTS];
+    uint8_t rx[APPLINK_OUT_BUF];
+};
+static AlMem *s_mem = nullptr;
 
 // ---------------------------------------------------------------------------
 static void alLog(const char *msg)
@@ -96,7 +103,7 @@ static void ioOnAuthed(void *ctx)
     // client receives no frames before its own hello re-claims PL_NET.
     int old = s_sessionIdx;
     if (old >= 0 && old != i && s_fd[old] >= 0)
-        alConnClose(&s_conn[old], 4409, "taken over");
+        alConnClose(&s_mem->conn[old], 4409, "taken over");
     s_sessionIdx = i;
     s_authedAt[i] = millis();
 }
@@ -133,19 +140,51 @@ static void slotsInit()
     s_inited = true;
     alLockoutInit(&s_lock);
     for (int i = 0; i < AL_SLOTS; i++)
+        s_fd[i] = -1;
+}
+
+// true when the connection memory is there (allocates it on first use)
+static bool memEnsure()
+{
+    if (s_mem)
+        return true;
+    s_mem = (AlMem *)calloc(1, sizeof(AlMem));
+    if (!s_mem)
+    {
+        alLog("no memory, retry");
+        return false;
+    }
+    for (int i = 0; i < AL_SLOTS; i++)
     {
         AlConnIo io;
         makeIo(i, &io);
-        alConnInit(&s_conn[i], &io);
+        alConnInit(&s_mem->conn[i], &io);
         s_fd[i] = -1;
     }
+    s_sessionIdx = -1;
+    return true;
+}
+
+// applinkLoop() only, after closeAll() and stopListener(): no connection is left that could use it
+static void memRelease()
+{
+    if (!s_mem || s_listen_fd >= 0)
+        return;
+    for (int i = 0; i < AL_SLOTS; i++)
+        if (s_fd[i] >= 0)
+            return;
+    free(s_mem);
+    s_mem = nullptr;
+    s_sessionIdx = -1;
 }
 
 static void closeAll(uint16_t code, const char *reason)
 {
+    if (!s_mem)
+        return;
     for (int i = 0; i < AL_SLOTS; i++)
         if (s_fd[i] >= 0)
-            alConnClose(&s_conn[i], code, reason);
+            alConnClose(&s_mem->conn[i], code, reason);
 }
 
 static void stopListener()
@@ -278,10 +317,10 @@ static void acceptClients()
                  (unsigned)((a >> 24) & 0xFF));
         AlConnIo io;
         makeIo(slot, &io);
-        alConnInit(&s_conn[slot], &io);   // reset state
+        alConnInit(&s_mem->conn[slot], &io);   // reset state
         uint8_t nonce[16];
         esp_fill_random(nonce, sizeof(nonce));
-        alConnOpen(&s_conn[slot], nonce, millis());
+        alConnOpen(&s_mem->conn[slot], nonce, millis());
     }
 }
 
@@ -297,6 +336,12 @@ void applinkLoop()
             closeAll(1001, want ? "network down" : "off");
             stopListener();
         }
+        memRelease();
+        return;
+    }
+    if (!memEnsure())
+    {
+        stopListener();   // no listener without the memory to serve it
         return;
     }
     if (s_listen_fd < 0)
@@ -323,45 +368,45 @@ void applinkLoop()
     {
         for (int k = 0; k < 2 && s_fd[i] >= 0; k++)
         {
-            int r = ::recv(s_fd[i], s_rx, sizeof(s_rx), MSG_DONTWAIT);
+            int r = ::recv(s_fd[i], s_mem->rx, sizeof(s_mem->rx), MSG_DONTWAIT);
             if (r > 0)
             {
-                alConnRx(&s_conn[i], s_rx, (size_t)r, &info, &s_lock, now);
-                if (r < (int)sizeof(s_rx))
+                alConnRx(&s_mem->conn[i], s_mem->rx, (size_t)r, &info, &s_lock, now);
+                if (r < (int)sizeof(s_mem->rx))
                     break;
             }
             else if (r == 0)
             {
-                alConnClose(&s_conn[i], 1001, NULL);
+                alConnClose(&s_mem->conn[i], 1001, NULL);
             }
             else
             {
                 if (errno != EAGAIN && errno != EWOULDBLOCK)
-                    alConnClose(&s_conn[i], 1006, NULL);
+                    alConnClose(&s_mem->conn[i], 1006, NULL);
                 break;
             }
         }
         if (s_fd[i] >= 0)
-            alConnPoll(&s_conn[i], now);
+            alConnPoll(&s_mem->conn[i], now);
     }
 }
 
 void applinkClose(uint16_t code, const char *reason)
 {
-    if (s_sessionIdx >= 0 && s_fd[s_sessionIdx] >= 0)
-        alConnClose(&s_conn[s_sessionIdx], code, reason);
+    if (s_mem && s_sessionIdx >= 0 && s_fd[s_sessionIdx] >= 0)
+        alConnClose(&s_mem->conn[s_sessionIdx], code, reason);
 }
 
 bool applinkSessionUp()
 {
-    return s_sessionIdx >= 0 && s_fd[s_sessionIdx] >= 0 && alConnAuthed(&s_conn[s_sessionIdx]);
+    return s_mem && s_sessionIdx >= 0 && s_fd[s_sessionIdx] >= 0 && alConnAuthed(&s_mem->conn[s_sessionIdx]);
 }
 
 BlePhoneSend applinkSendFrame(const uint8_t *buf, uint16_t len)
 {
     if (!applinkSessionUp())
         return BLE_SEND_DOWN;
-    return alConnSendFrame(&s_conn[s_sessionIdx], buf, len, millis());
+    return alConnSendFrame(&s_mem->conn[s_sessionIdx], buf, len, millis());
 }
 
 size_t applinkStatus(char *out, size_t out_size)
@@ -374,10 +419,10 @@ size_t applinkStatus(char *out, size_t out_size)
     else if (s_pw[0] == 0)
         n = snprintf(out, out_size, "AppLink off (no password)");
     else if (!networkUp() || s_listen_fd < 0)
-        n = snprintf(out, out_size, "AppLink on, waiting for network");
+        n = snprintf(out, out_size, s_mem || !networkUp() ? "AppLink on, waiting for network" : "AppLink on, no memory");
     else if (applinkSessionUp())
     {
-        const AlConn *c = &s_conn[s_sessionIdx];
+        const AlConn *c = &s_mem->conn[s_sessionIdx];
         n = snprintf(out, out_size,
                      "AppLink on :%d session %s up %lus in %lu out %lu busy %lu authfail %lu",
                      APPLINK_PORT, s_ip[s_sessionIdx],
