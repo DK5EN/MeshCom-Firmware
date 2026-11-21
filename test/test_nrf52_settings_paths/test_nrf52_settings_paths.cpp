@@ -33,6 +33,7 @@
 #include <nrf52/WisBlock-API.h> // s_meshcom_settings, meshcom_settings, init_flash_done, MESHCOM_DATA_MARKER
 #include <nrf52/ble_settings_v1.h> // s_ble_settings_v1, bleSettingsToV1() -- legacy blobs are v1 images now (D1-04 W3 step 4)
 #include <nrf52/settings_store_nrf52.h> // SettingsLoadResult, settingsStoreLoad()/Save()
+#include <settings_dump_mask.h>
 #include <settings_schema.h>
 #include <settings_store.h>
 
@@ -1057,6 +1058,144 @@ static void test_ble_set_01_dead_settings_characteristic_is_gone(void)
                              "g_lora_data is declared again in WisBlock-API.h");
 }
 
+// ---------------------------------------------------------------------------
+// SEC-DUMP-01 (#1291): --dumpsettings must not print secrets.
+// ---------------------------------------------------------------------------
+static void set_str(char *dst, size_t cap, const char *v)
+{
+    memset(dst, 0, cap);
+    strncpy(dst, v, cap - 1);
+}
+
+static std::string dump_state(const s_meshcom_settings &state, size_t *file_size = nullptr)
+{
+    auto keyed = make_keyed_store(state);
+    g_fake_fs.seed(kKeyedPath, keyed.data(), keyed.size());
+    if (file_size)
+        *file_size = keyed.size();
+    Serial.clear();
+    settingsStoreDump();
+    return Serial.captured();
+}
+
+static void test_dump_masks_the_five_secrets(void)
+{
+    s_meshcom_settings s;
+    snprintf(s.node_passwd, sizeof(s.node_passwd), "%-14.14s", "pw-console-91");
+    set_str(s.node_webpwd, sizeof(s.node_webpwd), "pw-web-7712");
+    set_str(s.node_pwd, sizeof(s.node_pwd), "wlan-psk-4471");
+    set_str(s.node_opwd, sizeof(s.node_opwd), "srv-pw-3308");
+    s.bt_code = 731942;
+
+    const std::string out = dump_state(s);
+    TEST_ASSERT_TRUE_MESSAGE(out.find("pw-console-91") == std::string::npos, "node_passwd in clear");
+    TEST_ASSERT_TRUE_MESSAGE(out.find("pw-web-7712") == std::string::npos, "node_webpwd in clear");
+    TEST_ASSERT_TRUE_MESSAGE(out.find("wlan-psk-4471") == std::string::npos, "node_lpwd in clear");
+    TEST_ASSERT_TRUE_MESSAGE(out.find("srv-pw-3308") == std::string::npos, "node_pwd in clear");
+    TEST_ASSERT_TRUE_MESSAGE(out.find("731942") == std::string::npos, "bt_code in clear");
+    TEST_ASSERT_TRUE_MESSAGE(out.find("node_passwd=***\n") != std::string::npos, "node_passwd=*** missing");
+    TEST_ASSERT_TRUE_MESSAGE(out.find("node_webpwd=***\n") != std::string::npos, "node_webpwd=*** missing");
+    TEST_ASSERT_TRUE_MESSAGE(out.find("node_lpwd=***\n") != std::string::npos, "node_lpwd=*** missing");
+    TEST_ASSERT_TRUE_MESSAGE(out.find("node_pwd=***\n") != std::string::npos, "node_pwd=*** missing");
+    TEST_ASSERT_TRUE_MESSAGE(out.find("bt_code=***\n") != std::string::npos, "bt_code=*** missing");
+}
+
+static void test_dump_keeps_unset_and_non_secret_lines(void)
+{
+    s_meshcom_settings s;
+    set_str(s.node_webpwd, sizeof(s.node_webpwd), "");
+    set_str(s.node_call, sizeof(s.node_call), "DK5EN-90");
+    set_str(s.node_eqns, sizeof(s.node_eqns), "0123456789012345678901234567890123456789012345678");
+    s.bt_code = 0;
+
+    size_t n = 0;
+    const std::string out = dump_state(s, &n);
+    TEST_ASSERT_TRUE(out.find("node_webpwd=\n") != std::string::npos);
+    TEST_ASSERT_TRUE(out.find("bt_code=0\n") != std::string::npos);
+    TEST_ASSERT_TRUE(out.find("node_call=DK5EN-90\n") != std::string::npos);
+    TEST_ASSERT_TRUE(out.find("node_eqns=0123456789012345678901234567890123456789012345678\n") != std::string::npos);
+    char begin[64];
+    snprintf(begin, sizeof(begin), "[SETST];dump;begin;bytes=%lu\n", (unsigned long)n);
+    TEST_ASSERT_TRUE(out.find(begin) != std::string::npos);
+    TEST_ASSERT_TRUE(out.find(";end;read_error=0\n") != std::string::npos);
+}
+
+static void test_dump_masks_across_chunk_boundaries(void)
+{
+    const size_t lens[] = {1, 13, 14, 63};
+    for (size_t L : lens)
+    {
+        g_fake_fs.reset();
+        s_meshcom_settings s;
+        std::string secret(L, 'q');
+        set_str(s.node_webpwd, sizeof(s.node_webpwd), secret.substr(0, 19).c_str());
+        set_str(s.node_pwd, sizeof(s.node_pwd), secret.c_str());
+        snprintf(s.node_passwd, sizeof(s.node_passwd), "%-14.14s", secret.c_str());
+        const std::string out = dump_state(s);
+        TEST_ASSERT_TRUE_MESSAGE(out.find("node_lpwd=***\n") != std::string::npos, "node_lpwd not masked");
+        TEST_ASSERT_TRUE_MESSAGE(out.find("node_passwd=***\n") != std::string::npos, "node_passwd not masked");
+        if (L >= 3)
+            TEST_ASSERT_TRUE_MESSAGE(out.find("qqq") == std::string::npos, "secret leaked");
+        else
+            TEST_ASSERT_TRUE_MESSAGE(out.find("=q\n") == std::string::npos, "short secret leaked");
+    }
+
+    // One-shot short read on the first chunk.
+    g_fake_fs.reset();
+    s_meshcom_settings s;
+    set_str(s.node_pwd, sizeof(s.node_pwd), "wlan-psk-4471");
+    auto keyed = make_keyed_store(s);
+    g_fake_fs.seed(kKeyedPath, keyed.data(), keyed.size());
+    g_fake_fs.force_short_read = 7;
+    Serial.clear();
+    settingsStoreDump();
+    TEST_ASSERT_TRUE_MESSAGE(Serial.captured().find("wlan-psk-4471") == std::string::npos, "leaked on short read");
+    TEST_ASSERT_TRUE(Serial.captured().find("node_lpwd=***\n") != std::string::npos);
+}
+
+static void test_dump_secret_list_covers_schema_names(void)
+{
+    // Keys that look secret-ish by name but are not secrets.
+    static const char *const allow[] = {"node_pwd_unused_placeholder"};
+    const settings_store::FieldDescriptor *f = settings_schema::fields();
+    for (size_t i = 0; i < settings_schema::fieldCount(); i++)
+    {
+        std::string k = f[i].key;
+        bool looks = k.find("pwd") != std::string::npos || k.find("pas") != std::string::npos ||
+                     k.find("code") != std::string::npos;
+        bool allowed = false;
+        for (const char *a : allow)
+            allowed = allowed || k == a;
+        if (looks && !allowed)
+            TEST_ASSERT_TRUE_MESSAGE(settingsDumpKeyIsSecret(k.c_str(), k.size()), k.c_str());
+    }
+    // Every table key exists in the schema (node_aprsispas is ESP32-only).
+    for (const char *key : kSettingsDumpSecretKeys)
+    {
+        bool found = false;
+        for (size_t i = 0; i < settings_schema::fieldCount(); i++)
+            found = found || strcmp(f[i].key, key) == 0;
+        if (!found)
+            TEST_ASSERT_EQUAL_STRING("node_aprsispas", key);
+    }
+}
+
+static void test_dump_overlong_lines_mask_secret_and_keep_other(void)
+{
+    const std::string secret(300, 'S');
+    const std::string other(300, 'o');
+    std::string file = "node_call=DK5EN-90\nnode_lpwd=" + secret + "\nnode_eqns=" + other + "\nbt_code=0\n";
+    g_fake_fs.seed(kKeyedPath, file.data(), file.size());
+    Serial.clear();
+    settingsStoreDump();
+    const std::string out = Serial.captured();
+    TEST_ASSERT_TRUE_MESSAGE(out.find("SSS") == std::string::npos, "over-long secret leaked");
+    TEST_ASSERT_TRUE_MESSAGE(out.find("node_lpwd=***\n") != std::string::npos, "over-long secret not masked");
+    TEST_ASSERT_TRUE_MESSAGE(out.find("node_eqns=" + other + "\n") != std::string::npos, "over-long non-secret damaged");
+    TEST_ASSERT_TRUE_MESSAGE(out.find("node_call=DK5EN-90\nnode_lpwd=***\nnode_eqns=") != std::string::npos, "line order/framing");
+    TEST_ASSERT_TRUE(out.find("bt_code=0\n") != std::string::npos);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -1104,6 +1243,12 @@ int main(void)
     RUN_TEST(test_unchanged_legacy_blob_does_not_override_keyed_store);
 
     RUN_TEST(test_ble_set_01_dead_settings_characteristic_is_gone);
+
+    RUN_TEST(test_dump_masks_the_five_secrets);
+    RUN_TEST(test_dump_keeps_unset_and_non_secret_lines);
+    RUN_TEST(test_dump_masks_across_chunk_boundaries);
+    RUN_TEST(test_dump_secret_list_covers_schema_names);
+    RUN_TEST(test_dump_overlong_lines_mask_secret_and_keep_other);
 
     return UNITY_END();
 }

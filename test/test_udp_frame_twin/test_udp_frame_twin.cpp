@@ -3485,6 +3485,156 @@ static void test_agreement_rm_command_for_another_node_is_relayed_not_queued_on_
     rmQueueReset();
 }
 
+// GW-GROUP-01 / GW-DM-01 / D2 (docs/plan-gateway-routing-20261121.md): what the
+// gateway shows and hands to the phone link must follow the LoRa rule, the relay
+// to LoRa and the gateway ack stay unchanged.
+static void feed_gw(int side, const char *dest, char type, const char *payload, uint32_t id)
+{
+    uint8_t buf[BUF_CAP];
+    memset(buf, 0, sizeof(buf));
+    uint16_t len = build_gate_datagram(buf, "DK5EN-2", dest, type, payload, id);
+    if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+    else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+}
+
+static void test_agreement_gw_foreign_group_not_shown_nor_phoned_on_both(void)
+{
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[96];
+        recorder_reset();
+        meshcom_settings.node_gcb[0] = 262;
+        int depth0 = txRingDepth();
+        feed_gw(side, "9", ':', "foreign group", 0x7101 + (uint32_t)side * 2);
+        snprintf(msg, sizeof(msg), "%s: foreign group must not reach the display", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_sendDisplayText_calls, msg);
+        snprintf(msg, sizeof(msg), "%s: foreign group must not reach the phone", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ble.size(), msg);
+        snprintf(msg, sizeof(msg), "%s: foreign group is still relayed to LoRa", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(depth0 + 1, txRingDepth(), msg);
+
+        // control: the own group 262 is shown and phoned once
+        recorder_reset();
+        feed_gw(side, "262", ':', "own group", 0x7201 + (uint32_t)side * 2);
+        snprintf(msg, sizeof(msg), "%s: own group display", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_sendDisplayText_calls, msg);
+        snprintf(msg, sizeof(msg), "%s: own group phone", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ble.size(), msg);
+    }
+    memset(meshcom_settings.node_gcb, 0, sizeof(meshcom_settings.node_gcb));
+}
+
+static void test_agreement_gw_no_group_set_shows_every_group_on_both(void)
+{
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[96];
+        recorder_reset();
+        memset(meshcom_settings.node_gcb, 0, sizeof(meshcom_settings.node_gcb));
+        feed_gw(side, "9", ':', "any group", 0x7301 + (uint32_t)side);
+        snprintf(msg, sizeof(msg), "%s: no group set, display", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, g_sendDisplayText_calls, msg);
+        snprintf(msg, sizeof(msg), "%s: no group set, phone", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ble.size(), msg);
+    }
+}
+
+static void test_agreement_gw_third_party_dm_not_handed_to_phone_on_both(void)
+{
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[96];
+        recorder_reset();
+        int depth0 = txRingDepth();
+        feed_gw(side, "DK5EN-3", ':', "hallo{12", 0x7401 + (uint32_t)side * 4);
+        snprintf(msg, sizeof(msg), "%s: third-party DM must not reach the phone", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ble.size(), msg);
+        snprintf(msg, sizeof(msg), "%s: third-party DM is still relayed", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(depth0 + 1, txRingDepth(), msg);
+
+        recorder_reset();
+        feed_gw(side, "DK5EN-3", ':', "x:ack12", 0x7402 + (uint32_t)side * 4);
+        snprintf(msg, sizeof(msg), "%s: third-party ack must not reach the phone", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ble.size(), msg);
+
+        // control: DM to the own call (DK5EN-1) still reaches the phone once
+        recorder_reset();
+        feed_gw(side, "DK5EN-1", ':', "hallo{12", 0x7403 + (uint32_t)side * 4);
+        snprintf(msg, sizeof(msg), "%s: own DM phone", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ble.size(), msg);
+    }
+}
+
+static void test_agreement_gw_star_respects_nomsgall_on_both(void)
+{
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[96];
+        recorder_reset();
+        bNoMSGtoALL = true;
+        int depth0 = txRingDepth();
+        feed_gw(side, "*", ':', "to all", 0x7501 + (uint32_t)side);
+        snprintf(msg, sizeof(msg), "%s: * with --nomsgall on must not reach the phone", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ble.size(), msg);
+        snprintf(msg, sizeof(msg), "%s: * is still relayed", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(depth0 + 1, txRingDepth(), msg);
+
+        // control: with the flag off the phone gets it once
+        recorder_reset();
+        bNoMSGtoALL = false;
+        feed_gw(side, "*", ':', "to all again", 0x7503 + (uint32_t)side);
+        snprintf(msg, sizeof(msg), "%s: * with --nomsgall off reaches the phone", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ble.size(), msg);
+    }
+    bNoMSGtoALL = false;
+}
+
+static void test_agreement_gw_position_and_set_cet_still_reach_phone_on_both(void)
+{
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[96];
+        recorder_reset();
+        feed_gw(side, "DK5EN-3", '!', "4700.00N/01300.00E-test", 0x7601 + (uint32_t)side * 2);
+        snprintf(msg, sizeof(msg), "%s: position still reaches the phone", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ble.size(), msg);
+
+        recorder_reset();
+        feed_gw(side, "DK5EN-3", ':', "{CET}2026-11-21 12:00:00", 0x7602 + (uint32_t)side * 2);
+        snprintf(msg, sizeof(msg), "%s: {CET} still reaches the phone", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ble.size(), msg);
+    }
+}
+
+// D4: the gateway keeps acking a foreign group (and relaying it); display and phone get nothing.
+static void test_agreement_gw_foreign_group_is_still_acked_and_relayed_on_both(void)
+{
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[96];
+        recorder_reset();
+        meshcom_settings.node_gcb[0] = 262;
+        int depth0 = txRingDepth();
+        feed_gw(side, "9", ':', "foreign group{033", 0x7701 + (uint32_t)side);
+        snprintf(msg, sizeof(msg), "%s: foreign group is still acked by the gateway", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_ack_ids.size(), msg);
+        TEST_ASSERT_EQUAL_UINT_MESSAGE(33u, g_ack_ids[0], msg);
+        snprintf(msg, sizeof(msg), "%s: foreign group is still relayed", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(depth0 + 1, txRingDepth(), msg);
+        snprintf(msg, sizeof(msg), "%s: foreign group not on the display", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, g_sendDisplayText_calls, msg);
+        snprintf(msg, sizeof(msg), "%s: foreign group not on the phone", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_ble.size(), msg);
+    }
+    memset(meshcom_settings.node_gcb, 0, sizeof(meshcom_settings.node_gcb));
+}
+
 int main(int, char **argv)
 {
     g_argv0 = argv[0] ? argv[0] : "";
@@ -3547,6 +3697,13 @@ int main(int, char **argv)
     RUN_TEST(test_regression_server_delivered_rm_command_with_msgno_group_and_full_queue_on_both);
     RUN_TEST(test_regression_same_rm_frame_twice_is_queued_once_on_both);
     RUN_TEST(test_agreement_rm_command_for_another_node_is_relayed_not_queued_on_both);
+
+    RUN_TEST(test_agreement_gw_foreign_group_not_shown_nor_phoned_on_both);
+    RUN_TEST(test_agreement_gw_foreign_group_is_still_acked_and_relayed_on_both);
+    RUN_TEST(test_agreement_gw_no_group_set_shows_every_group_on_both);
+    RUN_TEST(test_agreement_gw_third_party_dm_not_handed_to_phone_on_both);
+    RUN_TEST(test_agreement_gw_star_respects_nomsgall_on_both);
+    RUN_TEST(test_agreement_gw_position_and_set_cet_still_reach_phone_on_both);
 
     RUN_TEST(test_u1_corpus_ordered_sink_dump_both_platforms);
 

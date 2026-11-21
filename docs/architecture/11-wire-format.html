@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MeshCom Wire Format</title>
-<meta name="source-sha256" content="4f5775686cd438ea277a9be064335991c5d3453cf59ff8500d0946c1e22eddb9">
+<meta name="source-sha256" content="4cc3842c4397345440d0c618a8d7637c11c78a50e1bce6ba6a26dd6405ea325d">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -226,6 +226,14 @@ appends its own callsign. <code>msg_source_call</code> = first element,
 <li>Destination: <code>*</code> = broadcast; a numeric group (<code>9999</code>, <code>20</code>, …); or a
 callsign for a direct message (DM). Non-group destinations must pass the
 callsign regex too.</li>
+<li>Call sign grammar (GW-CALL-01, decision D5): letters, digits and an optional
+<code>-SSID</code>; no <code>/</code>. A country prefix (<code>SV/OE3WFA</code>) or suffix (<code>OE3WFA/P</code>) is
+refused by <code>--setcall</code>, <code>--setudpcall</code>, <code>--setlog</code> and the web setup, and every
+receiver drops frames carrying one, so a portable call is not possible: use the
+home call and an SSID. The refusal is by design (pinned by
+<code>test_lehnt_laenderkennung_mit_schraegstrich_ab</code>); the console line names the
+reason (<code>callRejectHint()</code>). Whether the home call may be used abroad is a
+licensing matter, not decided here.</li>
 <li>HEY beacons are <code>0x40</code> frames with destination <code>H</code> (<code>HG</code> from gateways) and
 payload like <code>R0;</code> (trickle neighbor discovery); weather frames share type
 <code>0x40</code> with other destinations. Each hop that handles a HEY appends a signal

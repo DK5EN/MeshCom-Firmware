@@ -154,6 +154,24 @@ static void test_board_profil_ist_gepinnt(void)
 }
 
 // ------------------------------------------------------------ Via-Liste
+// GW-CALL-01 (D5 = A): the refusal of a country prefix is by design, not by accident.
+static void test_lehnt_laenderkennung_mit_schraegstrich_ab(void)
+{
+    TEST_ASSERT_FALSE_MESSAGE(checkRegexCall("SV/OE3WFA"), "SV/OE3WFA");
+    TEST_ASSERT_FALSE_MESSAGE(checkRegexCall("SV1/OE3WFA"), "SV1/OE3WFA");
+    TEST_ASSERT_FALSE_MESSAGE(checkRegexCall("OE3WFA/P"), "OE3WFA/P");
+}
+
+static void test_reject_hint_names_the_slash(void)
+{
+    String slash = callRejectHint("SV/OE3WFA");
+    TEST_ASSERT_TRUE_MESSAGE(slash.indexOf("'/'") >= 0, "hint names the slash");
+    TEST_ASSERT_TRUE_MESSAGE(slash.indexOf("-SSID") >= 0, "hint names the SSID");
+    String plain = callRejectHint("XX");
+    TEST_ASSERT_TRUE_MESSAGE(plain.indexOf("'/'") < 0, "plain text has no slash hint");
+    TEST_ASSERT_TRUE_MESSAGE(plain.indexOf("-SSID") >= 0, "plain text names the grammar");
+}
+
 static void test_via_akzeptiert_gueltige_listen(void)
 {
     TEST_ASSERT_TRUE(checkViaList(String("DK8VW-99")));
@@ -223,6 +241,9 @@ int main(int, char **)
     RUN_TEST(test_lehnt_leeres_rufzeichen_ab);
     RUN_TEST(test_lehnt_offensichtlichen_unsinn_ab);
     RUN_TEST(test_ueberlanges_rufzeichen_stuerzt_nicht_ab);
+
+    RUN_TEST(test_lehnt_laenderkennung_mit_schraegstrich_ab);
+    RUN_TEST(test_reject_hint_names_the_slash);
 
     RUN_TEST(test_via_akzeptiert_gueltige_listen);
     RUN_TEST(test_via_lehnt_ungueltige_ssid_ab);

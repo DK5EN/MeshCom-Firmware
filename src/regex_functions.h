@@ -7,6 +7,13 @@
 
 bool checkRegexCall(String strCallSign);
 
+// GW-CALL-01 (D5): the tail of the "Callsign <..> not valid" console line, with a
+// leading space, so the setters (--setcall, --setudpcall, --setlog) share one text.
+// A call with '/' (country prefix such as SV/OE3WFA) gets the reason; the grammar
+// has no '/' by design. Keep "[ERR]..Callsign <%s> not valid" as the first part of
+// the line, the hint is appended: printfdeb("... not valid%s\n", ..., callRejectHint(s).c_str())
+String callRejectHint(const String &callsign);
+
 // QA-RX-07: the special targets checkRegexCall() accepts ("*", "H", "HG",
 // "TEST", "TESTER"). They are destinations only; decodeAPRS() rejects them
 // as the source call of a received frame.

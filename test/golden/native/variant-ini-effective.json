@@ -3472,6 +3472,27 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_eth_dns": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_eth_dns"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_eth_recovery": {
   "build_flags": [
    "-std=gnu++17",
@@ -4261,6 +4282,27 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_netmode_label": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_netmode_label"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_node_position": {
   "build_flags": [
    "-std=gnu++17",
@@ -4552,6 +4594,27 @@
   "test_build_src": "True",
   "test_filter": [
    "test_remote_cmd"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_rf_pa": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_rf_pa"
   ],
   "test_framework": "unity"
  },

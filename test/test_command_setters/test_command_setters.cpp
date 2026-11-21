@@ -1064,6 +1064,40 @@ static void test_web_temp_offset_takes_comma_and_leading_zero()
     TEST_ASSERT_EQUAL_INT(3, (int)n);   // indoor/outdoor offset + WX-01 windcal
 }
 
+// WEB-TEMPOFF-01 (#1296): the outdoor getparam branch tested "tempoffsetindoor" a second time, so
+// /getparam/?tempoffsetoutdoor fell through to WS_RETURNCODE_UNKNOWN (422).
+static void test_web_getparam_outdoor_offset_is_reachable()
+{
+    const std::string src = read_repo_file("src/web_functions/web_setup.cpp");
+    const size_t start = src.find("void webSetup_getParam(");
+    TEST_ASSERT_TRUE_MESSAGE(start != std::string::npos, "webSetup_getParam not found");
+    const std::string cut = src.substr(start);
+
+    const std::string outKey = "paramName.equals(\"tempoffsetoutdoor\")";
+    const size_t out = cut.find(outKey);
+    TEST_ASSERT_TRUE_MESSAGE(out != std::string::npos, "getparam has no tempoffsetoutdoor branch");
+    const size_t outRet = cut.find("return;", out);
+    const std::string outBody = cut.substr(out, outRet - out);
+    TEST_ASSERT_TRUE_MESSAGE(outBody.find("node_tempo_off") != std::string::npos, "outdoor branch must read node_tempo_off");
+
+    const size_t in = cut.find("paramName.equals(\"tempoffsetindoor\")");
+    TEST_ASSERT_TRUE_MESSAGE(in != std::string::npos, "getparam has no tempoffsetindoor branch");
+    const size_t inRet = cut.find("return;", in);
+    TEST_ASSERT_TRUE_MESSAGE(cut.substr(in, inRet - in).find("node_tempi_off") != std::string::npos,
+                             "indoor branch must read node_tempi_off");
+
+    // generic guard: no paramName.equals("...") literal twice (a duplicate branch is dead code)
+    const std::regex re("paramName\\.equals\\(\"([^\"]*)\"\\)");
+    std::vector<std::string> seen;
+    for (std::sregex_iterator it(cut.begin(), cut.end(), re), end; it != end; ++it)
+    {
+        const std::string lit = (*it)[1];
+        const bool dup = std::find(seen.begin(), seen.end(), lit) != seen.end();
+        TEST_ASSERT_FALSE_MESSAGE(dup, ("duplicate getparam branch literal: " + lit).c_str());
+        seen.push_back(lit);
+    }
+}
+
 // Web "setvia": the OK/FAIL check must compare against the form --via stores
 // (viaCanonical), not the raw field -- "dk8vw-99" and "none" reported FAIL.
 // AU web GUI W1 rework: source pins for the wiring that has no host harness (ESP32-only code).
@@ -2561,6 +2595,7 @@ int main(int, char **)
     RUN_TEST(test_ota_update_and_the_handover_share_one_reboot_function);
     RUN_TEST(test_update_apply_hands_over_now_and_is_not_remote);
     RUN_TEST(test_web_temp_offset_takes_comma_and_leading_zero);
+    RUN_TEST(test_web_getparam_outdoor_offset_is_reachable);
     RUN_TEST(test_stagelan_is_instrument_only_everywhere);
     RUN_TEST(test_lan_url_accepts_only_plain_http_to_private_ipv4);
     RUN_TEST(test_stage_flash_goes_through_one_guarded_helper);

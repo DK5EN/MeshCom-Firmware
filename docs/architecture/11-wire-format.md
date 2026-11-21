@@ -142,6 +142,14 @@ itself.
 - Destination: `*` = broadcast; a numeric group (`9999`, `20`, …); or a
   callsign for a direct message (DM). Non-group destinations must pass the
   callsign regex too.
+- Call sign grammar (GW-CALL-01, decision D5): letters, digits and an optional
+  `-SSID`; no `/`. A country prefix (`SV/OE3WFA`) or suffix (`OE3WFA/P`) is
+  refused by `--setcall`, `--setudpcall`, `--setlog` and the web setup, and every
+  receiver drops frames carrying one, so a portable call is not possible: use the
+  home call and an SSID. The refusal is by design (pinned by
+  `test_lehnt_laenderkennung_mit_schraegstrich_ab`); the console line names the
+  reason (`callRejectHint()`). Whether the home call may be used abroad is a
+  licensing matter, not decided here.
 - HEY beacons are `0x40` frames with destination `H` (`HG` from gateways) and
   payload like `R0;` (trickle neighbor discovery); weather frames share type
   `0x40` with other destinations. Each hop that handles a HEY appends a signal

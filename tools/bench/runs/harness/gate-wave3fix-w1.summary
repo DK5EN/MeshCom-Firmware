@@ -1,0 +1,12 @@
+regression rc=1
+build heltec_wifi_lora_32_V3 rc=0 RAM: [==== ] 41.8% (used 137052 bytes from 327680 bytes) Flash: [===== ] 52.5% (used 1786581 bytes from 3403776 bytes) 
+build wiscore_rak4631 rc=0 RAM: [==== ] 41.7% (used 103700 bytes from 248832 bytes) Flash: [======== ] 83.1% (used 677616 bytes from 815104 bytes) 
+build ttgo_tbeam rc=0 RAM: [= ] 8.2% (used 107208 bytes from 1310720 bytes) Flash: [====== ] 55.5% (used 1890645 bytes from 3403776 bytes) 
+build LilyGo_T-Beam-1W rc=0 RAM: [=== ] 25.9% (used 137748 bytes from 532480 bytes) Flash: [===== ] 53.0% (used 1803093 bytes from 3403776 bytes) 
+build heltec_t114 rc=0 RAM: [==== ] 41.0% (used 96564 bytes from 235520 bytes) Flash: [===== ] 52.7% (used 429448 bytes from 815104 bytes) 
+build t_echo rc=0 RAM: [==== ] 40.3% (used 100220 bytes from 248832 bytes) Flash: [====== ] 55.3% (used 450816 bytes from 815104 bytes) 
+build t_deck_plus rc=0 RAM: [===== ] 48.3% (used 158204 bytes from 327680 bytes) Flash: [== ] 19.2% (used 2415865 bytes from 12582912 bytes) 
+=== gate done
+first regression run: 3 steps red (golden variant-ini baseline + u1 twin-diff record stale after GW D1 A, wire doc HTML stale, test_rm_rx_gate_lint pinned the pre-GW gate line); fixed by regeneration and lint update
+re-run regression --stage 1,2: Unity 119 envs, 4047 cases, 4047 ok; pytest 1639 passed; golden selftest 48 commands all green (after twin-diff regeneration)
+advisor (Opus): APPROVED, follow-ups applied (over-long dump line test, revert-probed red; D4 ack twin pin)

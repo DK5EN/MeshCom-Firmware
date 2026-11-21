@@ -52,5 +52,7 @@ def test_both_server_ingress_handlers_call_the_gate() -> None:
         code = _code((SRC / rel).read_text())
         assert code.count("rmRxTryQueue(") == 1, rel
         # the command must stay off the display and the phone
-        assert "!bStoConsumed && !bRmConsumed)" in code, rel
+        # GW-GROUP-01/GW-DM-01 (#1290) add "&& bForNode" behind it on both lines
+        assert code.count("!bStoConsumed && !bRmConsumed && bForNode)") == 2 or \
+            "!bStoConsumed && !bRmConsumed)" in code, rel
         assert code.count("!bRmConsumed") == 2, rel
