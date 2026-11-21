@@ -954,6 +954,24 @@ static void test_au_tick_and_wifi_gate_are_wired_in_esp32_main()
     TEST_ASSERT_TRUE_MESSAGE(call != std::string::npos, "esp32loop() never calls auTick()");
 }
 
+// OTA-SAFEBOOT-01 (#1300, D1 b): --ota-update on an old Safeboot warns (safeboot_too_old wording) and still reboots
+static void test_manual_ota_warns_on_old_safeboot_and_proceeds()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const size_t ota = cmd.find("commandCheck(msg_text+2, (char*)\"ota-update\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(ota != std::string::npos, "--ota-update rung missing");
+    const std::string rung = cmd.substr(ota, cmd.find("#endif", ota) - ota);
+    const size_t dec = rung.find("fwManualOtaDecide(fwNetSafebootVersion(), AU_SAFEBOOT_MIN, fwNetSafebootOld())");
+    const size_t warn = rung.find("safeboot_too_old;ver;%d;need;%d");
+    const size_t reboot = rung.find("auRebootToSafeboot()");
+    TEST_ASSERT_TRUE_MESSAGE(dec != std::string::npos, "--ota-update does not ask fwManualOtaDecide()");
+    TEST_ASSERT_TRUE_MESSAGE(warn != std::string::npos, "--ota-update lacks the safeboot_too_old warning");
+    TEST_ASSERT_TRUE_MESSAGE(reboot != std::string::npos && dec < warn && warn < reboot, "order must be: decide, warning, reboot");
+    // warn and proceed: no refusal return between the decision and the reboot, no force word
+    TEST_ASSERT_TRUE_MESSAGE(rung.substr(dec, reboot - dec).find("return") == std::string::npos, "--ota-update refuses instead of warning");
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("force") == std::string::npos, "--ota-update grew a force word");
+}
+
 // ---- AU-08 (#1187): shared Safeboot reboot, --update apply, bench-only stagelan --------------
 
 static void test_ota_update_and_the_handover_share_one_reboot_function()
@@ -2593,6 +2611,7 @@ int main(int, char **)
     RUN_TEST(test_update_rungs_sit_in_the_esp32_block_with_the_expected_output);
     RUN_TEST(test_au_tick_and_wifi_gate_are_wired_in_esp32_main);
     RUN_TEST(test_ota_update_and_the_handover_share_one_reboot_function);
+    RUN_TEST(test_manual_ota_warns_on_old_safeboot_and_proceeds);
     RUN_TEST(test_update_apply_hands_over_now_and_is_not_remote);
     RUN_TEST(test_web_temp_offset_takes_comma_and_leading_zero);
     RUN_TEST(test_web_getparam_outdoor_offset_is_reachable);

@@ -1365,6 +1365,29 @@ static void test_safeboot_why_dio_wins_over_old(void)
     TEST_ASSERT_EQUAL_STRING("dio", fwSafebootWhy(true, true, false));
 }
 
+// OTA-SAFEBOOT-01 (#1300, operator D1 b): a manual --ota-update on a Safeboot below the minimum WARNS and
+// proceeds; there is no refusal verdict and no override word.
+static void test_manual_ota_decide_warns_never_refuses(void)
+{
+    TEST_ASSERT_EQUAL_INT(FWOTA_WARN_OLD, fwManualOtaDecide(0, 1, false));
+    TEST_ASSERT_EQUAL_INT(FWOTA_WARN_OLD, fwManualOtaDecide(1, 2, false));
+    TEST_ASSERT_EQUAL_INT(FWOTA_PROCEED, fwManualOtaDecide(1, 1, false));
+    TEST_ASSERT_EQUAL_INT(FWOTA_PROCEED, fwManualOtaDecide(2, 1, false));
+    TEST_ASSERT_EQUAL_INT(FWOTA_PROCEED, fwManualOtaDecide(3, 1, false));
+    TEST_ASSERT_EQUAL_INT(FWOTA_PROCEED, fwManualOtaDecide(-1, 1, false)); // unreadable / no scanner: no new noise
+    TEST_ASSERT_EQUAL_INT(FWOTA_PROCEED, fwManualOtaDecide(0, 0, false));  // minimum 0 never warns
+    // nocap (a Safeboot handover failed) is "old" for the web status too: same verdict, still warn-and-proceed
+    TEST_ASSERT_EQUAL_INT(FWOTA_WARN_OLD, fwManualOtaDecide(1, 1, true));
+    TEST_ASSERT_EQUAL_INT(FWOTA_WARN_OLD, fwManualOtaDecide(3, 1, true));
+    TEST_ASSERT_EQUAL_INT(FWOTA_PROCEED, fwManualOtaDecide(-1, 1, true)); // no partition: auRebootToSafeboot reports it
+    // one predicate: the verdict is "old" exactly when fwSafebootWhy says "old" (bootQio true = not DIO-blocked)
+    for (int v = -1; v <= 3; v++)
+        for (int nc = 0; nc <= 1; nc++)
+            if (v >= 0)
+                TEST_ASSERT_EQUAL_INT(strcmp(fwSafebootWhy(v >= 1, nc != 0, true), "old") == 0 ? FWOTA_WARN_OLD : FWOTA_PROCEED,
+                                      fwManualOtaDecide(v, 1, nc != 0));
+}
+
 static void test_check_age_min(void)
 {
     // AU-22: both stamps are node UTC (node_date_*), 0 while the node clock is not valid; never uptime seconds
@@ -1891,6 +1914,7 @@ int main(int, char **)
     RUN_TEST(test_go_decide_current_noasset_safeboot_order);
     RUN_TEST(test_check_age_min);
     RUN_TEST(test_safeboot_why_dio_wins_over_old);
+    RUN_TEST(test_manual_ota_decide_warns_never_refuses);
     RUN_TEST(test_go_decide_notready_low_battery);
     RUN_TEST(test_go_decide_notready_before_nowifi);
     RUN_TEST(test_go_tick_handover_when_everything_passes);

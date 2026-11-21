@@ -345,17 +345,6 @@ static void test_dht_type_sanitize(void)
     TEST_ASSERT_EQUAL_INT(11, v);
 }
 
-/* SENS-04: the driver reports "DHT11"/"DHT22"; the name must match the configured type. */
-static void test_dht_name_matches(void)
-{
-    TEST_ASSERT_TRUE(dht_name_matches("DHT11", 11));
-    TEST_ASSERT_TRUE(dht_name_matches("DHT22", 22));
-    TEST_ASSERT_FALSE(dht_name_matches("DHT22", 11));
-    TEST_ASSERT_FALSE(dht_name_matches("DHT11", 22));
-    TEST_ASSERT_FALSE(dht_name_matches("DHT21", 22));
-    TEST_ASSERT_FALSE(dht_name_matches(NULL, 11));
-}
-
 static char g_new_value[8];
 static void capture_new(const char *, const char *, const char *newv)
 {
@@ -515,6 +504,68 @@ static void test_dht_type_sanitised_on_both_load_paths(void)
     TEST_ASSERT_EQUAL_INT(11, v);
 }
 
+/* DHT-PROBE-01: "found" means a read returned numbers, never the driver's static type name. */
+static void test_dht_probe_no_sensor_never_found(void)
+{
+    bool found = false;
+    uint8_t tries = 3;
+    for (int i = 0; i < 3; i++)
+        dht_probe_step(found, tries, false);
+    TEST_ASSERT_FALSE(found);
+    TEST_ASSERT_EQUAL_UINT8(0, tries);
+    dht_probe_step(found, tries, false); /* stays at 0 */
+    TEST_ASSERT_EQUAL_UINT8(0, tries);
+}
+
+static void test_dht_probe_valid_read_found(void)
+{
+    bool found = false;
+    uint8_t tries = 3;
+    dht_probe_step(found, tries, false);
+    TEST_ASSERT_FALSE(found);
+    TEST_ASSERT_EQUAL_UINT8(2, tries);
+    dht_probe_step(found, tries, true);
+    TEST_ASSERT_TRUE(found);
+    TEST_ASSERT_EQUAL_UINT8(0, tries);
+}
+
+static void test_dht_found_survives_bad_read(void)
+{
+    bool found = true;
+    uint8_t tries = 0;
+    dht_probe_step(found, tries, false);
+    TEST_ASSERT_TRUE(found);
+    dht_probe_step(found, tries, true);
+    TEST_ASSERT_TRUE(found);
+}
+
+static void test_dht_status_words(void)
+{
+    TEST_ASSERT_EQUAL_STRING("found", dht_status_word(true, true, 0));
+    TEST_ASSERT_EQUAL_STRING("read error", dht_status_word(true, false, 0));
+    TEST_ASSERT_EQUAL_STRING("probing", dht_status_word(false, false, 2));
+    TEST_ASSERT_EQUAL_STRING("not found", dht_status_word(false, false, 0));
+    /* the status line buffer is 16 bytes: " (" + word + ")" + NUL */
+    const char *all[] = { dht_status_word(true, true, 0), dht_status_word(true, false, 0),
+                          dht_status_word(false, false, 2), dht_status_word(false, false, 0) };
+    for (const char *w : all)
+        TEST_ASSERT_TRUE(strlen(w) + 4 <= 16);
+}
+
+static void test_dht_init_has_no_static_found(void)
+{
+    const std::string ow = read_src("src/onewire_functions.cpp");
+    TEST_ASSERT_TRUE(ow.find("dht_probe_step(") != std::string::npos);
+    TEST_ASSERT_TRUE(ow.find("dht_name_matches(") == std::string::npos);
+    TEST_ASSERT_TRUE(ow.find("Unified Sensor found") == std::string::npos);
+    const std::string cmd = read_src("src/command_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("dht_status_word(") != std::string::npos, "command_functions.cpp");
+    const std::string esp = read_src("src/esp32/esp32_main.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(esp.find("if(dht_found)") == std::string::npos, "esp32_main.cpp gate");
+    const std::string nrf = read_src("src/nrf52/nrf52_main.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(nrf.find("if(dht_found)") == std::string::npos, "nrf52_main.cpp gate");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -536,7 +587,6 @@ int main(int, char **)
     RUN_TEST(test_boot_nbrrelay_on_in_production);
     RUN_TEST(test_backlight_level);
     RUN_TEST(test_dht_type_sanitize);
-    RUN_TEST(test_dht_name_matches);
     RUN_TEST(test_ping_target_ungueltig_wird_geleert);
     RUN_TEST(test_ping_target_gueltig_und_leer_bleiben);
     RUN_TEST(test_ping_target_ohne_terminator);
@@ -546,5 +596,10 @@ int main(int, char **)
     RUN_TEST(test_nrf52_load_path_repairs_reserved_pins);
     RUN_TEST(test_console_refuses_reserved_pins);
     RUN_TEST(test_dht_type_sanitised_on_both_load_paths);
+    RUN_TEST(test_dht_probe_no_sensor_never_found);
+    RUN_TEST(test_dht_probe_valid_read_found);
+    RUN_TEST(test_dht_found_survives_bad_read);
+    RUN_TEST(test_dht_status_words);
+    RUN_TEST(test_dht_init_has_no_static_found);
     return UNITY_END();
 }

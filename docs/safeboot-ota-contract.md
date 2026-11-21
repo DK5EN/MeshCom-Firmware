@@ -222,7 +222,7 @@ partition once per boot (`fwNetSafebootVersion()`, 256 B chunks) and derives:
 | -1      | no `safeboot` partition, or unreadable                                                    |
 | 0       | no marker and not AU-aware (older than the staged-apply image): too old                   |
 | 1       | no marker, but the strings `FWS2`, `fwstage` and `nocap` are all present (first AU image) |
-| N >= 2  | marker found; N is the Safeboot capability version (current: 2)                           |
+| N >= 2  | marker found; N is the Safeboot capability version (current: 3)                           |
 
 `AU_SAFEBOOT_MIN` (currently 1) is the lowest version auto update runs on. Raise `SAFEBOOT_VERSION` whenever
 Safeboot gains behaviour the app relies on, and `AU_SAFEBOOT_MIN` in the same change if the app needs it; a
@@ -231,5 +231,10 @@ minimum, or the handover-failure flag `nocap` set): `--autoupdate auto` is refus
 (`[ERR];autoupdate;safeboot_too_old`), a stored auto mode drops to notify at boot
 (`[AU];refuse;safeboot_too_old;mode;notify`), the automatic handover is blocked, the web dropdown is greyed
 out with a footnote ("flash once with the web flasher"), and `--update status` ends in
-`;safeboot;old;sbver;N;sbneed;M`. Notify, off and `--update apply` stay available. OTA and auto update never
-replace Safeboot; only the web flasher does.
+`;safeboot;old;sbver;N;sbneed;M`. Notify, off and `--update apply` stay available. A manual `--ota-update` (console, web button) is not
+refused on an old Safeboot: it prints `[AU];ota-update;note;safeboot_too_old;ver;N;need;M;nocap;0|1;proceeding` and reboots
+into Safeboot anyway (OTA-SAFEBOOT-01, operator decision: warn and proceed, no override word). The warning
+appears when the web status says "old" (version below the minimum or `nocap` set after a failed handover) and goes to the
+serial console only: the web button and BLE do not show it. Two edge cases differ from the web status: an unreadable
+Safeboot (version -1) proceeds without the warning (the reboot reports the missing partition), and a DIO bootloader
+with `nocap` set warns "old" while the web says "dio". OTA and auto update never replace Safeboot; only the web flasher does.

@@ -32,12 +32,25 @@ static void test_helper_passes_optimize_false_by_default(void)
     TEST_ASSERT_FALSE(r.optimize);
 }
 
+// RadioLib 7.1.2 (T-Deck Pro) has no two-argument overload: the table path must compile
+// against a radio that only offers setOutputPower(int8_t) and must call exactly that.
+struct OneArgRadio {
+    int calls = 0;
+    int8_t power = 0;
+    int16_t setOutputPower(int8_t p)
+    {
+        calls++;
+        power = p;
+        return 0;
+    }
+};
+
 static void test_helper_tdeckpro_keeps_table(void)
 {
-    MockRadio r;
-    rfApplyOutputPower(r, -9, true);
+    OneArgRadio r;
+    TEST_ASSERT_EQUAL_INT16(0, rfApplyOutputPowerTable(r, -9));
+    TEST_ASSERT_EQUAL_INT(1, r.calls);
     TEST_ASSERT_EQUAL_INT8(-9, r.power);
-    TEST_ASSERT_TRUE(r.optimize);
 }
 
 static std::string slurp(const char *rel)
@@ -50,6 +63,13 @@ static std::string slurp(const char *rel)
     std::stringstream ss;
     ss << f.rdbuf();
     return ss.str();
+}
+
+static void test_tdeckpro_dispatch_uses_the_one_arg_overload(void)
+{
+    std::string s = slurp("src/rf_pa.h");
+    size_t a = s.find("#if defined(BOARD_T_DECK_PRO)\n    return rfApplyOutputPowerTable(r, power);");
+    TEST_ASSERT_TRUE_MESSAGE(a != std::string::npos, "T-Deck Pro must take the one-argument table path");
 }
 
 static void test_both_paths_use_the_helper(void)
@@ -68,6 +88,7 @@ int main(int, char **)
     UNITY_BEGIN();
     RUN_TEST(test_helper_passes_optimize_false_by_default);
     RUN_TEST(test_helper_tdeckpro_keeps_table);
+    RUN_TEST(test_tdeckpro_dispatch_uses_the_one_arg_overload);
     RUN_TEST(test_both_paths_use_the_helper);
     return UNITY_END();
 }

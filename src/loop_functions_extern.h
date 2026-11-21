@@ -214,6 +214,7 @@ extern int one_start;
 extern bool ina226_found;
 extern bool shtc3_found;
 extern bool dht_found;
+extern uint8_t dht_probe_left;   // onewire_functions.cpp: DHT-PROBE-01 first-read attempts left (0 = decided)
 extern bool dht_ok;      // onewire_functions.cpp: last DHT read gave valid T and H (SENS-03)
 
 extern bool bSHORTPATH;

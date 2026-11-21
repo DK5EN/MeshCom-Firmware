@@ -1,0 +1,14 @@
+regression rc=0
+build wiscore_rak4631 rc=0 RAM: [==== ] 41.7% (used 103748 bytes from 248832 bytes) Flash: [======== ] 83.4% (used 679656 bytes from 815104 bytes) 
+build heltec_wifi_lora_32_V3 rc=0 RAM: [==== ] 41.8% (used 137092 bytes from 327680 bytes) Flash: [===== ] 52.6% (used 1788969 bytes from 3403776 bytes) 
+build t_deck_pro rc=0 RAM: [===== ] 50.0% (used 163720 bytes from 327680 bytes) Flash: [== ] 17.6% (used 2211437 bytes from 12582912 bytes) 
+build t_deck_plus rc=0 RAM: [===== ] 48.3% (used 158252 bytes from 327680 bytes) Flash: [== ] 19.2% (used 2416897 bytes from 12582912 bytes) 
+build ttgo_tbeam rc=0 RAM: [= ] 8.2% (used 107248 bytes from 1310720 bytes) Flash: [====== ] 55.6% (used 1892845 bytes from 3403776 bytes) 
+build heltec_t114 rc=0 RAM: [==== ] 41.0% (used 96612 bytes from 235520 bytes) Flash: [===== ] 52.9% (used 431448 bytes from 815104 bytes) 
+build t_echo rc=0 RAM: [==== ] 40.3% (used 100268 bytes from 248832 bytes) Flash: [====== ] 55.6% (used 452824 bytes from 815104 bytes) 
+build LilyGo_T-Beam-1W rc=0 RAM: [=== ] 25.9% (used 137788 bytes from 532480 bytes) Flash: [===== ] 53.0% (used 1805209 bytes from 3403776 bytes) 
+=== gate done
+first gate (before rework): Unity 4073/4073, 8 builds incl. t_deck_pro green; red only on regenerated baselines (variant-ini filter, wire doc HTML)
+advisor round 1: REWORK (autosymbol speed read stale posinfo_last on RAK with TRACK off) -> fresh Sonnet-high rework (own estimator, TRACK path restored to HEAD form; OTA nocap predicate)
+advisor round 2: REWORK (1 s sample spacing vs RAK 3 s jitter) -> orchestrator: 10 s spacing, (0,0) skipped, two tests red before; delta check APPROVED
+wave 1 regression found here: t_deck_pro (RadioLib 7.1.2) did not build with rf_pa.h two-arg call -> one-arg table path, test_rf_pa +1
