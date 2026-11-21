@@ -1,0 +1,10 @@
+{
+ "db0ais": {
+  "base_date": "2026-10-30",
+  "start_clock": "17:01:00",
+  "first_valid_line": 82,
+  "step_back_line": 18015,
+  "step_back_s": 3600,
+  "_comment": "DB0AIS-12 PuTTY capture 2026-10-30 17:01: lines before 82 have no clock yet; node clock ran 1 h ahead until a step back at line 18015 (19:20:26 -> 18:20:31); capture start confirms post-step = true time."
+ }
+}

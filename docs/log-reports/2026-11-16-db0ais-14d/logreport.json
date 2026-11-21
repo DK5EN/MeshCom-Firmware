@@ -1,0 +1,9 @@
+{
+  "_comment": "DB0AIS-12 PuTTY capture 2026-10-30 17:01 .. 2026-11-16 09:30 (one boot). Extractors run on the healthy part up to the main-loop hang on 2026-11-14 05:43:42 (line 4448151); the hang tail is analysed separately in generators/lib.",
+  "names": {"db0ais.log": "db0ais"},
+  "topics": {
+    "txpool": ["--clock-profiles", "config/txpool_clock_profiles.json"],
+    "timesignal": ["--standalone-start", "2026-10-30 17:01:11", "--standalone-utc-off-h", "2", "--logger-utc-off-s", "3600"],
+    "health": ["--standalone-start", "2026-10-30 17:01:11"]
+  }
+}
