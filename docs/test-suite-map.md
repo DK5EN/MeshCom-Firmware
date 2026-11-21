@@ -228,6 +228,7 @@ flashes whatever is attached.
 | test_fw_update_http          | Unit          |    13 | native_fw_update_http                                        |
 | test_hmac_sha256             | Unit          |    20 | native_hmac_sha256                                           |
 | test_kiss_frame              | Unit          |    18 | native_kiss_frame                                            |
+| test_pong_format             | Unit          |     7 | native_pong_format                                           |
 | test_loop_breadcrumb         | Unit          |    11 | native                                                       |
 | test_loop_scheduler          | Twin          |    26 | native_loop_scheduler                                        |
 | test_lora_aprs_encode        | Regression    |     4 | native_aprs_fuzz                                             |
