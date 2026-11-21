@@ -1,10 +1,17 @@
 # RESUME -- pick up here
 
 **Resume here: section "State 2026-11-21" below (fork release `v4.40a.11.22` out, Latest; upstream PR #1286
-(nav buttons, pong id) open); campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md).**
+(nav buttons, pong id) merged and synced); campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md).**
 
 ## State 2026-11-21
 
+- **Upstream sync 2026-11-21 late:** #1286 (nav buttons, pong id) merged upstream as `4164f180`, synced into
+  fork-dev as `66aeb04d`; merged tree equals the pre-merge tree (one comment conflict, fork side kept). Worktrees
+  and branches `pr/nav-pong` (local and origin) and `scratch/web-trial-20261116` removed; no PR of ours is open.
+- **Plan for 26.11. (operator 2026-11-21):** wave 3 becomes 2-4 topical fix PRs (network/gateway, commands/APRS,
+  display/position, update/sensors) with the fork fixes already done plus the ticket fixes gated by 24.11. GitHub
+  issues upstream, English, one per topic, assigned to DK5EN; draft on the operator's Desktop
+  (`github-issues-entwurf-20261121.md`), not posted yet. Release plan Fassung 9 on the Desktop.
 - **Firmware ticket triage 2026-11-21** ([campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.md)): the 59
   open firmware tickets of the telegram incident desk with a 2026-11-21 check verdict. 33 closed in the desk as
   already-implemented with linked fix commits; 3 closure proposals (P-0053, P-0104, P-0125) wait for the operator;
