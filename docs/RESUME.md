@@ -5,6 +5,12 @@
 
 ## State 2026-11-21
 
+- **CMD-DASH-01 on fork-dev (discussion #1042, DL4OCE):** a command written with minus signs (U+2212, as the
+  command web page had them) or an en/em dash (phone keyboards) answered "wrong command". `src/command_dash.h` folds
+  such a dash run to `--` at both `commandAction()` entries, only at a word start and only before a lowercase letter,
+  so dashes in names and comments stay. 8 new cases in `test_command_match`; the source pin fails without the calls.
+  Gate PASS 3915 Unity cases in 112 envs, stage 2 PASS; Heltec V3 and RAK4631 build.
+  Not benched, not in a release. The icssw.org command page still shows `−−setgrc` (ICSSW's page).
 - **WEB-NAV-02 and PONG-SIGN-01 on fork-dev** (`82b4be8a`, `9283e6a3`, after the release, not in `v4.40a.11.21`): nav
   buttons 75 % of the bar with border and padding scaled by `--widthfactor` (DK1TCP chose B: the smaller look); pong id
   as `%03lu`, display via `src/pong_format.h`. Gate PASS 3907 Unity cases in 112 envs; Opus advisor approved. Upstream
