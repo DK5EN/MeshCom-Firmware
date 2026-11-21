@@ -62,13 +62,24 @@ Wave 2 (2026-11-21):
 | plan-dht-probe-20261121.md                  | P-0351 DHT-PROBE-01                                                              |
 | plan-web-tempoffsetoutdoor-20261121.md      | P-0385 WEB-TEMPOFF-01                                                            |
 
+## Operator decisions 2026-11-21 (interview)
+
+Recorded in each plan under "Operator decisions 2026-11-21".
+
+- P-0380: mask `bt_code` and `node_pwd` in the dump.
+- P-0209: D1 (b) warn and proceed, no refusal (against the recommendation); D2 a, D3 a, D4 a, D5 reuse.
+- Gateway: D1 A, D2 A, D3 A, D4 A, D5 A.
+- APRS: D1 (a) 25 bytes, D2 no name, D3 A, D4 B0.
+- P-0030: fix for every SX1262/LLCC68 board; no bench above 2 dBm (no setup).
+- Display: rank, counter on arrival (Wireless Paper), first-click rule Wireless Paper only, `PAGE_MAX` 6.
+- Autosymbol also without TRACK (against the recommendation); no extra beacon; P-0081 part 2 considered fixed.
+- Ethernet: nRF52 honours `--setowndns`; T114 prints `none`. DHT: stop after three probes; remove `dht_name_matches`.
+- New row POSINFO-LAG-01 (beacon about 30 s late).
+- Desk: P-0258 closed already-implemented (group tabs on the Messages page, d46e2904, v4.35t); P-0159 closed by
+  operator decision (mitigation 2e874921). P-0167 stays open (ready): its own defect, ships with P-0166.
+
 ## Open / needs operator
 
-- P-0159 (T-Deck flush): not closed. Only a workaround exists (NOP flush, `tdeck_main.cpp:597`), root cause unknown.
-- P-0258: not closed. "not-ours" holds only for McApp; the request (group filter in the node's own web message list,
-  `web_functions.cpp` ~3850-3917) is an unmet firmware feature. Suggest needs-info or a feature row.
-- P-0167: problem file says closed as duplicate of P-0166, but the defect needs its own fix (GPS-AUTOSYM-03); desk set to
-  ready. Reopen the problem file at the next sync?
-- Plan decisions: each plan has a Decisions section (gateway D1-D5, OTA D1-D5, APRS D1-D4, DHT D1-D2, display,
-  autosymbol, Ethernet). P-0030 bench above 2 dBm needs an explicit OK (conducted into a dummy load).
-- P-0380: mask `bt_code` in the dump (plan default) although `--info` shows it (CQ-01)? Include the legacy `node_pwd`?
+- Accept the three close proposals P-0053, P-0104, P-0125 in the desk (the agent cannot accept its own proposals).
+- P-0167: reopen the problem file at the next sync (it says closed as duplicate of P-0166; desk is ready).
+- Problem files in `telegram/problems/` were not edited: sync them from the desk.

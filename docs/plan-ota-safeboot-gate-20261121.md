@@ -232,3 +232,12 @@ nightly side (`docs/concept-nightly-01-20261116.md:79`, `:393`); Phase 2 would r
 ## 11. Backlog row (to be added by the orchestrator, table "Implement (firmware and tooling)")
 
 | OTA-SAFEBOOT-01 | OTA / Safeboot | Manual OTA (--ota-update, web button) is not gated by the Safeboot version: it goes straight to auRebootToSafeboot() (command_functions.cpp:1680) while the auto path refuses below AU_SAFEBOOT_MIN; a node with an old Safeboot (v4.35o loop, no 180 s return) can be lost by hand (P-0209, DB0ND 2026-10-24). OTA cannot replace Safeboot (by design, contract); a new Safeboot needs the web flasher. ESP32 only; same code in upstream/dev. Plan [plan-ota-safeboot-gate-20261121.md](plan-ota-safeboot-gate-20261121.md). Problem file P-0209. | Open 2026-11-21: plan written, not implemented. | Operator decisions D1-D5 in the plan; then Phase 1 (gate, two native tests, bench on one classic and one S3 board). |
+
+## Operator decisions 2026-11-21
+
+- D1 (b): warn and proceed. A manual `--ota-update` or the web button on a node whose Safeboot is below the minimum
+  prints the warning and still reboots into the Safeboot; no refusal and no `force` word. The DB0ND case stays
+  reachable by hand; the warning makes it visible. The tests change accordingly: the decision helper returns
+  "warn", the source pin asserts the warning line inside the rung, not a refusal.
+- D2 (a): `--update apply` unchanged. D3 (a): threshold `AU_SAFEBOOT_MIN` (1). D4 (a): no Safeboot self-update now.
+  D5: reuse the `safeboot_too_old` wording.

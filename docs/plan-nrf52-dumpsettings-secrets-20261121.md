@@ -189,3 +189,8 @@ the two fork suites.
 2. Five keys instead of the ticket's four: include `node_pwd` (the legacy MeshCom server password)? Plan: yes.
 3. Not in this plan: `...BTCODE` in `--info` stays (closed CQ-01). nRF52 has no BLE settings image any more, so the
    unmasked `node_opwd` in `bleSettingsV1MaskSecrets()` has no output path.
+
+## Operator decisions 2026-11-21
+
+- `bt_code` is masked in the dump (the plan default); `--info` keeps showing it (CQ-01 unchanged).
+- The legacy `node_pwd` is masked too: five keys.

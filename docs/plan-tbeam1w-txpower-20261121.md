@@ -156,3 +156,10 @@ conducted measurement.
 - Platforms: ESP32 read (boot `esp32_main.cpp`, runtime `lora_setchip.cpp`); nRF52 read (`nrf52_main.cpp:1297-1302`,
   `lora_setchip.cpp` nRF52 branches); both `SetTxConfig`, no split.
 - Not verified: RF output, RadioLib behaviour at the 1W supply, whether any T-Beam 1W unit is free for the bench.
+
+## Operator decisions 2026-11-21
+
+- The fix applies to every ESP32 board with SX1262 or LLCC68 (both call sites through the helper, no `paOptTable`;
+  T-Deck Pro keeps the table).
+- No bench measurement above 2 dBm: no conducted setup available. The flat-curve claim of the reporters stays
+  unproven; the bench step is limited to 2 dBm and the native tests.

@@ -170,3 +170,8 @@ plan.
   `OneWire_GPIO` list from `variants/*/configuration.h` (nRF52: only `wiscore_rak4631`).
 - Not verified: Adafruit library version actually resolved for each env (read from the `E22_1262-DevKitC` libdeps copy,
   `library.json` missing there; `platformio.ini:74` pins `^1.4.6`); no hardware run.
+
+## Operator decisions 2026-11-21
+
+- D1 (a): stop after three failed probes; a sensor plugged in later is found after a reboot.
+- D2 (a): remove `dht_name_matches` and its test.

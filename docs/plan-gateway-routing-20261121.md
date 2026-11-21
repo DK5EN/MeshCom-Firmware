@@ -329,3 +329,10 @@ text (`[ERR]..Callsign <...> not valid`) would still find the prefix: keep it as
   `web_functions.cpp:3283` (now `:3269`), `web_setup.cpp:304-315` (now `:312-324`); P-0381/P-0382 numbers are current.
 - The gateway ack for a group message is sent for every numeric group (LoRa `:2335`, UDP end of branch): a gateway
   without that group acknowledges a group it does not hold (kept, D4).
+
+## Operator decisions 2026-11-21
+
+- D1 A: third-party DMs and their acks no longer reach the phone link.
+- D2 A: `--nomsgall on` also hides `*` on the UDP path.
+- D3 A: a node with no group keeps seeing every group. D4 A: the gateway keeps acking foreign groups.
+- D5 A: the refusal of `/` in call signs stays; the error text explains it, plus docs.

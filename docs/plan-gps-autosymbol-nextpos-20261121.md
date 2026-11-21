@@ -411,3 +411,14 @@ edit `BACKLOG.md` from this plan; the orchestrator inserts the rows.
   `bSOFTSERDEBUG`, `bAnalogFilter`, `bSHT21ON` (not checked whether the nRF52 builds use them). Same class as P-0383.
 - With TRACK off, `setSMartBeaconing()` returns at `:6738` before any symbol logic, so `--gps autosymbol` silently needs
   `--track on`; the help text (`src/command_functions.cpp:1778`) does not say so.
+
+## Operator decisions 2026-11-21
+
+- Autosymbol is NOT TRACK-only: it must also work with TRACK off. Design change for GPS-AUTOSYM-02: the symbol pick
+  runs before the TRACK-off early return (`loop_functions.cpp:6739`) as well as before the stationary return; the
+  source pin covers both returns. P-0166 and P-0167 ship together: with the pick moved but the zero-initialised
+  timestamps unchanged, a stationary node would show the car for the first 120 s after boot.
+- No extra beacon on a symbol change; the next regular beacon carries it.
+- P-0081 part 2 (duplicate positions at rest): no new problem; the operator considers it fixed by the GPS work.
+- New row POSINFO-LAG-01 for the about 30 s late beacon (section 10 finding; `esp32_main.cpp:5079-5082` refreshes
+  `posinfo_timer_min` on every pass while not due, `nrf52_main.cpp` the same).

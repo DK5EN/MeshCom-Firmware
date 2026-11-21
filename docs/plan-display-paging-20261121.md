@@ -496,3 +496,10 @@ Columns Id, Area, Item, Status, Next step. Not yet added to `BACKLOG.md`; the or
    nobody reported it.
 3. DISP-PAGE-01: keep `PAGE_MAX 6` (5 browsable) or raise the OLED ring? Recommended: keep; a larger ring costs about 221 B of
    DRAM per slot and does not make the OLED match the web history.
+
+## Operator decisions 2026-11-21
+
+- The OLED top-right number shows the rank (1 = newest).
+- Wireless Paper shows the counter on a freshly arrived message too.
+- The first-click rule (first press after an arrival goes to the second newest) stays Wireless Paper / E213 only.
+- `PAGE_MAX` stays 6.

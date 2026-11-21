@@ -410,3 +410,10 @@ Gate per step: `tools/regression.sh --stage 1,2`; no bare `pio test`; board buil
 - `encodeLoRaAPRS()` (`aprs_functions.cpp:1278`) has no caller (only a commented call at `loop_functions.cpp:5808`).
 - Stale line citations in source comments ("aprs_functions.cpp:632" in `charset_filter.h:119`,
   `loop_functions.cpp:5466`, `aprs_functions.cpp:1313-1316`); the decoder is at :722.
+
+## Operator decisions 2026-11-21
+
+- D1 (a): the Track frame comment cap goes from 16 to 25 bytes (`APRS_ATXT_WIRE_MAX`).
+- D2: no `#name` in the Track frame.
+- D3 A: bytes stay the contract (25 on air, up to 39 stored), notice at set time, UTF-8-safe setter clip, docs.
+- D4 B0: budget stays 100; a visible notice (serial marker and `--info`) when comment or name is dropped.

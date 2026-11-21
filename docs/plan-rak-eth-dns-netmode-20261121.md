@@ -296,3 +296,8 @@ is empty (2026-11-21).
   (`src/extudp_target.h:30`); two strict IPv4 parsers.
 - Problem file P-0163 cites `web_functions.cpp:4288` as another surface for the same defect; that
   row is `HAS_ETHERNET`-only and absent on the RAK (see the correction above).
+
+## Operator decisions 2026-11-21
+
+- P-0154: nRF52 honours `--setowndns` like ESP32.
+- P-0163: the T114 prints `none`.
