@@ -39,7 +39,7 @@ class NrfETH {
 void ethLinkPoll();          // once per loop: link up/down edge -> [ETH];event;link
 void ethLinkHeartbeat();     // [ETH];link every 60 s
 void ethStat();              // --ethstat
-void ethDrop();              // --ethdrop: Udp.stop + DHCP renew + UDP restart, timed
+void ethDrop(bool forceHwReset = false);   // --ethdrop [hw]: recovery path, timed; hw forces the W5100S reset path (ETH-06)
 
 // C1 carve-out (DRY unification U1): the frame handler is the body that runs
 // once a datagram is in the buffer -- no socket, no NTP, no DHCP. Returns 0

@@ -7057,14 +7057,26 @@ void commandAction(char *umsg_text, bool ble)
     #endif
     #if defined(NRF52_SERIES)
     else
+    if(commandCheck(msg_text+2, (char*)"ethdrop hw") == 0)
+    {
+        // ETH-06 bench hook: force the W5100S hardware-reset recovery path (DB0AIS 2026-11-14)
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        #else
+        extern void ethDrop(bool forceHwReset);
+        ethDrop(true);
+        #endif
+        return;
+    }
+    else
     if(commandCheck(msg_text+2, (char*)"ethdrop") == 0)
     {
         // TM-35 bench hook: run the firmware's recovery path (resetDHCP), timed
         #if defined(NRF52_NO_ETH)
         printfdeb(NRF52_NO_ETH_MSG);
         #else
-        extern void ethDrop();
-        ethDrop();
+        extern void ethDrop(bool forceHwReset);
+        ethDrop(false);
         #endif
         return;
     }

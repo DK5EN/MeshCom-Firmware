@@ -7,8 +7,8 @@
       "board": "heltec_wifi_lora_32_V3",
       "family": "esp32",
       "usb_serial": "0001",
-      "host": "192.168.68.57",
-      "last_ip_verified": "2026-11-15 (identity_guard over USB)"
+      "host": "192.168.68.80",
+      "last_ip_verified": "2026-11-21 (identity_guard over 2323; new board flashed as DK5EN-1)"
     },
     "t-deck-14": {
       "call": "DK5EN-14",
@@ -31,9 +31,9 @@
       "board": "wiscore_rak4631",
       "family": "nrf52",
       "usb_serial": "230D6EBB3266D20E",
-      "host": "192.168.68.67",
+      "host": "192.168.68.78",
       "last_ip": "192.168.68.75",
-      "last_ip_verified": "2026-11-15 (identity_guard over USB)"
+      "last_ip_verified": "2026-11-21 (identity_guard over USB)"
     }
   },
   "taken_ssids": {

@@ -5,6 +5,11 @@
 
 ## State 2026-11-21
 
+- **Bench 2026-11-21:** new Heltec V3 flashed as DK5EN-1 (chip erased first: it ran a foreign TNC firmware whose NVS
+  left MeshCom unable to save), WiFi .80; RAK DK5EN-90 on an INSTRUMENT image, .78. ETH-06 verified on hardware with
+  the new bench hook `--ethdrop hw` (forces the DB0AIS DHCP-fail chip reset); AppLink verified on both boards incl. a
+  chip reset with a session up. Summary `tools/bench/runs/harness/bench-20261121-eth06-applink.summary`. Both nodes
+  left with AppLink off, ExtUDP off.
 - **Upstream sync 2026-11-21:** `upstream/dev` `5698913a` (our #1285, REVIEW.md) merged into fork-dev as `29d9d65c`;
   only REVIEW.md changed, now byte-identical to upstream. Gate PASS (4012 Unity, 1631 pytest). Merged PR worktrees and branches
   `pr/review-november`, `pr/web-gui` removed (local and origin); `pr/nav-pong` (#1286, open) and `../mc-web-trial` kept.

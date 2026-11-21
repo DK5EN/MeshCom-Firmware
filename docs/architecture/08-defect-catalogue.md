@@ -1773,7 +1773,7 @@ Evidence: [`txp-own-msg-echo-release-20261024.md`](../txp-own-msg-echo-release-2
 
 ## 2n. ETH-06 — RAK4631 main loop hangs after a W5100S hardware reset (2026-11-14)
 
-**FIXED** on fork-dev 2026-11-21 (not committed at the time of writing, not released, not benched). Field report and
+**FIXED** on fork-dev 2026-11-21 (`e8188e3c`), bench-verified 2026-11-21 on DK5EN-90, not released. Field report and
 evidence: [`log-reports/2026-11-16-db0ais-14d/db0ais_14d.html`](../log-reports/2026-11-16-db0ais-14d/db0ais_14d.html)
 (DB0AIS-12, DG3FBL, RAK4631 with RAK13800, Ethernet gateway with EXTUDP to MeshDash).
 
@@ -1797,7 +1797,14 @@ evidence: [`log-reports/2026-11-16-db0ais-14d/db0ais_14d.html`](../log-reports/2
   T-ETH-Elite build.
 - **Left out:** a hardware watchdog on nRF52 (feeding across the long blocking calls DHCP, flash, DFU needs its own
   design); the web server socket after a chip reset is restarted only on the 15-minute web tick (no hang, only
-  unreachable); an on-bench repro of the hang (needs a forced DHCP failure on a RAK with Ethernet).
+  unreachable); a hardware run of the unfixed image (the bench hook did not exist before the fix).
+- **Bench 2026-11-21 (DK5EN-90, INSTRUMENT image):** `--ethdrop hw` forces the DB0AIS state (two DHCP failures, no
+  lease) and takes the production `hw_reset;reason;dhcp_fail` path. Three runs: `[EXT];event;chip_reset;socket;dropped`,
+  chip reset, new IP after 6 s (33 s once, PHY), `[EXT];event;reopened_after_chip_reset`; keepalives every 30 s
+  throughout. ExtUDP to the host: a DM before the reset and one after it arrived (2 datagrams each); one DM during the
+  33 s without IP was not forwarded (send gated, by design). With an AppLink session up: `[APPLINK];event;chip_reset;
+socket;dropped`, session closed, listener back, new login ok. Summary
+  `tools/bench/runs/harness/bench-20261121-eth06-applink.summary`.
 
 ## 3. Refuted claims — do not re-investigate
 

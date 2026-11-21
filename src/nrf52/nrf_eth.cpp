@@ -236,12 +236,22 @@ static void ethClearLog(int site, int rc)
 // nur den UDP-Socket neu; ein zweites --ethdrop ohne UDP-RX dazwischen macht volles
 // DHCP (ein reiner Webserver-Knoten zaehlt nie UDP-RX, dort also immer). Kein
 // Kabel-Ereignis -- das kann nur der Operator ausloesen (N-20-Soak).
-void ethDrop()
+void ethDrop(bool forceHwReset)
 {
   if(!neth.hasETHHardware)
   {
     Serial.println("[ETH];drop;err;no ETH hardware");
     return;
+  }
+  if(forceHwReset)
+  {
+    // ETH-06 bench hook (--ethdrop hw, INSTRUMENT builds): the state DB0AIS was in on 2026-11-14 -- two failed
+    // DHCP attempts, no lease held, no reset in the last 5 min -- so eth_recovery::decide() takes the production
+    // HwResetThenDhcp path (initETH_HW() with the EXTUDP/AppLink socket drops, then DHCP).
+    s_leaseHeld = false;
+    s_recov.dhcp_fail_streak = eth_recovery::kHwResetAfterFails;
+    s_recov.hw_reset_done = false;
+    Serial.println("[ETH];drop;force_hw_reset");
   }
   uint32_t t0 = millis();
   Serial.printf("[ETH];drop;ms;%lu\n", (unsigned long)t0);

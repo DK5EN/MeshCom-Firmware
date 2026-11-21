@@ -82,8 +82,11 @@ branch `feat/applink` (from `02097c59`) are removed. Contract: `docs/applink-api
 
 ## Next step
 
-- Bench: AppLink on a Heltec V3 and on a RAK4631+RAK13800 with `tools/bench/applink_client.py`, BLE capture diff,
-  socket census on the RAK, a forced W5100S reset with a session up.
+- Bench done 2026-11-21 (summary `tools/bench/runs/harness/bench-20261121-eth06-applink.summary`): Heltec V3 DK5EN-1
+  over WiFi (login, `hw=HELTEC_V3`, config frames); RAK4631 DK5EN-90 over Ethernet (login, `hw=RAK4631`); forced W5100S
+  reset (`--ethdrop hw`, INSTRUMENT) with a session up: session dropped without chip access, listener back, new login
+  ok. A client whose session dies with the chip sees no close (1006, no FIN): the app needs its heartbeat timeout.
+- Still open: BLE capture diff, RAK socket census, `socket_taken` path (needs a peer reset in one loop pass).
 - App side with the app maintainer (contract `hw` field now a name).
 
 ## Open after the gate

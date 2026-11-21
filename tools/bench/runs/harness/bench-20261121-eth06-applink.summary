@@ -1,0 +1,96 @@
+# Bench 2026-11-21 (fork-dev 85656e90 + --ethdrop hw hook): ETH-06 and AppLink
+# RAK4631 DK5EN-90 INSTRUMENT image, Heltec V3 DK5EN-1 stock image; host 192.168.68.58
+## eth06-rak-20261121-185633.log
+    0.621 [ETH];link;up;link;1;link_age_s;540;ip;192.168.68.78;dest;89.185.97.38;hb_age_s;16;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;21;rx_max_ms;2;tx_fail
+    1.036 >>> --extudpip 192.168.68.58
+    3.067 >>> --extudp on
+   13.529 [GW];keep;tx;ok;1;ms;570630
+   40.079 >>> --ethstat
+   41.106 [ETH];stat;up;link;1;link_age_s;580;ip;192.168.68.78;dest;89.185.97.38;hb_age_s;27;got_ip_n;1;downs;0;renews;0;renew_fail;0;resets;0;rx_n;22;rx_max_ms;2;tx_fail
+   41.106 [ETH];stat;hw;1;hasip;1;busy;0;last_got_ip_ms;17351;stall_ms;50
+   43.578 [GW];keep;tx;ok;1;ms;600694
+   45.043 >>> --ethdrop hw
+   46.382 [ETH];drop;force_hw_reset
+   46.382 [ETH];event;hw_reset;reason;dhcp_fail;n;2;ms;603527
+   46.382 [EXT];event;chip_reset;socket;dropped;ms;603527
+   52.495 [ETH];event;got_ip;192.168.68.78;ms;609592
+   52.495 [EXT];event;reopened_after_chip_reset;ms;609595
+   60.600 [ETH];link;up;link;1;link_age_s;600;ip;192.168.68.78;dest;89.185.97.38;hb_age_s;8;got_ip_n;2;downs;0;renews;0;renew_fail;0;resets;1;rx_n;24;rx_max_ms;2;tx_fail;
+   73.577 [GW];keep;tx;ok;1;ms;630751
+  103.713 [GW];keep;tx;ok;1;ms;660790
+  110.043 >>> --ethstat
+  111.075 [ETH];stat;up;link;1;link_age_s;650;ip;192.168.68.78;dest;89.185.97.38;hb_age_s;7;got_ip_n;2;downs;0;renews;0;renew_fail;0;resets;1;rx_n;26;rx_max_ms;2;tx_fail;
+  111.075 [ETH];stat;hw;1;hasip;1;busy;0;last_got_ip_ms;609592;stall_ms;50
+  115.092 >>> --info
+  115.814 ...AppLink off
+  120.682 [ETH];link;up;link;1;link_age_s;660;ip;192.168.68.78;dest;89.185.97.38;hb_age_s;16;got_ip_n;2;downs;0;renews;0;renew_fail;0;resets;1;rx_n;26;rx_max_ms;2;tx_fail
+  133.718 [GW];keep;tx;ok;1;ms;690846
+  150.043 >>> --ethdrop hw
+  151.396 [ETH];drop;force_hw_reset
+  151.396 [ETH];event;hw_reset;reason;dhcp_fail;n;2;ms;708505
+  151.396 [EXT];event;chip_reset;socket;dropped;ms;708505
+  157.467 [ETH];event;got_ip;192.168.68.78;ms;714571
+  157.467 [EXT];event;reopened_after_chip_reset;ms;714574
+  163.854 [GW];keep;tx;ok;1;ms;720940
+  180.743 [ETH];link;up;link;1;link_age_s;720;ip;192.168.68.78;dest;89.185.97.38;hb_age_s;16;got_ip_n;3;downs;0;renews;0;renew_fail;0;resets;2;rx_n;29;rx_max_ms;2;tx_fail
+  185.041 >>> --info
+  185.760 ...AppLink off
+## eth06b-rak-20261121-190043.log
+    4.260 [GW];keep;tx;ok;1;ms;811074
+   16.484 [EXT];tx;len;189;stack_hwm;660;ms;823282
+   16.484 [EXT];tx;len;192;stack_hwm;660;ms;823291
+   23.127 [EXT];tx;len;201;stack_hwm;660;ms;829960
+   34.404 [GW];keep;tx;ok;1;ms;841156
+   45.073 >>> --ethdrop hw
+   46.308 [ETH];drop;force_hw_reset
+   46.412 [ETH];event;hw_reset;reason;dhcp_fail;n;2;ms;853152
+   46.412 [EXT];event;chip_reset;socket;dropped;ms;853152
+   51.298 [ETH];link;down;link;1;link_age_s;0;ip;0.0.0.0;dest;89.185.97.38;hb_age_s;16;got_ip_n;3;downs;1;renews;0;renew_fail;0;resets;3;rx_n;35;rx_max_ms;2;tx_fail;0;tx_
+   79.988 [ETH];event;got_ip;192.168.68.78;ms;886734
+   79.988 [EXT];event;reopened_after_chip_reset;ms;886767
+   94.489 [GW];keep;tx;ok;1;ms;901322
+  108.799 [EXT];tx;len;196;stack_hwm;660;ms;915642
+  108.904 [EXT];tx;len;199;stack_hwm;660;ms;915652
+  111.303 [ETH];link;up;link;1;link_age_s;60;ip;192.168.68.78;dest;89.185.97.38;hb_age_s;2;got_ip_n;4;downs;1;renews;0;renew_fail;0;resets;4;rx_n;39;rx_max_ms;2;tx_fail;0
+  124.558 [GW];keep;tx;ok;1;ms;931341
+  140.098 >>> --info
+  140.817 ...AppLink off
+## applink-rak-20261121-190401.log
+    1.030 >>> --extudp off
+    4.095 >>> --applink on
+    6.376 ...AppLink on (port 8002)
+    7.097 >>> --applink
+    8.136 ...AppLink on :8002 listening
+   12.303 [APPLINK] session up 192.168.68.58
+   17.172 [GW];keep;tx;ok;1;ms;1021515
+   33.828 [ETH];link;up;link;1;link_age_s;180;ip;192.168.68.78;dest;89.185.97.38;hb_age_s;16;got_ip_n;4;downs;1;renews;0;renew_fail;0;resets;4;rx_n;43;rx_max_ms;2;tx_fail
+   40.044 >>> --applink
+   41.083 ...AppLink on :8002 session 192.168.68.58 up 28s in 2 out 25
+   45.038 >>> --ethdrop hw
+   46.390 [ETH];drop;force_hw_reset
+   46.390 [ETH];event;hw_reset;reason;dhcp_fail;n;2;ms;1050762
+   46.390 [APPLINK];event;chip_reset;socket;dropped;ms;1050762
+   46.390 [APPLINK] session closed
+   52.433 [ETH];event;got_ip;192.168.68.78;ms;1056829
+   52.433 [GW];keep;tx;ok;1;ms;1056831
+   82.459 [GW];keep;tx;ok;1;ms;1086874
+   93.874 [ETH];link;up;link;1;link_age_s;240;ip;192.168.68.78;dest;89.185.97.38;hb_age_s;11;got_ip_n;5;downs;1;renews;0;renew_fail;0;resets;5;rx_n;46;rx_max_ms;2;tx_fail
+  100.010 >>> --applink
+  101.046 ...AppLink on :8002 listening
+  102.906 [APPLINK] session up 192.168.68.58
+  112.556 [GW];keep;tx;ok;1;ms;1116918
+  117.936 [APPLINK] session closed
+  141.727 ...AppLink off
+  142.554 [GW];keep;tx;ok;1;ms;1146980
+  153.874 [ETH];link;up;link;1;link_age_s;300;ip;192.168.68.78;dest;89.185.97.38;hb_age_s;11;got_ip_n;5;downs;1;renews;0;renew_fail;0;resets;5;rx_n;48;rx_max_ms;2;tx_fail
+  160.079 >>> --applink
+  160.992 ...AppLink off
+## applink-v3-20261121-190336.jsonl
+node: call=DK5EN-1 fw=4.40a hw=HELTEC_V3 v=1
+login ok, mtu=257
+frames rx: 26
+## applink-rak-b-20261121-190401.jsonl (login after chip reset)
+node: call=DK5EN-90 fw=4.40a hw=RAK4631 v=1
+login ok, mtu=257
+frames rx: 20
+## eth06b-extudp-peer-20261121-190043.jsonl:        5 datagrams (2 before, 0 during the 33 s without IP, 2 after the reset)
