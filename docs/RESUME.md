@@ -1,7 +1,27 @@
 # RESUME -- pick up here
 
-**Resume here: section "State 2026-11-20" below (fork release `v4.40a.11.20` out; upstream wave 2 merged and synced);
+**Resume here: section "State 2026-11-21" below (PR #1284 open: W/S hemisphere fixes, #1279/#1278); then "State
+2026-11-20 (fork release `v4.40a.11.20` out; upstream wave 2 merged and synced);
 campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md).**
+
+## State 2026-11-21
+
+- **Upstream PR [icssw-org #1284](https://github.com/icssw-org/MeshCom-Firmware/pull/1284)** open since 2026-11-21,
+  branch `pr/track-hemisphere` (worktree `../MeshCom-PR-next`, base `upstream/dev` `015beb78`), 4 commits, 11 files
+  +49/-27, `Closes #1279`, `Closes #1278`. Fork side: `99186bd2`.
+  - **#1279 (W9GIL):** TRACK turn beacon sent E for W and N for S. `WZ_GPS_Loop` and T-Deck Pro `tdeck_get_gps` fed
+    magnitudes to `setSMartBeaconing()`; now signed. TRACK OLED line prints `fabs()`.
+  - **Found on the way (operator OK, option A twice):** nRF52 RAK GPS stored signed values into `node_lat/lon` (now
+    `cround4abs`); 8 own-position readers (display course/distance, `--mheard`, web, app DIST, neighbour row 0) and 5
+    T-Deck map fallbacks used magnitudes against signed coordinates (now `nodeSignedLat/Lon`).
+  - **#1278:** `compile_commands.json` in upstream `.gitignore` (fork already had it).
+  - Gate: fork-dev 3898 Unity, 1605 pytest, 9 board envs; PR tree 9 envs + upstream native 291/291. Pins:
+    `tools/tests/test_smartbeacon_signed_sites.py` (8, all fail on the old src). Opus advisor approved after two rework
+    rounds. Not benched: no node west/south, no on-air TRACK check.
+  - **Left out, follow-ups:** negative `node_lat` writers (T-Deck position entry `event_functions.cpp`, `config_json.h`
+    import); lowercase hemisphere from T-Deck/T-Deck Pro setup; dead map-centre fallback `esp32_main.cpp` ~4966.
+- **Open:** after merge `/sync-upstream` (merge path), then remove worktree `../MeshCom-PR-next` and branch
+  `pr/track-hemisphere` (local and origin).
 
 ## State 2026-11-20
 
