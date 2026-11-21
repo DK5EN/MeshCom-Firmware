@@ -11,7 +11,11 @@
 - **Plan for 26.11. (operator 2026-11-21):** wave 3 becomes 2-4 topical fix PRs (network/gateway, commands/APRS,
   display/position, update/sensors) with the fork fixes already done plus the ticket fixes gated by 24.11. GitHub
   issues upstream, English, one per topic, assigned to DK5EN; draft on the operator's Desktop
-  (`github-issues-entwurf-20261121.md`), not posted yet. Release plan Fassung 9 on the Desktop.
+  (`github-issues-entwurf-20261121.md`), created 2026-11-21 as icssw-org #1287-#1311 (wave 3: #1287-#1302, ETH-06
+  #1287, aprswx #1288, RAK DNS/netmode #1289, gateway routing #1290, SEC-DUMP-01 #1291, CMD-DASH-01 #1292, APRS
+  text #1293, display paging #1294, autosymbol/NEXT #1295, tempoffsetoutdoor #1296, TD-LOCK-01 #1297,
+  TBEAM-SLEEP-01 #1298, AU-27 #1299, OTA-SAFEBOOT-01 #1300, TBEAM1W-PWR-01 #1301, DHT-PROBE-01 #1302; wave 4
+  #1303-#1306; wave 5 #1307-#1308; wave 6 #1309; clock #1310; channel access #1311). Release plan Fassung 9 on the Desktop.
 - **Firmware ticket triage 2026-11-21** ([campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.md)): the 59
   open firmware tickets of the telegram incident desk with a 2026-11-21 check verdict. 33 closed in the desk as
   already-implemented with linked fix commits; 3 closure proposals (P-0053, P-0104, P-0125) wait for the operator;
