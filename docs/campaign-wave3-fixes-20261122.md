@@ -81,12 +81,22 @@ pytest 1639, golden selftest 48 green, builds `heltec_wifi_lora_32_V3`, `wiscore
 Opus advisor APPROVED; follow-ups done: over-long dump line test (revert-probed red), D4 ack twin pin. Gate side
 effects: golden u1 replay, u1 twin-diff record and variant-ini baseline regenerated, wire doc HTML regenerated,
 `test_rm_rx_gate_lint.py` accepts the new `&& bForNode`. Backlog rows moved to "Bench test and measure"
-(TBEAM1W-PWR-01 next step field). Desk: link_fix pending per P-number.
+(TBEAM1W-PWR-01 next step field). Desk: link_fix refused (`no commit c22cb3d2 in firmware`: the desk only knows pushed commits); link P-0380, P-0154,
+P-0163, P-0381, P-0382, P-0210, P-0385, P-0030 after the operator allows a push.
+
+Wave 2 (2026-11-21, `1830d8ed`, on top of parallel-session commits `f65ad7b2`, `ee7a8e56`): GPS-AUTOSYM-01..03,
+POSINFO-NEXT-01, OTA-SAFEBOOT-01, DHT-PROBE-01, plus a wave 1 follow-up: `t_deck_pro` (RadioLib 7.1.2) did not build
+with the two-argument `setOutputPower` of `rf_pa.h`; it takes the one-argument table path again (the wave 1 gate had not
+built `t_deck_pro`; every later gate does). Advisor: two rework rounds. Round 1: the hoisted TRACK speed read a stale
+`posinfo_last` on RAK with TRACK off; the autosymbol got its own estimator and the TRACK path is back to its HEAD form.
+Round 2: 1 s spacing let RAK jitter (3 s calls) read as bike; now 10 s, (0,0) skipped. OTA warning carries `nocap`.
+Gate: Unity 119 envs 4085/4085, pytest 1639, 8 board envs (`tools/bench/runs/harness/gate-wave3fix-w2c.summary`).
+Desk links pending a push (P-0383, P-0166, P-0167, P-0081, P-0209, P-0351).
 
 ## Next
 
-Wave 2: GPS (owns `loop_functions.cpp`, `nrf52_main.cpp`, `command_functions.cpp` NEXT sites, `lv_obj_functions.cpp`,
-`web_functions.cpp`, `ui_deckpro.cpp`), OTA (`fw_update.h`, `test_fw_update`, `test_command_setters.cpp`; ota branch
-carved), DHT (`onewire_functions.cpp`, `settings_sanitize.*`, `loop_functions_extern.h`, `esp32_main.cpp`; cmd,
-`loop_functions.cpp` and the nrf52 gate carved). Orchestrator adds `test_sset3_restore`, `test_autosymbol`,
-`test_posinfo_next` to the `[env:native]` filter before dispatch.
+Wave 3: APRS (owns `aprs_functions.cpp`, `aprs_structures.h`, `charset_filter.*`, `pos_text_budget.h`,
+`loop_functions.cpp`, `command_functions.cpp`, `test_command_setters.cpp`, `docs/rm1-commands.md`,
+`11-wire-format.md`) and TDECK-VOLT (new shared `src/batt_label.h`, `t-deck/lv_obj_functions.cpp`, its test; the five
+OLED call sites in `loop_functions.cpp` are an orchestrator carve-out). Orchestrator adds `test_pos_text_budget` to the
+native filter and `[env:native_batt_label]` before dispatch. Wave 4: display paging alone. Then the bench.

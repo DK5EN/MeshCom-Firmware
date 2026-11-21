@@ -99,6 +99,11 @@ Added 2026-11-21 (wave 3 fixes W1, `c22cb3d2`, campaign-wave3-fixes-20261122.md)
 6 -> 13 (SEC-DUMP-01), `test_udp_frame_twin` +4 (GW-GROUP-01, GW-DM-01, D2, D4), `test_regex_call` to 20
 (GW-CALL-01 hint), `test_command_setters` +1 (WEB-TEMPOFF-01). Gate after the wave: Unity 119 envs, 4047 cases.
 
+Added 2026-11-21 (wave 3 fixes W2, `1830d8ed`): `test_sset3_restore` (2), `test_autosymbol` (24) and
+`test_posinfo_next` (6) in env `native` (GPS-AUTOSYM-01..03, POSINFO-NEXT-01). Extended: `test_fw_update` +2
+(OTA-SAFEBOOT-01, both fw_update envs), `test_command_setters` +1 (OTA pin), `test_settings_sanitize` +5 -1
+(DHT-PROBE-01), `test_rf_pa` +1 (T-Deck Pro one-arg path). Gate after the wave: Unity 119 envs, 4085 cases.
+
 The per-suite sums were recomputed from the tree on 2026-10-04 (every
 `RUN_TEST` under `test/test_*`). The totals before that date were stale: the
 old header said 96 suites / 1563 cases, while the table below already listed
