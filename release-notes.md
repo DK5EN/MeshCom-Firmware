@@ -3,7 +3,7 @@
 
 ## What this release is
 
-**`v4.40a.11.21` fixes Auto Update after a downgrade and the west/south hemisphere in TRACK beacons, and brings the APRS-IS weather feature that upstream merged on 2026-11-20.** Your configuration survives the update. Nobody needs to act; T-Beam owners coming from before `v4.40a.11.20` should read the first box.
+**`v4.40a.11.22` stops a RAK4631 Ethernet gateway from going silent after a network outage, and adds AppLink: the phone app over the LAN instead of Bluetooth, off by default.** Your configuration survives the update. Nobody needs to act; T-Beam owners coming from before `v4.40a.11.20` should read the first box.
 
 ### Action needed
 
@@ -23,20 +23,57 @@
 
 ### Key facts
 
-- **Base:** the official `v4.40a.11.14` (2026-11-14) plus everything upstream `dev` has merged since, up to our PR [#1284](https://github.com/icssw-org/MeshCom-Firmware/pull/1284) (merged 2026-11-21, `cd89e6e0`). Upstream has released none of it yet.
+- **Base:** the official `v4.40a.11.14` (2026-11-14) plus everything upstream `dev` has merged since, up to our PR [#1285](https://github.com/icssw-org/MeshCom-Firmware/pull/1285) (`REVIEW.md` only, merged 2026-11-21, `5698913a`). Upstream has released none of it yet.
 - **Merged upstream, not yet released there:** ping display and budget (#1280), web GUI with Pins page (#1281), APRS-IS weather over Wi-Fi (#1269) and the W/S hemisphere fixes (#1284).
-- **Fork-only firmware:** the Auto Update downgrade fix of this release, the fork-only items of `v4.40a.11.20` and older, and the `dev` Auto Update channel. The release is **not** byte-identical to any official release.
+- **Fork-only firmware:** everything under "New in" below, the fork-only items of `v4.40a.11.21` and older, and the `dev` Auto Update channel. The release is **not** byte-identical to any official release.
 - **How to tell builds apart:** the version on the air still reads `4.40a`. The flash stamp in `--info` is the distinguishing mark.
-  - `--info` prints `...AU env=<board> tag=v4.40a.11.21` and `FLASH_VERSION 20261121`.
-  - `--id` prints `MCBOARD:v1:<hwid>:<hwid>:<board>:v4.40a.11.21`.
-- **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings are kept. The six new APRS-IS settings start at their defaults (feature off); settings are stored by name on ESP32 and nRF52, so the new rows move nothing.
+  - `--info` prints `...AU env=<board> tag=v4.40a.11.22` and `FLASH_VERSION 20261122`.
+  - `--id` prints `MCBOARD:v1:<hwid>:<hwid>:<board>:v4.40a.11.22`.
+- **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings are kept. AppLink uses two bits of an existing settings word and starts off; see "Known gaps" for the one exception.
 - **Safeboot** stays at capability v3 and unchanged since `v4.40a.11.20`.
 - **Auto Update channels:** `prod` reads the latest icssw-org release, `dev` (`--updchan dev`) the **Latest** release of this fork, which is this one. The mode is always `notify`.
 - **Release line:** cut from `fork-dev` once more by operator decision (2026-11-21). The stable branch `fork-nightly` (NIGHTLY-01) is still planned.
-- **Bench status:** none of the three changes ran on a node before the tag. "Verification" and "Known gaps" below say what was checked instead.
+- **Bench status:** the Ethernet fix and AppLink ran on our bench on 2026-11-21 (RAK4631 and Heltec V3), AppLink again on the release candidate. The three small fixes did not. "Verification" says what was checked.
 - **Assets (69):** 28 ESP32 application `.bin` plus 28 `.autoupdate` files, the three nRF52 boards as `.uf2` and DFU `.zip`, and seven support files.
 
-## New in `v4.40a.11.21`
+## New in `v4.40a.11.22`
+
+**Ethernet gateway (RAK4631 with RAK13800)**
+
+- **A RAK4631 gateway no longer goes silent after a hardware reset of its Ethernet chip** (ETH-06, fork-only).
+  - Cause: after two failed DHCP attempts the firmware resets the W5100S Ethernet chip, which deletes every network socket in it. The socket to an Extern-UDP peer (for example MeshDash) stayed marked as open; the next datagram waited forever for the chip, and the main loop stopped. The node kept receiving but sent nothing, not on LoRa and not to the server. Field log DB0AIS-12 (DG3FBL): 52 hours silent from 2026-11-14 05:43; the map server shows the same window offline.
+  - Now: before the chip reset the firmware drops the Extern-UDP and AppLink sockets without touching the chip and opens them again once the node has an address. On top of that, the library's wait for a sent datagram ends after 3 s (build script `tools/w5100s_patch.py`; the chip's own timeout is 1.6 s).
+  - New log lines: `[EXT];event;chip_reset;socket;dropped` and `[EXT];event;reopened_after_chip_reset`.
+  - Bench 2026-11-21, DK5EN-90: the forced chip reset (bench command `--ethdrop hw`, INSTRUMENT builds only) ran three times; keepalives continued every 30 s, and Extern-UDP datagrams arrived before and after the reset.
+  - Background: [`docs/architecture/08-defect-catalogue.md`](docs/architecture/08-defect-catalogue.md), section 2n.
+
+**AppLink: the phone app over the LAN** (APPLINK-01, fork-only)
+
+- **The MeshCom phone protocol now also runs over a WebSocket on TCP port 8002**, for apps on the same network as the node. Off by default.
+  - `--applink on` needs a console password (`--passwd`) first: the login is an HMAC challenge keyed with it. `--applink off` and `--applink` (status) round it off; the web setup page has a switch.
+  - ESP32 boards over WiFi or W5500 Ethernet, RAK4631 with RAK13800. On the RAK, AppLink and Extern-UDP exclude each other (the W5100S has four sockets).
+  - One session at a time; the newest login wins, also against a Bluetooth phone.
+  - Heltec T114 and T-Echo have no network: `--applink` answers "AppLink not available on this board".
+  - Bench 2026-11-21: login and configuration frames on DK5EN-1 (Heltec V3, WiFi) and DK5EN-90 (RAK4631, Ethernet), and a chip reset on the RAK with a session up.
+  - No app speaks AppLink yet; the interface is agreed with an app maintainer. Background: [`docs/applink-api-contract.md`](docs/applink-api-contract.md).
+
+**Console, ping and web**
+
+- **Commands written with a minus sign or a dash work** (CMD-DASH-01, discussion #1042).
+  - Cause: the command web page showed `−−` (minus signs) and phone keyboards turn `--` into an en or em dash; the node answered "wrong command".
+  - Now: one or two such dashes at the start of a command are read as `--`. Dashes in names and text stay.
+- **The pong id is printed unsigned** (PONG-SIGN-01).
+  - Cause: ids with the top bit set went on air as a negative number, for example `{pong}{-427409305}`, and the display showed nothing useful.
+  - Now: the id is unsigned and the display shows its last three digits.
+  - On air: ids below 2^31 are unchanged.
+- **The web navigation buttons take 75 % of the bar on every system** (WEB-NAV-02). Since `v4.40a.11.20` they filled the whole bar on Linux with a classic scrollbar; the reporter chose the smaller look.
+
+## Earlier fork releases
+
+Everything below is already in `v4.40a.11.21` and older, and therefore in this release too. Open a section for details.
+
+<details>
+<summary><strong><code>v4.40a.11.21</code></strong> — Auto Update after a downgrade, W/S hemisphere in TRACK beacons, APRS-IS weather over Wi-Fi</summary>
 
 **Auto Update**
 
@@ -68,9 +105,7 @@
 
 - **Wider navigation buttons on Linux** (WEB-NAV-01, since `v4.40a.11.20`): browsers with a classic scrollbar showed the left button bar 15 px narrower than designed. Since 11.20 the scrollbar is hidden and the buttons have their design size of 60 px, which looks almost twice as large to anyone used to the narrow bar. The bar still scrolls with the mouse wheel.
 
-## Earlier fork releases
-
-Everything below is already in `v4.40a.11.20` and older, and therefore in this release too. Open a section for details.
+</details>
 
 <details>
 <summary><strong><code>v4.40a.11.20</code></strong> — clock ranks NTP and GPS before LoRa beacons, ping display and nRF52 budget, web GUI with Pins page, faster relay ACKs, T-Beam deep-sleep press, Safeboot checks</summary>
@@ -684,12 +719,14 @@ Base: the official `v4.40a.11.07` (2026-11-08, `upstream/dev` 5d76238b). Configu
 
 </details>
 
-Full list of differences from upstream: [`docs/fork-dev-vs-upstream-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.11.21/docs/fork-dev-vs-upstream-20261018.md) (state of 2026-10-18).
+Full list of differences from upstream: [`docs/fork-dev-vs-upstream-20261018.md`](https://github.com/DK5EN/MeshCom-Firmware/blob/v4.40a.11.22/docs/fork-dev-vs-upstream-20261018.md) (state of 2026-10-18).
 
 ## What changes on the air
 
 With default settings, compared with the official `v4.40a.11.14`:
 
+- **Pong ids with the top bit set go out unsigned** (PONG-SIGN-01): `{pong}{3867557991}` instead of `{pong}{-427409305}`. Ids below 2^31 are unchanged.
+- **A RAK4631 gateway keeps sending after an Ethernet chip reset** (ETH-06) instead of falling silent until a reboot.
 - **TRACK turn beacons west of Greenwich or south of the equator carry W and S again** (upstream #1284). Nodes in the north-east send what they sent before.
 - **APRS-IS weather goes over Wi-Fi, not LoRa** (upstream #1269), and only after `--aprswx on`.
 - **Relayed ACKs leave after 6 s of waiting instead of 20 s** (ACK-AGE-01). Expect shorter ACK delays at a busy relay. Frame format and length are unchanged. Seen on one gateway in a quiet night only.
@@ -737,15 +774,26 @@ With default settings, compared with the official `v4.40a.11.14`:
 
 ### Verification for this release
 
+- **Host suite:** `tools/regression.sh --stage 1,2` PASS on the tagged tree: 4012 Unity test cases in 116 native environments, plus the golden selftest and 1632 host tool tests. The Ethernet fix, the AppLink socket rules and the AppLink memory rule each have tests that fail on the old code.
+- **Build:** all 36 board environments built from the AppLink merge on 2026-11-21 (35 green; `esp32-external-radio` needs its own build overlay and is not shipped); after the last code change T-Beam, Heltec V3 and RAK4631. CI builds all shipped environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download.
+- **Review:** the AppLink merge, its socket fix and the memory change each passed an independent review before commit.
+- **Idle heap on the T-Beam release image (`DK5EN-92`), 2026-11-21:** 65,860 B free at idle with BLE up, 1,844 B above the baseline of 64,016 B. The first image of this release failed this check (3,360 B below): AppLink held 5.4 kB of static RAM even when off. Since then AppLink takes its memory from the heap only while it is on; its static share on the T-Beam is 112 B.
+- **Bench 2026-11-21:** Ethernet chip reset on `DK5EN-90` (RAK4631, INSTRUMENT image) three times; AppLink on `DK5EN-1` (Heltec V3, WiFi) and `DK5EN-90`, including a chip reset with a session up. Identity guard ok, 2 dBm.
+- **Production gateway:** `DK5EN-98` runs `v4.40a.11.20`; it does not run this release yet.
+- **Smoke test after the memory change, 2026-11-21:** release-candidate images on `DK5EN-1` and `DK5EN-90`; AppLink on, login, off, on, login again on both.
+- **Not on a node:** the dash commands, the unsigned pong id and the navigation buttons.
+
+<details>
+<summary>Bench results of earlier releases (unchanged code since)</summary>
+
+**`v4.40a.11.21`:**
+
 - **Host suite:** `tools/regression.sh --stage 1,2` PASS on the tagged tree: 3900 Unity test cases in 111 native environments, plus the golden selftest and the host tool suites. The Auto Update fix has a test that failed on the old code; the W/S fix has eight pins that fail on the old source.
 - **Build:** CI builds all environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download. Heltec V3 built locally after the last code change.
 - **Review:** the Auto Update fix and the W/S fix each passed an independent review before commit.
 - **Idle heap on the T-Beam release image (`DK5EN-92`):** not run, waived by the operator. The APRS-IS client allocates nothing while it is off.
 - **Production gateway:** `DK5EN-98` runs `v4.40a.11.20` since 2026-11-21 by Auto Update from the web page, operator OK; the gateway reconnected after the reboot. It does not run this release yet.
 - **Not on a node:** the downgrade case, a TRACK beacon from west or south, and APRS-IS weather.
-
-<details>
-<summary>Bench results of earlier releases (unchanged code since)</summary>
 
 **`v4.40a.11.20`:**
 
@@ -892,6 +940,19 @@ With default settings, compared with the official `v4.40a.11.14`:
 - **A failed image after the flash erase** leaves the node in Safeboot until a web-flasher upload (single app slot).
 - **Locked settings are reset at boot without asking.** INSTRUMENT bench builds keep them changeable. `--stor on` is refused, so store-and-forward (#1188) is effectively off.
 
+**AppLink (new in `v4.40a.11.22`)**
+
+- **A node can start with AppLink on by accident** if it ever had both `--gpsdebug on` (removed in 2026-04) and `--checkmesh on` (v4.35p, May to June 2026) set, and has a console password. The boot log then says `[APPLINK] on (port 8002)`; `--applink off` ends it. Accepted by the operator; the login still needs the password.
+- **No encryption:** like the web GUI, AppLink runs over plain TCP. The password never travels, but the session content does.
+- **A session that dies with the RAK's Ethernet chip sends no close:** the app learns it from its own heartbeat timeout.
+- **RAK4631:** after `--extudp off`, AppLink stays off until `--applink on` or a reboot, although the saved setting says on.
+- **T-Deck Plus** names itself `TDECK+` in the login, not `TDECK_PLUS` (short-name table of the T-Deck builds).
+- **Not measured:** heap use of an AppLink session on ESP32, and a frame-by-frame comparison with a Bluetooth capture.
+
+**Not on the bench in this release**
+
+- **Dash commands, unsigned pong id and the 75 % navigation buttons:** host tests and builds only; the button size was measured in Chrome on a saved node page.
+
 **Web login (since `v4.40a.10.30`)**
 
 - **No encryption:** the web GUI still runs over plain HTTP. Someone who can sniff the network can take over an open session cookie, and settings changed after login travel in plain text.
@@ -1029,9 +1090,9 @@ With default settings, compared with the official `v4.40a.11.14`:
   - **T-Deck:** theme and readable light mode, setup controls, header icons, GPS layout and sky plot, smaller builds.
   - **Boards:** Heltec V4 GNSS, DHT22, T-Deck Pro pins and sky plot.
   - **From others:** DH1FR's T114 pages (#1264 to #1267), INA226 on Heltec (#1272), and the OE1KBC fixes #1274 and #1275 (`BOARD_COUNTRY` default, spectral scan, Info page label). Merged as `f05ead76`, `ac763f66` and `173b1e3c`.
-- **Merged in upstream `dev`, not in an official release:** [#1280](https://github.com/icssw-org/MeshCom-Firmware/pull/1280) (ping, `4cfa2ac2`) and [#1281](https://github.com/icssw-org/MeshCom-Firmware/pull/1281) (web GUI, Pins page, GPIO control, board LED, `45f66dc7`), both by oe1kbc on 2026-11-19; [#1269](https://github.com/icssw-org/MeshCom-Firmware/pull/1269) (APRS-IS weather, Mateusz-Krajewski) on 2026-11-20, merged here as `6731af6c`; our [#1284](https://github.com/icssw-org/MeshCom-Firmware/pull/1284) (W/S hemisphere) on 2026-11-21, synced here as `0110fd3c` with the tree unchanged. This release carries all of upstream `dev` as of 2026-11-21.
-- **Not byte-identical:** this release adds the fork-only firmware listed under "New in" to the official `v4.40a.11.14`. The flash stamp in `--info` (`FLASH_VERSION 20261121`, `tag=v4.40a.11.21`) is the distinguishing mark.
-- **Open upstream:** no PR of ours is open. The Auto Update downgrade fix (AU-27) goes with the Auto Update wave. The next waves (remote management and mesh, gateway, Auto Update and Safeboot, channel access) follow; RAM-WSP-01 goes with the next web PR.
+- **Merged in upstream `dev`, not in an official release:** [#1280](https://github.com/icssw-org/MeshCom-Firmware/pull/1280) (ping, `4cfa2ac2`) and [#1281](https://github.com/icssw-org/MeshCom-Firmware/pull/1281) (web GUI, Pins page, GPIO control, board LED, `45f66dc7`), both by oe1kbc on 2026-11-19; [#1269](https://github.com/icssw-org/MeshCom-Firmware/pull/1269) (APRS-IS weather, Mateusz-Krajewski) on 2026-11-20, merged here as `6731af6c`; our [#1284](https://github.com/icssw-org/MeshCom-Firmware/pull/1284) (W/S hemisphere) on 2026-11-21, synced here as `0110fd3c` with the tree unchanged; our [#1285](https://github.com/icssw-org/MeshCom-Firmware/pull/1285) (`REVIEW.md` only) on 2026-11-21, synced as `29d9d65c`. This release carries all of upstream `dev` as of 2026-11-21.
+- **Not byte-identical:** this release adds the fork-only firmware listed under "New in" to the official `v4.40a.11.14`. The flash stamp in `--info` (`FLASH_VERSION 20261122`, `tag=v4.40a.11.22`) is the distinguishing mark.
+- **Open upstream:** our [#1286](https://github.com/icssw-org/MeshCom-Firmware/pull/1286) (navigation buttons WEB-NAV-02 and unsigned pong id PONG-SIGN-01, since 2026-11-21). The Ethernet fix ETH-06, the dash commands CMD-DASH-01 and AppLink have no PR yet. The Auto Update downgrade fix (AU-27) goes with the Auto Update wave. The next waves (remote management and mesh, gateway, Auto Update and Safeboot, channel access) follow; RAM-WSP-01 goes with the next web PR.
 - **Earlier official releases:** `v4.40a.10.28` (2026-10-28) with all fork firmware up to `v4.40a.10.25` as one commit ([#1238](https://github.com/icssw-org/MeshCom-Firmware/pull/1238)), `.autoupdate` assets in the official CI ([#1239](https://github.com/icssw-org/MeshCom-Firmware/pull/1239)) and the E290 OTP image ([#1240](https://github.com/icssw-org/MeshCom-Firmware/pull/1240), sp2ong). Before it `v4.40a.spserver` (2026-10-22) with the gateway server table, network mode and RAK4631 static IP ([#1213](https://github.com/icssw-org/MeshCom-Firmware/pull/1213)), T-Deck reply button and web firmware column (#1214), web send buffer (#1224) and the gateway server-link warning fix (#1233).
 - **In the official release `v4.40a.11.07`** (2026-11-08, `upstream/dev` 5d76238b): our PRs [#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247) to #1251 (ping target lock, own beacons at priority 2, receive-silence logging, national characters, charge state, UV and wind) and [#1257](https://github.com/icssw-org/MeshCom-Firmware/pull/1257) (mailbox echo), plus OE1KBC's RAK4631 L76K GPS probe (#1259) and the T-Deck Pro / T3 S3 bootloader mapping in `tools/download_meshcom.py` (#1260 to #1262). Merged into this tree as `da76033b`.
 - **Merged upstream 2026-10-31** (shipped here since `v4.40a.10.30`, in the official `v4.40a.11.07`): HEY upload names the gateway and path cap ([#1243](https://github.com/icssw-org/MeshCom-Firmware/pull/1243)), Extern-UDP sends in the web chat ([#1244](https://github.com/icssw-org/MeshCom-Firmware/pull/1244)), web login without plain-text password ([#1245](https://github.com/icssw-org/MeshCom-Firmware/pull/1245)).

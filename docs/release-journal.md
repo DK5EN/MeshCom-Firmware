@@ -1,6 +1,6 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261121`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261122`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
@@ -8,6 +8,35 @@ Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `releas
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
 
 ---
+
+## Release v4.40a.11.22 (Sonntag, 2026-11-22, geschnitten am 2026-11-21)
+
+Gebaut und veröffentlicht von GitHub CI (`MeshCom CI`, Tag `v4.40a.11.22`, `MC_BUILD_TAG` und `MC_AU_DEV_CHANNEL=1` gesetzt), 69 Assets wie `v4.40a.11.21`.
+`FLASH_VERSION` 20261122, `FLASH_STRUCT_VERSION` 20260724 unverändert, die Einstellungen bleiben erhalten. Safeboot unverändert seit `v4.40a.11.20`. Der Tag trägt das Datum des Folgetags, weil `v4.40a.11.21` am selben Tag erschien und `fwParseTag()` keine `.N`-Endung kennt.
+Basis ist `upstream/dev` vom 2026-11-21 mit unserem PR #1285 (`REVIEW.md`), gesynct als `29d9d65c`. Upstream hat seit dem offiziellen `v4.40a.11.14` nichts released.
+
+Inhalt, neu gegenüber `v4.40a.11.21`:
+
+- Ethernet-Gateway RAK4631 (ETH-06, nur Fork): nach einem Hardware-Reset des W5100S hing die Hauptschleife in der Sendeschleife der Bibliothek, weil der Extern-UDP-Socket als offen galt. Feldlog DB0AIS-12 (DG3FBL), 52 h ohne Senden ab 2026-11-14 05:43. Jetzt werden Extern-UDP- und AppLink-Socket vor dem Reset ohne Chipzugriff verworfen und mit Adresse neu geöffnet; die Sendeschleife der Bibliothek endet nach 3 s (`tools/w5100s_patch.py`) (`e8188e3c`, `ce05f38c`).
+- AppLink (APPLINK-01, nur Fork): das Telefonprotokoll per WebSocket auf TCP 8002 mit HMAC-Login über `--passwd`, aus per Vorgabe, ESP32 und RAK4631 mit RAK13800; auf dem RAK schließen sich AppLink und Extern-UDP aus. T114 und T-Echo antworten "not available" (`ce05f38c`).
+- Befehle mit Minuszeichen oder Gedankenstrich davor werden als `--` gelesen (CMD-DASH-01, Diskussion #1042) (`f4af55b0`).
+- Pong-ID ohne Vorzeichen, Anzeige der letzten drei Ziffern (PONG-SIGN-01) (`9283e6a3`).
+- Navigationsknöpfe der Web-GUI 75 % der Leiste auf jedem System (WEB-NAV-02, Wahl des Melders) (`82b4be8a`).
+- Bench-Werkzeug: `--ethdrop hw` erzwingt im INSTRUMENT-Build den Chip-Reset-Pfad (`8b4d509b`); nicht in Release-Images.
+- AppLink belegt Speicher nur noch, solange es eingeschaltet ist: Verbindungszustand und Empfangspuffer kommen bei Bedarf vom Heap, die Handshake-Puffer je Verbindungsaufbau. Statischer Anteil auf dem T-Beam 112 B statt 5,4 kB (Release-Gate Leerlauf-Heap).
+
+### Was für dieses Release auf Hardware geprüft wurde
+
+- 2026-11-21, DK5EN-90 (RAK4631, INSTRUMENT-Image), 2 dBm: drei erzwungene Chip-Resets, Socket verworfen und neu geöffnet, Keepalives alle 30 s, Extern-UDP vor und nach dem Reset am Host angekommen.
+- 2026-11-21, AppLink auf DK5EN-1 (neuer Heltec V3, WLAN) und DK5EN-90 (Ethernet): Login, Konfigurationsframes, Chip-Reset mit laufender Sitzung, neuer Login danach.
+- 2026-11-21, Leerlauf-Heap DK5EN-92 (T-Beam, Release-Image mit Tag): erster Lauf 60.656 B, 3.360 B unter der Baseline, Abbruch vor dem Tag. Ursache: AppLink belegte 5,4 kB statischen RAM auch im Aus-Zustand. Nach dem Umbau (Speicher nur bei eingeschaltetem AppLink vom Heap) 65.860 B, 1.844 B über der Baseline von 64.016 B.
+- 2026-11-21, Rauchtest der Release-Kandidaten auf DK5EN-1 und DK5EN-90: AppLink an, Login, aus, an, Login; danach wieder aus.
+
+### Was ausdrücklich NICHT geprüft wurde
+
+- Befehle mit Gedankenstrich, Pong-ID und Navigationsknöpfe auf einem Knoten (Host-Tests, Builds; Knöpfe in Chrome vermessen).
+- Ein AppLink-Vergleich Frame für Frame mit einem BLE-Mitschnitt, der Heap einer AppLink-Sitzung auf ESP32, die Socket-Zählung auf dem RAK.
+- Ein Hardware-Lauf des ungefixten Images mit erzwungenem Chip-Reset (der Bench-Haken existierte vor dem Fix nicht).
 
 ## Release v4.40a.11.21 (Samstag, 2026-11-21)
 
