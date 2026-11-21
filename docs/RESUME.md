@@ -1,10 +1,15 @@
 # RESUME -- pick up here
 
-**Resume here: section "State 2026-11-21" below (fork release `v4.40a.11.21` out, Latest; upstream PR #1285 open:
-REVIEW.md November additions); campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md).**
+**Resume here: section "State 2026-11-21" below (fork release `v4.40a.11.21` out, Latest; upstream PRs #1285 (REVIEW.md) and #1286
+(nav buttons, pong id) open); campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md).**
 
 ## State 2026-11-21
 
+- **WEB-NAV-02 and PONG-SIGN-01 on fork-dev** (`82b4be8a`, `9283e6a3`, after the release, not in `v4.40a.11.21`): nav
+  buttons 75 % of the bar with border and padding scaled by `--widthfactor` (DK1TCP chose B: the smaller look); pong id
+  as `%03lu`, display via `src/pong_format.h`. Gate PASS 3907 Unity cases in 112 envs; Opus advisor approved. Upstream
+  PR [icssw-org #1286](https://github.com/icssw-org/MeshCom-Firmware/pull/1286) open since 2026-11-21, branch
+  `pr/nav-pong`, worktree `../MeshCom-PR-pong`, 33 of 33 envs built. Open: app side of unsigned pong ids not checked.
 - **Release `v4.40a.11.21`** (Latest since 2026-11-21 11:47 UTC), tag on `96aaa67c`, cut from `fork-dev` once more by
   operator decision (NIGHTLY-01 still planned). Content: AU-27, W/S hemisphere (#1284), APRS-IS weather (#1269) with
   the fork fix `temp(aprswx)`. CI run `44895542343` green; 69 assets, names as 11.20, 28 `.autoupdate` with `78 da`,
