@@ -1,11 +1,23 @@
 # RESUME -- pick up here
 
-**Resume here: section "State 2026-11-21" below (PR #1284 open: W/S hemisphere fixes, #1279/#1278); then "State
-2026-11-20 (fork release `v4.40a.11.20` out; upstream wave 2 merged and synced);
-campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md).**
+**Resume here: section "State 2026-11-21" below (fork release `v4.40a.11.21` out, Latest; upstream PR #1285 open:
+REVIEW.md November additions); campaign [campaign-release-train-20261115.md](campaign-release-train-20261115.md).**
 
 ## State 2026-11-21
 
+- **Release `v4.40a.11.21`** (Latest since 2026-11-21 11:47 UTC), tag on `96aaa67c`, cut from `fork-dev` once more by
+  operator decision (NIGHTLY-01 still planned). Content: AU-27, W/S hemisphere (#1284), APRS-IS weather (#1269) with
+  the fork fix `temp(aprswx)`. CI run `44895542343` green; 69 assets, names as 11.20, 28 `.autoupdate` with `78 da`,
+  28 of 28 re-inflate byte-exact, tag string in the Heltec V3 image, T-Deck field commands `mute=2 stat=1 udplog=1
+injectraw=0`. Gate PASS 3900 Unity cases in 111 envs. Idle heap on DK5EN-92 waived by the operator.
+- **Web flasher** offers only `v4.40a.11.21` (31 boards, `gh-pages` `94449670`, 11.20 pruned); root `safeboot*.bin` =
+  release assets. Pages: index release card 11.21, PR history round 11 (#1284, 77 PRs), fork release table row 11.21.
+- **Upstream PR [icssw-org #1285](https://github.com/icssw-org/MeshCom-Firmware/pull/1285)** open since 2026-11-21:
+  `REVIEW.md` November additions (F-13 downgrade, H-17 command prefix, R1 two representations, R2 release files, R3
+  web across browsers and on the RAK, F-06 to F-09, T114), branch `pr/review-november`, worktree `../MeshCom-PR-next`.
+  After the merge: `/sync-upstream`, then remove worktree and branch.
+- **Reply to DK1TCP** drafted (Desktop `antwort-pit-20261121.html`); open: his answer A (keep 60 px nav buttons) or B
+  (shrink).
 - **AU-27 fixed on fork-dev (field report DK1TCP, Heltec V3):** after an AU install of `v4.40a.11.20` and an OTA-flasher
   downgrade to `v4.40a.11.08`, Auto Update said "current" and never offered 11.20 again. Cause: the reinstall guard
   (NVS `fwstage/last`) blocked the tag even on a dated running image. Now `fwShouldInstall()` applies it only while the
