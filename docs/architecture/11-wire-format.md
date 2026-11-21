@@ -1061,9 +1061,9 @@ the serial console. `--…` command strings are dispatched through the same
 enforces them silently — no error reaches the phone):
 
 - Total `{dst}text` longer than **160 characters** → dropped
-  (`src/loop_functions.cpp:3388`, debug-log only).
+  (`src/loop_functions.cpp:4931`, debug-log only).
 - The closing `}` must appear at index ≤ 10, i.e. **dst ≤ 9 characters**
-  (`:3396`). A longer destination is not an error: the message goes out as
+  (`:4942`). A longer destination is not an error: the message goes out as
   a **broadcast** with the braces left in the payload — an intended DM
   becomes public.
 - `0x95` accepts only symbol table ids `/` (0x2F) and `\` (0x5C)

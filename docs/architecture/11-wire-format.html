@@ -1342,9 +1342,9 @@ the serial console. <code>--…</code> command strings are dispatched through th
 enforces them silently — no error reaches the phone):</p>
 <ul>
 <li>Total <code>{dst}text</code> longer than <strong>160 characters</strong> → dropped
-(<code>src/loop_functions.cpp:3388</code>, debug-log only).</li>
+(<code>src/loop_functions.cpp:4931</code>, debug-log only).</li>
 <li>The closing <code>}</code> must appear at index ≤ 10, i.e. <strong>dst ≤ 9 characters</strong>
-(<code>:3396</code>). A longer destination is not an error: the message goes out as
+(<code>:4942</code>). A longer destination is not an error: the message goes out as
 a <strong>broadcast</strong> with the braces left in the payload — an intended DM
 becomes public.</li>
 <li><code>0x95</code> accepts only symbol table ids <code>/</code> (0x2F) and <code>\</code> (0x5C)

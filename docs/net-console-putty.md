@@ -51,7 +51,7 @@ Der Node schickt keine Passwortabfrage, sondern eine Zahlenfolge:
 NONCE: 3f9a0c…
 ```
 
-Du musst innerhalb von **30 Sekunden** eine daraus berechnete Antwort zurückschicken. Mit PuTTY allein geht das nicht. Es gibt zwei Wege:
+Du musst innerhalb von **10 Sekunden** (Fork-Builds, `src/net_console.cpp` `hsBudgetMs`; offizielle icssw-Releases: 30 Sekunden) eine daraus berechnete Antwort zurückschicken. Mit PuTTY allein geht das nicht. Es gibt zwei Wege:
 
 **Weg 1 (einfacher): PowerShell statt PuTTY.** Nimm das Skript [`tools/hmac_connect.ps1`](../tools/hmac_connect.ps1) aus dem Firmware-Repo und starte es so:
 
@@ -67,7 +67,7 @@ Das Skript erledigt die Anmeldung und zeigt danach das Log an.
 $n='HIER_NONCE_EINSETZEN'; $k=[Text.Encoding]::UTF8.GetBytes('MeinPasswort'); $b=[byte[]](0..15|%{[Convert]::ToByte($n.Substring($_*2,2),16)}); [BitConverter]::ToString(([Security.Cryptography.HMACSHA256]::new($k)).ComputeHash($b)).Replace('-','').ToLower()
 ```
 
-Kopiere das Ergebnis (64 Zeichen) ins PuTTY-Fenster und drücke Enter. Mit Rechtsklick fügst du in PuTTY ein. Danach sollte `OK` erscheinen. Kommt `FAIL`, war das Passwort falsch oder die 30 Sekunden waren um.
+Kopiere das Ergebnis (64 Zeichen) ins PuTTY-Fenster und drücke Enter. Mit Rechtsklick fügst du in PuTTY ein. Danach sollte `OK` erscheinen. Kommt `FAIL`, war das Passwort falsch oder die Zeit war um. Auf Fork-Builds reichen 10 Sekunden für Kopieren und Einfügen von Hand kaum; nimm dann Weg 1.
 
 ## Gut zu wissen
 

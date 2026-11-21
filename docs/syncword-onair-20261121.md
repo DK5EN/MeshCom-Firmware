@@ -44,9 +44,9 @@ Median over all frames; the spread per board is below 0.1 bin.
 ## Firmware facts (v4.40a.11.22)
 
 - **nRF52:** `Radio.SetCustomSyncWord(0x242b)` in `src/nrf52/nrf52_main.cpp:1254` and
-  `src/lora_setchip.cpp:303`. The comment at `src/nrf52/nrf52_main.cpp:251` already names `b4` as the
+  `src/lora_setchip.cpp:304`. The comment at `src/nrf52/nrf52_main.cpp:251` already names `b4` as the
   intended second byte.
-- **ESP32:** RadioLib `radio.setSyncWord(rf_syncword)` with `0x2B`, `src/lora_setchip.cpp:552`, which
+- **ESP32:** RadioLib `radio.setSyncWord(rf_syncword)` with `0x2B`, `src/lora_setchip.cpp:553`, which
   RadioLib writes as `0x24 0xB4` on the SX126x.
 - **Define:** `SYNC_WORD_SX127x_2BYTE 0x2b24` in `src/configuration_global.h:653` is unused and has its
   bytes swapped; the natural place for a corrected `0x24B4`.
