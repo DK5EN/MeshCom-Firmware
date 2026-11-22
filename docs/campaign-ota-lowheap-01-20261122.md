@@ -149,3 +149,22 @@ Scope: S3 boards without PSRAM only; PSRAM boards and the RAK4631 keep the large
   position, mheard, path, neighbours, rxlog, setup; spectrum and remote left out; GET only, nothing sent on air).
   First effect: free heap -2 to -3 KB on the V3s, -14 KB on the T-Deck. The cycler dies if a tab reloads or Chrome
   discards it; check the tab counters (`window.__mcCycN`) in the morning.
+
+## Ratchet test: repeated AU checks (2026-11-22 21:20-21:36, DK5EN-1, under web load)
+
+- Question (operator): does each AU check leave something behind, so the largest block shrinks check by check?
+- Method: 3 x `--update check` over the net console, 5 min apart, no install
+  (`tools/bench/runs/harness/ota-lowheap-night-20261122/ratchet.summary`).
+
+  | Round | Free before -> after | Largest block before -> after | Lowest free during TLS | Min ever |
+  | ----- | -------------------- | ----------------------------- | ---------------------- | -------- |
+  | 1     | 96,280 -> 96,492     | 61,428 -> 61,428              | 22,912                 | 12,556   |
+  | 2     | 96,036 -> 96,036     | 61,428 -> 61,428              | 22,500                 | 10,904   |
+  | 3     | 96,492 -> 96,040     | 61,428 -> 61,428              | 22,876                 | 10,904   |
+
+- Result: no ratchet. The split at the first check after boot (86,004 -> 61,428) happens once; later checks reuse the
+  same holes and return all memory. The TLS session leaves about 22.5 KB free at its peak every time. The lower
+  min-ever (14.4 -> 10.9 KB) is the web load (about 3 KB) overlapping the TLS peak, not a leak.
+- Consequence: repeated nightly checks alone do not explain the field refusal on the bench V3. Remaining candidates:
+  what the download (install) itself allocates on top of the check, a phone on BLE (H2), or heap use the bench
+  does not have (more neighbours, mailbox in use). The 06:00 run tests the download under web load.
