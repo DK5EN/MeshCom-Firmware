@@ -107,13 +107,12 @@ P-0021, P-0384, P-0059, P-0345, TDECK-VOLT-01 ticket).
 Bench (2026-11-22, `45732840`, `tools/bench/runs/harness/bench-wave3fix-20261122.summary`): PASS on hardware for
 SEC-DUMP-01, RAK-NETMODE-01, RAK-ETH-DNS-01, GPS-AUTOSYM-01 (DK5EN-90), WEB-TEMPOFF-01, APRS-TXT-02 notice, DISP-PAGE-01,
 DISP-PAGE-02 (DK5EN-1, OLED harness on an INSTRUMENT image), GW-GROUP-01 display path (DK5EN-1 as gateway on the local
-mock under `--airgap on`). Not shown: TDECK-VOLT-01 (DK5EN-14 on external power shows USB). Not benchable here: GW-DM-01
+mock under `--airgap on`). TDECK-VOLT-01 PASS on DK5EN-14 on battery (`4.0V` / `75%`; USB on external power). Not benchable here: GW-DM-01
 phone path, GW-CALL-01, OTA-SAFEBOOT-01 warning (needs an old Safeboot), BTN-OFF-01 (physical button), DISP-PAGE-03,
 APRS on-air frames, DHT-PROBE-01, GPS-AUTOSYM-02/03, TBEAM1W-PWR-01. All nodes restored (normal images, settings
-reverted, DK5EN-1 gateway off). Seven rows archived in `archive/backlog-closed-20261122.md`.
+reverted, DK5EN-1 gateway off). Eight rows archived in `archive/backlog-closed-20261122.md`.
 
 ## Next
 
-Operator: put DK5EN-14 on battery for the `--volt` header check (and confirm its `--volt` setting; it is off now); allow
-a push so the desk links (P-numbers listed per wave above) can be made. Then `/submit-pr` (one PR per operator
+Operator: confirm the `--volt` setting of DK5EN-14 (off now); allow a push so the desk links (P-numbers listed per wave above) can be made. Then `/submit-pr` (one PR per operator
 2026-11-22; fix the deferred comment nits at the cut).
