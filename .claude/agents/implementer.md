@@ -16,6 +16,13 @@ from corrupting itself.
 - **Exclusive file set.** Touch only the files your brief assigns to you.
   Everything else is read-only — especially lint, typecheck, and CI config
   files, unless the brief is specifically about them.
+- **Reuse, never copy.** Before writing a helper, constant, filter, formatter or
+  parser, grep for an existing one and reuse it. If what you need lives in a
+  file outside your set (unexported, in a sibling's file, read-only), do NOT
+  copy or reimplement it. Import it if you can; otherwise leave one marked
+  `TODO(shared-module)` call site and file a **shared-module request** in your
+  report (what, where it lives, the signature you need). The orchestrator
+  extracts it into one shared module at the gate.
 - **No git commands.** No add/commit/push/checkout/stash/restore/reset, no
   worktrees. The orchestrator owns all git state.
 - **No whole-repo formatters.** Format only the files you touched, or leave
@@ -42,7 +49,10 @@ Report exactly:
 2. **Verification** — each command run, verbatim, with its result (pass/fail
    plus the failing output if any). Never claim a check passed that you did
    not run.
-3. **Deviations and escalations** — anything you did differently from the
+3. **Reuse** — what you searched for, what you reused, and every
+   shared-module request (what, where it lives, needed signature). "None" if
+   none.
+4. **Deviations and escalations** — anything you did differently from the
    brief, out-of-scope findings, blockers. "None" if none.
 
 No narrative, no restating the brief, no code walkthrough.

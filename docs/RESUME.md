@@ -29,66 +29,32 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
   `../MeshCom-PR-next` and `pr/wave3` (local and origin) removed. Open: 13 desk links (`1830d8ed`, `45732840`) wait for the desk's
   next fork-dev sync. Tag note: upstream now has its own `v4.40a.11.22` (on `5db0a4f5`), name clash with the fork
   tag of the same name; `v4.40a.11.23` is free on both remotes.
-- **Open upstream tracking issues, all implemented on fork-dev (checked 2026-11-22):** #1303, #1305, #1306 (PR
-  ~12-04), #1307, #1308 (~12-11), #1309 (~12-18), #1311 (after the 24 h soak). Bench still owed: SB-06, RM Queues
+- **Open upstream tracking issues, all implemented on fork-dev (checked 2026-11-22):** #1303 (RM cards, RM1
+  `pins`/`gpio`), #1305 (RAM-WSP-01), #1306 (QA-RX-03, BL-02; PR ~12-04), #1307 (`--udphold`), #1308 (EXTUDP register
+  query; ~12-11), #1309 (AU schedule, AU-23, SB-06; ~12-18), #1311 (ACK-AGE-01, CSMA-01/03/05, IDEE-04; after the 24 h soak). Bench still owed: SB-06, RM Queues
   card Read button, ACK-AGE-01 beyond DK5EN-98.
 - **New finding (2026-11-22, upstream behaviour):** with `--gps on` and no GPS module the ESP32 main loop resets
   `posinfo_interval` to 1800 s after 10 GPS polls, so `--postime` has no effect (`esp32_main.cpp`, `igps`). Not
   filed yet.
-- **Wave 3 fix campaign done (2026-11-22):** [campaign-wave3-fixes-20261122.md](campaign-wave3-fixes-20261122.md).
-  All 11 issues implemented, gated (Unity 4129/4129, pytest 1639, 13 board envs) and benched where the bench can show
-  it: `c22cb3d2` (#1291, #1289, #1290, #1296, #1301), `1830d8ed` (#1295, #1300, #1302), `45732840` (#1293, #1312,
-  #1294); eight rows archived in `archive/backlog-closed-20261122.md`. Upstream in #1316. #1314 (T114 dark theme, `--msgwake`) implemented
-  `57acc7c3` ([campaign-t114-dark-20261122.md](campaign-t114-dark-20261122.md)), bench PASS on DK5EN-1, T114 colours field.
+- **Wave 3 fixes done (2026-11-22):** [campaign-wave3-fixes-20261122.md](campaign-wave3-fixes-20261122.md), all 11
+  issues gated and benched, upstream in #1316; #1314 (T114 dark theme, `--msgwake`) `57acc7c3`
+  ([campaign-t114-dark-20261122.md](campaign-t114-dark-20261122.md)), T114 colours still field.
 - **Wave 3 by 2026-11-26 (operator 2026-11-21):** 2-4 topical PRs from `upstream/dev` (network/gateway,
   commands/APRS, display/position, update/sensors). Content: fork fixes already done (ETH-06, `temp(aprswx)` as a
   real fix, CMD-DASH-01, AU-27, TD-LOCK-01, TBEAM-SLEEP-01) plus the ticket fixes that pass gate and bench by
   2026-11-24; the rest goes with wave 4 or a second fix PR. Order: SEC-DUMP-01 first, then plan by plan.
-- **Upstream issues** (icssw-org, English, assigned to DK5EN, created 2026-11-21; PR bodies use `Closes #N`):
-
-  | Issue | Topic                                  | Issue | Topic                                      |
-  | ----- | -------------------------------------- | ----- | ------------------------------------------ |
-  | #1287 | ETH-06 RAK hang after W5100S reset     | #1300 | OTA-SAFEBOOT-01                            |
-  | #1288 | `--aprswx on/off` fall-through (#1269) | #1301 | TBEAM1W-PWR-01 (SX1262/LLCC68 PA)          |
-  | #1289 | RAK-ETH-DNS-01, RAK-NETMODE-01         | #1302 | DHT-PROBE-01                               |
-  | #1290 | GW-GROUP-01, GW-DM-01, GW-CALL-01      | #1312 | TDECK-VOLT-01                              |
-  | #1291 | SEC-DUMP-01                            | #1303 | wave 4: RM cards, RM1 `pins`/`gpio`        |
-  | #1292 | CMD-DASH-01                            | #1304 | wave 4: RM-LOSTREPLY-01                    |
-  | #1293 | APRS-TXT-01..03                        | #1305 | wave 4: RAM-WSP-01                         |
-  | #1294 | DISP-PAGE-01..03, BTN-OFF-01           | #1306 | wave 4: QA-RX-03, BL-02 (RX path)          |
-  | #1295 | GPS-AUTOSYM-01..03, POSINFO-NEXT-01    | #1307 | wave 5: `--udphold`                        |
-  | #1296 | WEB-TEMPOFF-01                         | #1308 | wave 5: EXTUDP register query              |
-  | #1297 | TD-LOCK-01                             | #1309 | wave 6: AU schedule, AU-23, SB-06          |
-  | #1298 | TBEAM-SLEEP-01                         | #1310 | clock: CET-SCATTER-01                      |
-  | #1299 | AU-27                                  | #1311 | wave 7: ACK-AGE-01, CSMA-01/03/05, IDEE-04 |
-
-  Not filed: AppLink (upstream #1276 exists; never post there), POSINFO-LAG-01 (no plan yet).
-
-- **Upstream state:** no PR of ours open; `upstream/dev` `4164f180` (#1286) synced as `66aeb04d`. Merged on
-  2026-11-21: #1284 (TRACK W/S), #1285 (REVIEW.md), #1286 (nav buttons, pong id). No `pr/*` branch or extra worktree
-  exists.
+- **Upstream issues** (icssw-org, English, assigned to DK5EN; PR bodies use `Closes #N`): not filed are AppLink
+  (upstream #1276 exists; never post there). Closed topics: see
+  [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md).
 - **Operator open:** accept the desk close proposals P-0053, P-0104, P-0125; reopen P-0167 at the next problem-file
   sync; CET-RESTAMP-01 answers; NIGHTLY-01 parked; remote branch `origin/backup/fork-dev-code-review-xdxqzv-fbb5e966`
   (19 commits not in fork-dev, 2026-10-26) kept until the operator decides.
 - **Field open:** ETH-06 confirmation on DB0AIS-12 (operator answers 2026-11-22: EXTUDP to MeshDash is off, so the hang path is idle there; router logged nothing; details in `issue-rak-dhcp-after-reboot-db0ais.md`); AppLink app side with the app maintainer; app side of unsigned
   pong ids.
 
-## State 2026-11-21
+## Archive
 
-- **Releases** `v4.40a.11.21` (AU-27, #1284, #1269 with `temp(aprswx)`) and `v4.40a.11.22` (Latest; ETH-06, AppLink
-  APPLINK-01 off by default, CMD-DASH-01, WEB-NAV-02, PONG-SIGN-01), both cut from `fork-dev` by operator decision.
-  11.22: CI run `44939256914`, gate 4012 Unity in 116 envs and 1632 pytest, 69 assets verified, web flasher
-  `--keep 1`, Pages synced.
-- **Bench:** ETH-06 verified on hardware with the new hook `--ethdrop hw`; AppLink verified on Heltec V3 and RAK incl. a
-  chip reset with a session up (`tools/bench/runs/harness/bench-20261121-eth06-applink.summary`). New Heltec V3 is
-  DK5EN-1 (chip erased first).
-- **Ticket triage** ([campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.md)): 59 open desk tickets
-  checked, 33 closed as already implemented, 11 plans (`docs/plan-*-20261121.md`, incl. TDECK-VOLT-01 added later),
-  backlog rows in 3.2, operator decisions recorded in each plan. Nothing implemented.
-- **Upstream syncs:** #1285 as `29d9d65c`, #1284 as `0110fd3c`, #1286 as `66aeb04d`; each merged tree equal to the
-  pre-merge tree.
-- Full detail of the day and of 2026-11-15 .. 2026-11-20:
-  [archive/resume-journal-20261115-20261121.md](archive/resume-journal-20261115-20261121.md).
+- Day detail 2026-11-15 .. 2026-11-21: [archive/resume-journal-20261115-20261121.md](archive/resume-journal-20261115-20261121.md). Release `v4.40a.11.22` facts: [release-journal.md](release-journal.md).
 
 ## Fleet
 
@@ -107,17 +73,14 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
 - **Upstream waves 2-7:** the release plan is the operator's Desktop HTML (Fassung 10, 2026-11-22, with the checklist), not a repo file; the
   repo copy was removed 2026-11-16 (operator: double work, always outdated). Wave list also in the campaign doc.
 - **GPSV4-01, GPIO-01, INA226-HELTEC-01:** field feedback only (BACKLOG "Field").
-- Closed, history only: IMPL-TRAIN ([campaign-impl-train-20261107.md](campaign-impl-train-20261107.md), CLK-01 S2-S4
-  moved to B-1), BACKLOG-ROUND ([campaign-backlog-round-20261108.md](campaign-backlog-round-20261108.md)), CLK-01
-  ([campaign-clk-01-20261107.md](campaign-clk-01-20261107.md), upstream in #1277).
 
 ## Rules and recipes
 
 - Branch model, gates, toolchain traps, bench rules: [CLAUDE.md](../CLAUDE.md). Bench fleet, ports, flashing: the
   local `/bench` skill and `tools/bench/fleet.json`.
 - Every local fork build: `export MC_AU_DEV_CHANNEL=1` (dev update channel is a build flag since `6c84a46c`).
-- Releases: `/release-firmware`; never a same-day `.N` release (the AU tag parser rejects it). Read `AU-24` (T-Beam
-  Auto Update download) in the backlog before the next release.
+- Releases: `/release-firmware`; never a same-day `.N` release (the AU tag parser rejects it). Read `OTA-LOWHEAP-01` (Auto
+  Update low heap) in the backlog before the next release.
 
 ## Where things are
 
@@ -131,8 +94,4 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
   [test-suite-map.md](test-suite-map.md).
 - Releases: [release-journal.md](release-journal.md), [release-notes.md](../release-notes.md). Plan view:
   [campaign-gantt.html](campaign-gantt.html).
-- Session journals that used to live here: [2026-11-15 .. 2026-11-21](archive/resume-journal-20261115-20261121.md),
-  [2026-11-07, incl. this page before the debloat](archive/resume-journal-20261107.md),
-  [2026-10-23 .. 2026-10-24](archive/resume-journal-20261024.md),
-  [2026-10-05 .. 2026-10-23](archive/resume-journal-20261005-20261023.md),
-  [2026-09-03 .. 2026-10-01](archive/resume-journal-20260903-20261001.md).
+- Older session journals: `archive/resume-journal-*.md`.

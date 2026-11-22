@@ -22,6 +22,14 @@ for this every time; making it standard saves a round trip.
 
 ## 1. Map file ownership, then classify
 
+**Slice waves building blocks first, features second.** Before cutting feature waves, list the
+building blocks the features share (filters, detectors, AGCs, formatters, constants, parsers,
+API clients). Find each one's existing implementations, then consolidate them into one shared
+module in an early wave. Later waves only *use* those modules. If a campaign cuts by feature
+(one wave builds APRS end to end, the next DV end to end), every wave rebuilds the missing pieces
+locally. That is how one repo ended up with four copies of a biquad and four AGCs with four level
+targets (sdr, 2026-11-17).
+
 Before spawning anything, list every file each planned task will touch.
 
 | Task                                                   | Dispatch                                                                        |
@@ -40,6 +48,15 @@ and silently cost you the parallelism you just planned.
 integration file (registry, router, `__init__.py`, exports, config), assign that file to _no_
 agent. Agents write their disjoint modules; the orchestrator applies the few-line integration
 edits itself at the gate. Zero isolation cost, nothing to clobber.
+
+**Shared-module requests use the same carve-out.** Sometimes an agent needs code that lives in a
+file it does not own: an unexported constant, a helper in a sibling's file, or a function in a
+read-only module. It must not copy that code. It files a **shared-module request** in its report:
+what it needs, where the code lives, and the signature it would use. Meanwhile it imports the
+existing symbol if it can, or writes a single clearly marked `TODO(shared-module)` call site, never
+a second implementation. At the gate the orchestrator extracts or exports the code into one shared
+module and points every caller at it. A copy made to stay inside the file set is a defect, not a
+shortcut.
 
 **No agent-created worktrees, no `isolation: "worktree"`.** Deep overlap that a carve-out can't fix
 means serialize or re-slice the tasks (an agent-made worktree off stale `main` has already caused a
@@ -98,6 +115,11 @@ Never rely on a subagent rediscovering these from project memory or a prior sess
   world without editing a single file it doesn't own.
 - **Out-of-scope bugs are still in scope** — fix if trivial, escalate explicitly if not; never
   silently patch, never silently ignore.
+- **Reuse before write; never copy to stay inside the file set.** Before writing a helper, constant,
+  filter, formatter or parser, grep for an existing one and say in the report what was found and
+  reused. If the needed code sits outside the exclusive set, file a shared-module request (§1)
+  instead of duplicating it. Name the project's shared-module locations in the brief (for
+  example from the repo's engineering policy).
 - **A bug fix ships with a regression test** that fails before the fix and passes after — name it
   in the brief, and require the before/after output in the report. The "before" is a real run
   against the unfixed code (write and run the test before the edit, or against a copy of the old
@@ -146,7 +168,7 @@ Never rely on a subagent rediscovering these from project memory or a prior sess
   rest of the session and is re-read on every later turn.
 
 Model tier and effort are part of the dispatch decision. Use the named agents in
-`.claude/agents/` (prices per MTok in/out, as of 2026-10):
+`~/.claude/agents/` (prices per MTok in/out, as of 2026-10):
 
 | Work                                                         | Dispatch as                | Model and effort                                                     |
 | ------------------------------------------------------------ | -------------------------- | -------------------------------------------------------------------- |
@@ -315,7 +337,10 @@ Run the gate only once **all** agents in the wave have returned, in this order:
 1. **`ls` every file the wave was supposed to produce**, before reading any report. A file that
    vanished (§2, third-path rule) is invisible in every agent's self-report — the agent that
    deleted it verified the deletion and called that a pass.
-2. **Apply the orchestrator-owned hotspot edits** (the carved-out integration files from §1).
+2. **Apply the orchestrator-owned hotspot edits** (the carved-out integration files from §1),
+   and **resolve every shared-module request**: extract or export the code into the one shared
+   module, point all callers at it, and delete any `TODO(shared-module)` stub. Run the repo's
+   duplicate check if it has one.
 3. **Run the full local gate** — lint, typecheck, format-check, and the real test suite, plus the
    whole-env test runs no writer was allowed to run. This is the only place the full suite runs;
    agent-side verification was scoped to touched files, so the gate is the first whole-tree check,
@@ -398,4 +423,4 @@ compaction only if they are on disk.
 
 `fable-review` — a review campaign is these mechanics plus its finder fan-out and adversarial
 verification; the advisor gate itself is §4 step 6 and applies to every behavioral wave, campaign
-or not. The `scout` and `implementer` dispatch tiers are defined in `.claude/agents/`.
+or not. The `scout` and `implementer` dispatch tiers are defined in `~/.claude/agents/`.
