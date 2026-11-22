@@ -22,7 +22,7 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
   - 2026-11-23 06:00: `tools/bench/ota_lowheap_trigger.py` runs check + install (stage only, never apply) three
     times on DK5EN-1, -92, -14. Next: read `trigger.summary`, the `[INSTR-HEAP]` curves (free, largest block) and
     `reboot-events.log`; red = `lowheap` refusal. Then the fix wave (update after a fresh boot, D7-D10) with
-    red-before tests; afterwards decide DK5EN-1 back to non-gateway and DK5EN-98 back to the release image.
+    red-before tests; DK5EN-1 stays gateway and DK5EN-98 stays on the INSTRUMENT image until the new fork release on 2026-11-23, which upgrades the whole fleet (operator).
 - **PR #1316 open (2026-11-22):** [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md). One upstream PR,
   `pr/wave3` (worktree `../MeshCom-PR-next`, 17 commits, 65 files), closes 21 issues (#1287-#1302, #1304, #1310,
   #1312, #1314, #1315). Next: wait for the maintainers; after the merge `/sync-upstream` (merge path), then remove
