@@ -23,10 +23,15 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
     times on DK5EN-1, -92, -14. Next: read `trigger.summary`, the `[INSTR-HEAP]` curves (free, largest block) and
     `reboot-events.log`; red = `lowheap` refusal. Then the fix wave (update after a fresh boot, D7-D10) with
     red-before tests; DK5EN-1 stays gateway and DK5EN-98 stays on the INSTRUMENT image until the new fork release on 2026-11-23, which upgrades the whole fleet (operator).
-- **PR #1316 open (2026-11-22):** [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md). One upstream PR,
-  `pr/wave3` (worktree `../MeshCom-PR-next`, 17 commits, 65 files), closes 21 issues (#1287-#1302, #1304, #1310,
-  #1312, #1314, #1315). Next: wait for the maintainers; after the merge `/sync-upstream` (merge path), then remove
-  the worktree and `pr/wave3`. Open: 13 desk links (`1830d8ed`, `45732840`) wait for the desk's next fork-dev sync.
+- **PR #1316 merged upstream (2026-11-22), synced:** [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md).
+  21 issues closed (#1287-#1302, #1304, #1310, #1312, #1314, #1315). Merge `dc5ea81c` keeps fork-dev on every path
+  (upstream copies differ only in comments); tree unchanged, gate stage 1,2 PASS, V3 and RAK4631 build. Next: remove
+  the worktree `../MeshCom-PR-next` and `pr/wave3`. Open: 13 desk links (`1830d8ed`, `45732840`) wait for the desk's
+  next fork-dev sync. Tag note: upstream now has its own `v4.40a.11.22` (on `5db0a4f5`), name clash with the fork
+  tag of the same name; `v4.40a.11.23` is free on both remotes.
+- **Open upstream tracking issues, all implemented on fork-dev (checked 2026-11-22):** #1303, #1305, #1306 (PR
+  ~12-04), #1307, #1308 (~12-11), #1309 (~12-18), #1311 (after the 24 h soak). Bench still owed: SB-06, RM Queues
+  card Read button, ACK-AGE-01 beyond DK5EN-98.
 - **New finding (2026-11-22, upstream behaviour):** with `--gps on` and no GPS module the ESP32 main loop resets
   `posinfo_interval` to 1800 s after 10 GPS polls, so `--postime` has no effect (`esp32_main.cpp`, `igps`). Not
   filed yet.

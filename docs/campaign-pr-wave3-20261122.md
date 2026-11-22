@@ -122,3 +122,11 @@ files, +2093 / -483, 21 closing references (GraphQL `closingIssuesReferences` 21
 Desk links still open (desk index at fork-dev `ee7a8e56`, 2026-11-21 22:17): `1830d8ed` -> P-0383, P-0166, P-0167,
 P-0081, P-0209, P-0351; `45732840` -> P-0044, P-0386, P-0179, P-0021, P-0384, P-0059, P-0345, TDECK-VOLT-01 ticket.
 After the merge: `/sync-upstream` (merge path), `git worktree remove ../MeshCom-PR-next`, delete `pr/wave3`.
+
+## Merged and synced -- 2026-11-22
+
+icssw-org merged #1316 as `bcc3b3ef`; all 21 issues closed. `/sync-upstream` merge `dc5ea81c` keeps `fork-dev` on all
+22 conflicted paths and every auto-merged PR path: the upstream copies differ only in comments (fork IDs replaced by
+issue numbers, fork paths removed) and in where `CLK_SRC` and `wpLiveNewest` are declared. Merged tree equal to the
+pre-merge tree. Gate: stage 1,2 PASS (122 envs, 4161/4161 Unity), `heltec_wifi_lora_32_V3` and `wiscore_rak4631`
+build. Left: remove worktree `../MeshCom-PR-next` and branch `pr/wave3`.
