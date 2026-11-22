@@ -168,3 +168,23 @@ Scope: S3 boards without PSRAM only; PSRAM boards and the RAK4631 keep the large
 - Consequence: repeated nightly checks alone do not explain the field refusal on the bench V3. Remaining candidates:
   what the download (install) itself allocates on top of the check, a phone on BLE (H2), or heap use the bench
   does not have (more neighbours, mailbox in use). The 06:00 run tests the download under web load.
+
+## Advisor verdict on the block split and plan for 2026-11-23 (operator: option A, 22:00)
+
+- Fable advisor, two claims checked: the ESP32-S3 heap is TLSF (`libheap.a` exports 22 `tlsf_*` symbols), and every
+  largest-block reading has the form n x 1024 - 12 (size-class rounding). The "12 KB / 24 KB" steps are an artifact;
+  the real split sits 23.5-26.6 KB into the old 86 KB block, caused by about 0.5 KB of long-lived objects created
+  during the first TLS session. Top suspects: lazy mutexes of the hardware crypto (SHA/AES/MPI), WiFi per-peer
+  state on the first TCP stream. The AU code frees everything it allocates (`fw_update_net.cpp:843-888`).
+- The split is very likely not the field cause: 61 KB + 24 KB hold both 16.7 KB record buffers, and "warm reboot did
+  not help, power cycle did" cannot be a heap-layout effect (a warm reboot rebuilds the heap). The tight number on the
+  bench is total free during TLS (14.4 KB first check, 22.5 KB later).
+- Plan, after the 06:00 run is read:
+  1. Splitter owner: flash DK5EN-1 with the INSTRUMENT build that adds `--heapwatch on|off|dump|clear` (link-time
+     `--wrap` of `heap_caps_*`, records ptr, size, task, return PCs) and `--heapgap` (map of free blocks and hexdump
+     of the small gaps between them). Boot, `--heapwatch on`, `--heapgap`, `--update check`, wait 60 s,
+     `--heapwatch dump`, `--heapgap`; resolve PCs with `addr2line` against the saved ELF.
+  2. Field mechanism: DK5EN-1 on the 11.21 image, phone on BLE and the update page open. Compare warm reboot against
+     power cycle; read the exact refusal token, the `[AU];refuse;lowheap;...` line, the alloc-fail line, and free /
+     largest block 30 s after boot.
+  3. Margin: step `--heapeat <kb>` up until the check, then the download, refuses.

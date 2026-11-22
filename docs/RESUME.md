@@ -19,6 +19,11 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
     exception), -92, -14, -90 and DK5EN-98 (OTA-flashed 15:02, BLE McApp, reference only), displays off on the OLED
     nodes, `--heaplog 60`. Detached processes on the Mac (PPID 1, not screen): meshloggers, `serial_capture.py`
     (RAK), `reboot_watch.py`, `caffeinate`. Logs: `tools/bench/runs/harness/ota-lowheap-night-20261122/`.
+  - Evening 2026-11-22: web GUI of all 5 nodes open in Chrome, an in-page cycler loads one page per minute (web load
+    like the field). Heap flat, no leak; the first AU check after boot splits the largest block once (86 -> 61 KB on
+    the V3), repeated checks do not (ratchet test). Advisor: the split is not the field cause; next tests are the
+    splitter owner (`--heapwatch`/`--heapgap` INSTRUMENT build, image saved as `heapwatch-v3-firmware.bin/.elf` in the
+    run folder) and warm reboot vs power cycle with phone + update page on 11.21. Plan in the campaign doc.
   - 2026-11-23 06:00: `tools/bench/ota_lowheap_trigger.py` runs check + install (stage only, never apply) three
     times on DK5EN-1, -92, -14. Next: read `trigger.summary`, the `[INSTR-HEAP]` curves (free, largest block) and
     `reboot-events.log`; red = `lowheap` refusal. Then the fix wave (update after a fresh boot, D7-D10) with

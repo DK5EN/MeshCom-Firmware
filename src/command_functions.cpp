@@ -6959,6 +6959,22 @@ void commandAction(char *umsg_text, bool ble)
         return;
     }
     else
+    #if defined(ESP32)
+    // --heapwatch on|off|dump|clear: live internal-RAM allocation table (needs INSTR_HEAPWATCH build). Before "heap" (prefix match).
+    if(commandCheck(msg_text+2, (char*)"heapwatch") == 0)
+    {
+        instrument_heapwatch(msg_text + 11);
+        return;
+    }
+    else
+    // --heapgap: map of free internal blocks and the bytes between them. Before "heap" (prefix match).
+    if(commandCheck(msg_text+2, (char*)"heapgap") == 0)
+    {
+        instrument_heapgap();
+        return;
+    }
+    else
+    #endif
     // --wifips none|min|max: esp_wifi_set_ps(), prints [INSTR-WIFIPS]
     if(commandCheck(msg_text+2, (char*)"wifips ") == 0)
     {
