@@ -63,6 +63,26 @@ Median over all frames; the spread per board is below 0.1 bin.
    Not `0x12` (LoRa APRS) and not `0x34` (LoRaWAN). Needs a cut-over date; decide after the LR2012
    capture.
 
+## Field result from OE1KFR (2026-11-22)
+
+OE1KFR keeps working on it; we only observe and change nothing in the firmware.
+
+- **Tested:** sync words `0x12` and `0x56` work on all three chip families (SX127x, SX126x, LR2012).
+- **Reading:** in OE1KFR's view this confirms the rule "both nibbles at most 7" for a word that old SX127x and
+  Gen4 LR20xx share. A long-term test can follow later.
+- **Recommendation (OE1KFR):** no LR2012 compatibility mode; a hard cut to a new sync word, best with MeshCom 5.0,
+  together with new frequency and modulation parameters. Leaving the Meshtastic word `0x2B` is welcome anyway.
+- **For this proposal:** supports item 3. `0x12` works on air but is the LoRa APRS default, so the caveat above
+  stays. SYNC-NRF-01 (`0x24B4` on nRF52) is still only needed if `0x2B` stays until the cut.
+
+- **Follow-up 12:09/12:45 (question from DK5EN: can we align the sync word now?):** OE1KFR answers that nodes
+  with different sync words no longer hear each other. The chip raises the interrupt, but the header fails with a
+  CRC error after the preamble, so nothing decodes. Separating nets this way is sometimes intended. LoRa APRS and
+  MeshCore are not affected: both use the standard sync word `0x12`.
+- **Consequence:** no gradual change node by node. A new sync word needs one cut-over date for the whole net (or a
+  transition in which nodes listen on both words, which one receiver cannot do at the same time; our assumption, not measured). Choosing `0x12` would put
+  MeshCom on the same word as LoRa APRS and MeshCore; their frames would then reach the MeshCom decoder.
+
 ## Not checked
 
 - **LR2012:** not measured. That it expects -40 is an assumption from the field.

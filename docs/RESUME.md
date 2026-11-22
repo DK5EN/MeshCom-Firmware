@@ -54,7 +54,7 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
 - **Operator open:** accept the desk close proposals P-0053, P-0104, P-0125; reopen P-0167 at the next problem-file
   sync; CET-RESTAMP-01 answers; NIGHTLY-01 parked; remote branch `origin/backup/fork-dev-code-review-xdxqzv-fbb5e966`
   (19 commits not in fork-dev, 2026-10-26) kept until the operator decides.
-- **Field open:** ETH-06 confirmation on DB0AIS-12; AppLink app side with the app maintainer; app side of unsigned
+- **Field open:** ETH-06 confirmation on DB0AIS-12 (operator answers 2026-11-22: EXTUDP to MeshDash is off, so the hang path is idle there; router logged nothing; details in `issue-rak-dhcp-after-reboot-db0ais.md`); AppLink app side with the app maintainer; app side of unsigned
   pong ids.
 
 ## State 2026-11-21

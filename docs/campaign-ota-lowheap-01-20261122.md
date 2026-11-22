@@ -5,7 +5,7 @@ uptime. Fork issue DK5EN/MeshCom-Firmware#3, analysis [rca-ota-lowheap-01-202611
 Subsumes AU-24 and AU-25. Base `fork-dev` `d7503fb1`. Auto Update is fork-only firmware: no upstream PR in this
 campaign (it goes with upstream wave 6).
 
-State: **plan, waiting for the operator's OK and answers to Q1-Q4.**
+State: **wave 1 running (2026-11-22 evening): overnight bench run (red first), CI RAM budget.**
 
 ## Code facts (scout, 2026-11-22, against `fork-dev`)
 
@@ -41,16 +41,72 @@ Wave 1 has three disjoint writers; 1b and 1c hold no shared build target (1b is 
 in its own worktree, sequentially behind the pio lock. Wave 3a and 3b share `fw_update_net.cpp` and `esp32_main.cpp`:
 serialized.
 
-## Open questions for the operator
+## Operator decisions 2026-11-22
 
-- Q1 Measure first (wave 1a and the 1 h bench repro in wave 2) before the fixes, or ship 3a and 3b at once.
-- Q2 TLS reserve block (rca section 6 step 3, about 34 KB less heap in normal operation): only if wave 2 shows the
-  fixes in 3a/3b are not enough.
-- Q3 CI static RAM budget: fail the build above +1 KB per env without a baseline update, or warn only.
-- Q4 Overnight run R1 on DK5EN-1 with the field image `v4.40a.11.21` (bench node, standing OK) in addition to the 1 h
-  recipe.
+- D1 Measure and reproduce first (red), fix after: no fix wave before the overnight run has shown the refusal.
+- D2 No reserved TLS buffers (about 34 KB less heap all the time; other allocations would fail first, with reboots
+  under load as the likely result).
+- D3 CI static RAM budget: fail above +1 KB per env over the committed baseline; an env without a baseline fails.
+- D4 Overnight run on all bench nodes with the current INSTRUMENT build of `fork-dev` (`--heaplog 60`): DK5EN-1
+  (Heltec V3, S3 without PSRAM), DK5EN-14 (T-Deck Plus, S3 with PSRAM), DK5EN-92 (T-Beam, classic), DK5EN-90 (RAK,
+  heap curve only). DK5EN-98 as read-only reference (`meshlogger --no-debug-flags`, BLE connected to McApp; no
+  command, no flash).
+- D5 DK5EN-1 runs as gateway and transmits normally at 2 dBm for this night (exception to the no-broadcast rule,
+  operator 2026-11-22).
+- D6 Trigger 2026-11-23 06:00 from the Mac over the 2323 console: per ESP32 node `--update check`, `--update install`
+  (stages only, never `apply`), `--update forget`, three attempts 2 min apart. Red = `lowheap` refusal.
+- Operator hypothesis "heard messages queue up in RAM without a BLE client": three scouts found no unbounded growth.
+  Phone ring (`loop_functions.cpp:834`) is a fixed 2-3 KB byte ring that evicts the oldest frame; NimBLE buffers
+  nothing without a client (`esp32_main.cpp:2635`); all tables are fixed arrays, all malloc sites paired. Remaining
+  suspects are fragmentation sources: per-page 1.4 KB `web_txbuf` block (`web_txbuf.cpp:113`), lwIP TIME_WAIT pcbs
+  (purged only when the gate refuses, `fw_update_net.cpp:689`), the nightly TLS checks (about 56 KB in many pieces),
+  plus the 21 KB static growth. The overnight curves decide.
+
+## Wave 1 dispatch (2026-11-22)
+
+- 1-bench (Sonnet medium): INSTRUMENT builds, flash -1/-14/-92/-90, gateway on -1, loggers to
+  `tools/bench/runs/harness/ota-lowheap-night-20261122/`, trigger `tools/bench/ota_lowheap_trigger.py` at 06:00.
+- 1b (Sonnet medium): CI RAM budget in `meshcom-ci.yml` + `resource_watch.py`; baseline refresh by the orchestrator
+  from a `ci-proof-*` run at the gate.
+- 1a (RAM hunt, symbol diff 09-11 vs HEAD) and 1c (largest block in the STAT line) start after the bench builds
+  are done (one pio at a time; 1c edits `src/`, which must not land in tonight's image).
 
 ## Log
 
 - 2026-11-22: analysis moved from the Desktop into `docs/`, reporter call signs replaced by "Field 1/2". Backlog row
   `OTA-LOWHEAP-01` (Implement), AU-24 and AU-25 point to it. Scout verified the code facts above.
+
+## Wave 1b result (2026-11-22, not committed yet, waits for the stage 1,2 gate)
+
+- `resource_watch.py gate` + CI step after `pio run` (`meshcom-ci.yml`, build log via `tee`); fails above baseline +
+  1024 B, on a missing baseline entry, and on an env without RAM/Flash line. `update --log` refreshes from CI logs.
+- Orchestrator fix: the header regex only knew `(platform:`; real CI logs print `(board: ...; platform: ...)`, so the
+  first version saw 5 of 33 envs. Test `test_gate_reads_real_ci_header_format` red before, green after.
+- Baseline refreshed from CI run `44939256914` (`v4.40a.11.22`, 33 envs, gate green on that log). The refresh drops
+  the 2026-09-11 linker-region entries (`dram0_0_seg`, `iram0_0_seg`); they were informational (`dram` reads the map),
+  and `snap` re-adds them from local builds.
+- Evidence from the real log against the 09-11 baseline: every S3 env +20 to +25 KB, classic ESP32 -5 to -7 KB,
+  nRF52 +7.5 to +15 KB. Next release tag: red if `fork-dev` grew more than 1 KB per env since 11.22.
+
+## Wave 1 bench setup (2026-11-22 14:30, done)
+
+- INSTRUMENT images of `1184177d` (`MC_AU_DEV_CHANNEL=1`, ELF markers `INSTR-HEAP` 5/4, `heaplog` 10/5): DK5EN-1 .78
+  (USB, gateway on, connected to the server, 2 dBm), DK5EN-92 .61 (USB), DK5EN-14 .77 (WiFi OTA), DK5EN-90 .80 (DFU;
+  nRF52 prints `not_available_on_this_board`, no heap telemetry). AU mode notify everywhere, TX 2 dBm, identity
+  guard ok. DK5EN-98 .65 untouched, logger `--no-debug-flags`.
+- Loggers until 2026-11-23 07:30 in `tools/bench/runs/harness/ota-lowheap-night-20261122/<call>/`;
+  `reboot_watch.py` re-sends `--heaplog 60` after a reboot and logs `reboot-events.log`; `caffeinate` keeps the Mac
+  awake. Trigger `tools/bench/ota_lowheap_trigger.py` armed for 2026-11-23 06:00 (DK5EN-1, -92, -14; refuses -98
+  and -90; no `apply`). Dry run on DK5EN-92 passed (login, PAUSE hand-over, parsing).
+- First readings (internal heap, bytes):
+
+  | Node                   | Image            | Uptime | Free    | Min ever | Largest block |
+  | ---------------------- | ---------------- | ------ | ------- | -------- | ------------- |
+  | DK5EN-1 Heltec V3 (S3) | INSTRUMENT HEAD  | 586 s  | 98,412  | 77,572   | 86,004        |
+  | DK5EN-98 Heltec V3     | CI 11.22, BLE up | 17 h   | 103,020 | -        | - (STAT only) |
+  | DK5EN-14 T-Deck Plus   | INSTRUMENT HEAD  | 507 s  | 60,176  | 45,436   | 51,188        |
+  | DK5EN-92 T-Beam        | INSTRUMENT HEAD  | 497 s  | 56,876  | 36,444   | 55,284        |
+
+  Reading: the V3 idles near 98 KB free, about 21 KB below the old 119 KB comment (matches the static growth). The
+  largest block at boot (86 KB) is far above the gate's 2 x 16.7 KB, so a fresh V3 passes; the refusal needs the
+  heap to break up over uptime. The night decides.

@@ -319,6 +319,23 @@ All recovery paths still call `NrfETH::resetDHCP()`. It now asks the pure decisi
 - Observed on one bench boot, pre-existing: the PHY took longer than the 3 s LinkON wait, boot
   DHCP was skipped, and the ETH-02 retry got the lease 30 s later.
 
+## Update 2026-11-22: operator answers to the 14-day log report
+
+The 14-day report (`docs/log-reports/2026-11-16-db0ais-14d/`, hang of 14.11. 05:43, ETH-06 / #1287) asked the
+DB0AIS operator four questions. Answers (Telegram, 2026-11-22):
+
+- **16.11. about 12:00:** DB0AIS was restarted on purpose for a power-supply rework. Not a crash; the log ends there.
+- **EXTUDP to MeshDash:** MeshDash delivered a map and the texts of the local group 26269; it is out of service now.
+  The ETH-06 hang ran through the EXTUDP send, so with MeshDash off that path is idle at DB0AIS. A field
+  confirmation of ETH-06 there needs EXTUDP active again, or a forced chip reset (bench hook `--ethdrop hw`).
+- **HAMNET router 03.11. about 05:00 and 14.11. about 05:40:** nothing in the router log. The silence of the HAMNET
+  server before both events was not caused by the router at DB0AIS.
+- **DHCP:** a MikroTik, as on almost every HAMNET site; a static IP is possible. A static IP would avoid the DHCP path,
+  but then the field would not confirm the ETH-04 fix, which is about DHCP. Ask the operator to keep DHCP until the
+  fixed image has run there.
+- **Nearby nodes on old firmware (4.35d to 4.35o):** the operator contacts those stations himself.
+- The 14.11. date in the operator's own system log shows nothing either.
+
 ## Code references
 
 - `src/nrf52/nrf_eth.cpp:605` `resetDHCP()` (no hardware reset, `//initETH_HW();` commented out)
