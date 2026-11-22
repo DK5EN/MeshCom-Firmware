@@ -2520,6 +2520,7 @@
    "test_sset3_restore",
    "test_autosymbol",
    "test_posinfo_next",
+   "test_posinfo_timer",
    "test_pos_text_budget",
    "test_csma_timing",
    "test_millis_rollover",

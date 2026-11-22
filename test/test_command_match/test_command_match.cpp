@@ -253,6 +253,21 @@ static void test_dash_both_entry_points_fold_first(void)
                              "the single-command entry does not fold before it copies the line");
 }
 
+// Upstream #1288: the "aprswx" status rung must not catch "aprswx on/off" (TG_BRETURN
+// toggle rows). commandMatches() lets them through (a space ends the token);
+// commandMatchesBare() only takes the bare status line.
+void test_bare_status_rung_does_not_catch_toggle_forms(void)
+{
+    TEST_ASSERT_TRUE(commandMatches("aprswx on", "aprswx"));   // the defect
+    TEST_ASSERT_FALSE(commandMatchesBare("aprswx on", "aprswx"));
+    TEST_ASSERT_FALSE(commandMatchesBare("aprswx off", "aprswx"));
+    TEST_ASSERT_FALSE(commandMatchesBare("aprswxint 10", "aprswx"));
+    TEST_ASSERT_TRUE(commandMatchesBare("aprswx", "aprswx"));
+    TEST_ASSERT_TRUE(commandMatchesBare("APRSWX", "aprswx"));
+    TEST_ASSERT_TRUE(commandMatchesBare("aprswx \r\n", "aprswx"));
+    TEST_ASSERT_FALSE(commandMatchesBare("aprsw", "aprswx"));
+}
+
 void setUp(void) {}
 void tearDown(void) {}
 
@@ -267,6 +282,7 @@ int main(int, char **)
     RUN_TEST(test_trailing_space_is_a_prefix_match);
     RUN_TEST(test_argument_form_still_needs_the_space);
     RUN_TEST(test_two_word_commands);
+    RUN_TEST(test_bare_status_rung_does_not_catch_toggle_forms);
     RUN_TEST(test_short_input_never_matches_a_long_command);
     RUN_TEST(test_matching_is_case_insensitive);
     RUN_TEST(test_overlong_input_is_not_truncated_into_a_match);

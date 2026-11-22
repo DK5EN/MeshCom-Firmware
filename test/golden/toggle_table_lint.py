@@ -158,6 +158,9 @@ TRIVIAL_OR = 0x00000000
 TG_BLE_ECHO = re.compile(r"\bTG_BLE_ECHO\b")
 TG_BRETURN = re.compile(r"\bTG_BRETURN\b")
 RUNG_RE = re.compile(r'commandCheck\(\s*msg_text\s*\+\s*2\s*,\s*\(char\s*\*\)\s*"([^"]+)"\s*\)')
+# A rung written as commandMatchesBare(msg_text+2, "x"): the bare status form, it
+# matches only the line "x" itself and so cannot prefix-catch "x on" (upstream #1288).
+RUNG_BARE_RE = re.compile(r'commandMatchesBare\(\s*msg_text\s*\+\s*2\s*,\s*"([^"]+)"\s*\)')
 SETTINGS_ANSWER = {
     "via on": "TG_DIRTY_NODE",
     "via off": "TG_DIRTY_NODE",
@@ -429,6 +432,14 @@ def check_breturn_fallthrough(rows: list[Row], commands_text: str) -> list[str]:
                 out.append(
                     "%s: TG_BRETURN lets %r run on into the ladder, where the rung "
                     "%r matches it too" % (row.where(), row.name, rung)
+                )
+        # A bare-status rung only matches its own line: it catches a row only
+        # when the row's whole text IS the rung.
+        for rung in sorted(set(RUNG_BARE_RE.findall(commands_text))):
+            if row.bare.lower() == rung.lower():
+                out.append(
+                    "%s: TG_BRETURN lets %r run on into the ladder, where the bare "
+                    "rung %r matches it too" % (row.where(), row.name, rung)
                 )
     return out
 
@@ -710,6 +721,21 @@ def self_test() -> int:
     hard, _ = messages(make_table(gw), ladder + 'if(commandCheck(msg_text+2, (char*)"gateway pos") == 0)\n')
     expect("a rung that is a different command does not trip check 9",
            not any("run on into the ladder" in h for h in hard))
+    # #1288: the status rung fix. commandCheck "aprswx" next to TG_BRETURN rows fails,
+    # commandMatchesBare "aprswx" does not (it only matches the bare line).
+    aw = lambda opt, nm: GOOD_ROW_TMPL.format(
+        name=nm, flag="&bAPRSWX", sset="&meshcom_settings.node_aprswx",
+        and_mask="0xFFFFFFFF", or_mask="0x0001", opt=opt)
+    aw_rows = aw("TG_SAVE | TG_BRETURN | TG_FLAG_TRUE", "aprswx on")
+    hard, _ = messages(make_table(aw_rows), 'if(commandCheck(msg_text+2, (char*)"aprswx") == 0)\n')
+    expect("#1288: a plain status rung 'aprswx' next to a TG_BRETURN toggle is reported",
+           any("run on into the ladder" in h for h in hard))
+    hard, _ = messages(make_table(aw_rows), 'if(commandMatchesBare(msg_text+2, "aprswx"))\n')
+    expect("#1288: a commandMatchesBare 'aprswx' status rung is not reported",
+           not any("run on into the ladder" in h for h in hard))
+    hard, _ = messages(make_table(aw_rows), 'if(commandMatchesBare(msg_text+2, "aprswx on"))\n')
+    expect("#1288: a bare rung equal to the row's own text is still reported",
+           any("run on into the ladder" in h for h in hard))
     # A bare exact-token rung DOES catch "gateway on" (a space ends the token).
     hard, _ = messages(make_table(gw), 'if(commandCheck(msg_text+2, (char*)"gateway") == 0)\n')
     expect("a bare exact-token rung with the row's base name trips check 9",

@@ -91,12 +91,22 @@ struct SendPositionArgs
 static int g_sendPosition_calls = 0;
 static SendPositionArgs g_last_sendPosition;
 
+// ---- POSINFO-LAG-01 / D6: the 60 s gate for automatic beacons reads these (loop_functions.cpp) ----
+unsigned long posinfo_timer_min = 0;
+bool posinfo_shot = false;
+static bool g_have_own_tx = false;
+static unsigned long g_own_tx = 0;
+bool haveOwnPosTx(void) { return g_have_own_tx; }
+unsigned long lastOwnPosTxMs(void) { return g_own_tx; }
+
 void sendPosition(unsigned long intervall, double lat, char lat_c, double lon, char lon_c, int alt,
                    float press, float hum, float temp, float temp2, float gasres, float co2,
                    int qfe, float qnh)
 {
     g_sendPosition_calls++;
     g_last_sendPosition = {intervall, lat, lat_c, lon, lon_c, alt, press, hum, temp, temp2, gasres, co2, qfe, qnh};
+    g_have_own_tx = true;          // like loop_functions.cpp: every sendPosition() stamps lastOwnPosTx
+    g_own_tx = millis();
 }
 
 // ---------------------------------------------------------------- Fixtures
@@ -108,6 +118,11 @@ void setUp(void)
     g_sendMessage_calls = 0;
     g_sendPosition_calls = 0;
     g_last_sendPosition = SendPositionArgs{};
+    posinfo_timer_min = 0;
+    posinfo_shot = false;
+    g_have_own_tx = false;
+    g_own_tx = 0;
+    mc_test_set_millis(1000000UL);   // well past boot: the 60 s gate is open
     bmx_found = bmp3_found = aht20_found = sht21_found = false;
     meshcom_settings = s_meshcom_settings{};
     Serial.clear();
@@ -196,12 +211,23 @@ static void test_tele_partiell_aktualisiert_nur_vorhandene_felder(void)
 
 static void test_sendposition_einmal_pro_tele_datagramm(void)
 {
-    // FL-01 begrenzt die Beacon-Rate INNERHALB von sendPosition() -- hier
-    // gestubbt, also zaehlt jeder Aufruf. Zwei Datagramme -> zwei Aufrufe.
+    // D6 (POSINFO_AUTO_MIN_MS, aprs.fi): the tele beacon is automatic traffic. The first datagram sends at
+    // once; a second one inside 60 s of that TX does not send, it defers to the main loop (posinfo_shot).
     callGetExtern(R"({"type":"tele","temp":1.0})");
-    callGetExtern(R"({"type":"tele","temp":2.0})");
+    TEST_ASSERT_EQUAL_INT(1, g_sendPosition_calls);
+    TEST_ASSERT_FALSE(posinfo_shot);
 
+    mc_test_advance_millis(30000UL);
+    callGetExtern(R"({"type":"tele","temp":2.0})");
+    TEST_ASSERT_EQUAL_INT(1, g_sendPosition_calls);
+    TEST_ASSERT_TRUE(posinfo_shot);                       // deferred, not lost
+    TEST_ASSERT_EQUAL_FLOAT(2.0f, meshcom_settings.node_temp);   // newest value rides the deferred beacon
+
+    posinfo_shot = false;
+    mc_test_advance_millis(30000UL);                      // 60 s after the first TX
+    callGetExtern(R"({"type":"tele","temp":3.0})");
     TEST_ASSERT_EQUAL_INT(2, g_sendPosition_calls);
+    TEST_ASSERT_FALSE(posinfo_shot);
 }
 
 static void test_echte_sensorhardware_ueberspringt_extern_telemetrie(void)

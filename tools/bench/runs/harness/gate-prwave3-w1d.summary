@@ -1,0 +1,22 @@
+regression rc=0
+== Stage 2: host tools (pytest, nbrlog scripts, node, self-tests)
+OK     pytest tools/bench tools/tests tools/mock    1639 passed
+OK     pytest tools/bench tools/tests tools/mock    1639 passed
+Unity: 122 envs, 4161 cases, 4161 ok, 0 failed, 0 skipped
+RESULT: PASS
+build heltec_wifi_lora_32_V3 rc=0 RAM:     41.8% (used 137100 bytes from 327680 bytes) Flash:   52.6% (used 1790729 bytes from 3403776 bytes) 
+build wiscore_rak4631 rc=0 RAM:     41.7% (used 103756 bytes from 248832 bytes) Flash:   83.6% (used 681200 bytes from 815104 bytes) 
+build ttgo_tbeam rc=0 RAM:      8.2% (used 107256 bytes from 1310720 bytes) Flash:   55.7% (used 1894641 bytes from 3403776 bytes) 
+build t_deck_plus rc=0 RAM:     48.3% (used 158260 bytes from 327680 bytes) Flash:   19.2% (used 2417785 bytes from 12582912 bytes) 
+build t_deck rc=0 RAM:     48.3% (used 158260 bytes from 327680 bytes) Flash:   19.2% (used 2418097 bytes from 12582912 bytes) 
+build t_deck_pro rc=0 RAM:     50.0% (used 163728 bytes from 327680 bytes) Flash:   17.6% (used 2213397 bytes from 12582912 bytes) 
+build heltec_t114 rc=0 RAM:     41.0% (used 96612 bytes from 235520 bytes) Flash:   53.2% (used 433880 bytes from 815104 bytes) 
+build t_echo rc=0 RAM:     40.3% (used 100268 bytes from 248832 bytes) Flash:   55.7% (used 454080 bytes from 815104 bytes) 
+build wireless-paper rc=0 RAM:     42.4% (used 138924 bytes from 327680 bytes) Flash:   51.3% (used 1746113 bytes from 3403776 bytes) 
+build heltec_wireless_tracker rc=0 RAM:     42.0% (used 137612 bytes from 327680 bytes) Flash:   53.2% (used 1809277 bytes from 3403776 bytes) 
+build vision-master-e290 rc=0 RAM:     43.7% (used 143076 bytes from 327680 bytes) Flash:   53.2% (used 1811661 bytes from 3403776 bytes) 
+build vision-master-e213 rc=0 RAM:     42.5% (used 139340 bytes from 327680 bytes) Flash:   52.0% (used 1771561 bytes from 3403776 bytes) 
+build LilyGo_T-Beam-1W rc=0 RAM:     25.9% (used 137796 bytes from 532480 bytes) Flash:   53.1% (used 1806965 bytes from 3403776 bytes) 
+artifact heltec_wifi_lora_32_V3 deferred-string=1
+artifact wiscore_rak4631 deferred-string=1
+=== gate done

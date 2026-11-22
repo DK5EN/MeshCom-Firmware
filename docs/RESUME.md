@@ -7,6 +7,10 @@ Fassung 9; working checklist: operator's Desktop `MeshCom-Checkliste-20261115.md
 
 ## Now (2026-11-22)
 
+- **PR wave 3 running:** [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md). One upstream PR closing the
+  20 implemented issues plus POSINFO-LAG-01 (new issue). Wave 1 committed: POSINFO-LAG-01 (beacon on time, 60 s
+  floor for automatic beacons incl. EXTUDP, NCNT trigger removed; operator D5/D6 for aprs.fi) and the real #1288
+  fix. Next: wave 2 sync #1313 + push `fork-dev` (desk links), wave 3 `/submit-pr` (add `d0ecf82f` for #1298).
 - **Wave 3 fix campaign done (2026-11-22):** [campaign-wave3-fixes-20261122.md](campaign-wave3-fixes-20261122.md).
   All 11 issues implemented, gated (Unity 4129/4129, pytest 1639, 13 board envs) and benched where the bench can show
   it: `c22cb3d2` (#1291, #1289, #1290, #1296, #1301), `1830d8ed` (#1295, #1300, #1302), `45732840` (#1293, #1312,
