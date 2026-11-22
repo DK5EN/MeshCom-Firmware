@@ -62,6 +62,23 @@ serialized.
   (purged only when the gate refuses, `fw_update_net.cpp:689`), the nightly TLS checks (about 56 KB in many pieces),
   plus the 21 KB static growth. The overnight curves decide.
 
+## Operator decisions 2026-11-22, option A (static tables on ESP32-S3 without PSRAM)
+
+Basis: [ota-lowheap-ram-hunt-20261122.md](ota-lowheap-ram-hunt-20261122.md) (09-11 reproduced to the byte at
+`291f375a`, +21,224 B fully attributed; 71 % upstream, 6,080 B fork-only; whole classic tier -29,736 B measured).
+Scope: S3 boards without PSRAM only; PSRAM boards and the RAK4631 keep the large tier.
+
+- D7 (1C) Msgstore mailbox (13,547 B with the STOR announce tables): allocate only when the store mode is on, taking
+  effect after a reboot (allocation on a fresh heap); with the mode off (factory default, `msgstore.cpp:33`) nothing
+  is reserved. Refusal message if the allocation fails.
+- D8 (2B) UDP outage hold `UDP_HOLD_BYTES` 6,144 -> 1,024 B (about 10 instead of 60 held texts on a gateway),
+  saving 5,120 B.
+- D9 (3A) Neighbour matrix stays at 128 rows (14,248 B).
+- D10 (4B) `RING_BYTES_PHONE` and `RING_BYTES_UDP` 3,072 -> 2,048 B each, saving 2,048 B.
+- Expected total on a V3 with the mailbox off: about 20.7 KB (13,547 + 5,120 + 2,048), close to the 09-11 level.
+- Order (D1): implemented only after the overnight run has shown the refusal (red); then fix B (update after a fresh
+  boot) and these cuts in one fix wave, each with a test that is red before.
+
 ## Wave 1 dispatch (2026-11-22)
 
 - 1-bench (Sonnet medium): INSTRUMENT builds, flash -1/-14/-92/-90, gateway on -1, loggers to
