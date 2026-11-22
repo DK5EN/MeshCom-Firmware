@@ -22,7 +22,8 @@ Open-source MeshCom Firmware. We contribute via PRs against the **upstream DEV b
 
 ## Releases
 
-- `/release-firmware` is the recipe. CI builds and publishes since `v4.40a.10.11`: `MeshCom CI` (`.github/workflows/meshcom-ci.yml`) fires on `v*` tags (release, Latest) and `ci-proof-*` tags (draft; delete draft and tag afterwards). `ci-build.yml` was removed 2026-10-17 (disabled since 09-20; history in git).
+- `/release-firmware` is the recipe. `MeshCom CI` (`.github/workflows/meshcom-ci.yml`) builds and publishes on `v*` tags (release, Latest) and `ci-proof-*` tags (draft; delete draft and tag afterwards).
+- Never a same-day `.N` release (the auto-update tag parser rejects it). Local fork builds need `export MC_AU_DEV_CHANNEL=1`.
 - Every `gh` call needs `-R DK5EN/MeshCom-Firmware` (no `gh` default repo is set; with two remotes it may pick upstream).
 
 ## PR Workflow
@@ -33,22 +34,21 @@ Open-source MeshCom Firmware. We contribute via PRs against the **upstream DEV b
 
 - Host gate: `tools/regression.sh --stage 1,2` (all `[env:native*]` Unity envs, golden selftest, pytest and tool suites).
 - With bench hardware: `tools/regression.sh --stage all` (adds stage 3, `tools/bench/bench_suite.py`; `--flash`, `--extudp`, `--deepsleep` are opt-in, passed after `--`).
-- The `/full-regression` skill wraps the runner (`.claude/commands/full-regression.md`, local and gitignored).
+- `/full-regression` wraps the runner (`.claude/commands/`, local and gitignored).
 - **Never run bare `pio test`**: it walks the board envs and flashes attached hardware.
-- **One `pio` process at a time** (shared build cache and global package store; `selftest.sh` shells out to `pio project config`). Parallel writers route every `pio` call through a mkdir-lock wrapper (`piolock.sh` in the scratchpad).
+- **One `pio` process at a time** (shared build cache and global package store; `test/golden/selftest.sh` shells out to `pio project config`). Parallel writers route every `pio` call through a mkdir-lock wrapper (`piolock.sh` in the scratchpad).
 - Suite inventory: `docs/test-suite-map.md`.
 
 ## Toolchain Pitfalls
 
 - nRF52 builds fail with make "Error 126" / "Bad CPU type": the pinned gcc-arm is x86_64 and Rosetta is missing. Run `softwareupdate --install-rosetta --agree-to-license`; do not bump the toolchain.
 - Harness and bench logs go to `tools/bench/runs/harness/`, never the repo root.
-- Raw `*.log` there is gitignored; the summaries (`.json`, `.jsonl`, `.summary`) are not. A wave's commit includes the
-  summaries its docs cite and deletes the rest, so `git status` is clean after every wave.
+- Raw `*.log` there is gitignored; the summaries (`.json`, `.jsonl`, `.summary`) are not. A wave's commit includes the summaries its docs cite and deletes the rest.
 - ESP32 app builds are not byte-reproducible; compare RAM/flash regions, not image hashes.
 
 ## Hardware and Flashing
 
-Bench fleet, USB serials, DHCP addresses, the 2323 console login and per-board flashing are in the local `/bench` skill; `/flash-rak` flashes the RAK4631. Load `/bench` before any flash, serial session or bench test.
+Bench fleet, USB serials, DHCP addresses, the 2323 console login and per-board flashing are in the local `/bench` command (`tools/bench/fleet.json` has the fleet); `/flash-rak` flashes the RAK4631. Load `/bench` before any flash, serial session or bench test.
 
 ## Bench Rules (hard)
 
