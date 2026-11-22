@@ -25,8 +25,8 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
     red-before tests; DK5EN-1 stays gateway and DK5EN-98 stays on the INSTRUMENT image until the new fork release on 2026-11-23, which upgrades the whole fleet (operator).
 - **PR #1316 merged upstream (2026-11-22), synced:** [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md).
   21 issues closed (#1287-#1302, #1304, #1310, #1312, #1314, #1315). Merge `dc5ea81c` keeps fork-dev on every path
-  (upstream copies differ only in comments); tree unchanged, gate stage 1,2 PASS, V3 and RAK4631 build. Next: remove
-  the worktree `../MeshCom-PR-next` and `pr/wave3`. Open: 13 desk links (`1830d8ed`, `45732840`) wait for the desk's
+  (upstream copies differ only in comments); tree unchanged, gate stage 1,2 PASS, V3 and RAK4631 build. Worktree
+  `../MeshCom-PR-next` and `pr/wave3` (local and origin) removed. Open: 13 desk links (`1830d8ed`, `45732840`) wait for the desk's
   next fork-dev sync. Tag note: upstream now has its own `v4.40a.11.22` (on `5db0a4f5`), name clash with the fork
   tag of the same name; `v4.40a.11.23` is free on both remotes.
 - **Open upstream tracking issues, all implemented on fork-dev (checked 2026-11-22):** #1303, #1305, #1306 (PR

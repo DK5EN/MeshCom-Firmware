@@ -129,4 +129,4 @@ icssw-org merged #1316 as `bcc3b3ef`; all 21 issues closed. `/sync-upstream` mer
 22 conflicted paths and every auto-merged PR path: the upstream copies differ only in comments (fork IDs replaced by
 issue numbers, fork paths removed) and in where `CLK_SRC` and `wpLiveNewest` are declared. Merged tree equal to the
 pre-merge tree. Gate: stage 1,2 PASS (122 envs, 4161/4161 Unity), `heltec_wifi_lora_32_V3` and `wiscore_rak4631`
-build. Left: remove worktree `../MeshCom-PR-next` and branch `pr/wave3`.
+build. Worktree `../MeshCom-PR-next` and branch `pr/wave3` (local and origin) removed 2026-11-22.
