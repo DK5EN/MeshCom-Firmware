@@ -1,0 +1,5 @@
+bench T114-DARK-01 (#1314) 2026-11-22, fork-dev 57acc7c3, DK5EN-1 (Heltec V3 OLED), INSTRUMENT image, --airgap on during the run, normal image restored afterwards (MSGWAKE on, DISPLAY on, gateway off, identity guard ok)
+A  --msgwake off, display off (isoff 1), --injectmsg TEST: no [OLED];frame, isoff stays 1, ring last 0->1            PASS
+B  --btn click afterwards: frame pushed, isoff 0 (stored message shown)                                              PASS
+C  --msgwake on with the display still on: message drawn as today                                                    PASS (display was on; wake-from-off with msgwake on is unchanged code)
+not benchable here: T114 dark theme colours (no T114 on the bench), Wireless Paper / e-paper store-only path, T-Deck panel stays dark

@@ -35,4 +35,12 @@ T114).
 
 ## State
 
-Wave 1 dispatched 2026-11-22.
+Done 2026-11-22: `57acc7c3`. Two writers (palette; settings + wake gate), orchestrator gated the T-Deck wake site
+(`msg_focus_and_alert`) and added the web setup toggle (D5) and the info-page line. Advisor round 1 (REWORK: OLED blink,
+e-paper double refresh, Wireless Paper first click) -> fresh Sonnet-high rework: store-only mode `bDispStoreOnly`
+(no push, no update(), no backlight; ring filled by `dispStoreRingLines`); round 2 (REWORK: WP pending status step) ->
+orchestrator: `WpBrowseState.arrived` / `wpArrived`; final check APPROVED. Gate: Unity 122 envs 4149/4149, pytest 1639,
+selftest 48, 11 board envs (`tools/bench/runs/harness/gate-wave3fix-wt114.summary`). Bench: `--msgwake off` PASS on
+DK5EN-1 (`bench-t114dark-20261122.summary`). Field: T114 colours, Wireless Paper store-only, T-Deck panel.
+PR notes: D4 (old `--checkmesh` bit), T5_EPAPER and T-Deck Pro bypass the gate (no display-off there), BLE/app not
+exposed yet (app follows).

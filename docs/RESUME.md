@@ -11,8 +11,8 @@ Fassung 9; working checklist: operator's Desktop `MeshCom-Checkliste-20261115.md
   All 11 issues implemented, gated (Unity 4129/4129, pytest 1639, 13 board envs) and benched where the bench can show
   it: `c22cb3d2` (#1291, #1289, #1290, #1296, #1301), `1830d8ed` (#1295, #1300, #1302), `45732840` (#1293, #1312,
   #1294); eight rows archived in `archive/backlog-closed-20261122.md`. Next: operator allows a push (desk links), then
-  `/submit-pr` as one PR (operator 2026-11-22). New since then: #1314 (T114 dark theme, enhancement) as Ideas row
-  T114-DARK-01.
+  `/submit-pr` as one PR (operator 2026-11-22). #1314 (T114 dark theme, `--msgwake`) implemented
+  `57acc7c3` ([campaign-t114-dark-20261122.md](campaign-t114-dark-20261122.md)), bench PASS on DK5EN-1, T114 colours field.
 - **Wave 3 by 2026-11-26 (operator 2026-11-21):** 2-4 topical PRs from `upstream/dev` (network/gateway,
   commands/APRS, display/position, update/sensors). Content: fork fixes already done (ETH-06, `temp(aprswx)` as a
   real fix, CMD-DASH-01, AU-27, TD-LOCK-01, TBEAM-SLEEP-01) plus the ticket fixes that pass gate and bench by
