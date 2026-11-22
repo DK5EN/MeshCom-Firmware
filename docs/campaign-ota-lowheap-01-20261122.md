@@ -127,3 +127,25 @@ Scope: S3 boards without PSRAM only; PSRAM boards and the RAK4631 keep the large
   Reading: the V3 idles near 98 KB free, about 21 KB below the old 119 KB comment (matches the static growth). The
   largest block at boot (86 KB) is far above the gate's 2 x 16.7 KB, so a fresh V3 passes; the refusal needs the
   heap to break up over uptime. The night decides.
+
+## Evening check and web load (2026-11-22 19:50)
+
+- After 4.7-5.5 h, no reboot on any node. Total free heap is flat on every node: no leak.
+- The largest block drops exactly once, at the first automatic AU check 10-40 min after boot (TLS session), and is
+  flat afterwards:
+
+  | Node                 | Free (range)   | Largest block boot -> now | Min ever (during the AU check) |
+  | -------------------- | -------------- | ------------------------- | ------------------------------ |
+  | DK5EN-1 Heltec V3    | 96,572-100,132 | 86,004 -> 61,428          | 14,404                         |
+  | DK5EN-98 Heltec V3   | 92,080-97,988  | 86,004 -> 59,380          | 11,052                         |
+  | DK5EN-92 T-Beam      | 52,224-57,032  | 55,284 -> 36,852          | 9,840                          |
+  | DK5EN-14 T-Deck Plus | 41,396-63,664  | 55,284 -> 21,492..38,900  | 30,320 (TLS buffers in PSRAM)  |
+
+- Prognosis without web load: the V3 keeps about 61 KB in one block, far above the gate's 2 x 16.7 KB, so the 06:00
+  trigger would likely stage cleanly (green). The field failures came through the web GUI (RCA H1/H2), which the
+  console-only trigger lacks.
+- Operator decision 19:50: open the web GUI of all 5 nodes (DK5EN-1, -92, -14, -98, -90) in Chrome and cycle the
+  pages overnight. Each tab runs an in-page cycler (`loadPage()` every 60 s through info, messages, mailbox, wx, pins,
+  position, mheard, path, neighbours, rxlog, setup; spectrum and remote left out; GET only, nothing sent on air).
+  First effect: free heap -2 to -3 KB on the V3s, -14 KB on the T-Deck. The cycler dies if a tab reloads or Chrome
+  discards it; check the tab counters (`window.__mcCycN`) in the morning.
