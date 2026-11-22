@@ -29,7 +29,7 @@ desk proposals P-0053/P-0104/P-0125 and P-0167 reopen (operator only).
 | 1    | APRSWX (Sonnet med)    | `command_functions.cpp` aprswx rows + status rung, `test/golden/toggle_table_lint.py`, cmd tests | done  |
 | 1    | port map (Haiku scout) | read-only                                                                                        | done  |
 | 1    | orchestrator           | `platformio.ini` (`test_posinfo_timer` in `[env:native]`), BACKLOG, RESUME, this doc             | -     |
-| 2    | orchestrator           | `/sync-upstream`: merge `upstream/dev` #1313 into `fork-dev`, push `fork-dev`, desk links        | open  |
+| 2    | orchestrator           | `/sync-upstream`: merge `upstream/dev` #1313 into `fork-dev`, push `fork-dev`, desk links        | done  |
 | 3    | orchestrator           | `/submit-pr`: `pr/wave3` from `upstream/dev`, port, gate, German body, Opus advisor, open PR     | open  |
 
 Gate wave 1: `tools/regression.sh --stage 1,2`, board builds of touched envs, Opus advisor, commit. Bench: `[POS]`
@@ -77,3 +77,48 @@ Wave 1 done: final gate `tools/bench/runs/harness/gate-prwave3-w1d.summary` (Uni
 13 boards, deferred-log string in the Heltec V3 and RAK images). Advisor round 1 REWORK (fresh Sonnet high), round 2
 small rework done by the orchestrator with fail-before tests; no third advisor pass (orchestrator-sized change, every
 item pinned by a red-before test). Bench `[POS]` timestamps: with the PR branch on DK5EN-1.
+
+## Wave 2 -- done
+
+`upstream/dev` `5db0a4f5` (#1313, our `tools/hmac_connect.ps1`, = `ee7a8e56`) merged as `4f555c2e`; merged tree equal
+to the pre-merge tree, no gate needed. `fork-dev` pushed to origin. Upstream carries its own tag `v4.40a.11.22` on
+`5db0a4f5`, clashing with the fork release tag of that name (left as is; fetch warns). Desk links: P-0380, P-0154,
+P-0163, P-0381, P-0382, P-0210, P-0385, P-0030 -> `c22cb3d2` done; `1830d8ed` (P-0383, P-0166, P-0167, P-0081,
+P-0209, P-0351) and `45732840` (P-0044, P-0386, P-0179, P-0021, P-0384, P-0059, P-0345, TDECK-VOLT-01 ticket)
+refused "no commit in firmware" (desk has not fetched the push yet): retry after wave 3.
+
+## Wave 3 -- log
+
+- Issue #1315 filed (POSINFO-LAG-01, English, assigned DK5EN, label bug).
+- Worktree `../MeshCom-PR-next`, branch `pr/wave3` from `5db0a4f5` (pinned SHA). 17 commits, 62 files, +1991 / -481.
+  Port notes: ETH-06 without the W5100S library patch script (`extra_scripts`, stays in the fork) and without
+  EXT-PEER-01/extReg; `extudp_refresh.h` carries only the two ETH-06 helpers. CET Part B: `CLK_SRC()` defined in
+  `clock.h` (note only, no INSTRUMENT), 11 set sites as on the fork. DHT-PROBE-01 without SENS-03 (`read_ok` local,
+  `dht_ok` kept for `--info`). QA-RX-07 `isSpecialTargetCall` not ported (#1306). Comments cite no fork test/doc/desk
+  paths (separate chore commit). `wpLiveNewest` extern moved to `loop_functions.h` (deferred nit).
+- PR body draft: `../pr-wave3-body.md` (outside the repo), German, 21 `Closes`.
+- Gate: all 36 board envs + upstream native envs in the worktree, fork host suites on an overlay copy (scratchpad);
+  Opus advisor on the PR diff. Bench: POSINFO `[POS]` timestamps on DK5EN-1 with the PR build.
+- Advisor (Opus) on the PR diff: one port defect fixed (`--info` NETWORK label used fork-only `HAS_NRF_ETH`; now
+  `BOARD_RAK4630 && !BOARD_HELTEC_T114 && !BOARD_T_ECHO`, folded into the W1 commit), stale `charge_led_mode.h`
+  comment; body items added (Track frame +9 B, PA at runtime, routing no LoRa change, beacon airtime, sset bits).
+- Gate: 35/36 board envs (`esp32-external-radio` = upstream `#error`, baseline), upstream native 6/6 (291 cases);
+  fork suites on the overlay: 3119/3182, every failure triaged to a fork-only feature (no port defect).
+- Branch: 16 commits, 63 files, +1994 / -483. Waiting for the operator's `yes` (push `pr/wave3`, `gh pr create`).
+- Operator 2026-11-22: W5100S library patch script goes into the PR after all (upstream already carries
+  `pre:tools/nimble_patch.py`, same pattern; S-03 did not apply). Commit `74ed647d`; RAK build shows
+  `w5100s_patch: ETH-06 applied`. Branch now 17 commits.
+- Bench POSINFO-LAG-01 on DK5EN-1 (PR image, INSTRUMENT, `--airgap on` confirmed before any beacon, placeholder
+  position 48.0 N / 11.0 E, reset afterwards). Run 1: first-fix beacon at 100 s after boot (never fired before the
+  fix). No periodic beacon in 23 min: GPS on without a module lets the main loop reset `posinfo_interval` to 1800 s
+  after 10 GPS polls (`esp32_main.cpp:4677-4684`, upstream behaviour, not the fix). Run 2 with `--gps off`: PASS (first-fix 100.0 s, periodic +300.2 s, after `--sendpos` +59.9 s),
+  `tools/bench/runs/harness/bench-posinfo-lag-20261122.summary`. DK5EN-1 back on the fork-dev image, identity
+  guard ok.
+
+## Wave 3 -- done
+
+PR [#1316](https://github.com/icssw-org/MeshCom-Firmware/pull/1316) opened 2026-11-22 against `dev`: 17 commits, 65
+files, +2093 / -483, 21 closing references (GraphQL `closingIssuesReferences` 21). Body: `../pr-wave3-body.md`.
+Desk links still open (desk index at fork-dev `ee7a8e56`, 2026-11-21 22:17): `1830d8ed` -> P-0383, P-0166, P-0167,
+P-0081, P-0209, P-0351; `45732840` -> P-0044, P-0386, P-0179, P-0021, P-0384, P-0059, P-0345, TDECK-VOLT-01 ticket.
+After the merge: `/sync-upstream` (merge path), `git worktree remove ../MeshCom-PR-next`, delete `pr/wave3`.

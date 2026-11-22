@@ -7,15 +7,17 @@ Fassung 9; working checklist: operator's Desktop `MeshCom-Checkliste-20261115.md
 
 ## Now (2026-11-22)
 
-- **PR wave 3 running:** [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md). One upstream PR closing the
-  20 implemented issues plus POSINFO-LAG-01 (new issue). Wave 1 committed: POSINFO-LAG-01 (beacon on time, 60 s
-  floor for automatic beacons incl. EXTUDP, NCNT trigger removed; operator D5/D6 for aprs.fi) and the real #1288
-  fix. Next: wave 2 sync #1313 + push `fork-dev` (desk links), wave 3 `/submit-pr` (add `d0ecf82f` for #1298).
+- **PR #1316 open (2026-11-22):** [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md). One upstream PR,
+  `pr/wave3` (worktree `../MeshCom-PR-next`, 17 commits, 65 files), closes 21 issues (#1287-#1302, #1304, #1310,
+  #1312, #1314, #1315). Next: wait for the maintainers; after the merge `/sync-upstream` (merge path), then remove
+  the worktree and `pr/wave3`. Open: 13 desk links (`1830d8ed`, `45732840`) wait for the desk's next fork-dev sync.
+- **New finding (2026-11-22, upstream behaviour):** with `--gps on` and no GPS module the ESP32 main loop resets
+  `posinfo_interval` to 1800 s after 10 GPS polls, so `--postime` has no effect (`esp32_main.cpp`, `igps`). Not
+  filed yet.
 - **Wave 3 fix campaign done (2026-11-22):** [campaign-wave3-fixes-20261122.md](campaign-wave3-fixes-20261122.md).
   All 11 issues implemented, gated (Unity 4129/4129, pytest 1639, 13 board envs) and benched where the bench can show
   it: `c22cb3d2` (#1291, #1289, #1290, #1296, #1301), `1830d8ed` (#1295, #1300, #1302), `45732840` (#1293, #1312,
-  #1294); eight rows archived in `archive/backlog-closed-20261122.md`. Next: operator allows a push (desk links), then
-  `/submit-pr` as one PR (operator 2026-11-22). #1314 (T114 dark theme, `--msgwake`) implemented
+  #1294); eight rows archived in `archive/backlog-closed-20261122.md`. Upstream in #1316. #1314 (T114 dark theme, `--msgwake`) implemented
   `57acc7c3` ([campaign-t114-dark-20261122.md](campaign-t114-dark-20261122.md)), bench PASS on DK5EN-1, T114 colours field.
 - **Wave 3 by 2026-11-26 (operator 2026-11-21):** 2-4 topical PRs from `upstream/dev` (network/gateway,
   commands/APRS, display/position, update/sensors). Content: fork fixes already done (ETH-06, `temp(aprswx)` as a
