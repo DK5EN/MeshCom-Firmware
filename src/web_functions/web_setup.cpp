@@ -177,6 +177,7 @@ static constexpr WsParam wsParams[] = {
     WSP_ONOFF_RO("softser", bSOFTSERON),
     #endif
     WSP_ONOFF ("nomsgall", "nomsgall", bNoMSGtoALL),
+    WSP_ONOFF ("msgwake", "msgwake", bMsgWake),        // T114-DARK-01 (#1314): a message wakes an off display
     #ifndef BOARD_RAK4630
     WSP_STR   ("setssid", "setssid", meshcom_settings.node_ssid),
     WSP_STR   ("setpwd", "setpwd", meshcom_settings.node_pwd),

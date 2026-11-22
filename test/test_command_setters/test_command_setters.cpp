@@ -1084,6 +1084,18 @@ static void test_web_temp_offset_takes_comma_and_leading_zero()
 
 // WEB-TEMPOFF-01 (#1296): the outdoor getparam branch tested "tempoffsetindoor" a second time, so
 // /getparam/?tempoffsetoutdoor fell through to WS_RETURNCODE_UNKNOWN (422).
+// T114-DARK-01 (#1314, operator D5): --msgwake is a toggle on the web setup page: a wsParams row maps
+// /setparam/?msgwake= and /getparam/?msgwake to the console command, and the setup card shows the switch.
+static void test_web_setup_has_msgwake_toggle()
+{
+    const std::string setup = read_repo_file("src/web_functions/web_setup.cpp");
+    const std::string page  = read_repo_file("src/web_functions/web_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(setup.find("WSP_ONOFF (\"msgwake\", \"msgwake\", bMsgWake)") != std::string::npos,
+                             "web_setup.cpp has no msgwake row");
+    TEST_ASSERT_TRUE_MESSAGE(page.find("_create_setup_switch_element(\"msgwake\"") != std::string::npos,
+                             "web setup page has no msgwake switch");
+}
+
 static void test_web_getparam_outdoor_offset_is_reachable()
 {
     const std::string src = read_repo_file("src/web_functions/web_setup.cpp");
@@ -2635,9 +2647,56 @@ static void test_deinit_detaches_every_attached_handler()
                              "deinit_onebutton() not declared in onebutton_functions.h");
 }
 
+// T114-DARK-01 source pins: --msgwake rows (D3), boot readers, T114 --theme branch (D1)
+void test_msgwake_rows_and_readers(void)
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    std::smatch m;
+    TEST_ASSERT_TRUE_MESSAGE(std::regex_search(cmd, m, std::regex("\\{ \"--msgwake on\",[^\\n]*&bMsgWake,[^\\n]*node_sset,[^\\n]*0xFFFF7FFF,\\s*0x00000000")),
+                             "--msgwake on row (clears 0x8000) missing");
+    TEST_ASSERT_TRUE_MESSAGE(std::regex_search(cmd, m, std::regex("\\{ \"--msgwake off\",[^\\n]*&bMsgWake,[^\\n]*node_sset,[^\\n]*0xFFFFFFFF,\\s*0x8000")),
+                             "--msgwake off row (sets 0x8000) missing");
+    const char *mains[] = { "src/nrf52/nrf52_main.cpp", "src/esp32/esp32_main.cpp" };
+    for (const char *f : mains)
+    {
+        const std::string s = read_repo_file(f);
+        TEST_ASSERT_TRUE_MESSAGE(std::regex_search(s, std::regex("bMsgWake\\s*=\\s*\\(?\\s*\\(?meshcom_settings\\.node_sset\\s*&\\s*0x8000\\)?\\s*==\\s*0")),
+                                 (std::string(f) + ": bMsgWake not read from node_sset 0x8000").c_str());
+    }
+}
+
+// bit 0x8000 of node_sset must survive every literal AND-mask (the old 0x7xxx masks cleared it)
+void test_msgwake_bit_survives_sset_masks(void)
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(!std::regex_search(cmd, std::regex("meshcom_settings\\.node_sset\\s*&\\s*\\(?0x[0-7][0-9A-Fa-f]{3}\\b")),
+                             "a literal node_sset & 0x0xxx..0x7xxx mask still clears bit 0x8000");
+    TEST_ASSERT_TRUE_MESSAGE(!std::regex_search(cmd, std::regex("&meshcom_settings\\.node_sset,\\s*0x0000[0-7][0-9A-Fa-f]{3},")),
+                             "a node_sset toggle row mask still clears bit 0x8000");
+}
+
+void test_t114_theme_branch(void)
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const size_t g = cmd.find("#if defined(HAS_TFT_114)\n    // T114-DARK-01");
+    TEST_ASSERT_TRUE_MESSAGE(g != std::string::npos, "HAS_TFT_114 --theme branch missing");
+    const size_t e = cmd.find("#endif", g);
+    const std::string br = cmd.substr(g, e - g);
+    TEST_ASSERT_TRUE_MESSAGE(br.find("tdeck_theme_parse(") != std::string::npos, "T114 --theme does not reuse tdeck_theme_parse");
+    TEST_ASSERT_TRUE_MESSAGE(br.find("node_sset2") != std::string::npos && br.find("0x2000") != std::string::npos,
+                             "T114 --theme does not store node_sset2 0x2000");
+    TEST_ASSERT_TRUE_MESSAGE(br.find("bDisplayDark") != std::string::npos, "T114 --theme does not set bDisplayDark");
+    const std::string nrf = read_repo_file("src/nrf52/nrf52_main.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(std::regex_search(nrf, std::regex("bDisplayDark\\s*=[^;]*node_sset2\\s*&\\s*0x2000")),
+                             "nrf52_main does not read bDisplayDark from node_sset2 0x2000");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_msgwake_rows_and_readers);
+    RUN_TEST(test_msgwake_bit_survives_sset_masks);
+    RUN_TEST(test_t114_theme_branch);
     RUN_TEST(test_a_plain_number_parses);
     RUN_TEST(test_windpin_windcal_rungs_validate_and_store);
     RUN_TEST(test_pin_setters_ask_the_policy_and_restore);
@@ -2681,6 +2740,7 @@ int main(int, char **)
     RUN_TEST(test_update_apply_hands_over_now_and_is_not_remote);
     RUN_TEST(test_web_temp_offset_takes_comma_and_leading_zero);
     RUN_TEST(test_web_getparam_outdoor_offset_is_reachable);
+    RUN_TEST(test_web_setup_has_msgwake_toggle);
     RUN_TEST(test_stagelan_is_instrument_only_everywhere);
     RUN_TEST(test_lan_url_accepts_only_plain_http_to_private_ipv4);
     RUN_TEST(test_stage_flash_goes_through_one_guarded_helper);

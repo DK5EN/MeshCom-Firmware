@@ -571,8 +571,8 @@ void test_wp_first_click_wiring(void)
     TEST_ASSERT_TRUE_MESSAGE(arrival != std::string::npos, "ring advance not found");
     const size_t blk = d1306.rfind("iDisplayType == 0 && bNeu", arrival);
     TEST_ASSERT_TRUE_MESSAGE(blk != std::string::npos, "arrival block not found");
-    TEST_ASSERT_TRUE_MESSAGE(d1306.substr(blk, arrival - blk).find("wpLiveNewest = true;") != std::string::npos,
-                             "arrival does not set wpLiveNewest");
+    TEST_ASSERT_TRUE_MESSAGE(d1306.substr(blk, arrival - blk).find("wpLiveNewest = dispArrivalLiveNewest(bDispStoreOnly);") != std::string::npos,
+                             "arrival does not set wpLiveNewest (true for a pushed message, false for a store-only one)");
     const size_t idx = d1306.find("wpDrawMsgIdx();");
     TEST_ASSERT_TRUE_MESSAGE(idx != std::string::npos && d1306.find("wpBrowseShow(") != std::string::npos,
                              "live render does not draw the counter");
@@ -614,9 +614,189 @@ void test_head_guard_blocks_during_hold(void)
                              "sendDisplayHead() does not use dispHeadBlocked()");
 }
 
+// T114-DARK-01 (D2): --msgwake. dispMsgWakes(msgWake, displayIsOff): may an incoming message turn the
+// display on? Only a display that is OFF and has msgwake off stays dark; an ON display always keeps
+// today's behaviour (timer re-armed), whatever the setting.
+void test_msgwake_truth_table(void)
+{
+    TEST_ASSERT_TRUE(dispMsgWakes(true, true));     // default: a message lights an off display
+    TEST_ASSERT_TRUE(dispMsgWakes(true, false));
+    TEST_ASSERT_FALSE(dispMsgWakes(false, true));   // msgwake off + display off: stays dark
+    TEST_ASSERT_TRUE(dispMsgWakes(false, false));   // display on: as today
+}
+
+// the one wake site in sendDisplayText() asks the helper; the wake lines (timer, flag, T114 page close)
+// are behind it, the ring storage and the draw stay unconditional
+void test_msgwake_wake_site_calls_helper(void)
+{
+    const std::string body = code_only(func_body(read_repo_file("src/loop_functions.cpp"),
+                                                 "void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)\n{"));
+    const size_t h = body.find("dispMsgWakes(bMsgWake, bDisplayIsOff)");
+    TEST_ASSERT_TRUE_MESSAGE(h != std::string::npos, "sendDisplayText() does not call dispMsgWakes(bMsgWake, bDisplayIsOff)");
+    const size_t w = body.find("DisplayOffWait = millis() + (30 * 1000)");
+    TEST_ASSERT_TRUE_MESSAGE(w != std::string::npos, "wake timer line not found");
+    TEST_ASSERT_TRUE_MESSAGE(h < w, "the helper is asked after the wake timer was armed");
+    TEST_ASSERT_TRUE_MESSAGE(read_repo_file("src/loop_functions.cpp").find("bool bMsgWake = true;") != std::string::npos,
+                             "bMsgWake default true missing");
+    TEST_ASSERT_TRUE_MESSAGE(read_repo_file("src/loop_functions_extern.h").find("extern bool bMsgWake;") != std::string::npos,
+                             "extern bMsgWake missing");
+    TEST_ASSERT_TRUE_MESSAGE(read_repo_file("src/loop_functions_extern.h").find("extern bool bDisplayDark;") != std::string::npos,
+                             "extern bDisplayDark missing");
+}
+
+// T114-DARK-01 (#1314, operator D2: every display board): the T-Deck wakes its panel in
+// msg_focus_and_alert(), not through sendDisplayText(); --msgwake off must keep a dark panel dark there too.
+static void test_tdeck_message_wake_respects_msgwake(void)
+{
+    const std::string body = func_body(read_repo_file("src/t-deck/lv_obj_functions.cpp"),
+                                       "static void msg_focus_and_alert(bool bWithAudio)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("dispMsgWakes(bMsgWake") != std::string::npos,
+                             "msg_focus_and_alert() wakes the T-Deck panel without asking dispMsgWakes()");
+}
+
+
+// ---- T114-DARK-01 (D2) store-only mode: a message that may not wake the display is stored in the page
+// ring but pushed to NO panel. Source pins: the flag bDispStoreOnly is set from !bMsgWakes for exactly the
+// duration of sendDisplayText(), every push/update point is inside an `if(!bDispStoreOnly)` block, the "#C"
+// re-blank (which pushed the message first) is gone, and a suppressed message is not "live newest".
+
+// code with trailing // comments and string literals removed, for brace scanning
+static std::string strip_for_scan(const std::string &w)
+{
+    std::istringstream is(w);
+    std::string line, out;
+    while (std::getline(is, line))
+    {
+        bool in_str = false;
+        std::string o;
+        for (size_t i = 0; i < line.size(); i++)
+        {
+            if (line[i] == '"' && (i == 0 || line[i - 1] != '\\')) in_str = !in_str;
+            if (!in_str && line[i] == '/' && i + 1 < line.size() && line[i + 1] == '/') break;
+            o += in_str ? ' ' : line[i];
+        }
+        out += o + "\n";
+    }
+    return out;
+}
+
+// is position pos inside a block whose header (text after the previous ; { } or directive line) holds `needle`?
+static bool inside_block_headed_by(const std::string &w, size_t pos, const char *needle)
+{
+    int depth = 0;
+    for (size_t i = pos; i-- > 0;)
+    {
+        if (w[i] == '}') depth++;
+        else if (w[i] == '{')
+        {
+            if (depth > 0) { depth--; continue; }
+            size_t b = i;
+            while (b > 0 && w[b - 1] != ';' && w[b - 1] != '{' && w[b - 1] != '}')
+            {
+                // stop at a preprocessor line
+                size_t ls = w.rfind('\n', b - 1);
+                size_t first = (ls == std::string::npos) ? 0 : ls + 1;
+                while (first < b && (w[first] == ' ' || w[first] == '\t')) first++;
+                if (first < b && w[first] == '#') break;
+                b--;
+            }
+            if (w.substr(b, i - b).find(needle) != std::string::npos) return true;
+        }
+    }
+    return false;
+}
+
+static void expect_all_guarded(const std::string &body, const char *token, const char *fn)
+{
+    size_t pos = 0, n = 0;
+    while ((pos = body.find(token, pos)) != std::string::npos)
+    {
+        n++;
+        std::string msg = std::string(fn) + ": " + token + " (occurrence " + std::to_string(n) + ") is not inside if(!bDispStoreOnly)";
+        TEST_ASSERT_TRUE_MESSAGE(inside_block_headed_by(body, pos, "if(!bDispStoreOnly)"), msg.c_str());
+        pos += strlen(token);
+    }
+    std::string msg = std::string(fn) + ": token not found: " + token;
+    TEST_ASSERT_TRUE_MESSAGE(n > 0, msg.c_str());
+}
+
+// a message is store-only exactly when it may not wake the display; only a pushed message is "live newest"
+void test_storeonly_truth_table(void)
+{
+    const bool wakes[4][2] = {{true, true}, {true, false}, {false, true}, {false, false}};   // {msgWake, displayIsOff}
+    const bool storeOnly[4] = {false, false, true, false};
+    for (int i = 0; i < 4; i++)
+    {
+        const bool so = !dispMsgWakes(wakes[i][0], wakes[i][1]);
+        TEST_ASSERT_EQUAL(storeOnly[i], so);
+        TEST_ASSERT_EQUAL(!storeOnly[i], dispArrivalLiveNewest(so));
+    }
+    TEST_ASSERT_FALSE(dispArrivalLiveNewest(true));    // suppressed: the first click must show the message
+    TEST_ASSERT_TRUE(dispArrivalLiveNewest(false));    // pushed: the panel shows it, a click steps on
+}
+
+void test_storeonly_flag_set_from_msgwake_gate(void)
+{
+    const std::string src = read_repo_file("src/loop_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(src.find("static bool bDispStoreOnly = false;") != std::string::npos, "bDispStoreOnly flag missing");
+    const std::string body = code_only(func_body(src, "void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)\n{"));
+    const size_t g = body.find("DispStoreOnlyScope storeOnlyScope(!bMsgWakes)");
+    TEST_ASSERT_TRUE_MESSAGE(g != std::string::npos, "sendDisplayText() does not set the store-only flag from !bMsgWakes");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("bMsgWakes = dispMsgWakes(bMsgWake, bDisplayIsOff)") < g, "flag set before bMsgWakes is computed");
+    TEST_ASSERT_TRUE_MESSAGE(g < body.find("sendDisplayMainline()"), "flag set after the first draw call");
+}
+
+void test_storeonly_no_blank_reblank_after_push(void)
+{
+    const std::string body = code_only(func_body(read_repo_file("src/loop_functions.cpp"),
+                                                 "void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)\n{"));
+    TEST_ASSERT_TRUE_MESSAGE(body.find("\"#C\"") == std::string::npos,
+                             "sendDisplayText() still re-blanks with \"#C\" after pushing the message to the panel");
+}
+
+void test_storeonly_every_push_point_guarded(void)
+{
+    const std::string src = read_repo_file("src/loop_functions.cpp");
+    const std::string d1306 = strip_for_scan(code_only(func_body(src, "void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)\n{")));
+    expect_all_guarded(d1306, "u8g2->firstPage()", "sendDisplay1306");
+    expect_all_guarded(d1306, "u8g2->nextPage()", "sendDisplay1306");
+    expect_all_guarded(d1306, "epaper_display.update()", "sendDisplay1306");
+    expect_all_guarded(d1306, "epaper_display.clear()", "sendDisplay1306");
+    expect_all_guarded(d1306, "e290FullRefreshDue()", "sendDisplay1306");
+    expect_all_guarded(d1306, "displayTFT(", "sendDisplay1306");
+    expect_all_guarded(d1306, "tftBacklight()", "sendDisplay1306");
+    const std::string dtext = strip_for_scan(code_only(func_body(src, "void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)\n{")));
+    expect_all_guarded(dtext, "epaper_display.update()", "sendDisplayText");
+    expect_all_guarded(dtext, "epaper_display.fastmodeOff()", "sendDisplayText");
+    expect_all_guarded(dtext, "e290FullRefreshDue()", "sendDisplayText");
+    expect_all_guarded(dtext, "displayTFT(", "sendDisplayText");
+}
+
+void test_storeonly_suppressed_message_is_not_live_newest(void)
+{
+    const std::string body = code_only(func_body(read_repo_file("src/loop_functions.cpp"),
+                                                 "void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)\n{"));
+    TEST_ASSERT_TRUE_MESSAGE(body.find("wpLiveNewest = true;") == std::string::npos,
+                             "sendDisplay1306() sets wpLiveNewest = true for every arrival, also a suppressed one");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("wpLiveNewest = dispArrivalLiveNewest(bDispStoreOnly);") != std::string::npos,
+                             "arrival does not derive wpLiveNewest from the store-only flag");
+}
+
+void test_storeonly_gps_page_close_outside_wake_gate(void)
+{
+    const std::string body = strip_for_scan(code_only(func_body(read_repo_file("src/loop_functions.cpp"),
+                                                 "void sendDisplayText(struct aprsMessage &aprsmsg, int16_t rssi, int8_t snr)\n{")));
+    const size_t c = body.find("t114GpsPageClose()");
+    TEST_ASSERT_TRUE_MESSAGE(c != std::string::npos, "t114GpsPageClose() missing from sendDisplayText()");
+    TEST_ASSERT_FALSE_MESSAGE(inside_block_headed_by(body, c, "bMsgWakes"),
+                              "t114GpsPageClose() is inside the wake gate: a suppressed message leaves the GPS page active");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_msgwake_truth_table);
+    RUN_TEST(test_msgwake_wake_site_calls_helper);
     RUN_TEST(test_click_walk_uses_page_ring);
     RUN_TEST(test_wp_first_click_wiring);
     RUN_TEST(test_display_off_handler_cancels_browse_hold);
@@ -650,5 +830,12 @@ int main(int, char **)
     RUN_TEST(test_ping_hold02_wiring);
     RUN_TEST(test_track_ping_frame_replaced_after_hold_wiring);
     RUN_TEST(test_track_mode_ping_frame_released_at_deadline);
+    RUN_TEST(test_tdeck_message_wake_respects_msgwake);
+    RUN_TEST(test_storeonly_truth_table);
+    RUN_TEST(test_storeonly_flag_set_from_msgwake_gate);
+    RUN_TEST(test_storeonly_no_blank_reblank_after_push);
+    RUN_TEST(test_storeonly_every_push_point_guarded);
+    RUN_TEST(test_storeonly_suppressed_message_is_not_live_newest);
+    RUN_TEST(test_storeonly_gps_page_close_outside_wake_gate);
     return UNITY_END();
 }

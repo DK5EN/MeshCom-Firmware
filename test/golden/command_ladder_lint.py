@@ -97,6 +97,9 @@ RUNG = re.compile(r'commandCheck\([^,]*,\s*\(char\*\)\s*"([^"]*)"\s*\)')
 # narrow, evidenced carve-out for a pattern that is actually in the file
 # today ("udplog on"/"udplog off" at command_functions.cpp:4807/:4831).
 ARCH_GUARDS = frozenset({"defined(NRF52_SERIES)", "defined(ESP32)"})
+BOARD_EXCLUSIVE_GUARDS = (
+    ("defined(HAS_TFT_114)", "defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)"),
+)
 
 
 @dataclass
@@ -330,7 +333,11 @@ def _arch_exempt(g1: Tuple[str, ...], g2: Tuple[str, ...]) -> bool:
     compiled into the same build -- see ARCH_GUARDS."""
     found1 = set(g1) & ARCH_GUARDS
     found2 = set(g2) & ARCH_GUARDS
-    return len(found1) == 1 and len(found2) == 1 and found1 != found2
+    if len(found1) == 1 and len(found2) == 1 and found1 != found2:
+        return True
+    # T114-DARK-01: "theme" exists twice on purpose -- the T-Deck rung and the T114 rung. A board is
+    # either a T-Deck or a T114 (HAS_TFT_114 is defined by variants/heltec_t114 only), never both.
+    return any((x in g1 and y in g2) or (y in g1 and x in g2) for x, y in BOARD_EXCLUSIVE_GUARDS)
 
 
 def find_duplicates(rungs: List[Rung],

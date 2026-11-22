@@ -355,6 +355,21 @@ void test_rank_on_arrival(void)
     }
 }
 
+// T114-DARK-01 (#1314, --msgwake off): a message stored while the display stays dark is not on the panel
+// (liveNewest false), but its arrival must still cancel a status step left over from the last walk, so the
+// first click shows that message (newest, full rank) and not the status page.
+static void test_suppressed_arrival_cancels_status_step_and_shows_newest(void)
+{
+    int lineAnz[WPMAX] = {0};
+    for (int i = 0; i < 5; i++) lineAnz[i] = 2;
+    const int last = 5;                              // newest slot = 4
+    WpBrowseState st = { true, false, 4, true };     // pending status step, suppressed arrival
+    const WpBrowseResult r = wpBrowseClick(lineAnz, WPMAX, last, WPBROWSE, st);
+    TEST_ASSERT_FALSE_MESSAGE(r.status, "first click after a suppressed arrival went to the status page");
+    TEST_ASSERT_EQUAL_INT(4, r.slot);
+    TEST_ASSERT_EQUAL_INT(wpBrowseShow(5, WPBROWSE), r.rank);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -370,5 +385,6 @@ int main(int, char **)
     RUN_TEST(test_fresh_arrival_supersedes_pending_status_step);
     RUN_TEST(test_not_live_equals_legacy);
     RUN_TEST(test_rank_on_arrival);
+    RUN_TEST(test_suppressed_arrival_cancels_status_step_and_shows_newest);
     return UNITY_END();
 }

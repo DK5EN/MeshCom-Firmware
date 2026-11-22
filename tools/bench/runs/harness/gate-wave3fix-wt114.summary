@@ -1,0 +1,15 @@
+regression rc=1
+build heltec_t114 rc=0 RAM: [==== ] 41.0% (used 96620 bytes from 235520 bytes) Flash: [===== ] 53.2% (used 433896 bytes from 815104 bytes) 
+build heltec_wifi_lora_32_V3 rc=0 RAM: [==== ] 41.8% (used 137100 bytes from 327680 bytes) Flash: [===== ] 52.6% (used 1790517 bytes from 3403776 bytes) 
+build t_echo rc=0 RAM: [==== ] 40.3% (used 100276 bytes from 248832 bytes) Flash: [====== ] 55.7% (used 454048 bytes from 815104 bytes) 
+build wiscore_rak4631 rc=0 RAM: [==== ] 41.7% (used 103756 bytes from 248832 bytes) Flash: [======== ] 83.5% (used 680992 bytes from 815104 bytes) 
+build t_deck_plus rc=0 RAM: [===== ] 48.3% (used 158260 bytes from 327680 bytes) Flash: [== ] 19.2% (used 2417525 bytes from 12582912 bytes) 
+build t_deck rc=0 RAM: [===== ] 48.3% (used 158260 bytes from 327680 bytes) Flash: [== ] 19.2% (used 2417805 bytes from 12582912 bytes) 
+build t_deck_pro rc=0 RAM: [===== ] 50.0% (used 163728 bytes from 327680 bytes) Flash: [== ] 17.6% (used 2213153 bytes from 12582912 bytes) 
+build wireless-paper rc=0 RAM: [==== ] 42.4% (used 138932 bytes from 327680 bytes) Flash: [===== ] 51.3% (used 1745877 bytes from 3403776 bytes) 
+build ttgo_tbeam rc=0 RAM: [= ] 8.2% (used 107256 bytes from 1310720 bytes) Flash: [====== ] 55.7% (used 1894429 bytes from 3403776 bytes) 
+build vision-master-e290 rc=0 RAM: [==== ] 43.7% (used 143076 bytes from 327680 bytes) Flash: [===== ] 53.2% (used 1811445 bytes from 3403776 bytes) 
+build vision-master-e213 rc=0 RAM: [==== ] 42.5% (used 139340 bytes from 327680 bytes) Flash: [===== ] 52.0% (used 1771289 bytes from 3403776 bytes) 
+=== gate done
+T114-DARK-01 (#1314): final gate above red only on info_switch_lint (web info page lacked "Message wake"); line added, golden selftest 48 green, heltec_wifi_lora_32_V3 and wiscore_rak4631 rebuilt SUCCESS, native_command_setters 79/79
+advisor: round 1 REWORK (OLED blink, e-paper double refresh, WP first click) -> fresh Sonnet-high store-only rework; round 2 REWORK (WP pending status step) -> orchestrator: wpArrived flag, test red before; final check APPROVED
