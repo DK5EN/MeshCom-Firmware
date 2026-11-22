@@ -104,6 +104,12 @@ Added 2026-11-21 (wave 3 fixes W2, `1830d8ed`): `test_sset3_restore` (2), `test_
 (OTA-SAFEBOOT-01, both fw_update envs), `test_command_setters` +1 (OTA pin), `test_settings_sanitize` +5 -1
 (DHT-PROBE-01), `test_rf_pa` +1 (T-Deck Pro one-arg path). Gate after the wave: Unity 119 envs, 4085 cases.
 
+Added 2026-11-22 (wave 3 fixes W3+W4, `45732840`): `test_pos_text_budget` (9, env `native`, APRS-TXT-03), new envs
+`native_batt_label` (`test_batt_label`, 6, TDECK-VOLT-01) and `native_page_ring` (`test_page_ring`, 12, DISP-PAGE-01/03).
+Extended: `test_charset_filter` (+ `charset_wire_field` cases), `test_lora_aprs_encode` (+3, Track 25 bytes),
+`test_display_clock` (DISP-PAGE-01..03 pins), `test_command_setters` (atxt, `--info` drop line, display off,
+`--button off`). Gate after the wave: Unity 121 envs, 4129 cases.
+
 The per-suite sums were recomputed from the tree on 2026-10-04 (every
 `RUN_TEST` under `test/test_*`). The totals before that date were stale: the
 old header said 96 suites / 1563 cases, while the table below already listed

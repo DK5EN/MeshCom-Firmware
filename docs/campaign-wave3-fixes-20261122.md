@@ -16,12 +16,12 @@ Scope source: `gh issue list -R icssw-org/MeshCom-Firmware --assignee DK5EN --st
 | #1290 | GW-GROUP-01, GW-DM-01, GW-CALL-01   | plan-gateway-routing-20261121.md            | 1    | done `c22cb3d2` |
 | #1296 | WEB-TEMPOFF-01                      | plan-web-tempoffsetoutdoor-20261121.md      | 1    | done `c22cb3d2` |
 | #1301 | TBEAM1W-PWR-01                      | plan-tbeam1w-txpower-20261121.md            | 1    | done `c22cb3d2` |
-| #1295 | GPS-AUTOSYM-01..03, POSINFO-NEXT-01 | plan-gps-autosymbol-nextpos-20261121.md     | 2    | planned         |
-| #1300 | OTA-SAFEBOOT-01                     | plan-ota-safeboot-gate-20261121.md          | 2    | planned         |
-| #1302 | DHT-PROBE-01                        | plan-dht-probe-20261121.md                  | 2    | planned         |
-| #1293 | APRS-TXT-01..03                     | plan-aprs-text-limits-20261121.md           | 3    | planned         |
-| #1312 | TDECK-VOLT-01                       | plan-tdeck-volt-20261121.md                 | 3    | planned         |
-| #1294 | DISP-PAGE-01..03, BTN-OFF-01        | plan-display-paging-20261121.md             | 4    | planned         |
+| #1295 | GPS-AUTOSYM-01..03, POSINFO-NEXT-01 | plan-gps-autosymbol-nextpos-20261121.md     | 2    | done `1830d8ed` |
+| #1300 | OTA-SAFEBOOT-01                     | plan-ota-safeboot-gate-20261121.md          | 2    | done `1830d8ed` |
+| #1302 | DHT-PROBE-01                        | plan-dht-probe-20261121.md                  | 2    | done `1830d8ed` |
+| #1293 | APRS-TXT-01..03                     | plan-aprs-text-limits-20261121.md           | 3    | done `45732840` |
+| #1312 | TDECK-VOLT-01                       | plan-tdeck-volt-20261121.md                 | 3    | done `45732840` |
+| #1294 | DISP-PAGE-01..03, BTN-OFF-01        | plan-display-paging-20261121.md             | 4    | done `45732840` |
 
 Out of scope, already on `fork-dev` (all ancestors of `987ab0fd`, none reverted; pin tests): #1287 ETH-06 `e8188e3c`
 (`test_extudp_target`, env native); #1288 `632aa9b3` temp fix (no pin test, golden `toggle_table_lint.py` check 9);
@@ -93,10 +93,21 @@ Round 2: 1 s spacing let RAK jitter (3 s calls) read as bike; now 10 s, (0,0) sk
 Gate: Unity 119 envs 4085/4085, pytest 1639, 8 board envs (`tools/bench/runs/harness/gate-wave3fix-w2c.summary`).
 Desk links pending a push (P-0383, P-0166, P-0167, P-0081, P-0209, P-0351).
 
+Waves 3+4 (2026-11-22, `45732840`, batched by operator decision: implement everything, then one sweep):
+APRS-TXT-01..03, TDECK-VOLT-01, DISP-PAGE-01..03, BTN-OFF-01. Operator decisions on the way: TDECK `%.1fV`, one helper
+shared with OLED (OLED unchanged); OLED rank newest = highest (the plan's "1 = newest" line superseded). APRS D4 needed
+the `--info` line as well (added). Advisor: W3 approved (three nits applied), W3 follow-ups + W4 approved. Sweep gate:
+Unity 121 envs 4129/4129, pytest 1639, 13 board envs (`tools/bench/runs/harness/gate-wave3fix-w34.summary`).
+Deferred to the PR cut (comment-only nits): `loop_functions.cpp` WP arrival comment "(= first click's rank)";
+`charset_filter.h` `charset_wire_field` doc should name the dst clip; WP track revert rank not limited to the browse
+window (pre-existing); `wpLiveNewest` extern belongs in `loop_functions.h`; `oled_harness.py` `depth` comment; PR body
+line: T-Deck click with an empty ring no longer sets `pageHold`. Desk links pending a push (P-0044, P-0386, P-0179,
+P-0021, P-0384, P-0059, P-0345, TDECK-VOLT-01 ticket).
+
 ## Next
 
-Wave 3: APRS (owns `aprs_functions.cpp`, `aprs_structures.h`, `charset_filter.*`, `pos_text_budget.h`,
-`loop_functions.cpp`, `command_functions.cpp`, `test_command_setters.cpp`, `docs/rm1-commands.md`,
-`11-wire-format.md`) and TDECK-VOLT (new shared `src/batt_label.h`, `t-deck/lv_obj_functions.cpp`, its test; the five
-OLED call sites in `loop_functions.cpp` are an orchestrator carve-out). Orchestrator adds `test_pos_text_budget` to the
-native filter and `[env:native_batt_label]` before dispatch. Wave 4: display paging alone. Then the bench.
+Bench (load `/bench` first; identity guard, 2 dBm, TEST PN or DM to an own node only, never DK5EN-98): flash `45732840`
+builds to DK5EN-90, DK5EN-1, DK5EN-14; SEC-DUMP, RAK-ETH-DNS/NETMODE, autosymbol restore on DK5EN-90; OLED paging,
+`--button off`, NEXT, getparam `tempoffsetoutdoor`, OTA warning text (no old Safeboot) on DK5EN-1; `--volt` on DK5EN-14;
+gateway routing with the local mock server. Field only (stage C): TBEAM1W-PWR above 2 dBm, real DHT, autosymbol while
+moving, Wireless Paper.
