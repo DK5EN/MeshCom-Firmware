@@ -1,0 +1,15 @@
+bench wave3 fixes 2026-11-22, fork-dev 45732840 (normal images; INSTRUMENT images only for the OLED harness and the T-Deck screenshot, normal images restored afterwards)
+identity guard before/after: DK5EN-90, DK5EN-1, DK5EN-14 ok, 2 dBm, NTP; no TX of test traffic (gateway routing run under --airgap on, transmitted no)
+SEC-DUMP-01  DK5EN-90 --dumpsettings: node_passwd=*** (set), node_pwd/node_webpwd/node_lpwd empty, bt_code=0                         PASS
+RAK-NETMODE-01 DK5EN-90 --info: NETWORK Mode:ETH                                                                                     PASS
+RAK-ETH-DNS-01 DK5EN-90 static 192.168.68.80/gw .1/ms 255.255.252.0 + --setowndns 9.9.9.9 -> DNS address 9.9.9.9; reverted to DHCP    PASS
+GPS-AUTOSYM-01 DK5EN-90 --gps autosymbol, reboot -> SYMB ..Auto on; reverted (--gps fixsymbol, Auto off)                            PASS
+WEB-TEMPOFF-01 DK5EN-1 GET /getparam/?tempoffsetoutdoor -> 200 {"tempoffsetoutdoor":"0.00"}                                          PASS
+APRS-TXT-02  DK5EN-1 --atxt 31-byte umlaut text -> "[ATXT] 31 bytes stored, only the first 25 bytes go on air"; reset to none         PASS
+POSINFO-NEXT-01 DK5EN-1 --pos NEXT 1634 sec (normal countdown; overdue case only native)                                             PASS (partial)
+DISP-PAGE-01 DK5EN-1 oled_harness depth: 1..6 stored -> min(n,5) newest to oldest, head page, newest again                           PASS
+DISP-PAGE-02 DK5EN-1 oled_harness display_after_click: blank frame, isoff 1; pages scenario PASS                                     PASS
+GW-GROUP-01  DK5EN-1 as gateway on the local mock (airgap): group 9999 (foreign) ring last 0->0; group 9 (own) last 0->2, page 1      PASS (display path)
+TDECK-VOLT-01 DK5EN-14 on external power (4.56 V): header shows USB with --volt on and off (expected); volt label needs battery       NOT SHOWN
+not benched: GW-DM-01/D2 phone path (no BLE client), GW-CALL-01, OTA-SAFEBOOT-01 warning (needs an old Safeboot), BTN-OFF-01 (physical button), DISP-PAGE-03 (no Wireless Paper), APRS-TXT-01/03 on air, DHT-PROBE-01 (DK5EN-92 not flashed; real DHT field), GPS-AUTOSYM-02/03 (moving node), TBEAM1W-PWR-01 (>2 dBm)
+logs: bench-wave3fix-*.log (gitignored), bench-wave3fix-oled-summary.json, gwrx-gwroute-*.summary

@@ -104,10 +104,16 @@ window (pre-existing); `wpLiveNewest` extern belongs in `loop_functions.h`; `ole
 line: T-Deck click with an empty ring no longer sets `pageHold`. Desk links pending a push (P-0044, P-0386, P-0179,
 P-0021, P-0384, P-0059, P-0345, TDECK-VOLT-01 ticket).
 
+Bench (2026-11-22, `45732840`, `tools/bench/runs/harness/bench-wave3fix-20261122.summary`): PASS on hardware for
+SEC-DUMP-01, RAK-NETMODE-01, RAK-ETH-DNS-01, GPS-AUTOSYM-01 (DK5EN-90), WEB-TEMPOFF-01, APRS-TXT-02 notice, DISP-PAGE-01,
+DISP-PAGE-02 (DK5EN-1, OLED harness on an INSTRUMENT image), GW-GROUP-01 display path (DK5EN-1 as gateway on the local
+mock under `--airgap on`). Not shown: TDECK-VOLT-01 (DK5EN-14 on external power shows USB). Not benchable here: GW-DM-01
+phone path, GW-CALL-01, OTA-SAFEBOOT-01 warning (needs an old Safeboot), BTN-OFF-01 (physical button), DISP-PAGE-03,
+APRS on-air frames, DHT-PROBE-01, GPS-AUTOSYM-02/03, TBEAM1W-PWR-01. All nodes restored (normal images, settings
+reverted, DK5EN-1 gateway off). Seven rows archived in `archive/backlog-closed-20261122.md`.
+
 ## Next
 
-Bench (load `/bench` first; identity guard, 2 dBm, TEST PN or DM to an own node only, never DK5EN-98): flash `45732840`
-builds to DK5EN-90, DK5EN-1, DK5EN-14; SEC-DUMP, RAK-ETH-DNS/NETMODE, autosymbol restore on DK5EN-90; OLED paging,
-`--button off`, NEXT, getparam `tempoffsetoutdoor`, OTA warning text (no old Safeboot) on DK5EN-1; `--volt` on DK5EN-14;
-gateway routing with the local mock server. Field only (stage C): TBEAM1W-PWR above 2 dBm, real DHT, autosymbol while
-moving, Wireless Paper.
+Operator: put DK5EN-14 on battery for the `--volt` header check (and confirm its `--volt` setting; it is off now); allow
+a push so the desk links (P-numbers listed per wave above) can be made. Then `/submit-pr` (one PR per operator
+2026-11-22; fix the deferred comment nits at the cut).

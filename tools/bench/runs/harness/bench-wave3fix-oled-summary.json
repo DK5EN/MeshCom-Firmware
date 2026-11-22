@@ -1,0 +1,230 @@
+{
+  "depth": {
+    "ok": true,
+    "rounds": [
+      {
+        "stored": 1,
+        "expected": 1,
+        "visited": 1,
+        "slots": [
+          0
+        ],
+        "head_after": true,
+        "newest_again": true,
+        "ok": true
+      },
+      {
+        "stored": 2,
+        "expected": 2,
+        "visited": 2,
+        "slots": [
+          1,
+          0
+        ],
+        "head_after": true,
+        "newest_again": true,
+        "ok": true
+      },
+      {
+        "stored": 3,
+        "expected": 3,
+        "visited": 3,
+        "slots": [
+          2,
+          1,
+          0
+        ],
+        "head_after": true,
+        "newest_again": true,
+        "ok": true
+      },
+      {
+        "stored": 4,
+        "expected": 4,
+        "visited": 4,
+        "slots": [
+          3,
+          2,
+          1,
+          0
+        ],
+        "head_after": true,
+        "newest_again": true,
+        "ok": true
+      },
+      {
+        "stored": 5,
+        "expected": 5,
+        "visited": 5,
+        "slots": [
+          4,
+          3,
+          2,
+          1,
+          0
+        ],
+        "head_after": true,
+        "newest_again": true,
+        "ok": true
+      },
+      {
+        "stored": 6,
+        "expected": 5,
+        "visited": 5,
+        "slots": [
+          5,
+          4,
+          3,
+          2,
+          1
+        ],
+        "head_after": true,
+        "newest_again": true,
+        "ok": true
+      }
+    ]
+  },
+  "display_after_click": {
+    "ok": true,
+    "oledstat": {
+      "page": 5,
+      "last": 0,
+      "hold": 0,
+      "lines": 2,
+      "info": 0,
+      "track": 0,
+      "off": 1,
+      "isoff": 1,
+      "type": 0,
+      "frames": 68,
+      "last_us": 30991,
+      "posdisp": 1,
+      "offwait_ms": 15273,
+      "u8g2": 1,
+      "crc": 4021661486,
+      "skipped": 1
+    },
+    "frames": 1,
+    "last_frame_crc": 4021661486
+  },
+  "pages": {
+    "ok": true,
+    "steps": [
+      {
+        "cmd": "--btn click",
+        "acked": true,
+        "ack_line": "[BTN];click",
+        "frames": 1,
+        "frame_us_max": 32327,
+        "page_after": 5,
+        "crashed": false,
+        "crc_after": 3168710746
+      },
+      {
+        "cmd": "--btn click",
+        "acked": true,
+        "ack_line": "[BTN];click",
+        "frames": 1,
+        "frame_us_max": 32326,
+        "page_after": 4,
+        "crashed": false,
+        "crc_after": 464332457
+      },
+      {
+        "cmd": "--btn click",
+        "acked": true,
+        "ack_line": "[BTN];click",
+        "frames": 1,
+        "frame_us_max": 32331,
+        "page_after": 3,
+        "crashed": false,
+        "crc_after": 2450783848
+      },
+      {
+        "cmd": "--btn click",
+        "acked": true,
+        "ack_line": "[BTN];click",
+        "frames": 1,
+        "frame_us_max": 32341,
+        "page_after": 2,
+        "crashed": false,
+        "crc_after": 3420077720
+      },
+      {
+        "cmd": "--btn click",
+        "acked": true,
+        "ack_line": "[BTN];click",
+        "frames": 1,
+        "frame_us_max": 32364,
+        "page_after": 1,
+        "crashed": false,
+        "crc_after": 1874658178
+      },
+      {
+        "cmd": "--btn click",
+        "acked": true,
+        "ack_line": "[BTN];click",
+        "frames": 2,
+        "frame_us_max": 34783,
+        "page_after": 5,
+        "crashed": false,
+        "crc_after": 2846884125
+      },
+      {
+        "cmd": "--btn click",
+        "acked": true,
+        "ack_line": "[BTN];click",
+        "frames": 1,
+        "frame_us_max": 32330,
+        "page_after": 5,
+        "crashed": false,
+        "crc_after": 3168710746
+      }
+    ],
+    "pages_seen": [
+      5,
+      4,
+      3,
+      2,
+      1,
+      5,
+      5
+    ],
+    "before": {
+      "page": 5,
+      "last": 0,
+      "hold": 0,
+      "lines": 2,
+      "info": 0,
+      "track": 0,
+      "off": 0,
+      "isoff": 0,
+      "type": 9,
+      "frames": 70,
+      "last_us": 34769,
+      "posdisp": 1,
+      "offwait_ms": 13879,
+      "u8g2": 1,
+      "crc": 1189597895,
+      "skipped": 1
+    },
+    "after": {
+      "page": 4,
+      "last": 0,
+      "hold": 3,
+      "lines": 2,
+      "info": 0,
+      "track": 0,
+      "off": 0,
+      "isoff": 0,
+      "type": 0,
+      "frames": 78,
+      "last_us": 32330,
+      "posdisp": 1,
+      "offwait_ms": 4247,
+      "u8g2": 1,
+      "crc": 3168710746,
+      "skipped": 1
+    }
+  }
+}

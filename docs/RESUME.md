@@ -9,7 +9,8 @@ Fassung 9; working checklist: operator's Desktop `MeshCom-Checkliste-20261115.md
 
 - **Wave 3 fix campaign running:** [campaign-wave3-fixes-20261122.md](campaign-wave3-fixes-20261122.md) (resume
   point: section "Next"). Wave 1 `c22cb3d2` (#1291, #1289, #1290, #1296, #1301) , wave 2 `1830d8ed` (#1295, #1300, #1302) and waves 3+4
-  `45732840` (#1293, #1312, #1294): all 11 issues implemented and gated. Next: the bench. Desk links wait for a push.
+  `45732840` (#1293, #1312, #1294): all 11 issues implemented and gated;
+  benched 2026-11-22 where the bench can show it (campaign doc). Next: push (desk links), `/submit-pr`.
 - **Wave 3 by 2026-11-26 (operator 2026-11-21):** 2-4 topical PRs from `upstream/dev` (network/gateway,
   commands/APRS, display/position, update/sensors). Content: fork fixes already done (ETH-06, `temp(aprswx)` as a
   real fix, CMD-DASH-01, AU-27, TD-LOCK-01, TBEAM-SLEEP-01) plus the ticket fixes that pass gate and bench by
