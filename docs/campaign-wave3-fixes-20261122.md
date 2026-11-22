@@ -1,4 +1,4 @@
-# Campaign: upstream wave 3 fixes (2026-11-22)
+# Campaign: upstream wave 3 fixes (2026-11-22) -- done
 
 Implement on `fork-dev` every open upstream bug assigned to DK5EN that is not fixed yet, so the wave 3 fix PRs can go
 to icssw-org `dev` by Thu 2026-11-26. Internal deadline: gated and benched by Tue 2026-11-24 evening; what misses it is
