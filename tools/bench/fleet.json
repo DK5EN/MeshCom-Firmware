@@ -7,8 +7,8 @@
       "board": "heltec_wifi_lora_32_V3",
       "family": "esp32",
       "usb_serial": "0001",
-      "host": "192.168.68.80",
-      "last_ip_verified": "2026-11-21 (identity_guard over 2323; new board flashed as DK5EN-1)"
+      "host": "192.168.68.78",
+      "last_ip_verified": "2026-11-22 (identity_guard + start page, OTA-LOWHEAP night run)"
     },
     "t-deck-14": {
       "call": "DK5EN-14",
@@ -16,7 +16,7 @@
       "family": "esp32",
       "usb_serial": "E0:72:A1:AD:65:E0",
       "host": "192.168.68.77",
-      "last_ip_verified": "2026-11-15 (identity_guard over USB)"
+      "last_ip_verified": "2026-11-22 (identity_guard + start page, OTA-LOWHEAP night run)"
     },
     "t-beam-92": {
       "call": "DK5EN-92",
@@ -24,16 +24,16 @@
       "family": "esp32",
       "usb_serial": "573C000584",
       "host": "192.168.68.61",
-      "last_ip_verified": "2026-11-15 (identity_guard over 2323, after WiFi flash)"
+      "last_ip_verified": "2026-11-22 (identity_guard + start page, OTA-LOWHEAP night run)"
     },
     "rak-90": {
       "call": "DK5EN-90",
       "board": "wiscore_rak4631",
       "family": "nrf52",
       "usb_serial": "230D6EBB3266D20E",
-      "host": "192.168.68.78",
-      "last_ip": "192.168.68.75",
-      "last_ip_verified": "2026-11-21 (identity_guard over USB)"
+      "host": null,
+      "last_ip": "192.168.68.80",
+      "last_ip_verified": "2026-11-22 (identity_guard over USB; no net console, Ethernet IP)"
     }
   },
   "taken_ssids": {
