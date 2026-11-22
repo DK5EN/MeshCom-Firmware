@@ -7,6 +7,11 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
 
 ## Now (2026-11-22)
 
+- **OTA-LOWHEAP-01 next (fork issue DK5EN/MeshCom-Firmware#3):** ESP32-S3 Auto Update refuses with "Not enough free
+  memory" after long uptime (field, 11.22 rollout). Analysis
+  [rca-ota-lowheap-01-20261122.md](rca-ota-lowheap-01-20261122.md); plan and waves
+  [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md), waiting for the operator's OK.
+  Subsumes AU-24 and AU-25.
 - **PR #1316 open (2026-11-22):** [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md). One upstream PR,
   `pr/wave3` (worktree `../MeshCom-PR-next`, 17 commits, 65 files), closes 21 issues (#1287-#1302, #1304, #1310,
   #1312, #1314, #1315). Next: wait for the maintainers; after the merge `/sync-upstream` (merge path), then remove
