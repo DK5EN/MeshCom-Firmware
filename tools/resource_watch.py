@@ -35,12 +35,29 @@ Usage:
   python3 tools/resource_watch.py regions --env ttgo_tbeam \
       --map .pio/build/ttgo_tbeam/firmware.map
 
+  # CI GATE (OTA-LOWHEAP-01): check every env in a combined `pio run` log against
+  # the baseline. ESP32 envs: dram0_0_seg and iram0_0_seg from .pio/build/<env>/firmware.map
+  # (the RAM: summary line hides them); nRF52: the RAM: line. Exit 1 when a measure grew
+  # more than --budget (default 1024 B), when it has no baseline, or when an ESP32 map is
+  # missing. Prints a table, and appends it to --summary (CI passes $GITHUB_STEP_SUMMARY).
+  python3 tools/resource_watch.py gate --log build.log --summary "$GITHUB_STEP_SUMMARY"
+
+  # REFRESH THE BASELINE from a real CI run (combined log, one section per env,
+  # split at PlatformIO's "Processing <env> (" headers). Several --log files ok.
+  # Review and commit tools/resource_baseline.json afterwards:
+  #   gh run view <RUN_ID> -R DK5EN/MeshCom-Firmware --log > ci.log
+  #   python3 tools/resource_watch.py update --log ci.log
+  # A CI log carries no map: record the ESP32 regions from a local full build instead:
+  #   pio run 2>&1 | tee build.log
+  #   python3 tools/resource_watch.py update --log build.log --build-dir .pio/build
+
   # Run the built-in parser self-tests (no pio invocation, no files touched).
   python3 tools/resource_watch.py --self-test
 
 Exit codes:
   check:    always 0, unless --strict is given and a warning fired (then 1).
   update:   0 on success, 1 on parse failure.
+  gate:     0 within budget, 1 on any env over budget / without baseline / without RAM line.
   snapshot: 0 if all envs succeeded, 1 if any build or parse failed.
   --self-test: 0 if all assertions pass, 1 otherwise.
 """
@@ -216,10 +233,130 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0
 
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+# PlatformIO prints "Processing <env> (board: ...; platform: ...)" (field order varies) before each env.
+# `gh run view --log` prefixes lines with "job<TAB>step<TAB>timestamp ", so no ^ anchor.
+_PROCESSING_RE = re.compile(r"Processing (\S+) \((?:board|platform|framework):")
+
+
+def split_env_sections(text: str) -> dict[str, dict[str, int]]:
+    """Split a combined `pio run` log into {env: usage}. Envs without a RAM+Flash
+    line map to an empty dict so the caller can report them."""
+    text = _ANSI_RE.sub("", text)
+    marks = list(_PROCESSING_RE.finditer(text))
+    out: dict[str, dict[str, int]] = {}
+    for i, m in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(text)
+        try:
+            out[m.group(1)] = parse_usage(text[m.end():end])
+        except ParseError:
+            out[m.group(1)] = {}
+    return out
+
+
+def _read_logs(paths: list[str]) -> str:
+    return "\n".join(
+        sys.stdin.read() if p == "-" else Path(p).read_text(errors="replace") for p in paths
+    )
+
+
+def _map_regions(build_dir: str | None, env: str) -> dict[str, dict[str, int]] | None:
+    """Linker regions of one env from <build_dir>/<env>/firmware.map, or None without a map.
+    Empty dict for a map without ESP32 regions (nRF52)."""
+    if not build_dir:
+        return None
+    mp = Path(build_dir) / env / "firmware.map"
+    if not mp.is_file():
+        return None
+    return parse_regions(mp.read_text(errors="replace"))
+
+
+def cmd_gate(args: argparse.Namespace) -> int:
+    """Fail when static RAM of any built env grew > budget over the baseline.
+
+    ESP32 envs are judged on the linker regions dram0_0_seg and iram0_0_seg read from
+    <build-dir>/<env>/firmware.map: both come out of the internal SRAM the heap gets, and
+    the RAM: summary line hides them on PSRAM boards (and is a mixed figure on the S3).
+    Envs without ESP32 regions (nRF52) are judged on the RAM: summary line, which is their
+    static figure. An env whose baseline has regions but whose map is missing fails.
+    """
+    baseline = load_baseline(Path(args.baseline))
+    envs = split_env_sections(_read_logs(args.log))
+    if not envs:
+        print("::error ::resource gate: no 'Processing <env>' sections found in the log", flush=True)
+        return 1
+    refresh = "python3 tools/resource_watch.py update --log <build.log> --build-dir .pio/build"
+    rows = ["| env | measure | baseline | now | delta |", "|---|---|---:|---:|---:|"]
+    failures: list[str] = []
+
+    def judge(env: str, measure: str, base: int | None, now: int) -> None:
+        if base is None:
+            failures.append(f"::error ::{env}: no {measure} baseline in tools/resource_baseline.json -- add it with: {refresh}")
+            rows.append(f"| {env} | {measure} | - | {now} | no baseline |")
+            return
+        d = now - base
+        rows.append(f"| {env} | {measure} | {base} | {now} | {d:+d} |")
+        if d > args.budget:
+            failures.append(
+                f"::error ::{env}: {measure} grew {d:+d} B over the baseline (budget +{args.budget} B). "
+                f"Shrink it, or refresh the baseline on purpose: {refresh}"
+            )
+
+    for env in sorted(envs):
+        cur, base = envs[env], baseline.get(env)
+        regions = _map_regions(args.build_dir, env)
+        base_regions = [n for n, *_ in REGIONS if base and n in base]
+        if regions:
+            for name, *_ in REGIONS:
+                if name in regions:
+                    b = base.get(name, {}).get("used") if base else None
+                    judge(env, name, b, regions[name]["used"])
+                    print(f"[region] {env} {name} {regions[name]['used']} {regions[name]['length']}")
+            continue
+        if base_regions:
+            failures.append(f"::error ::{env}: baseline has {', '.join(base_regions)} but {args.build_dir}/{env}/firmware.map is missing")
+            rows.append(f"| {env} | regions | - | - | no firmware.map |")
+            continue
+        if not cur:
+            failures.append(f"::error ::{env}: no RAM/Flash summary line in the build log")
+            rows.append(f"| {env} | RAM line | - | - | no RAM line |")
+            continue
+        judge(env, "RAM line", base["ram_used"] if base else None, cur["ram_used"])
+    table = "\n".join(rows)
+    print(table)
+    for f in failures:
+        print(f)
+    if args.summary:
+        with open(args.summary, "a") as fh:
+            fh.write(f"### Static RAM vs. baseline (budget +{args.budget} B)\n\n{table}\n\n")
+            for f in failures:
+                fh.write(f"- {f.replace('::error ::', 'FAIL: ')}\n")
+    return 1 if failures else 0
+
+
 def cmd_update(args: argparse.Namespace) -> int:
     baseline_path = Path(args.baseline)
+    if not args.env:
+        envs = split_env_sections(_read_logs(args.log))
+        good = {e: u for e, u in envs.items() if u}
+        for e in sorted(set(envs) - set(good)):
+            print(f"::warning ::{e}: no RAM/Flash line, baseline entry left alone", file=sys.stderr)
+        if not good:
+            print("::error ::no env sections with a RAM/Flash line found", file=sys.stderr)
+            return 1
+        baseline = load_baseline(baseline_path)
+        today = datetime.date.today().isoformat()
+        for e, u in good.items():
+            entry = {**u, "date": today}
+            regions = _map_regions(args.build_dir, e)
+            for name, region in (regions or {}).items():
+                entry[name] = {"used": region["used"], "length": region["length"]}
+            baseline[e] = entry
+        save_baseline(baseline_path, baseline)
+        print(f"updated baseline for {len(good)} envs in {baseline_path}")
+        return 0
     try:
-        current = parse_source(args.log)
+        current = parse_source(args.log[0] if args.log else None)
     except ParseError as e:
         print(f"::error ::{args.env} {e}", file=sys.stderr)
         return 1
@@ -579,10 +716,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_check.set_defaults(func=cmd_check)
 
     p_update = sub.add_parser("update", help="write/refresh the baseline entry for one env")
-    p_update.add_argument("--env", required=True, help="PlatformIO env name")
-    p_update.add_argument("--log", default="-", help="build log path, or '-' for stdin (default)")
+    p_update.add_argument("--env", help="PlatformIO env name; omit to refresh every env found in a combined CI log")
+    p_update.add_argument("--log", nargs="+", default=["-"], help="build log path(s), or '-' for stdin (default)")
     p_update.add_argument("--baseline", default=str(DEFAULT_BASELINE), help="baseline JSON path")
+    p_update.add_argument("--build-dir", default=None,
+                          help="also record dram0_0_seg/iram0_0_seg from <dir>/<env>/firmware.map (e.g. .pio/build)")
     p_update.set_defaults(func=cmd_update)
+
+    p_gate = sub.add_parser(
+        "gate", help="CI gate: fail when RAM of any env in a combined build log exceeds baseline + budget"
+    )
+    p_gate.add_argument("--log", nargs="+", default=["-"], help="combined `pio run` log(s), or '-' for stdin")
+    p_gate.add_argument("--baseline", default=str(DEFAULT_BASELINE), help="baseline JSON path")
+    p_gate.add_argument("--budget", type=int, default=1024, help="allowed RAM growth in bytes (default 1024)")
+    p_gate.add_argument("--summary", help="append the table to this file (CI: $GITHUB_STEP_SUMMARY)")
+    p_gate.add_argument("--build-dir", default=".pio/build",
+                        help="where <env>/firmware.map lives; ESP32 envs are gated on its linker regions")
+    p_gate.set_defaults(func=cmd_gate)
 
     p_snap = sub.add_parser(
         "snapshot", help="build one or more envs sequentially and update their baselines"

@@ -80,7 +80,18 @@ jobs:
         MC_BUILD_TAG: ${{ startsWith(github.ref_name, 'v') && github.ref_name || '' }}
         # fork builds carry the Auto Update dev channel (DK5EN releases); upstream builds do not
         MC_AU_DEV_CHANNEL: "1"
-      run: "cd ${{ github.workspace }} && pio run"
+      run: |
+        set -o pipefail
+        cd ${{ github.workspace }}
+        pio run 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+    - name: RAM budget gate (baseline + 1 KB per env)
+      # OTA-LOWHEAP-01: static RAM growth must not go unnoticed. ESP32 envs are gated on the
+      # linker regions dram0_0_seg / iram0_0_seg from .pio/build/<env>/firmware.map, nRF52 on
+      # the RAM: line. Refresh on purpose from a local full build:
+      #   pio run 2>&1 | tee build.log
+      #   python3 tools/resource_watch.py update --log build.log --build-dir .pio/build
+      run: python3 tools/resource_watch.py gate --log "$RUNNER_TEMP/build.log" --build-dir .pio/build --summary "$GITHUB_STEP_SUMMARY"
 
     - name: Convert RAK to UF2
       run: "wget https://raw.githubusercontent.com/microsoft/uf2/refs/heads/master/utils/uf2conv.py && wget https://raw.githubusercontent.com/microsoft/uf2/refs/heads/master/utils/uf2families.json && python3 uf2conv.py .pio/build/wiscore_rak4631/firmware.hex -c -o .pio/build/wiscore_rak4631/wiscore_rak4631.uf2 -f 0xADA52840"
