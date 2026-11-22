@@ -7,11 +7,22 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
 
 ## Now (2026-11-22)
 
-- **OTA-LOWHEAP-01 next (fork issue DK5EN/MeshCom-Firmware#3):** ESP32-S3 Auto Update refuses with "Not enough free
-  memory" after long uptime (field, 11.22 rollout). Analysis
-  [rca-ota-lowheap-01-20261122.md](rca-ota-lowheap-01-20261122.md); plan and waves
-  [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md), waiting for the operator's OK.
-  Subsumes AU-24 and AU-25.
+- **OTA-LOWHEAP-01 running (fork issue DK5EN/MeshCom-Firmware#3):** ESP32-S3 Auto Update refuses with "Not enough
+  free memory" after long uptime (field, 11.22 rollout). Campaign
+  [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md); analysis
+  [rca-ota-lowheap-01-20261122.md](rca-ota-lowheap-01-20261122.md); RAM hunt
+  [ota-lowheap-ram-hunt-20261122.md](ota-lowheap-ram-hunt-20261122.md). Subsumes AU-24 and AU-25.
+  - Done 2026-11-22: CI static RAM gate on the ESP32 linker regions (`06b3a6db`); 21 KB growth on the V3 attributed
+    (71 % upstream); operator decisions D1-D10 (measure first, no TLS reserve, CI fails above +1 KB, mailbox on
+    demand, hold 1 KB, rings 2 KB, NBR unchanged). Code fixes wait for the red.
+  - Overnight run 2026-11-22 14:30 to 2026-11-23 07:30: INSTRUMENT `1184177d` on DK5EN-1 (gateway, 2 dBm, operator
+    exception), -92, -14, -90 and DK5EN-98 (OTA-flashed 15:02, BLE McApp, reference only), displays off on the OLED
+    nodes, `--heaplog 60`. Detached processes on the Mac (PPID 1, not screen): meshloggers, `serial_capture.py`
+    (RAK), `reboot_watch.py`, `caffeinate`. Logs: `tools/bench/runs/harness/ota-lowheap-night-20261122/`.
+  - 2026-11-23 06:00: `tools/bench/ota_lowheap_trigger.py` runs check + install (stage only, never apply) three
+    times on DK5EN-1, -92, -14. Next: read `trigger.summary`, the `[INSTR-HEAP]` curves (free, largest block) and
+    `reboot-events.log`; red = `lowheap` refusal. Then the fix wave (update after a fresh boot, D7-D10) with
+    red-before tests; afterwards decide DK5EN-1 back to non-gateway and DK5EN-98 back to the release image.
 - **PR #1316 open (2026-11-22):** [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md). One upstream PR,
   `pr/wave3` (worktree `../MeshCom-PR-next`, 17 commits, 65 files), closes 21 issues (#1287-#1302, #1304, #1310,
   #1312, #1314, #1315). Next: wait for the maintainers; after the merge `/sync-upstream` (merge path), then remove
