@@ -2,8 +2,8 @@
 
 **Resume here: section "Now" below. Next date: upstream wave 3, two to four fix PRs by Thu 2026-11-26.** Active
 campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.md) (the fixes),
-[campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves). Release plan: operator's Desktop HTML,
-Fassung 9; working checklist: operator's Desktop `MeshCom-Checkliste-20261115.md`.
+[campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves). Release plan and working checklist: operator's Desktop
+`upstream-releaseplan-20261122.html` (Fassung 10; the separate Desktop checklist is retired).
 
 ## Now (2026-11-22)
 
@@ -83,7 +83,7 @@ Fassung 9; working checklist: operator's Desktop `MeshCom-Checkliste-20261115.md
 - **Release train 2026-11-15:** [campaign-release-train-20261115.md](campaign-release-train-20261115.md) -- the active one.
 - **Channel access stabilisation** (ACK-AGE-01, ACK-CANCEL-01, CSMA-04/02, CSMA-03, PWR-01/02, soak): dates and exit
   criteria in the campaign doc, section "Parallel tracks".
-- **Upstream waves 2-7:** the release plan is the operator's Desktop HTML (Fassung 9, 2026-11-21), not a repo file; the
+- **Upstream waves 2-7:** the release plan is the operator's Desktop HTML (Fassung 10, 2026-11-22, with the checklist), not a repo file; the
   repo copy was removed 2026-11-16 (operator: double work, always outdated). Wave list also in the campaign doc.
 - **GPSV4-01, GPIO-01, INA226-HELTEC-01:** field feedback only (BACKLOG "Field").
 - Closed, history only: IMPL-TRAIN ([campaign-impl-train-20261107.md](campaign-impl-train-20261107.md), CLK-01 S2-S4

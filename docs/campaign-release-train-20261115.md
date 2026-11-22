@@ -4,7 +4,7 @@
 waves run without hardware back to back; then one central bench with one bulk build on DK5EN-1, -14, -90 and -92.
 DK5EN-98 (production gateway) gets soak runs only, each with an explicit operator OK.
 
-- Started 2026-11-15 on `fork-dev`. Operator copy of the plan as a German checklist: `~/Desktop/MeshCom-Checkliste-20261115.md`
+- Started 2026-11-15 on `fork-dev`. Operator copy of the plan with the German checklist: `~/Desktop/upstream-releaseplan-20261122.html`
   (outside the repo; this doc is authoritative).
 - Deadline: upstream wave 2 (Ping plus web GUI) on **Fri 2026-11-20**. It needs PING-NRF-01 and every browser row from
   B-1, so I-2 to F-1 run this week.
