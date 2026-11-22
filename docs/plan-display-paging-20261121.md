@@ -503,3 +503,6 @@ Columns Id, Area, Item, Status, Next step. Not yet added to `BACKLOG.md`; the or
 - Wireless Paper shows the counter on a freshly arrived message too.
 - The first-click rule (first press after an arrival goes to the second newest) stays Wireless Paper / E213 only.
 - `PAGE_MAX` stays 6.
+
+Operator 2026-11-22 (clarification): the plan's design and its "1 = newest" decision line contradicted each other. Decided:
+newest = highest (paging back counts down, same as E290 and Wireless Paper). The "1 = newest" line above is superseded.

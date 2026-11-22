@@ -93,6 +93,52 @@ void test_track_beacon_golden_frame(void)
     TEST_ASSERT_EQUAL_STRING(GOLDEN_TRACK_FRAME, tnc2(buf));
 }
 
+// APRS-TXT-01 (#1293): the Track frame carries the same 25 comment bytes as the mesh position.
+void test_track_beacon_keeps_25_bytes_of_comment(void)
+{
+    uint8_t buf[UDP_TX_BUF_SIZE];
+    strcpy(meshcom_settings.node_atxt, "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123");
+    encodeTrack(buf);
+
+    const char *p = strstr(tnc2(buf), " P[");
+    TEST_ASSERT_NOT_NULL(p);
+    TEST_ASSERT_EQUAL_STRING("ABCDEFGHIJKLMNOPQRSTUVWXY", p + 3);
+}
+
+void test_track_beacon_cut_never_splits_utf8(void)
+{
+    uint8_t buf[UDP_TX_BUF_SIZE];
+    for (int i = 0; i < 13; i++)
+    {
+        meshcom_settings.node_atxt[2 * i] = (char)0xC3;
+        meshcom_settings.node_atxt[2 * i + 1] = (char)0x84;
+    }
+    meshcom_settings.node_atxt[26] = 0;
+    encodeTrack(buf);
+
+    const char *p = strstr(tnc2(buf), " P[");
+    TEST_ASSERT_NOT_NULL(p);
+    p += 3;
+    TEST_ASSERT_EQUAL_UINT(24, strlen(p));
+    for (int i = 0; i < 12; i++)
+    {
+        TEST_ASSERT_EQUAL_UINT8(0xC3, (unsigned char)p[2 * i]);
+        TEST_ASSERT_EQUAL_UINT8(0x84, (unsigned char)p[2 * i + 1]);
+    }
+}
+
+// R4: worst-case Track frame (39 stored bytes, 25 on air) stays far below the 245-byte clamp.
+void test_track_beacon_worst_case_length_is_bounded(void)
+{
+    uint8_t buf[UDP_TX_BUF_SIZE];
+    memset(meshcom_settings.node_atxt, 'A', 39);
+    meshcom_settings.node_atxt[39] = 0;
+    uint16_t ilng = encodeTrack(buf);
+
+    TEST_ASSERT_EQUAL_UINT(strlen(GOLDEN_TRACK_FRAME) - 5 + 25 + 3, ilng);
+    TEST_ASSERT_TRUE(ilng < 245);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -102,5 +148,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_track_beacon_carries_wide1_1_path);
     RUN_TEST(test_track_beacon_path_follows_configured_tocall);
     RUN_TEST(test_track_beacon_golden_frame);
+    RUN_TEST(test_track_beacon_keeps_25_bytes_of_comment);
+    RUN_TEST(test_track_beacon_cut_never_splits_utf8);
+    RUN_TEST(test_track_beacon_worst_case_length_is_bounded);
     return UNITY_END();
 }

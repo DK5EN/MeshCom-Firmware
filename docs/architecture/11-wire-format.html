@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MeshCom Wire Format</title>
-<meta name="source-sha256" content="a3258e403e0ef9071822b6acdecdb41c5b9d250d6c8c73069ac5ae6ced4ff115">
+<meta name="source-sha256" content="16359f57f802dc5a1eab1a5a5910c52301b51b0f07a8d07ba8ac53115101deae">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -353,8 +353,9 @@ the string <code>PositionToAPRS()</code> returns) is:</p>
 <ul>
 <li><code>ddmm.mm</code>/<code>dddmm.mm</code>: <code>%07.2lf</code>/<code>%08.2lf</code> degrees-minutes
 (<code>loop_functions.cpp:4492</code>).</li>
-<li><code>atxt</code>: free-text comment, optional, ≤ 25 bytes, UTF-8-safe truncated
-(<code>charset_utf8_safe_truncate</code>, <code>:4280</code>) and CHR-02-filtered — the bytes
+<li><code>atxt</code>: free-text comment, optional, ≤ 25 bytes (<code>APRS_ATXT_WIRE_MAX</code>, also in the
+LoRa-APRS Track frame since APRS-TXT-01, there without <code>#name</code>), UTF-8-safe truncated
+(<code>charset_wire_field()</code>, built on <code>charset_utf8_safe_truncate</code>) and CHR-02-filtered — the bytes
 <code>{ } : ; , /</code> are stripped before truncation because each is structure
 elsewhere in the wire format (<code>src/charset_filter.h:71-89</code>; path
 <code>PositionToAPRS():4271-4284</code>).</li>
@@ -547,10 +548,14 @@ tokens, never split on <code>/</code> as a delimiter (that would also split insi
 <code>loop_functions.cpp:4259-4262,4470-4473</code>) are concatenated but never
 populated by any code path — reserved slots, currently always empty.</p>
 <p>The tail plus <code>atxt</code> plus <code>#name</code> share a 100-byte budget
-(<code>strconcat[100]</code>, <code>:4455</code>). If the combined length exceeds 100 bytes, the
-encoder drops fields in this order: <strong><code>atxt</code> first</strong> (<code>:4481-4484</code>), then
-<strong><code>#name</code></strong> (<code>:4486-4489</code>) — the <code>/X=</code> tail itself is never truncated or
-reordered, only the free-text comment and the node name are sacrificed.</p>
+(<code>POS_TEXT_BUDGET</code>, <code>src/pos_text_budget.h</code>; <code>strconcat[100]</code> in
+<code>PositionToAPRS()</code>). If the combined length exceeds 100 bytes (strictly), the
+encoder drops fields in this order: <strong><code>atxt</code> first</strong>, then <strong><code>#name</code></strong>
+(<code>posTextFit()</code>). The drop is announced once per change of outcome on the serial
+console as <code>[POS];txtdrop;&lt;atxt|name|atxt+name&gt;;tags;&lt;n&gt;;budget;100</code>. The <code>/X=</code>
+tail is never reordered, but it is not guaranteed whole: the tag buffer is
+<code>strncat</code>-bounded at 99 bytes, so a tag set beyond that (worst case about 111
+bytes) loses its last tag(s), possibly mid-tag.</p>
 <h4 id="1-8-4-decoder-tolerance">1.8.4 Decoder tolerance</h4>
 <p><code>decodeAPRSPOS()</code> reads <strong>14 of the 17</strong> keys — <code>/R=</code>, <code>/U=</code>, <code>/I=</code> have no
 scan loop and are silently ignored on receive, even though the same

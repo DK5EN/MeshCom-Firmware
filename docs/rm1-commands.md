@@ -284,8 +284,9 @@ Nicht-ASCII): `err text`. Mehr als 19 Zeichen: `err blocked`. Antwort: `ok n=<ge
 Beispiel: `RM1 66 name Martin <tag>`->`RM1 66 ok n=Martin <rtag>`.
 
 **`atxt`** - APRS-Kommentar (steht in der Positionsbake). Lesen: `ok a=<text>` (`a=-` leer). Schreiben:
-`atxt <text>`, 1..39 Zeichen, gleiche Regeln wie `name`, aber ohne `,` und `/`; der Text darf nicht genau `none`
-sein (Kleinbuchstaben). Fehler wie bei `name` (`err text`, `err blocked`, `err failed`).
+`atxt <text>`, 1..39 Bytes, gleiche Regeln wie `name`, aber ohne `,` und `/`; der Text darf nicht genau `none`
+sein (Kleinbuchstaben). Bytes zählen, nicht Zeichen: gespeichert werden bis zu 39 Bytes, in der Positionsbake (Mesh und
+LoRa-APRS-Track) gehen die ersten 25 Bytes auf die Luft, gekürzt. RM nimmt nur ASCII an (sonst `err text`); Umlaute (2 Bytes je Zeichen) gibt es nur über Konsole und Web. Fehler wie bei `name` (`err text`, `err blocked`, `err failed`).
 Beispiel: `RM1 68 atxt MeshCom Garten <tag>` -> `RM1 68 ok a=MeshCom Garten <rtag>`.
 
 **`pos`** - Knotenposition. Lesen: `ok <breite> <länge> <höhe> <quelle>`; Breite/Länge vorzeichenbehaftet in Grad,
@@ -641,8 +642,9 @@ sent.
 Example:`RM1 66 name Martin <tag>`->`RM1 66 ok n=Martin <rtag>`.
 
 **`atxt`** - APRS comment (carried in the position beacon). Read: `ok a=<text>` (`a=-` empty). Write:
-`atxt <text>`, 1..39 characters, same rules as `name` but without `,` and `/`; the text must not be exactly
-`none` (lower case). Errors as for `name` (`err text`, `err blocked`, `err failed`).
+`atxt <text>`, 1..39 bytes, same rules as `name` but without `,` and `/`; the text must not be exactly
+`none` (lower case). Bytes count, not characters: up to 39 bytes are stored, the first 25 bytes go on air in the position
+beacon (mesh and LoRa-APRS Track), cut. RM accepts ASCII only (else `err text`); umlauts (2 bytes each) come only from the console and the web. Errors as for `name` (`err text`, `err blocked`, `err failed`).
 Example: `RM1 68 atxt MeshCom Garten <tag>` -> `RM1 68 ok a=MeshCom Garten <rtag>`.
 
 **`pos`** - node position. Read: `ok <lat> <lon> <alt> <source>`; lat/lon signed degrees, 5 decimals, altitude whole

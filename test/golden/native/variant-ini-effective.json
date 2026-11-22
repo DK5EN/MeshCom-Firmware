@@ -2520,6 +2520,7 @@
    "test_sset3_restore",
    "test_autosymbol",
    "test_posinfo_next",
+   "test_pos_text_budget",
    "test_csma_timing",
    "test_millis_rollover",
    "test_ack_validate",
@@ -2857,6 +2858,27 @@
   "test_build_src": "True",
   "test_filter": [
    "test_batt_detect"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_batt_label": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_batt_label"
   ],
   "test_framework": "unity"
  },
@@ -4378,6 +4400,27 @@
   "platform": "native",
   "test_filter": [
    "test_oled_shot"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_page_ring": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_page_ring"
   ],
   "test_framework": "unity"
  },

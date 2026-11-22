@@ -2569,6 +2569,72 @@ static void test_tbeam_very_long_press_deepsleep()
     TEST_ASSERT_TRUE_MESSAGE(body.find("bTBeamSleepFired = true;") != std::string::npos, "deepsleep can fire twice");
 }
 
+// APRS-TXT-02 (#1293, D3 A): the atxt setter clips UTF-8-safe, never with a bare substring, and tells the operator
+static void test_atxt_setter_clips_utf8_safe_and_notices()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const size_t at = cmd.find("commandCheck(msg_text+2, (char*)\"atxt \") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(at != std::string::npos, "atxt setter rung missing");
+    const size_t end = cmd.find("\n    else\n    if(commandCheck", at);
+    TEST_ASSERT_TRUE_MESSAGE(end != std::string::npos, "atxt setter block end not found");
+    const std::string blk = cmd.substr(at, end - at);
+    TEST_ASSERT_TRUE_MESSAGE(blk.find("charset_utf8_safe_truncate(") != std::string::npos, "atxt setter does not clip UTF-8-safe");
+    TEST_ASSERT_TRUE_MESSAGE(blk.find("substring(0, RM_ATXT_MAX)") == std::string::npos, "atxt setter still clips with a bare substring(0, RM_ATXT_MAX)");
+    TEST_ASSERT_TRUE_MESSAGE(blk.find("charset_wire_field(") != std::string::npos && blk.find("[ATXT]") != std::string::npos,
+                             "atxt setter lacks the on-air cut notice");
+}
+
+// APRS-TXT-03 (D4 B0): --info shows the beacon text drop while one is active
+static void test_info_shows_the_position_text_drop()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(cmd.find("#include \"pos_text_budget.h\"") != std::string::npos, "command_functions.cpp does not include pos_text_budget.h");
+    const size_t atxt = cmd.find("...APRSMC: %s\\n...ATXT: %s");
+    TEST_ASSERT_TRUE_MESSAGE(atxt != std::string::npos, "--info APRSMC/ATXT line missing");
+    const size_t line = cmd.find("posTextInfoLine(", atxt);
+    TEST_ASSERT_TRUE_MESSAGE(line != std::string::npos && line - atxt < 1200, "--info does not print the posTextInfoLine() right after the ATXT line");
+}
+
+// BTN-OFF-01 (#1294, P-0345): "--button off" detached nothing, the OneButton handlers kept acting until
+// reboot. The off row now has a post hook that calls deinit_onebutton(), which detaches every handler
+// init_onebutton() attaches (OneButton needs the firmware, so this is a source scrape).
+static std::string func_block(const std::string &src, const char *sig)
+{
+    const size_t a = src.find(sig);
+    TEST_ASSERT_TRUE_MESSAGE(a != std::string::npos, sig);
+    const size_t e = src.find("\n}\n", a);
+    return src.substr(a, e == std::string::npos ? std::string::npos : e - a);
+}
+
+static void test_button_off_row_detaches()
+{
+    const std::string cmd = read_repo_file("src/command_functions.cpp");
+    const size_t row = pin_find(cmd, "{ \"--button off\",", 0, "--button off row missing");
+    const std::string line = cmd.substr(row, cmd.find('\n', row) - row);
+    TEST_ASSERT_TRUE_MESSAGE(line.find("tg_post_button_off") != std::string::npos, "--button off row has no tg_post_button_off hook");
+    TEST_ASSERT_TRUE_MESSAGE(line.find("nullptr") == std::string::npos, "--button off row still has a nullptr hook");
+    const std::string body = func_block(cmd, "static void tg_post_button_off()");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("deinit_onebutton();") != std::string::npos, "tg_post_button_off does not call deinit_onebutton()");
+}
+
+static void test_deinit_detaches_every_attached_handler()
+{
+    const std::string ob = read_repo_file("src/onebutton_functions.cpp");
+    const std::string init = func_block(ob, "void init_onebutton()\n{");
+    const std::string deinit = func_block(ob, "void deinit_onebutton()\n{");
+    const std::regex attach("btn\\.(attach[A-Za-z]+)\\(");
+    size_t n = 0;
+    for (std::sregex_iterator it(init.begin(), init.end(), attach), end; it != end; ++it, ++n)
+    {
+        const std::string want = "btn." + (*it)[1].str() + "(nullptr)";
+        TEST_ASSERT_TRUE_MESSAGE(deinit.find(want) != std::string::npos, want.c_str());
+    }
+    TEST_ASSERT_TRUE_MESSAGE(n >= 4, "init_onebutton() attaches fewer handlers than expected");
+    TEST_ASSERT_TRUE_MESSAGE(deinit.find("btn.reset();") != std::string::npos, "deinit does not reset the gesture state");
+    TEST_ASSERT_TRUE_MESSAGE(read_repo_file("src/onebutton_functions.h").find("void deinit_onebutton(") != std::string::npos,
+                             "deinit_onebutton() not declared in onebutton_functions.h");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -2643,5 +2709,9 @@ int main(int, char **)
     RUN_TEST(test_guard_chain_announces_the_check_result_before_the_download);
     RUN_TEST(test_ping_start_and_stop_clear_bPingSend);
     RUN_TEST(test_tbeam_very_long_press_deepsleep);
+    RUN_TEST(test_atxt_setter_clips_utf8_safe_and_notices);
+    RUN_TEST(test_info_shows_the_position_text_drop);
+    RUN_TEST(test_button_off_row_detaches);
+    RUN_TEST(test_deinit_detaches_every_attached_handler);
     return UNITY_END();
 }

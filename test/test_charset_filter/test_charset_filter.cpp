@@ -558,6 +558,77 @@ static void test_empty_and_null_input(void)
     TEST_ASSERT_EQUAL_UINT(0, charset_utf8_safe_truncate(buf, 0, 25));
 }
 
+// ---- APRS-TXT-02: charset_wire_field() -- one wire-field cut with cut report ----
+
+static void test_wire_field_26_byte_umlaut_comment(void)
+{
+    // "Meshcom Gro" C3 9F "er Inselsberg" = 25 characters, 26 bytes
+    const char src[] = {'M','e','s','h','c','o','m',' ','G','r','o',
+                        (char)0xC3, (char)0x9F,
+                        'e','r',' ','I','n','s','e','l','s','b','e','r','g', 0};
+    TEST_ASSERT_EQUAL_UINT(26, strlen(src));
+    char dst[40];
+    size_t cut = 99;
+    size_t n = charset_wire_field(src, dst, sizeof(dst), 25, &cut);
+    TEST_ASSERT_EQUAL_UINT(25, n);
+    TEST_ASSERT_EQUAL_UINT(25, strlen(dst));
+    TEST_ASSERT_EQUAL_CHAR('r', dst[24]);
+    TEST_ASSERT_EQUAL_UINT(1, cut);
+}
+
+static void test_wire_field_separator_strip_is_not_counted_as_cut(void)
+{
+    char dst[40];
+    size_t cut = 99;
+    size_t n = charset_wire_field("a,b/c", dst, sizeof(dst), 25, &cut);
+    TEST_ASSERT_EQUAL_UINT(3, n);
+    TEST_ASSERT_EQUAL_STRING("abc", dst);
+    TEST_ASSERT_EQUAL_UINT(0, cut);
+}
+
+static void test_wire_field_never_splits_utf8(void)
+{
+    char src[27];
+    for (int i = 0; i < 13; i++) { src[2 * i] = (char)0xC3; src[2 * i + 1] = (char)0x84; }
+    src[26] = 0;
+    char dst[40];
+    size_t cut = 99;
+    size_t n = charset_wire_field(src, dst, sizeof(dst), 25, &cut);
+    TEST_ASSERT_EQUAL_UINT(24, n);
+    TEST_ASSERT_EQUAL_UINT(2, cut);
+    TEST_ASSERT_EQUAL_UINT8(0x84, (unsigned char)dst[23]);
+}
+
+static void test_wire_field_dst_size_bounds_the_cap_and_null_cut_ok(void)
+{
+    char dst[6];
+    size_t n = charset_wire_field("ABCDEFGHIJ", dst, sizeof(dst), 25, nullptr);
+    TEST_ASSERT_EQUAL_UINT(5, n);
+    TEST_ASSERT_EQUAL_STRING("ABCDE", dst);
+}
+
+static void test_wire_field_dst_clip_never_splits_utf8(void)
+{
+    // source longer than the destination: the clip to dst_size-1 must not split the 2-byte umlaut
+    char dst[8];
+    size_t cut = 0;
+    size_t n = charset_wire_field("ABCDEF\xC3\xA4X", dst, sizeof(dst), 25, &cut);
+    TEST_ASSERT_EQUAL_size_t(6, n);
+    TEST_ASSERT_EQUAL_STRING("ABCDEF", dst);
+    TEST_ASSERT_EQUAL_size_t(3, cut);
+}
+
+static void test_wire_field_26_bytes_always_give_exactly_25(void)
+{
+    char src[27];
+    memset(src, 'x', 26);
+    src[26] = 0;
+    char dst[40];
+    size_t cut = 0;
+    TEST_ASSERT_EQUAL_UINT(25, charset_wire_field(src, dst, sizeof(dst), 25, &cut));
+    TEST_ASSERT_EQUAL_UINT(1, cut);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -591,5 +662,11 @@ int main(int, char **)
     RUN_TEST(test_latin1_pair_can_survive_as_wrong_character);
     RUN_TEST(test_truncate_steps_over_latin1_byte);
     RUN_TEST(test_empty_and_null_input);
+    RUN_TEST(test_wire_field_26_byte_umlaut_comment);
+    RUN_TEST(test_wire_field_separator_strip_is_not_counted_as_cut);
+    RUN_TEST(test_wire_field_never_splits_utf8);
+    RUN_TEST(test_wire_field_dst_size_bounds_the_cap_and_null_cut_ok);
+    RUN_TEST(test_wire_field_dst_clip_never_splits_utf8);
+    RUN_TEST(test_wire_field_26_bytes_always_give_exactly_25);
     return UNITY_END();
 }

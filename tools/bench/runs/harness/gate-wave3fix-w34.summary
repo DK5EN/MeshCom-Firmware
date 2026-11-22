@@ -1,0 +1,18 @@
+regression rc=0
+build heltec_wifi_lora_32_V3 rc=0 RAM: [==== ] 41.8% (used 137100 bytes from 327680 bytes) Flash: [===== ] 52.6% (used 1789973 bytes from 3403776 bytes) 
+build wiscore_rak4631 rc=0 RAM: [==== ] 41.7% (used 103756 bytes from 248832 bytes) Flash: [======== ] 83.5% (used 680472 bytes from 815104 bytes) 
+build ttgo_tbeam rc=0 RAM: [= ] 8.2% (used 107256 bytes from 1310720 bytes) Flash: [====== ] 55.6% (used 1893857 bytes from 3403776 bytes) 
+build t_deck_plus rc=0 RAM: [===== ] 48.3% (used 158260 bytes from 327680 bytes) Flash: [== ] 19.2% (used 2417109 bytes from 12582912 bytes) 
+build t_deck rc=0 RAM: [===== ] 48.3% (used 158260 bytes from 327680 bytes) Flash: [== ] 19.2% (used 2417389 bytes from 12582912 bytes) 
+build t_deck_pro rc=0 RAM: [===== ] 50.0% (used 163728 bytes from 327680 bytes) Flash: [== ] 17.6% (used 2212449 bytes from 12582912 bytes) 
+build heltec_t114 rc=0 RAM: [==== ] 41.0% (used 96620 bytes from 235520 bytes) Flash: [===== ] 53.0% (used 432224 bytes from 815104 bytes) 
+build t_echo rc=0 RAM: [==== ] 40.3% (used 100276 bytes from 248832 bytes) Flash: [====== ] 55.7% (used 453608 bytes from 815104 bytes) 
+build wireless-paper rc=0 RAM: [==== ] 42.4% (used 138932 bytes from 327680 bytes) Flash: [===== ] 51.3% (used 1745137 bytes from 3403776 bytes) 
+build heltec_wireless_tracker rc=0 RAM: [==== ] 42.0% (used 137612 bytes from 327680 bytes) Flash: [===== ] 53.1% (used 1808473 bytes from 3403776 bytes) 
+build vision-master-e290 rc=0 RAM: [==== ] 43.7% (used 143076 bytes from 327680 bytes) Flash: [===== ] 53.2% (used 1810877 bytes from 3403776 bytes) 
+build vision-master-e213 rc=0 RAM: [==== ] 42.5% (used 139340 bytes from 327680 bytes) Flash: [===== ] 52.0% (used 1770741 bytes from 3403776 bytes) 
+build LilyGo_T-Beam-1W rc=0 RAM: [=== ] 25.9% (used 137796 bytes from 532480 bytes) Flash: [===== ] 53.1% (used 1806197 bytes from 3403776 bytes) 
+=== gate done
+scope: waves 3+4 batched (operator 2026-11-22): APRS-TXT-01..03, TDECK-VOLT-01, DISP-PAGE-01..03, BTN-OFF-01
+advisor W3: APPROVED (nits applied: UTF-8-safe dst clip in charset_wire_field, test red before; silent-recovery comment; RM ASCII wording)
+advisor W3 follow-ups + W4: APPROVED; comment nits deferred to the PR cut (campaign doc)

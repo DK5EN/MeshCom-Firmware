@@ -27,7 +27,8 @@ from tdeck_harness import TDeckSession, default_log_path  # noqa: E402
 
 DEFAULT_PORT = "/dev/cu.usbserial-0001"      # Heltec V3 DK5EN-93
 CRASH = r"Guru Meditation|rst:0x|Backtrace:|abort\(\)|assert failed"
-PAGE_MAX = 6
+PAGE_MAX = 6          # ring slots; PAGE_MAX - 1 = 5 messages are browsable (DISP-PAGE-01)
+BLANK_CRC_128X64 = 0xefb5af2e   # blank 128x64 frame buffer, see scenario_display
 # TM-42: group the central server filters, so injected test traffic never
 # reaches the map/dashboard. See docs/automation-runner-runbook.md §2.6.
 TEST_GROUP = "TEST"
@@ -339,18 +340,90 @@ def scenario_timing(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]:
             "loop_max_us": loop_max, "flush_line": fl, "loop_line": lp}
 
 
+def _wait_hold_zero(s: OledSession, tries: int = 10) -> Optional[Dict[str, int]]:
+    """Wait until the post-message / post-click page hold has expired (oledstat hold;0)."""
+    st = None
+    for _ in range(tries):
+        st = oledstat(s)
+        if st and st.get("hold", 1) == 0:
+            return st
+        time.sleep(1.0)
+    return st
+
+
+def scenario_depth(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """DISP-PAGE-01 (#1294): the click walk covers every stored message, whatever the ring position.
+    For i = 1..6: inject one more message, wait for hold;0, click 7 times and read the page.
+    Expected per round: min(i, PAGE_MAX - 1) distinct message pages newest to oldest, then the head
+    page (type;9), then the newest again. Before the fix the depth was newest-slot + 1 and none at
+    slot 5 (clicks showed only the head page)."""
+    rounds: List[Dict[str, Any]] = []
+    s.send("--oledlog on"); time.sleep(0.2)
+    for i in range(1, PAGE_MAX + 1):
+        s.send(f"--injectmsg {TEST_GROUP} oled depth {i}")
+        s.wait_for(r"\[INJECT\];ok", 3.0)
+        _wait_hold_zero(s)
+        want = min(i, PAGE_MAX - 1)
+        seq: List[Tuple[Optional[int], Optional[int]]] = []     # (page slot, display type) per click
+        for _ in range(PAGE_MAX + 1):
+            st = step(s, "--btn click", r"\[BTN\];click", settle=0.8)
+            os_ = oledstat(s)
+            seq.append((st["page_after"], os_.get("type") if os_ else None))
+        _wait_hold_zero(s)
+        msgs: List[int] = []
+        for page, typ in seq:
+            if typ == 9:
+                break
+            if page is not None:
+                msgs.append(page)
+        head = len(seq) > want and seq[want][1] == 9
+        # slots strictly descending (wrapping) = newest to oldest, all distinct
+        distinct = len(set(msgs)) == len(msgs)
+        ok_round = (len(msgs) == want and distinct and head
+                    and len(seq) > want + 1 and seq[want + 1][1] != 9)
+        rounds.append({"stored": i, "expected": want, "visited": len(msgs), "slots": msgs,
+                       "head_after": head, "newest_again": len(seq) > want + 1 and seq[want + 1][1] != 9,
+                       "ok": ok_round})
+    s.send("--oledlog off")
+    return {"ok": all(r["ok"] for r in rounds), "rounds": rounds}
+
+
+def scenario_display_after_click(s: OledSession, args: argparse.Namespace) -> Dict[str, Any]:
+    """DISP-PAGE-02 (#1294): --display off within the 5 s browse hold after a click must blank the
+    panel at once. Sequence: --oledlog on, --btn click, within 1 s --display off, wait 1.5 s,
+    --oledstat. Expected: isoff;1 and the last frame is the blank buffer (crc efb5af2e). Before the
+    fix the browsed page stayed lit (isoff;1 but another CRC)."""
+    _wait_hold_zero(s)
+    s.send("--display on"); time.sleep(1.5)
+    s.send("--oledlog on"); time.sleep(0.2)
+    s.send("--btn click")
+    time.sleep(0.4)
+    idx = s.send("--display off")
+    time.sleep(1.5)
+    fr = frames_since(s, idx)
+    st = oledstat(s)
+    s.send("--oledlog off")
+    s.send("--display on"); time.sleep(1.0)
+    last_crc = fr[-1]["crc"] if fr else None
+    ok = (st is not None and st.get("isoff") == 1 and last_crc == BLANK_CRC_128X64
+          and st.get("crc") == BLANK_CRC_128X64)
+    return {"ok": ok, "oledstat": st, "frames": len(fr), "last_frame_crc": last_crc}
+
+
 SCENARIOS = {
     "boot": scenario_boot, "pages": scenario_pages, "inject": scenario_inject, "pos": scenario_pos,
     "display": scenario_display, "track": scenario_track, "timing": scenario_timing,
-    "dirty": scenario_dirty,
+    "dirty": scenario_dirty, "depth": scenario_depth, "display_after_click": scenario_display_after_click,
 }
-ORDER = ["boot", "pos", "inject", "pages", "display", "track", "timing", "dirty"]
+ORDER = ["boot", "pos", "inject", "pages", "depth", "display", "display_after_click", "track", "timing", "dirty"]
 HELP = {
     "boot": "boot log, display init (Wire1 ack), ready time, crash markers",
     "pages": "button clicks through the message ring, a frame per click",
     "inject": "--injectmsg N messages -> message page, ring advances",
     "pos": "--injectpos foreign positions -> position page (runs before any message: a shown text blocks positions for the ping time)",
     "display": "--display off/on x3, both must redraw, off flag follows",
+    "depth": "DISP-PAGE-01: inject 1..6 messages, 7 clicks each: min(i, 5) messages newest to oldest, head page, newest again",
+    "display_after_click": "DISP-PAGE-02: --btn click then --display off within 1 s: blank frame (crc efb5af2e), isoff;1",
     "track": "triple click: track (GPS) page on and off",
     "timing": "OLED frame push avg/max and loop max over a window",
     "dirty": "TM-10: every idle-window frame explained by LoRa traffic; a repeated identical page is skipped",

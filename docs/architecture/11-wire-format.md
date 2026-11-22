@@ -248,8 +248,9 @@ the string `PositionToAPRS()` returns) is:
 
 - `ddmm.mm`/`dddmm.mm`: `%07.2lf`/`%08.2lf` degrees-minutes
   (`loop_functions.cpp:4492`).
-- `atxt`: free-text comment, optional, ≤ 25 bytes, UTF-8-safe truncated
-  (`charset_utf8_safe_truncate`, `:4280`) and CHR-02-filtered — the bytes
+- `atxt`: free-text comment, optional, ≤ 25 bytes (`APRS_ATXT_WIRE_MAX`, also in the
+  LoRa-APRS Track frame since APRS-TXT-01, there without `#name`), UTF-8-safe truncated
+  (`charset_wire_field()`, built on `charset_utf8_safe_truncate`) and CHR-02-filtered — the bytes
   `{ } : ; , /` are stripped before truncation because each is structure
   elsewhere in the wire format (`src/charset_filter.h:71-89`; path
   `PositionToAPRS():4271-4284`).
@@ -323,10 +324,14 @@ Four buffers (`csfpegel`, `csfpegel2`, `csftemp`, `csfbatt`,
 populated by any code path — reserved slots, currently always empty.
 
 The tail plus `atxt` plus `#name` share a 100-byte budget
-(`strconcat[100]`, `:4455`). If the combined length exceeds 100 bytes, the
-encoder drops fields in this order: **`atxt` first** (`:4481-4484`), then
-**`#name`** (`:4486-4489`) — the `/X=` tail itself is never truncated or
-reordered, only the free-text comment and the node name are sacrificed.
+(`POS_TEXT_BUDGET`, `src/pos_text_budget.h`; `strconcat[100]` in
+`PositionToAPRS()`). If the combined length exceeds 100 bytes (strictly), the
+encoder drops fields in this order: **`atxt` first**, then **`#name`**
+(`posTextFit()`). The drop is announced once per change of outcome on the serial
+console as `[POS];txtdrop;<atxt|name|atxt+name>;tags;<n>;budget;100`. The `/X=`
+tail is never reordered, but it is not guaranteed whole: the tag buffer is
+`strncat`-bounded at 99 bytes, so a tag set beyond that (worst case about 111
+bytes) loses its last tag(s), possibly mid-tag.
 
 #### 1.8.4 Decoder tolerance
 

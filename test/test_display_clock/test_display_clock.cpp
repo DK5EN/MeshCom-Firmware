@@ -538,9 +538,89 @@ void test_gps_without_fix_leaves_ntp_time_alone(void)
                              "the GPS fix branch must still set the clock (GPS with fix wins over NTP)");
 }
 
+// ---- DISP-PAGE-01/02/03 (#1294, docs/plan-display-paging-20261121.md): source pins ----
+
+// DISP-PAGE-01: every board walks the message ring with pageClickStep() (page_ring.h); the absolute
+// slot-5 stop is gone from both the T114 and the generic branch, and the BOARD_E290 split with it.
+void test_click_walk_uses_page_ring(void)
+{
+    const std::string code = code_only(read_repo_file("src/onebutton_functions.cpp"));
+    TEST_ASSERT_TRUE_MESSAGE(code.find("pagePointer == 5") == std::string::npos, "absolute slot-5 stop still in onebutton_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(code.find("#include \"page_ring.h\"") != std::string::npos, "page_ring.h not included");
+    const std::string body = code_only(func_body(read_repo_file("src/onebutton_functions.cpp"), "void singleClick()\n{"));
+    const size_t step = body.find("pageClickStep(");
+    TEST_ASSERT_TRUE_MESSAGE(step != std::string::npos, "singleClick() does not call pageClickStep()");
+    const size_t from = step > 600 ? step - 600 : 0;
+    TEST_ASSERT_TRUE_MESSAGE(body.substr(from, step - from).find("BOARD_E290") == std::string::npos,
+                             "BOARD_E290 split in front of pageClickStep()");
+    const size_t status = body.find("sendDisplayHead(true);", step);
+    TEST_ASSERT_TRUE_MESSAGE(status != std::string::npos && status - step < 400, "Status result does not show the head page");
+}
+
+// DISP-PAGE-03: the WP_DISP click goes through wpBrowseClick(), the arrival marks the panel as live
+// and draws the counter, every other path that changes the panel clears the flag.
+void test_wp_first_click_wiring(void)
+{
+    const std::string click = code_only(func_body(read_repo_file("src/onebutton_functions.cpp"), "void singleClick()\n{"));
+    TEST_ASSERT_TRUE_MESSAGE(click.find("wpBrowseClick(") != std::string::npos, "WP_DISP block does not call wpBrowseClick()");
+    TEST_ASSERT_TRUE_MESSAGE(click.find("wpLiveNewest") != std::string::npos, "WP_DISP block does not read wpLiveNewest");
+
+    const std::string src = read_repo_file("src/loop_functions.cpp");
+    const std::string d1306 = code_only(func_body(src, "void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)\n{"));
+    const size_t arrival = d1306.rfind("pageLastLineAnz[pageLastPointer] = 0;");
+    TEST_ASSERT_TRUE_MESSAGE(arrival != std::string::npos, "ring advance not found");
+    const size_t blk = d1306.rfind("iDisplayType == 0 && bNeu", arrival);
+    TEST_ASSERT_TRUE_MESSAGE(blk != std::string::npos, "arrival block not found");
+    TEST_ASSERT_TRUE_MESSAGE(d1306.substr(blk, arrival - blk).find("wpLiveNewest = true;") != std::string::npos,
+                             "arrival does not set wpLiveNewest");
+    const size_t idx = d1306.find("wpDrawMsgIdx();");
+    TEST_ASSERT_TRUE_MESSAGE(idx != std::string::npos && d1306.find("wpBrowseShow(") != std::string::npos,
+                             "live render does not draw the counter");
+    TEST_ASSERT_TRUE_MESSAGE(d1306.find("epaper_display.update();", idx) != std::string::npos, "counter is not drawn before update()");
+
+    const std::string stored = code_only(func_body(src, "void wpShowStoredMessage(int slot, int idx)\n{"));
+    TEST_ASSERT_TRUE_MESSAGE(stored.find("wpLiveNewest = false;") != std::string::npos, "wpShowStoredMessage() does not clear wpLiveNewest");
+    const std::string head = code_only(func_body(src, "void sendDisplayHead(bool bInit)\n{"));
+    TEST_ASSERT_TRUE_MESSAGE(head.find("wpLiveNewest = false;") != std::string::npos, "sendDisplayHead() does not clear wpLiveNewest");
+}
+
+// DISP-PAGE-02: "display off" within the 5 s browse hold: sendDisplayHead(false) returns while
+// pageHold > 0, so the handler has to clear the hold first.
+void test_display_off_handler_cancels_browse_hold(void)
+{
+    const std::string src = read_repo_file("src/command_functions.cpp");
+    const size_t start = src.find("commandCheck(msg_text+2, (char*)\"display off\") == 0");
+    TEST_ASSERT_TRUE_MESSAGE(start != std::string::npos, "display off handler not found");
+    const size_t end = src.find("commandCheck(", start + 20);
+    TEST_ASSERT_TRUE_MESSAGE(end != std::string::npos, "end of the display off handler not found");
+    const std::string code = code_only(src.substr(start, end - start));
+    const size_t hold = code.find("pageHold = 0;");
+    const size_t head = code.find("sendDisplayHead(false);");
+    TEST_ASSERT_TRUE_MESSAGE(head != std::string::npos, "handler does not call sendDisplayHead(false)");
+    TEST_ASSERT_TRUE_MESSAGE(hold != std::string::npos, "display off handler does not cancel pageHold");
+    TEST_ASSERT_TRUE_MESSAGE(hold < head, "pageHold = 0 comes after sendDisplayHead(false)");
+}
+
+// DISP-PAGE-02: the guard consults pageHold (the mechanism the handler line works around)
+void test_head_guard_blocks_during_hold(void)
+{
+    TEST_ASSERT_TRUE(dispHeadBlocked(false, 5, false));
+    TEST_ASSERT_FALSE(dispHeadBlocked(false, 0, false));
+    TEST_ASSERT_TRUE(dispHeadBlocked(true, 0, false));
+    TEST_ASSERT_FALSE(dispHeadBlocked(true, 5, true));
+    TEST_ASSERT_FALSE(dispHeadBlocked(false, 5, true));
+    const std::string head = code_only(func_body(read_repo_file("src/loop_functions.cpp"), "void sendDisplayHead(bool bInit)\n{"));
+    TEST_ASSERT_TRUE_MESSAGE(head.find("dispHeadBlocked(bSetDisplay, pageHold, bInit)") != std::string::npos,
+                             "sendDisplayHead() does not use dispHeadBlocked()");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_click_walk_uses_page_ring);
+    RUN_TEST(test_wp_first_click_wiring);
+    RUN_TEST(test_display_off_handler_cancels_browse_hold);
+    RUN_TEST(test_head_guard_blocks_during_hold);
     RUN_TEST(test_shown_time_never_runs_back_a_few_seconds);
     RUN_TEST(test_shown_time_dst_and_midnight);
     RUN_TEST(test_status_line_clock_uses_the_held_time);
