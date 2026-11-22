@@ -54,7 +54,7 @@ Bench fleet, USB serials, DHCP addresses, the 2323 console login and per-board f
 ## Bench Rules (hard)
 
 - DK5EN-98 is the production gateway, not a bench node: no work on it without an explicit OK.
-- Test traffic only to group `TEST` or as a direct message to an own node. Never broadcast.
+- Test traffic only to group `9999` or as a direct message to an own node. Never broadcast. (`::{TEST}` is a personal message to a station named TEST, not a group.)
 - Never use a foreign callsign (never OE1XAR, never XX0XXX). Every callsign SSID is unique.
 - Bench TX power at most 2 dBm.
 - Run `tools/bench/identity_guard.py` before any test.
