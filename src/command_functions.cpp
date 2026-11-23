@@ -28,6 +28,9 @@
 #endif
 #include "node_position.h"    // DRY-01: hemisphere split / signed decode of the own position
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
+#if defined(ESP32)
+#include "instrument_probe.h" // TEMPORARY -- OTA-LOWHEAP-01 function heap probes
+#endif
 #include "batt_functions.h"
 #include "batt_info.h"       // --info battery line: factor vs multiplier
 #include "nbr_matrix.h"
@@ -6124,6 +6127,13 @@ void commandAction(char *umsg_text, bool ble)
         else
         if(casecmp(_owner_c, (char*)"forget") == 0)
             Serial.printf("[AU];forget;%s\n", fwNetForgetLast() ? "ok" : "failed");
+        // bench only: --update unstage drops the staged record (NVS) so a download can be measured again
+        else
+        if(casecmp(_owner_c, (char*)"unstage") == 0)
+        {
+            fwNetClearRecord();
+            Serial.printf("[AU];unstage;ok\n");
+        }
         // bench only: --update checknow makes the automatic check path due now
         else
         if(casecmp(_owner_c, (char*)"checknow") == 0)
@@ -6971,6 +6981,41 @@ void commandAction(char *umsg_text, bool ble)
     if(commandCheck(msg_text+2, (char*)"heapgap") == 0)
     {
         instrument_heapgap();
+        return;
+    }
+    else
+    // --heapstep on [bytes]|off: [INSTR-STEP] each time internal free crosses a step (default 5120 B).
+    if(commandCheck(msg_text+2, (char*)"heapstep") == 0)
+    {
+        instrument_heapstep(msg_text + 10);
+        return;
+    }
+    else
+    // --heapsites live|all: [INSTR-SITE] per allocation call site (needs INSTR_HEAPWATCH build).
+    if(commandCheck(msg_text+2, (char*)"heapsites") == 0)
+    {
+        instrument_heapsites(msg_text + 11);
+        return;
+    }
+    else
+    // --heapowners [reset]: [INSTR-OWN] per owner (BLE, wifi, tcpip, loop, AU, TLS, ...): live, peak, range.
+    if(commandCheck(msg_text+2, (char*)"heapowners") == 0)
+    {
+        instrument_heapowners(msg_text + 12);
+        return;
+    }
+    else
+    // --heapmap: [INSTR-MAP] every tracked internal block and the holes between them, by address.
+    if(commandCheck(msg_text+2, (char*)"heapmap") == 0)
+    {
+        instrument_heapmap();
+        return;
+    }
+    else
+    // --heapprobe list|<id>|all: run one function and print its internal-RAM use ([INSTR-PROBE]).
+    if(commandCheck(msg_text+2, (char*)"heapprobe") == 0)
+    {
+        instrument_heapprobe(msg_text + 11);
         return;
     }
     else

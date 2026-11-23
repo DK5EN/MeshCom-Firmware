@@ -1141,6 +1141,36 @@ void work_webpage(void)
                         continue;
                     }
 
+#if defined(ESP32)
+                    // OTA-LOWHEAP-01 A4: while an AU session runs (gate to TLS end) only /austatus and the GUI assets
+                    // are served; every other request, the 10 s mailbox refresh included, would take heap the TLS
+                    // handshake needs (a page costs 4.5-7 KB peak, about 3 KB held in TIME_WAIT). The page JS retries.
+                    if (!fwWebAdmit(fwNetSessionActive(), wg_path.c_str()))
+                    {
+                        static const char kBusy[] = "{\"ok\":false,\"err\":\"au_session_active\"}";
+                        // a full page load (reload, bookmark) gets a readable page that reloads itself
+                        static const char kBusyHtml[] =
+                            "<!DOCTYPE html><meta charset=utf-8><meta http-equiv=refresh content=10>"
+                            "<p>Update l\u00e4uft, die Seite l\u00e4dt in 10 s neu. / Update running, reloading in 10 s.";
+                        const bool page = wg_path == "/" || wg_path.startsWith("/?");
+                        const char *body = page ? kBusyHtml : kBusy;
+                        const unsigned blen = (unsigned)(page ? sizeof(kBusyHtml) - 1 : sizeof(kBusy) - 1);
+                        web_cors_ok = false;
+                        web_client.println("HTTP/1.1 503 Service Unavailable");
+                        web_client.println("Retry-After: 10");
+                        web_client.println(page ? "Content-Type: text/html; charset=utf-8" : "Content-Type: application/json");
+                        web_client.print("Content-Length: ");
+                        web_client.println(blen);
+                        web_client.println("Connection: close");
+                        web_client.println();
+                        web_client.write((const uint8_t *)body, blen);
+                        rm_wipe_string(web_header);
+                        rm_wipe_string(web_currentLine);
+                        web_client.stop();
+                        continue;
+                    }
+#endif
+
                     // static CSS/JS of the GUI: before the login gate (the login page needs them), after the guard
                     if (deliver_web_asset(web_header))
                     {

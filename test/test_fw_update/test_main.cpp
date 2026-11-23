@@ -1816,9 +1816,66 @@ void test_chan_decide_verdicts(void)
 #endif
 }
 
+// OTA-LOWHEAP-01 fix A1: total-free floor per target class
+static void test_gate_min_free_per_target(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(76000u, fwGateMinFree(true, false));  // classic ESP32: unchanged
+    TEST_ASSERT_EQUAL_UINT32(76000u, fwGateMinFree(true, true));
+    TEST_ASSERT_EQUAL_UINT32(78000u, fwGateMinFree(false, false)); // S3 without PSRAM: was 0; download 69.5 KB + margin
+    TEST_ASSERT_TRUE(fwGateMinFree(false, false) != 0u);
+    TEST_ASSERT_EQUAL_UINT32(0u, fwGateMinFree(false, true));      // PSRAM TLS: FWNET_MIN_IFREE_PSRAM governs
+}
+
+static void test_gate_s3_refuses_at_60k_free_that_used_to_pass(void)
+{
+    // bench 2026-11-23: free 60 KB / largest block 51 KB passed, TLS then failed
+    const uint32_t mf = fwGateMinFree(false, false);
+    TEST_ASSERT_FALSE(fwNetHeapGate(false, 60000u, 51000u, 0u, mf, 17000u, 24000u, true));
+    TEST_ASSERT_TRUE(fwNetHeapGate(false, 100000u, 51000u, 0u, mf, 17000u, 24000u, true));
+    // PSRAM path ignores minFree: same verdict as before
+    TEST_ASSERT_TRUE(fwNetHeapGate(true, 30000u, 0u, 100000u, fwGateMinFree(false, true), 17000u, 24000u, true));
+}
+
+// OTA-LOWHEAP-01 fix A4: web admission while an AU session runs
+static void test_web_admit_everything_when_idle(void)
+{
+    TEST_ASSERT_TRUE(fwWebAdmit(false, "/"));
+    TEST_ASSERT_TRUE(fwWebAdmit(false, "/?page=mailbox"));
+    TEST_ASSERT_TRUE(fwWebAdmit(false, "/austatus"));
+    TEST_ASSERT_TRUE(fwWebAdmit(false, "/?scan"));
+}
+
+static void test_web_admit_status_and_assets_during_session(void)
+{
+    TEST_ASSERT_TRUE(fwWebAdmit(true, "/austatus"));
+    TEST_ASSERT_TRUE(fwWebAdmit(true, "/austatus?x=1"));
+    TEST_ASSERT_TRUE(fwWebAdmit(true, "/mc.js?v=abc123"));
+    TEST_ASSERT_TRUE(fwWebAdmit(true, "/mcau.js?v=abc123"));
+    TEST_ASSERT_TRUE(fwWebAdmit(true, "/mc.css"));
+}
+
+static void test_web_refuse_pages_and_actions_during_session(void)
+{
+    TEST_ASSERT_FALSE(fwWebAdmit(true, "/"));
+    TEST_ASSERT_FALSE(fwWebAdmit(true, "/?page=mailbox"));
+    TEST_ASSERT_FALSE(fwWebAdmit(true, "/?page=info"));
+    TEST_ASSERT_FALSE(fwWebAdmit(true, "/?getmessages"));
+    TEST_ASSERT_FALSE(fwWebAdmit(true, "/callfunction/?wifiscan="));
+    TEST_ASSERT_FALSE(fwWebAdmit(true, "/mcrm.js?v=1"));
+    TEST_ASSERT_FALSE(fwWebAdmit(true, "/austatusX"));   // exact token, not a prefix
+    TEST_ASSERT_FALSE(fwWebAdmit(true, "/x/austatus"));
+    TEST_ASSERT_FALSE(fwWebAdmit(true, ""));
+    TEST_ASSERT_FALSE(fwWebAdmit(true, nullptr));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_gate_min_free_per_target);
+    RUN_TEST(test_gate_s3_refuses_at_60k_free_that_used_to_pass);
+    RUN_TEST(test_web_admit_everything_when_idle);
+    RUN_TEST(test_web_admit_status_and_assets_during_session);
+    RUN_TEST(test_web_refuse_pages_and_actions_during_session);
     RUN_TEST(test_tls_fail_token_blames_heap_when_allocations_failed);
     RUN_TEST(test_shed_settled_waits_for_the_tft_sprite);
     RUN_TEST(test_tft_sprite_wanted_needs_display_on_and_no_shed);

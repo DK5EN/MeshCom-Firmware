@@ -886,6 +886,48 @@ inline bool fwNetHeapGate(bool psramTls, uint32_t internalFree, uint32_t interna
     return psramLargestBlk >= minBlk && internalFree >= minIFree;
 }
 
+// OTA-LOWHEAP-01 fix A1: total-free floor of the pre-TLS gate (internal heap, no PSRAM-TLS).
+// Classic ESP32: 76000 = 69.2 KB measured chain-verify peak + margin (#1187, DK5EN-92).
+// Other targets (S3 without PSRAM, Heltec V3 bench 2026-11-23, INSTRUMENT image): with the stock TLS client
+// the check took ~85 KB and the download ~94 KB of total heap (low-water 2.9 KB); the gate passed at free 60 KB
+// and TLS then failed. With McTlsClient (fix B) and these admission rules: check 85.7 -> 24.3 KB = 61.4 KB,
+// download 85.1 -> 15.6 KB = 69.5 KB. 78000 = the download's 69.5 KB + 8 KB margin. With mbedTLS on PSRAM the record buffers are outside internal heap and
+// FWNET_MIN_IFREE_PSRAM governs instead (this floor is not consulted; 0 returned).
+#ifndef FWNET_MIN_FREE_CLASSIC
+#define FWNET_MIN_FREE_CLASSIC 76000u
+#endif
+#ifndef FWNET_MIN_FREE_S3
+#define FWNET_MIN_FREE_S3 78000u
+#endif
+inline uint32_t fwGateMinFree(bool classic, bool tlsOnPsram)
+{
+    if (classic)
+        return FWNET_MIN_FREE_CLASSIC;
+    return tlsOnPsram ? 0u : FWNET_MIN_FREE_S3;
+}
+
+// OTA-LOWHEAP-01 fix A4: while an AU session runs the web server serves only what the open update page polls:
+// GET /austatus (mcau.js, 1 s while busy) and the static assets /mc.css, /mc.js, /mcau.js (also with ?v=).
+// Everything else gets 503 + Retry-After. `path` is the request target (no method). Exact token: the path
+// must end after the name or continue with '?'.
+inline bool fwWebAdmit(bool sessionActive, const char *path)
+{
+    if (!sessionActive)
+        return true;
+    if (path == nullptr)
+        return false;
+    static const char *const kAllowed[] = {"/austatus", "/mc.css", "/mc.js", "/mcau.js"};
+    for (const char *a : kAllowed)
+    {
+        size_t n = 0;
+        while (a[n] != '\0' && path[n] == a[n])
+            n++;
+        if (a[n] == '\0' && (path[n] == '\0' || path[n] == '?'))
+            return true;
+    }
+    return false;
+}
+
 // n * size without wrap-around (calloc contract): false = the product does not fit in size_t.
 inline bool fwCallocSizeOk(size_t n, size_t size, size_t *total)
 {

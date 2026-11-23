@@ -196,6 +196,10 @@ int64_t fwNetNodeUtc(bool &ok);
 // Thread-safe snapshot (portMUX). Never blocks on the network.
 void fwNetGetStatus(FwNetStatus &out);
 
+// True while an AU job (CHECK/DOWNLOAD) owns the node, from before the pre-TLS gate to the end of the job on
+// every path. The web server and the WiFi scan stay out of the heap meanwhile (OTA-LOWHEAP-01 fix A).
+bool fwNetSessionActive(void);
+
 // RM-UPDCHAN: forget the last CHECK result (availTag, availNewer, installable, zlen, ilen,
 // lastCheckEpoch and the download cache) after a channel switch. Keeps the staged record,
 // stagedTag and the NVS "last" tag. Thread-safe (portMUX).

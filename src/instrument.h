@@ -70,14 +70,8 @@ void instrument_report_heapwifi(void);
 void instrument_heapeat(uint32_t kb);
 
 #if defined(ESP32)
-/** --heapwatch on|off|dump|clear: live internal-RAM allocation table (256 entries, ptr/size/caps/task/5 PCs)
- *  fed by link-time wrappers around heap_caps_*; needs -DINSTR_HEAPWATCH=1 plus the -Wl,--wrap=... flags.
- *  Without INSTR_HEAPWATCH prints [INSTR-HW];unavailable. Dump lines: [INSTR-HW];live;... and ;sum;. */
-void instrument_heapwatch(const char *arg);
-
-/** --heapgap: grabs the largest free internal blocks (scheduler suspended, up to 16, >= 4 KB), then
- *  prints [INSTR-GAP];blk / ;gap (bytes between neighbouring blocks, < 2 KB) / ;sum after resuming. */
-void instrument_heapgap(void);
+/* --heapwatch / --heapgap / --heapstep / --heapsites / --heapmap, low-water API: see instrument_heap.h */
+#include "instrument_heap.h"
 #endif
 
 /** Failed-alloc capture for the whole boot (plain stores, any task, no printf/malloc/lock).

@@ -9,7 +9,7 @@
 #include <HTTPClient.h>
 #include <Preferences.h>
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
+#include "mc_tls/McTlsClient.h" // OTA-LOWHEAP-01 fix B: fork TLS client (records first, one root per host)
 
 #include <esp_flash.h>
 #include <esp_heap_caps.h>
@@ -47,10 +47,23 @@
 #include "../fw_update.h"
 #include "../fw_update_assets.h"
 #include "../fw_update_http.h"
-#include "../fw_update_roots.h"
 #include "../hmac_sha256.h"
 #include "../rtc_offset.h"   // rtcOffsetSec(): fixed node_utcoff for the schedule
 #include "../instrument.h" // INSTRUMENT_ENABLED: the bench-only STAGELAN job
+
+// INSTRUMENT builds: tag every allocation of the AU task inside a TLS session as owner "TLS" (--heapowners).
+#if INSTRUMENT_ENABLED
+struct TlsOwnerTag
+{
+    TlsOwnerTag() { instrument_heap_owner_push(INSTR_OWN_TLS); }
+    ~TlsOwnerTag() { instrument_heap_owner_pop(); }
+};
+#else
+struct TlsOwnerTag
+{
+    TlsOwnerTag() {}
+};
+#endif
 #include "../net_console.h"  // Serial -> MSerial: the AU log lines reach the net console too
 #include "../safeboot/fw_apply.h"  // fwInflateStream (shared with Safeboot)
 #include "../safeboot/safeboot_id.h" // sbIdParse: the board marker in the inflated head
@@ -67,6 +80,7 @@ bool fwNetStart(FwNetJob, uint8_t) { return false; }
 bool fwNetStartLan(const char *, uint32_t, const char *) { return false; }
 #endif
 void fwNetGetStatus(FwNetStatus &out) { memset(&out, 0, sizeof(out)); }
+bool fwNetSessionActive(void) { return false; }
 void fwNetForgetAvail(void) {}
 bool fwNetPhoneHeld(void) { return false; }
 void fwNetHeapNow(uint32_t *ifree, uint32_t *iblk)
@@ -120,17 +134,15 @@ void fwNetLastInstalledTag(char *out, size_t n)
 #ifndef FWNET_MIN_BLOCK
 #define FWNET_MIN_BLOCK 17000u
 #endif
-// TOTAL free heap needed before a TLS session (#1187). The block rule alone is not enough: the
-// P-384 chain verify peaks at about 69 KB of total heap. Measured on DK5EN-92 (classic, BLE paused):
-// free 88180 -> min 18968 = 69.2 KB; with a phone on BLE (no pause) free 59832 -> min 268 and
-// mbedtls -10368. 76000 = 69.2 KB + margin. S3 has no NimBLE pause and runs with 119 KB free
-// (min 63 KB during TLS), so non-classic targets keep 0 = no total-free check.
-#ifndef FWNET_MIN_FREE
-#if defined(CONFIG_IDF_TARGET_ESP32)
-#define FWNET_MIN_FREE 76000u
-#else
-#define FWNET_MIN_FREE 0u
+// TOTAL free heap needed before a TLS session: fwGateMinFree() in fw_update.h (classic 76000, S3 78000,
+// PSRAM-TLS 0 because FWNET_MIN_IFREE_PSRAM governs there). Measurements in the comment there.
+#ifdef FWNET_MIN_FREE
+#error "FWNET_MIN_FREE is replaced by fwGateMinFree() (fw_update.h): override FWNET_MIN_FREE_CLASSIC / FWNET_MIN_FREE_S3"
 #endif
+#if defined(CONFIG_IDF_TARGET_ESP32)
+#define FWNET_CLASSIC_TARGET true
+#else
+#define FWNET_CLASSIC_TARGET false
 #endif
 // Internal free heap still needed when mbedTLS runs on PSRAM (AU-13). Measured on DK5EN-14 (T-Deck
 // Plus, 10 checks right after boot): ifree 71.4 KB at job start, minimum 55.7 KB = about 16 KB
@@ -555,7 +567,7 @@ const char *pumpBody(WiFiClient &c, Pump &p, bool chunked, int32_t clen, uint32_
 // HTTP GET with redirects; returns nullptr and leaves the response header read
 // ---------------------------------------------------------------------------
 
-const char *httpFail(int code, WiFiClientSecure &c)
+const char *httpFail(int code, McTlsClient &c)
 {
     if (code > 0)
     {
@@ -589,7 +601,7 @@ struct Resp
 
 // Sends the GET, follows redirects (strict: GET only), checks for 200 and reads the
 // framing headers. The body is left unread on `c`.
-const char *httpGet(HTTPClient &http, WiFiClientSecure &c, const String &url, bool wantJson,
+const char *httpGet(HTTPClient &http, McTlsClient &c, const String &url, bool wantJson,
                     Resp &out)
 {
     static const char *kHdr[] = {"Transfer-Encoding", "Content-Encoding"};
@@ -704,7 +716,7 @@ bool heapGateEval(uint32_t &fr, uint32_t &bk, uint32_t &pb, bool &ps, uint32_t &
     fr = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     bk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     pb = ps ? (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : 0u;
-    uint32_t minFree = FWNET_MIN_FREE;
+    uint32_t minFree = fwGateMinFree(FWNET_CLASSIC_TARGET, ps);
     uint32_t minIFree = FWNET_MIN_IFREE_PSRAM;
 #if INSTRUMENT_ENABLED
     if (s_gateOver > 0) // bench: replaces the free-heap thresholds (up or down), so the TLS peak can be measured below the gate
@@ -770,6 +782,13 @@ bool heapGateOk()
     auHeapLine("pregate", "", false);
     uint32_t fr, bk, pb, need;
     bool ps;
+    // OTA-LOWHEAP-01 A2: drop the closed web sockets (TIME_WAIT pcbs) before the FIRST reading, always, so the gate
+    // does not pass on memory that is about to be reclaimed or refuse on memory that is only parked.
+    {
+        const uint32_t purged0 = twPurge();
+        vTaskDelay(pdMS_TO_TICKS(FWNET_GATE_SETTLE_MS));
+        auLog("[AU];shed;tw0;%u\n", (unsigned)purged0);
+    }
     if (heapGateEval(fr, bk, pb, ps, need))
     {
         auHeapLine("gate", ";ok", false);
@@ -856,8 +875,8 @@ const char *runCheck(FwChannel ch)
     const char *err = nullptr;
     {
         String url = String("https://api.github.com/repos/") + fwChannelRepo(ch) + "/releases/latest";
-        WiFiClientSecure client;
-        client.setCACert(FW_UPDATE_ROOTS_PEM);
+        TlsOwnerTag tlsTag;   // INSTRUMENT: heap of this TLS session counts as owner "TLS"
+        McTlsClient client;   // trust anchor chosen per host on connect (fwRootForHost), bundle as fallback
         client.setHandshakeTimeout(FWNET_HANDSHAKE_S);
         HTTPClient http;
         Resp rs = {false, -1, false};
@@ -1382,8 +1401,8 @@ const char *runDownload()
 
     uint32_t t0 = millis();
     {
-        WiFiClientSecure client;
-        client.setCACert(FW_UPDATE_ROOTS_PEM);
+        TlsOwnerTag tlsTag;   // INSTRUMENT: heap of this TLS session counts as owner "TLS"
+        McTlsClient client;   // trust anchor chosen per host on connect (fwRootForHost), bundle as fallback
         client.setHandshakeTimeout(FWNET_HANDSHAKE_S);
         HTTPClient http;
         Resp rs = {false, -1, false};
@@ -1810,6 +1829,16 @@ bool fwNetForgetLast(void)
 #endif
 
 bool fwNetPhoneHeld(void) { return deviceConnected || isPhoneReady != 0; }
+
+// OTA-LOWHEAP-01 A3: s_busy is set in startJob() before the task exists and cleared at the one exit of fwNetTask
+// (success, refusal, failure, abort) and when the task cannot be created; the restart keeps it set.
+bool fwNetSessionActive(void)
+{
+    portENTER_CRITICAL(&s_mux);
+    const bool b = s_busy;
+    portEXIT_CRITICAL(&s_mux);
+    return b;
+}
 
 void fwNetGetStatus(FwNetStatus &out)
 {
@@ -2306,7 +2335,7 @@ struct FwNetProbe
 {
     FwNetProbe()
     {
-        static volatile void *keep[] = {(void *)fwNetStart, (void *)fwNetGetStatus,
+        static volatile void *keep[] = {(void *)fwNetStart, (void *)fwNetGetStatus, (void *)fwNetSessionActive,
                                         (void *)fwNetStagedPending, (void *)fwNetLoadRecord,
                                         (void *)fwNetLastInstalledTag};
         (void)keep;
