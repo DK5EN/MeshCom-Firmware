@@ -25,7 +25,22 @@ received so a later decision starts from facts. Pick up only on an operator deci
 - **Patch encoding:** UTF-16 LE with BOM and CRLF (PowerShell redirect). Convert before
   `git apply`: `iconv -f UTF-16LE -t UTF-8 | tr -d '\r'`, then drop the BOM.
 - **Noise in the patch, not to take over:** deletes `REVIEW.md`; adds four `firmware*.uf2`
-  binaries, `uf2conv.py` and `uf2families.json`; touches `variants/t_deck/lv_conf.h`.
+  binaries, `uf2conv.py` and `uf2families.json`; touches `variants/t_deck/lv_conf.h` and
+  `variants/t_deck_plus/lv_conf.h`.
+- **Encoding damage:** the patch's non-ASCII lines went through a wrong code page, so `git apply`
+  fails on 4 files even after the UTF-16 conversion. The loose files are the author's tree, but
+  their editor had already double-encoded umlauts and em-dashes in about 56 comment lines. Real
+  change after putting those lines back: 92 lines in `src/` (`api_functions.cpp` 72+/7-,
+  `loop_functions.cpp` +6, `nbr_views.cpp` 2/2, `nrf52_ble.cpp` 1/1, `nrf52_main.cpp` +1) plus
+  `variants/faketec_v4/`.
+- **Review worktree (2026-11-23):** `../MeshCom-faketec-review`, branch `review/faketec-v4` on
+  `649b5b17`, cleaned tree uncommitted. The pre-image blobs of all patched files match `649b5b17`
+  exactly.
+- **First finding, root `platformio.ini`:** rewritten as a whole (tabs to spaces, RadioLib exclude
+  list reordered, the fork comments dropped). It adds `jgromes/RadioLib@7.6.0` twice and a new
+  `[nrf52]` section with an unpinned `platform = nordicnrf52`, which brings back the section
+  collision that CFG-01 removed (`[nrf52_base]`). `[env:faketec_v4]` is defined in the root file
+  and again in `variants/faketec_v4/platformio.ini`.
 
 ### What the spec gets right
 
