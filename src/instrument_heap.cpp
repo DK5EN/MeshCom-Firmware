@@ -8,6 +8,7 @@
 
 #include "instrument.h"
 #include "instrument_heap.h"
+#include "instrument_heaptrace.h"
 
 #if INSTRUMENT_ENABLED && defined(ESP32)
 
@@ -48,6 +49,47 @@ static void hw_pace(uint32_t *lines)
         vTaskDelay(pdMS_TO_TICKS(20));   /* lets the net console (MSG_DONTWAIT, 2323) drain before the next lines */
     }
 }
+
+#if defined(INSTR_HEAPWATCH) || defined(INSTR_HEAPTRACE)
+
+extern "C" {
+/* Allocator glue that must not be reported as the call site. */
+void *pvPortMalloc(size_t);
+void *_malloc_r(struct _reent *, size_t);
+void *_calloc_r(struct _reent *, size_t, size_t);
+void *_realloc_r(struct _reent *, void *, size_t);
+void *_Znwj(size_t);
+void *_Znaj(size_t);
+void *_ZnwjRKSt9nothrow_t(size_t, const void *);
+void *_ZnajRKSt9nothrow_t(size_t, const void *);
+}
+
+/* Window sizes (bytes) read from `nm -S` of the heltec_wifi_lora_32_V3 elf; a pc inside [fn, fn+win) is glue.
+ * Shared by the allocation table (INSTR_HEAPWATCH) and the serial trace (INSTR_HEAPTRACE). */
+typedef struct { uintptr_t fn; uint16_t win; } hw_glue_t;
+static const hw_glue_t kGlue[] = {
+    { (uintptr_t)&malloc,               0x40 },
+    { (uintptr_t)&calloc,               0x40 },
+    { (uintptr_t)&realloc,              0x40 },
+    { (uintptr_t)&pvPortMalloc,         0x40 },
+    { (uintptr_t)&_malloc_r,            0x40 },
+    { (uintptr_t)&_calloc_r,            0x40 },
+    { (uintptr_t)&_realloc_r,           0x40 },
+    { (uintptr_t)&_Znwj,                0x40 },
+    { (uintptr_t)&_Znaj,                0x40 },
+    { (uintptr_t)&_ZnwjRKSt9nothrow_t,  0x40 },
+    { (uintptr_t)&_ZnajRKSt9nothrow_t,  0x40 },
+};
+
+bool instrument_heap_is_glue(uint32_t pc)
+{
+    for (size_t i = 0; i < sizeof(kGlue) / sizeof(kGlue[0]); i++)
+        if (pc >= kGlue[i].fn && pc < kGlue[i].fn + kGlue[i].win)
+            return true;
+    return false;
+}
+
+#endif  /* INSTR_HEAPWATCH || INSTR_HEAPTRACE */
 
 #if defined(INSTR_HEAPWATCH)
 
@@ -194,39 +236,12 @@ void  __real_heap_caps_free(void *ptr);
 void *__real_heap_caps_malloc_default(size_t size);
 void *__real_heap_caps_realloc_default(void *ptr, size_t size);
 
-/* Allocator glue that must not be reported as the call site. */
-void *pvPortMalloc(size_t);
-void *_malloc_r(struct _reent *, size_t);
-void *_calloc_r(struct _reent *, size_t, size_t);
-void *_realloc_r(struct _reent *, void *, size_t);
-void *_Znwj(size_t);
-void *_Znaj(size_t);
-void *_ZnwjRKSt9nothrow_t(size_t, const void *);
-void *_ZnajRKSt9nothrow_t(size_t, const void *);
 }
 
-/* Window sizes (bytes) read from `nm -S` of the heltec_wifi_lora_32_V3 elf; a pc inside [fn, fn+win) is glue. */
-typedef struct { uintptr_t fn; uint16_t win; } hw_glue_t;
-static const hw_glue_t kGlue[] = {
-    { (uintptr_t)&malloc,               0x40 },
-    { (uintptr_t)&calloc,               0x40 },
-    { (uintptr_t)&realloc,              0x40 },
-    { (uintptr_t)&pvPortMalloc,         0x40 },
-    { (uintptr_t)&_malloc_r,            0x40 },
-    { (uintptr_t)&_calloc_r,            0x40 },
-    { (uintptr_t)&_realloc_r,           0x40 },
-    { (uintptr_t)&_Znwj,                0x40 },
-    { (uintptr_t)&_Znaj,                0x40 },
-    { (uintptr_t)&_ZnwjRKSt9nothrow_t,  0x40 },
-    { (uintptr_t)&_ZnajRKSt9nothrow_t,  0x40 },
-};
-
+/* hw_is_glue: shared with the serial trace (instrument_heaptrace.cpp), see instrument_heap_is_glue() above. */
 static inline bool hw_is_glue(uint32_t pc)
 {
-    for (size_t i = 0; i < sizeof(kGlue) / sizeof(kGlue[0]); i++)
-        if (pc >= kGlue[i].fn && pc < kGlue[i].fn + kGlue[i].win)
-            return true;
-    return false;
+    return instrument_heap_is_glue(pc);
 }
 
 static inline uint32_t hw_hash_ptr(uint32_t p)
@@ -735,6 +750,7 @@ extern "C" {
 IRAM_ATTR void *__wrap_heap_caps_malloc(size_t size, uint32_t caps)
 {
     void *p = __real_heap_caps_malloc(size, caps);
+    instrument_heaptrace_alloc(p, size);
     if (!hw_skip())
         hw_track(p, size);
     return p;
@@ -743,6 +759,7 @@ IRAM_ATTR void *__wrap_heap_caps_malloc(size_t size, uint32_t caps)
 IRAM_ATTR void *__wrap_heap_caps_calloc(size_t n, size_t size, uint32_t caps)
 {
     void *p = __real_heap_caps_calloc(n, size, caps);
+    instrument_heaptrace_alloc(p, n * size);
     if (!hw_skip())
         hw_track(p, n * size);
     return p;
@@ -751,6 +768,7 @@ IRAM_ATTR void *__wrap_heap_caps_calloc(size_t n, size_t size, uint32_t caps)
 IRAM_ATTR void *__wrap_heap_caps_malloc_default(size_t size)
 {
     void *p = __real_heap_caps_malloc_default(size);
+    instrument_heaptrace_alloc(p, size);
     if (!hw_skip())
         hw_track(p, size);
     return p;
@@ -758,11 +776,17 @@ IRAM_ATTR void *__wrap_heap_caps_malloc_default(size_t size)
 
 IRAM_ATTR void *__wrap_heap_caps_realloc(void *ptr, size_t size, uint32_t caps)
 {
+    instrument_heaptrace_realloc_pre();
     if (hw_skip())
-        return __real_heap_caps_realloc(ptr, size, caps);
+    {
+        void *q = __real_heap_caps_realloc(ptr, size, caps);
+        instrument_heaptrace_realloc(q, ptr, size);
+        return q;
+    }
     hw_saved_t sv;
     hw_realloc_pre(ptr, &sv);
     void *p = __real_heap_caps_realloc(ptr, size, caps);
+    instrument_heaptrace_realloc(p, ptr, size);
     if (hw_realloc_post(p, ptr, size, &sv))
         hw_track(p, size);
     return p;
@@ -770,11 +794,17 @@ IRAM_ATTR void *__wrap_heap_caps_realloc(void *ptr, size_t size, uint32_t caps)
 
 IRAM_ATTR void *__wrap_heap_caps_realloc_default(void *ptr, size_t size)
 {
+    instrument_heaptrace_realloc_pre();
     if (hw_skip())
-        return __real_heap_caps_realloc_default(ptr, size);
+    {
+        void *q = __real_heap_caps_realloc_default(ptr, size);
+        instrument_heaptrace_realloc(q, ptr, size);
+        return q;
+    }
     hw_saved_t sv;
     hw_realloc_pre(ptr, &sv);
     void *p = __real_heap_caps_realloc_default(ptr, size);
+    instrument_heaptrace_realloc(p, ptr, size);
     if (hw_realloc_post(p, ptr, size, &sv))
         hw_track(p, size);
     return p;
@@ -782,6 +812,7 @@ IRAM_ATTR void *__wrap_heap_caps_realloc_default(void *ptr, size_t size)
 
 IRAM_ATTR void __wrap_heap_caps_free(void *ptr)
 {
+    instrument_heaptrace_free(ptr);
     if (hw_skip())
     {
         if (ptr != NULL && esp_ptr_internal(ptr))

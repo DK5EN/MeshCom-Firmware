@@ -65,6 +65,10 @@ void instrument_heapmap(void);
 /** Drain the step-event ring and sample the largest free block. Called from instrument_note_loop_tick(). */
 void instrument_heap_tick(void);
 
+/** True when pc lies inside allocator glue (malloc, calloc, realloc, pvPortMalloc, _malloc_r, operator new ...):
+ *  such frames are skipped when the call site is taken. Shared by the allocation table and the serial trace. */
+bool instrument_heap_is_glue(uint32_t pc);
+
 #ifdef __cplusplus
 extern "C" {
 #endif

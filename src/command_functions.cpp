@@ -30,6 +30,7 @@
 #include "instrument.h"     // TEMPORARY -- measurement scaffolding, see src/instrument.h
 #if defined(ESP32)
 #include "instrument_probe.h" // TEMPORARY -- OTA-LOWHEAP-01 function heap probes
+#include "instrument_heaptrace.h" // TEMPORARY -- OTA-LOWHEAP-01 serial allocation trace (--heaptrace mark)
 #endif
 #include "batt_functions.h"
 #include "batt_info.h"       // --info battery line: factor vs multiplier
@@ -6987,6 +6988,27 @@ void commandAction(char *umsg_text, bool ble)
     }
     else
     #if defined(ESP32)
+    // --heaptrace mark <name>: marker line in the serial allocation trace (needs INSTR_HEAPTRACE build). Before "heap".
+    if(commandCheck(msg_text+2, (char*)"heaptrace") == 0)
+    {
+        const char *a = msg_text + 11;
+        while (*a == ' ')
+            a++;
+        if (!instrument_heaptrace_enabled())
+            Serial.printf("[HT];unavailable\n"); // INSTRUMENT build without INSTR_HEAPTRACE
+        else if (strncmp(a, "mark", 4) == 0 && (a[4] == '\0' || a[4] == ' '))
+        {
+            a += 4;
+            while (*a == ' ')
+                a++;
+            instrument_heaptrace_mark(*a ? a : "mark");
+            Serial.printf("[HT];mark;ok\n");
+        }
+        else
+            Serial.printf("[HT];usage;--heaptrace mark <name>\n");
+        return;
+    }
+    else
     // --heapwatch on|off|dump|clear: live internal-RAM allocation table (needs INSTR_HEAPWATCH build). Before "heap" (prefix match).
     if(commandCheck(msg_text+2, (char*)"heapwatch") == 0)
     {
