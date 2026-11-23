@@ -1,0 +1,148 @@
+Error: Invariant F1 is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ heap = ........................
+/\ job = [ pc |-> "idle", gate |-> FALSE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [tabs |-> {}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 0]
+/\ sys = [ permDone |-> FALSE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 2: <TabArrive line 217, col 5 to line 219, col 39 of module heap_frag>
+/\ heap = ........................
+/\ job = [ pc |-> "idle", gate |-> FALSE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [tabs |-> {"w1"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 1]
+/\ sys = [ permDone |-> FALSE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 3: <TabArrive line 217, col 5 to line 219, col 39 of module heap_frag>
+/\ heap = ........................
+/\ job = [ pc |-> "idle", gate |-> FALSE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> FALSE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 4: <JobStart line 105, col 5 to line 110, col 17 of module heap_frag>
+/\ heap = SSS.....................
+/\ job = [ pc |-> "gate", gate |-> FALSE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> FALSE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 5: <Gate line 150, col 9 to line 150, col 67 of module heap_frag>
+/\ heap = SSS.....................
+/\ job = [ pc |-> "prep1", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> FALSE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 6: <AuAlloc line 153, col 5 to line 160, col 55 of module heap_frag>
+/\ heap = SSSg....................
+/\ job = [ pc |-> "prep2", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> FALSE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 7: <AuAlloc line 153, col 5 to line 160, col 55 of module heap_frag>
+/\ heap = SSSgc...................
+/\ job = [ pc |-> "r1", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> FALSE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 8: <AuAlloc line 153, col 5 to line 160, col 55 of module heap_frag>
+/\ heap = SSSgc11111..............
+/\ job = [ pc |-> "r2", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> FALSE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 9: <AuAlloc line 153, col 5 to line 160, col 55 of module heap_frag>
+/\ heap = SSSgc1111122222.........
+/\ job = [ pc |-> "hs1", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> FALSE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 10: <AuAlloc line 153, col 5 to line 160, col 55 of module heap_frag>
+/\ heap = SSSgc1111122222hh.......
+/\ job = [ pc |-> "hs2", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> FALSE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 11: <AuAlloc line 153, col 5 to line 160, col 55 of module heap_frag>
+/\ heap = SSSgc1111122222hhHH.....
+/\ job = [ pc |-> "sha", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> FALSE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 12: <AuAlloc line 153, col 5 to line 160, col 55 of module heap_frag>
+/\ heap = SSSgc1111122222hhHHa....
+/\ job = [ pc |-> "perm", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> FALSE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 13: <PermStep line 174, col 5 to line 181, col 55 of module heap_frag>
+/\ heap = SSSgc1111122222hhHHaP...
+/\ job = [ pc |-> "hsdone", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> TRUE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 14: <AuFree line 163, col 5 to line 164, col 76 of module heap_frag>
+/\ heap = SSSgc1111122222.....P...
+/\ job = [ pc |-> "lw", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> TRUE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 15: <AuAlloc line 153, col 5 to line 160, col 55 of module heap_frag>
+/\ heap = SSSgc1111122222l....P...
+/\ job = [ pc |-> "body", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> TRUE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 16: <WebServe line 230, col 5 to line 232, col 38 of module heap_frag>
+/\ heap = SSSgc1111122222lWW..P...
+/\ job = [ pc |-> "body", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> TRUE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 17: <Body line 186, col 12 to line 188, col 90 of module heap_frag>
+/\ heap = SSSgc...........WW..P...
+/\ job = [ pc |-> "r1", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 1, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> TRUE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 18: <AuAlloc line 153, col 5 to line 160, col 55 of module heap_frag>
+/\ heap = SSSgc11111......WW..P...
+/\ job = [ pc |-> "r2", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 1, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> TRUE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 19: <WebServe line 230, col 5 to line 232, col 38 of module heap_frag>
+/\ heap = SSSgc11111WW....WW..P...
+/\ job = [ pc |-> "r2", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 1, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> TRUE, reboots |-> 0, result |-> "none", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 20: <AuAlloc line 153, col 5 to line 160, col 55 of module heap_frag>
+/\ heap = SSSgc11111WW....WW..P...
+/\ job = [ pc |-> "unwind", gate |-> TRUE, failed |-> {"tls"}, purged |-> FALSE, hops |-> 1, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> TRUE, reboots |-> 0, result |-> "fail", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 21: <Unwind line 201, col 11 to line 204, col 52 of module heap_frag>
+/\ heap = SSS.......WW....WW..P...
+/\ job = [ pc |-> "done", gate |-> FALSE, failed |-> {"tls"}, purged |-> FALSE, hops |-> 1, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> TRUE, reboots |-> 0, result |-> "fail", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 22: <IdleFree line 206, col 13 to line 206, col 87 of module heap_frag>
+/\ heap = ..........WW....WW..P...
+/\ job = [ pc |-> "done", gate |-> FALSE, failed |-> {"tls"}, purged |-> FALSE, hops |-> 1, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> TRUE, reboots |-> 0, result |-> "fail", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 23: <JobStart line 105, col 5 to line 110, col 17 of module heap_frag>
+/\ heap = SSS.......WW....WW..P...
+/\ job = [ pc |-> "gate", gate |-> FALSE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> TRUE, reboots |-> 0, result |-> "fail", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> TRUE ]
+
+State 24: <Gate line 150, col 9 to line 150, col 67 of module heap_frag>
+/\ heap = SSS.......WW....WW..P...
+/\ job = [ pc |-> "prep1", gate |-> TRUE, failed |-> {}, purged |-> FALSE, hops |-> 0, held |-> {} ]
+/\ env = [ tabs |-> {"w1", "w2"}, phone |-> FALSE, con |-> FALSE, conTls |-> FALSE, churn |-> 2 ]
+/\ sys = [ permDone |-> TRUE, reboots |-> 0, result |-> "fail", everOk |-> FALSE, pool |-> {}, lastLF |-> -1, lastPD |-> FALSE, envChg |-> TRUE, f5viol |-> FALSE, gOk |-> FALSE ]
+
+The depth of the complete state graph search is 24.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 6 and the 95th percentile is 2).

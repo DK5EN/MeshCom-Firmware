@@ -188,3 +188,41 @@ Scope: S3 boards without PSRAM only; PSRAM boards and the RAK4631 keep the large
      power cycle; read the exact refusal token, the `[AU];refuse;lowheap;...` line, the alloc-fail line, and free /
      largest block 30 s after boot.
   3. Margin: step `--heapeat <kb>` up until the check, then the download, refuses.
+
+## 2026-11-23: night result, heap map instruments, red on the bench, TLA+
+
+- **06:00 trigger:** no lowheap refusal. DK5EN-1 staged 3/3 after 15.7 h under web load (free 97 KB, block 61 KB);
+  DK5EN-14 (PSRAM) 3/3; DK5EN-92 console dropped at the check, no reboot. The free heap of DK5EN-1 stayed at 93-100
+  KB all night; what fell was the low-water mark: 82 -> 14.4 KB at the first AU check (14:30), 10.9 KB at the ratchet
+  checks, **2.9 KB during the first download** (06:01). Every AU TLS session takes 85-97 KB for a short time.
+- **Loggers stopped 22:22:** the Mac briefly had < 500 MB free and `tools/meshlogger.py` exits by design below
+  `--minfree`. Fixed: it now keeps the console, pauses writing node lines and resumes 200 MB above the limit
+  (regression test `TestMeshloggerDiskLow`, red before, green after).
+- **Instruments (INSTRUMENT builds, ESP32 only):** `src/instrument_heap.cpp` (heap_caps_* wrap from the first
+  allocation, live table, call sites with backtrace, 5 KB step events `[INSTR-STEP]` reported when free moved a
+  full step from the last report, heap map `--heapmap`, `--heapsites`, `--heapstep`), `src/instrument_probe.cpp`
+  (`--heapprobe list|<id>|all`: AU check, DNS, bare TLS handshake, WiFi scan, every web page into a discard sink).
+  Two Opus advisor passes, all items fixed. Static cost on the V3: 23 KB (live table 10 KB, sites 10 KB); T-Beam
+  build uses 512/64. Host tool `tools/bench/heaptimeline.py` (timeline HTML, steps, sites resolved via addr2line,
+  map, probes; 15 tests). Flash note: the fork's ESP32 layout has safeboot at 0x10000 and the app at 0xC0000 (see
+  the variant `upload_command`); flashing the app at 0x10000 boot-loops the node.
+- **Red on the bench (DK5EN-1, heapwatch image, 23 KB less free):** AU check gate ok at free 60 KB / block 51 KB,
+  then TLS fails: `lowheap_tls -32512` (16717 B record calloc) or `-10368` (53 failed X509 allocs, low-water 588
+  B). Bare TLS handshake to api.github.com: peak 67.6 KB. DNS 15 KB, WiFi scan 10 KB, web pages 4.5-7 KB peak and
+  ~3 KB held. DK5EN-92: AU refuses `lowheap_ble_off`, free 40 KB.
+- **TLA+ (`specs/tla/`, TLC, 57 cfgs, all as expected):** heap.tla H1-H8 hold with mutations; heap_frag.tla today
+  violates F2 (gate passes, TLS fails), F3, F4, F6 (32 KB dry-run alloc after the download), F7 and F8p (update from
+  the web GUI with its own tab plus a phone, the field report). Static reservation fixes F8p but starves the phone
+  (F8s); sweep PoolN x R: no reservation satisfies both. The budget does not close.
+- **Fable advisor budget (V3, normal image):** permanent 132 KB + AU/TLS 74 + tab 8 + phone ~6 + reserve 8 = 228 KB
+  vs ~225 KB usable. Prebuilt mbedTLS has no buffer knob (SSL_MAX_CONTENT_LEN 16384, no asymmetric/dynamic, checked
+  in the framework sdkconfig). ssl_client parses the 5 roots before it allocates the records. BLE controller 31.7
+  KB, NimBLE 10 KB, system task stacks 23 KB; 62 KB had no owner (site table overflow).
+- **Operator decision (2026-11-23): A + B.** A = admission rules during an AU session (S3 total-free rule, twPurge
+  before the first gate, session flag, web 503 except AU status, no WiFi scan). B = fork copy of the TLS client
+  (records first, one root per host, free CA chain after the handshake). Not chosen now: BearSSL-class client (C),
+  update after a fresh boot without BLE (D).
+- **Wave 2 (dispatched 2026-11-23):** 2a owner table + site recycling (`src/instrument_heap.*`), 2b fix A
+  (`src/fw_update.h`, `src/esp32/fw_update_net.cpp`, `web_functions.cpp`, `test/test_fw_update`), 2c fix B
+  (`src/esp32/mc_tls/`, `src/fw_update_roots.h`, `test/test_fw_update_roots`). Orchestrator integrates McTlsClient
+  into fw_update_net.cpp at the gate. Run folder: `tools/bench/runs/harness/ota-lowheap-heapmap-20261123/`.

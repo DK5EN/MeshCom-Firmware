@@ -184,5 +184,33 @@ class TestMeshloggerZombie(unittest.TestCase):
         self.assertNotIn("could NOT be restored", log)
 
 
+class TestMeshloggerDiskLow(unittest.TestCase):
+    """OTA-LOWHEAP-01 night 2026-11-22: all loggers quit at 22:22 when the Mac
+    briefly had < 500 MB free and the overnight heap curves were lost. Below
+    --minfree the logger must keep the console and pause writing, not exit.
+    fails-before: the old logger exits with code 3 at the first status tick."""
+
+    def test_disk_low_pauses_instead_of_exiting(self):
+        srv = FakeConsole()
+        srv.start()
+        outdir = tempfile.mkdtemp(prefix="meshlogger_disklow_")
+        proc = subprocess.run(
+            [sys.executable, MESHLOGGER, "127.0.0.1",
+             "--port", str(srv.port), "--outdir", outdir,
+             "--seconds", "15", "--stall-timeout", "3",
+             "--minfree", str(10 ** 12)],
+            capture_output=True, timeout=120)
+        srv.stop.set()
+        self.assertEqual(proc.returncode, 0, proc.stderr.decode(errors="replace"))
+        log = ""
+        for name in sorted(os.listdir(outdir)):
+            if name.endswith(".log"):
+                log += open(os.path.join(outdir, name), errors="replace").read()
+        self.assertIn("[LOGGER] disk low", log)
+        self.assertNotIn("stopping: only", log)
+        status = open(os.path.join(outdir, "status.txt")).read()
+        self.assertIn("disk_low=1", status)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

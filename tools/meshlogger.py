@@ -241,6 +241,9 @@ class Sink:
             self.fh = None
 
 
+DISK_RESUME_MB = 200  # hysteresis above --minfree before writing resumes
+
+
 def free_mb(path):
     return shutil.disk_usage(path).free // (1024 * 1024)
 
@@ -263,7 +266,9 @@ def main():
     ap.add_argument("--cmd", action="append", default=[],
                     help="console command to send once after the first connect "
                          "(repeatable), e.g. --cmd=--info")
-    ap.add_argument("--minfree", type=int, default=500, help="stop below N MB free")
+    ap.add_argument("--minfree", type=int, default=500,
+                    help="below N MB free, keep the console but stop writing node lines "
+                         "until N+%d MB are free again" % DISK_RESUME_MB)
     ap.add_argument("--no-debug-flags", action="store_true",
                     help="do not switch the node, only record what it emits")
     ap.add_argument("--flags", default=DEFAULT_FLAGS,
@@ -306,6 +311,8 @@ def main():
     last_status = 0.0
     backoff = BACKOFF_MIN
     reason = "running"
+    disk_low = False
+    dropped = 0
 
     sink.write("[LOGGER] start host=%s hours=%.1f outdir=%s" % (args.host, run_s / 3600.0, outdir))
     cmds_sent = False
@@ -401,7 +408,10 @@ def main():
                     buf += chunk
                     while b"\n" in buf:
                         line, _, buf = buf.partition(b"\n")
-                        sink.write(line.decode(errors="replace").rstrip("\r"))
+                        if disk_low:
+                            dropped += 1
+                        else:
+                            sink.write(line.decode(errors="replace").rstrip("\r"))
                     if len(buf) > 65536:        # no newline in 64 KB -- drop it
                         sink.write("[LOGGER] oversized line discarded (%d B)" % len(buf))
                         buf = b""
@@ -425,7 +435,8 @@ def main():
                             "pid=%d\nhost=%s\nstart=%s\nnow=%s\n"
                             "tz=%s\nutc_offset=%s\nstart_iso=%s\nnow_iso=%s\n"
                             "elapsed_h=%.2f\nremaining_h=%.2f\n"
-                            "lines=%d\nbytes=%d\nreconnects=%d\nfree_mb=%d\nstatus=%s\n"
+                            "lines=%d\nbytes=%d\nreconnects=%d\nfree_mb=%d\n"
+                            "disk_low=%d\ndropped=%d\nstatus=%s\n"
                             % (os.getpid(), args.host,
                                at(started, tz).strftime("%Y-%m-%d %H:%M:%S"),
                                at(now, tz).strftime("%Y-%m-%d %H:%M:%S"),
@@ -433,11 +444,17 @@ def main():
                                at(started, tz).isoformat(timespec="seconds"),
                                at(now, tz).isoformat(timespec="seconds"),
                                (now - started) / 3600.0, max(0.0, (deadline - now) / 3600.0),
-                               sink.lines, sink.bytes, reconnects, free_now, reason))
-                    if free_now < args.minfree:
-                        sink.write("[LOGGER] stopping: only %d MB free" % free_now)
-                        reason = "stopped: out of disk"
-                        raise SystemExit(3)
+                               sink.lines, sink.bytes, reconnects, free_now,
+                               int(disk_low), dropped, reason))
+                    # Low disk pauses writing; the console stays held so the
+                    # node is not disturbed and logging resumes by itself.
+                    if not disk_low and free_now < args.minfree:
+                        sink.write("[LOGGER] disk low: %d MB free, pausing node lines" % free_now)
+                        disk_low = True
+                    elif disk_low and free_now >= args.minfree + DISK_RESUME_MB:
+                        disk_low = False
+                        sink.write("[LOGGER] disk ok again: %d MB free, %d lines dropped"
+                                   % (free_now, dropped))
 
         except SystemExit:
             raise
@@ -491,13 +508,15 @@ def main():
     console.close()
     if reason == "running":
         reason = "finished: time elapsed" if not stop_requested else "finished: signal"
-    sink.write("[LOGGER] end (%s) lines=%d bytes=%d reconnects=%d"
-               % (reason, sink.lines, sink.bytes, reconnects))
+    sink.write("[LOGGER] end (%s) lines=%d bytes=%d reconnects=%d dropped=%d"
+               % (reason, sink.lines, sink.bytes, reconnects, dropped))
     with open(status_path, "w") as fh:
         end = now_in(tz)
-        fh.write("pid=%d\nhost=%s\nlines=%d\nbytes=%d\nreconnects=%d\nstatus=%s\nend=%s\n"
+        fh.write("pid=%d\nhost=%s\nlines=%d\nbytes=%d\nreconnects=%d\n"
+                 "disk_low=%d\ndropped=%d\nstatus=%s\nend=%s\n"
                  "tz=%s\nutc_offset=%s\nend_iso=%s\n"
-                 % (os.getpid(), args.host, sink.lines, sink.bytes, reconnects, reason,
+                 % (os.getpid(), args.host, sink.lines, sink.bytes, reconnects,
+                    int(disk_low), dropped, reason,
                     end.strftime("%Y-%m-%d %H:%M:%S"), sink.label, utc_offset(end),
                     end.isoformat(timespec="seconds")))
     sink.close()
