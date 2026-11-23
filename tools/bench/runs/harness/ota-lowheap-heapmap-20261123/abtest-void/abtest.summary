@@ -1,0 +1,4 @@
+11:32:41 run=0 verify=on ok=False gate_free=71604 imin=2824 tls_peak=49384 dl_ms=? fails=0
+11:43:22 run=1 verify=off ok=False gate_free=69996 imin=3260 tls_peak=49384 dl_ms=? fails=1
+11:51:34 run=2 verify=on ok=False gate_free=? imin=3964 tls_peak=49384 dl_ms=? fails=0
+12:02:15 run=3 verify=off ok=False gate_free=71584 imin=4316 tls_peak=49384 dl_ms=? fails=0

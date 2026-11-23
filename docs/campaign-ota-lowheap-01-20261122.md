@@ -226,3 +226,31 @@ Scope: S3 boards without PSRAM only; PSRAM boards and the RAK4631 keep the large
   (`src/fw_update.h`, `src/esp32/fw_update_net.cpp`, `web_functions.cpp`, `test/test_fw_update`), 2c fix B
   (`src/esp32/mc_tls/`, `src/fw_update_roots.h`, `test/test_fw_update_roots`). Orchestrator integrates McTlsClient
   into fw_update_net.cpp at the gate. Run folder: `tools/bench/runs/harness/ota-lowheap-heapmap-20261123/`.
+
+## 2026-11-23: A/B test, chain verification on the download host (switch removed)
+
+- **Result: no measurable saving.** Turning off TLS chain verification for the asset CDN host
+  (`*.githubusercontent.com`) during the download does not lower the heap peak. The switch is removed again, it was
+  never committed; full verification stays on every host.
+- **Setup:** DK5EN-1 (Heltec V3), INSTRUMENT image with a RAM-only bench switch (`--update dlverify on|off`) and the
+  version stamp 11.20, so that release v4.40a.11.22 counts as newer. 6 real downloads, alternating on/off; every
+  switch command was acknowledged by the node (`[AU];dlverify;on` / `off_cdn`). Usage = free at the pre-download
+  gate minus the low-water mark during the download.
+
+  | Chain verification | Usage per run (KB) | Mean    | Download time | Failed allocs | Staged |
+  | ------------------ | ------------------ | ------- | ------------- | ------------- | ------ |
+  | on                 | 65.9 / 70.1 / 64.9 | 67.0 KB | ~11.0 s       | 0             | 3/3    |
+  | off (CDN host)     | 66.9 / 66.1 / 66.9 | 66.6 KB | ~10.5 s       | 0             | 3/3    |
+
+- The 0.4 KB difference is far below the run-to-run spread (5 KB).
+- Discarded: an earlier round (`abtest2.summary`, `abtest-void/`) never downloaded, because the image carried the
+  build date and 11.22 was not newer. A run without a real download now aborts the test as invalid.
+- Likely cause, not measured: the peak sits in the data transfer, not in the handshake. The root certificate is
+  already freed after the handshake (fix B), the server chain is parsed either way; what remains are the two 16.7 KB
+  TLS record buffers plus the inflate buffer. Only a rebuild of mbedTLS itself reaches the record buffers.
+- Evidence: `tools/bench/runs/harness/ota-lowheap-heapmap-20261123/abtest3.summary`.
+- **Next: knockout runs R0-R7 on DK5EN-1** (one feature off per run; free heap, heap per owner, check + download).
+  R0 baseline, R1 web server off, R2 KISS off, R3 AppLink off, R4 gateway + EXTUDP off, R5 mailbox off, R6 GPS /
+  display / sensors off (control), R7 everything that can be switched off. B1 image with `DISABLE_BLE`, B2 without
+  BLE, AppLink and KISS. R4 runs on DK5EN-1 only with an operator OK (it interrupts the gateway); without it, R4
+  runs on the T-Beam only.

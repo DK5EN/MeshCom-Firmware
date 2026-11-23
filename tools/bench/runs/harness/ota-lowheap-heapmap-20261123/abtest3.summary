@@ -1,0 +1,6 @@
+13:07:37 run=0 verify=on dlverify_line=on ok=True gate_free=85096 lowest=19200 used=65896 dl_ms=11003 fails=0
+13:08:43 run=1 verify=off dlverify_line=? ok=True gate_free=85100 lowest=18240 used=66860 dl_ms=10420 fails=0
+13:09:50 run=2 verify=on dlverify_line=? ok=True gate_free=85100 lowest=15032 used=70068 dl_ms=10871 fails=0
+13:10:57 run=3 verify=off dlverify_line=off_cdn ok=True gate_free=85100 lowest=18964 used=66136 dl_ms=10375 fails=0
+13:12:04 run=4 verify=on dlverify_line=on ok=True gate_free=85092 lowest=20168 used=64924 dl_ms=11180 fails=0
+13:13:11 run=5 verify=off dlverify_line=off_cdn ok=True gate_free=85100 lowest=18176 used=66924 dl_ms=10792 fails=0

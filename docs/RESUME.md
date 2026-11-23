@@ -28,6 +28,9 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
     times on DK5EN-1, -92, -14. Next: read `trigger.summary`, the `[INSTR-HEAP]` curves (free, largest block) and
     `reboot-events.log`; red = `lowheap` refusal. Then the fix wave (update after a fresh boot, D7-D10) with
     red-before tests; DK5EN-1 stays gateway and DK5EN-98 stays on the INSTRUMENT image until the new fork release on 2026-11-23, which upgrades the whole fleet (operator).
+  - 2026-11-23: fixes A + B committed (`878ebef4`), V3 green on the INSTRUMENT image. A/B test: chain verification
+    off on the download host saves nothing measurable (67.0 vs 66.6 KB), switch removed. Next: knockout runs R0-R7
+    (campaign doc), then T-Beam budget.
 - **PR #1316 merged upstream (2026-11-22), synced:** [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md).
   21 issues closed (#1287-#1302, #1304, #1310, #1312, #1314, #1315). Merge `dc5ea81c` keeps fork-dev on every path
   (upstream copies differ only in comments); tree unchanged, gate stage 1,2 PASS, V3 and RAK4631 build. Worktree
