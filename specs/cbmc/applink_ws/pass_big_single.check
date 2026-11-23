@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/applink_ws.cpp"
+CFLAGS="-I$ROOT/src -DMODE_BIG -DBIG_SINGLE -DBIG_FIXED -DBIGCALLS=2"
+FLAGS="--unwind 310"
+EXPECT=pass
+CHECKS="one BIN frame, 16-bit length 297..302 vs APPLINK_MAX_IN=300, chunks header|payload: msg[300] filled but never overrun, 1009 beyond"
+TIMEOUT=1800

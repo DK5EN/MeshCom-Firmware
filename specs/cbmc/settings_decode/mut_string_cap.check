@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DMODE_STRING -DMUT_CAP"
+FLAGS="--unwind 11"
+EXPECT=fail
+CHECKS="mutation: out buffer one smaller than cap"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

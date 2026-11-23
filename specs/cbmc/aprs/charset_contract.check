@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="charset_harness.cpp $ROOT/src/charset_filter.cpp"
+CFLAGS="-I$ROOT/src -DMAXLEN=40"
+FLAGS="--unwind 46"
+EXPECT=pass
+CHECKS="charset_filter_apply(PLAIN): in bounds, result <= len (decodeAPRS contract)"

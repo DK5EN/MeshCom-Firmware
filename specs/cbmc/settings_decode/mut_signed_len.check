@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DMODE_SIGNED -DMUT_LEN"
+FLAGS="--unwind 12"
+EXPECT=fail
+CHECKS="mutation: value buffer one smaller than value_len (decode_signed)"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

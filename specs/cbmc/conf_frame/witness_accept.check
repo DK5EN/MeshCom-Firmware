@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/conf_frame.cpp"
+CFLAGS="-I$ROOT/src -DWITNESS_ACCEPT"
+FLAGS="--unwind 257"
+EXPECT=fail
+CHECKS="mutation witness_accept"
+EXPECT_PROP='assertion !ok'

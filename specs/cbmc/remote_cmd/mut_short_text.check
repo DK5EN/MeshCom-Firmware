@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp hmac_model.cpp $ROOT/src/remote_cmd.cpp"
+CFLAGS="-I$ROOT/src -Ishim -DNATIVE_BUILD=1 -DMUT_SHORT_TEXT -DPARSE_ONLY"
+FLAGS="--unwind 45"
+EXPECT=fail
+CHECKS="mutation: text buffer one byte short (no terminator) read by rmParse"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

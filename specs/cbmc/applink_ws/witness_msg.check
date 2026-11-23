@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/applink_ws.cpp"
+CFLAGS="-I$ROOT/src -DWITNESS_MSG"
+FLAGS="--unwind 12"
+EXPECT=fail
+CHECKS="witness: complete message decoded"
+EXPECT_PROP='assertion 0$'

@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DDOC -DWITNESS -DNFREE=2"
+FLAGS="--unwind 90"
+EXPECT=fail
+CHECKS="witness: an asset with a non-empty url is produced (accept path reachable)"
+EXPECT_PROP='assertion !\(out.found'

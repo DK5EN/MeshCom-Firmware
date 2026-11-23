@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/byte_fifo.cpp"
+CFLAGS="-I$ROOT/src "
+FLAGS="--unwind 10"
+EXPECT=pass
+CHECKS="cap 8, any 4 ops (push2/peek/peek_gen/pop_if/pop/iter), shadow model, wrap+eviction"

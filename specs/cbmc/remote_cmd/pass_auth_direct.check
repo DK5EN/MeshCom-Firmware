@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp hmac_model.cpp $ROOT/src/remote_cmd.cpp"
+CFLAGS="-I$ROOT/src -Ishim -DNATIVE_BUILD=1 -DDIRECT"
+FLAGS="--unwind 110"
+EXPECT=pass
+CHECKS="rmCheck over any RmCmd (all bytes nondet), nondet secret/sender/state: memory safety, dispatch => HMAC verified over canonical text"
+TIMEOUT=2400

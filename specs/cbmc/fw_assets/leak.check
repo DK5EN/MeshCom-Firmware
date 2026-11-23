@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DLEAK -DNFREE=6"
+FLAGS="--unwind 90"
+EXPECT=pass
+CHECKS="state reset: nothing of the previous asset survives beginAsset (byte-wise, 6 free bytes in asset 1)"

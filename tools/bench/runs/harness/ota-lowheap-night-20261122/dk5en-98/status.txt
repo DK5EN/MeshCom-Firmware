@@ -1,0 +1,15 @@
+pid=31639
+host=192.168.68.65
+start=2026-11-22 14:26:24
+now=2026-11-22 22:22:44
+tz=Europe/Berlin
+utc_offset=+01:00
+start_iso=2026-11-22T14:26:24+01:00
+now_iso=2026-11-22T22:22:44+01:00
+elapsed_h=7.94
+remaining_h=9.13
+lines=8314
+bytes=917927
+reconnects=1
+free_mb=183
+status=running

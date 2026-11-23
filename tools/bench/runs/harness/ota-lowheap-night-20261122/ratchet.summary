@@ -1,0 +1,3 @@
+21:23:32 DK5EN-1 round=1 before ifree=96280 iblk=61428 after ifree=96492 iblk=61428 | [AU];check;started;chan;prod | [AU];check;tag;v4.40a.11.22;newer;1 | [AU];heap;peak;free;81332;iblk;45044;min;12556;lowest;22912
+21:29:36 DK5EN-1 round=2 before ifree=96036 iblk=61428 after ifree=96036 iblk=61428 | [AU];check;started;chan;prod | [AU];check;tag;v4.40a.11.22;newer;1 | [AU];heap;peak;free;80916;iblk;45044;min;10904;lowest;22500
+21:35:41 DK5EN-1 round=3 before ifree=96492 iblk=61428 after ifree=96040 iblk=61428 | [AU];check;started;chan;prod | [AU];check;tag;v4.40a.11.22;newer;1 | [AU];heap;peak;free;81788;iblk;61428;min;10904;lowest;22876

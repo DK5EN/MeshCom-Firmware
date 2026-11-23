@@ -1,0 +1,151 @@
+# DK5EN-1 Heltec V3, heapwatch image, round 1 2026-11-23 ~10:00, tables cost 23 KB static RAM
+map {'used': 131992, 'untracked': 13448, 'free': 69952, 'holes': 43, 'largest': 57332, 'drops': 0, 'blk': 395}
+probe au_check peak_used 73376 delta 1504 rc err
+probe dns peak_used 15440 delta 1660 rc ok
+probe tls peak_used 67628 delta 2788 rc ok
+probe wifi_scan peak_used 10012 delta 4236 rc ok
+probe page_info peak_used 4732 delta 3060 rc ok
+probe page_setup peak_used 6608 delta 1624 rc ok
+probe page_messages peak_used 4716 delta 3204 rc ok
+probe page_rxlog peak_used 6916 delta 5404 rc ok
+probe page_mheard peak_used 4940 delta 3112 rc ok
+probe page_path peak_used 4656 delta 3060 rc ok
+probe page_neighbours peak_used 4940 delta 2788 rc ok
+probe page_position peak_used 4716 delta 3204 rc ok
+probe page_wx peak_used 4568 delta 3056 rc ok
+probe page_mailbox peak_used 4576 delta 3064 rc ok
+site  255 live 203 bytes  48936 allocs 189079 frees 188876 overflow  ?? ??:0
+site   59 live   2 bytes  12632 allocs      2 frees      0 main      xTaskCreateUniversal esp32/esp32-hal-misc.c:164
+site  200 live   1 bytes   9356 allocs      1 frees      0 loopTask  btdm_controller_init ??:?
+site   29 live   2 bytes   4952 allocs      2 frees      0 -         esp_timer_init src/esp_timer.c:477
+site  207 live   2 bytes   4440 allocs      2 frees      0 loopTask  task_create_wrapper esp32c3/bt.c:683 (discriminator 4)
+site  236 live   2 bytes   3416 allocs      2 frees      0 loopTask  esp_nimble_enable src/nimble_port_freertos.c:64
+site  225 live   1 bytes   3000 allocs      1 frees      0 loopTask  ble_buf_alloc src/transport.c:241
+site   16 live   4 bytes   2736 allocs      4 frees      0 -         esp_ipc_init src/esp_ipc.c:115
+site   41 live   4 bytes   2736 allocs      4 frees      0 -         prvCreateIdleTasks freertos/tasks.c:2383 < vTaskStartScheduler freertos/tasks.c:2430
+site  191 live   1 bytes   2528 allocs      1 frees      0 loopTask  btdm_controller_init ??:?
+site  216 live   9 bytes   2448 allocs      9 frees      0 btContro  r_emi_em_base_init ??:?
+site  199 live   1 bytes   2088 allocs      1 frees      0 loopTask  btdm_controller_init ??:?
+site   67 live   1 bytes   2048 allocs      1 frees      0 loopTask  xRingbufferCreate esp_ringbuf/ringbuf.c:883
+site  201 live   1 bytes   1868 allocs      1 frees      0 loopTask  btdm_controller_init ??:?
+site  184 live   1 bytes   1604 allocs      1 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site  212 live   1 bytes   1260 allocs      1 frees      0 btContro  r_emi_em_base_init ??:?
+site  221 live   1 bytes   1168 allocs      1 frees      0 loopTask  os_msys_buf_alloc src/os_msys_init.c:153
+site  223 live   1 bytes   1152 allocs      1 frees      0 loopTask  ble_buf_alloc src/transport.c:234
+site  209 live   1 bytes   1080 allocs      1 frees      0 btContro  r_emi_em_base_init ??:?
+site  190 live   1 bytes    976 allocs      1 frees      0 loopTask  btdm_controller_init ??:?
+site   56 live   7 bytes    896 allocs      7 frees      0 main      ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&) src/nvs_memory_management.hpp:53 < nvs::HashList::insert(nvs::Item const&, unsigned 
+site  214 live   1 bytes    752 allocs      1 frees      0 btContro  r_emi_em_base_init ??:?
+site  210 live   1 bytes    616 allocs      1 frees      0 btContro  r_emi_em_base_init ??:?
+site  196 live   1 bytes    608 allocs      1 frees      0 loopTask  llm_hci_env_init ??:?
+site  213 live   1 bytes    540 allocs      1 frees      0 btContro  r_emi_em_base_init ??:?
+site  224 live   1 bytes    520 allocs      1 frees      0 loopTask  ble_buf_alloc src/transport.c:238
+site  197 live   1 bytes    444 allocs      1 frees      0 loopTask  ?? ??:0
+site    4 live   1 bytes    428 allocs      1 frees      0 -         __sfmoreglue stdio/findfp.c:132
+site   53 live   1 bytes    424 allocs      1 frees      0 main      nvs::PageManager::load(nvs::Partition*, unsigned int, unsigned int) src/nvs_pagemanager.cpp:20 (discriminator 4)
+site  195 live   1 bytes    408 allocs      1 frees      0 loopTask  r_llm_env_init ??:?
+site  208 live   1 bytes    328 allocs      1 frees      0 btContro  r_emi_em_base_init ??:?
+site   65 live   1 bytes    324 allocs      9 frees      8 loopTask  xQueueGenericCreate freertos/queue.c:447
+site   57 live  11 bytes    308 allocs     11 frees      0 main      ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&) src/nvs_memory_management.hpp:53 < nvs::Storage::init(unsigned int, unsigned int) sr
+site  222 live   1 bytes    288 allocs      1 frees      0 loopTask  ble_buf_alloc src/transport.c:230
+site  193 live   1 bytes    284 allocs      1 frees      0 loopTask  r_lld_env_init ??:?
+site  189 live   1 bytes    280 allocs      1 frees      0 loopTask  btdm_controller_init ??:?
+site  198 live   1 bytes    260 allocs      1 frees      0 loopTask  r_hci_tl_env_init ??:?
+site   69 live   1 bytes    256 allocs      9 frees      8 loopTask  xRingbufferCreate esp_ringbuf/ringbuf.c:883
+site   64 live   1 bytes    244 allocs      1 frees      0 loopTask  uartBegin esp32/esp32-hal-uart.c:435
+site   33 live   5 bytes    240 allocs      5 frees      0 -         load_partitions spi_flash/partition.c:214 < ensure_partitions_loaded spi_flash/partition.c:74
+site   66 live   1 bytes    236 allocs      1 frees      0 loopTask  xRingbufferCreate esp_ringbuf/ringbuf.c:881
+site   68 live   1 bytes    236 allocs      9 frees      8 loopTask  xRingbufferCreate esp_ringbuf/ringbuf.c:881
+site  194 live   1 bytes    220 allocs      1 frees      0 loopTask  r_llm_env_init ??:?
+site  188 live   1 bytes    216 allocs      1 frees      0 loopTask  esp_bt_controller_init esp32c3/bt.c:1205
+site  227 live   1 bytes    212 allocs      1 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site   82 live   1 bytes    200 allocs      1 frees      0 loopTask  i2c_driver_install driver/i2c.c:254
+site  104 live   1 bytes    200 allocs      1 frees      0 loopTask  i2c_driver_install driver/i2c.c:254
+site  211 live   1 bytes    200 allocs      1 frees      0 btContro  r_emi_em_base_init ??:?
+site    1 live   1 bytes    192 allocs      1 frees      0 -         esp_vfs_register_common vfs/vfs.c:64
+site    2 live   1 bytes    192 allocs      1 frees      0 -         esp_vfs_register_common vfs/vfs.c:64
+site    3 live   1 bytes    192 allocs      1 frees      0 -         esp_vfs_register_common vfs/vfs.c:64
+site   84 live   2 bytes    176 allocs      2 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site   13 live   2 bytes    168 allocs      2 frees      0 -         xQueueGenericCreate freertos/queue.c:447
+site   14 live   2 bytes    168 allocs      2 frees      0 -         xQueueGenericCreate freertos/queue.c:447
+site   15 live   2 bytes    168 allocs      2 frees      0 -         xQueueGenericCreate freertos/queue.c:447
+site   63 live   2 bytes    168 allocs      2 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site   81 live   2 bytes    168 allocs      2 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site   83 live   2 bytes    168 allocs      2 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site  178 live   1 bytes    132 allocs      1 frees      0 loopTask  _Balloc stdlib/mprec.c:106
+site  204 live   2 bytes    132 allocs      2 frees      0 loopTask  btdm_controller_init ??:?
+site    5 live   1 bytes    128 allocs      1 frees      0 -         __smakebuf_r stdio/makebuf.c:53
+site    6 live   1 bytes    128 allocs      1 frees      0 -         __smakebuf_r stdio/makebuf.c:53
+site   55 live   1 bytes    128 allocs      1 frees      0 main      ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&) src/nvs_memory_management.hpp:53 < nvs::HashList::insert(nvs::Item const&, unsigned 
+site   79 live   1 bytes    128 allocs      1 frees      0 loopTask  TwoWire::allocateWireBuffer() src/Wire.cpp:150
+site   80 live   1 bytes    128 allocs      1 frees      0 loopTask  TwoWire::allocateWireBuffer() src/Wire.cpp:157 < TwoWire::allocateWireBuffer() src/Wire.cpp:146
+site  102 live   1 bytes    128 allocs      1 frees      0 loopTask  TwoWire::allocateWireBuffer() src/Wire.cpp:150
+site  103 live   1 bytes    128 allocs      1 frees      0 loopTask  TwoWire::allocateWireBuffer() src/Wire.cpp:157 < TwoWire::allocateWireBuffer() src/Wire.cpp:146
+site   52 live   1 bytes    104 allocs      1 frees      0 main      ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&) src/nvs_memory_management.hpp:53 < nvs::NVSPartitionManager::init_custom(nvs::Partit
+site  215 live   1 bytes    104 allocs      1 frees      0 btContro  r_emi_em_base_init ??:?
+site   36 live   2 bytes     92 allocs      2 frees      0 -         coex_core_pre_init ??:?
+site   37 live   2 bytes     92 allocs      2 frees      0 -         coex_schm_init ??:?
+site  203 live   2 bytes     92 allocs      2 frees      0 loopTask  btdm_controller_init ??:?
+site  205 live   2 bytes     92 allocs      2 frees      0 loopTask  btdm_controller_init ??:?
+site  206 live   2 bytes     92 allocs      2 frees      0 loopTask  btdm_controller_init ??:?
+site  217 live   2 bytes     92 allocs      2 frees      0 btContro  r_vhci_init ??:?
+site    8 live   1 bytes     84 allocs      1 frees      0 -         xQueueGenericCreate freertos/queue.c:447
+site    9 live   1 bytes     84 allocs      1 frees      0 -         xQueueGenericCreate freertos/queue.c:447
+site   11 live   1 bytes     84 allocs      1 frees      0 -         xQueueGenericCreate freertos/queue.c:447
+site   17 live   1 bytes     84 allocs      1 frees      0 -         xQueueGenericCreate freertos/queue.c:447
+site   22 live   1 bytes     84 allocs      1 frees      0 -         xQueueGenericCreate freertos/queue.c:447
+site   23 live   1 bytes     84 allocs      1 frees      0 -         xQueueGenericCreate freertos/queue.c:447
+site   24 live   1 bytes     84 allocs      1 frees      0 -         xQueueGenericCreate freertos/queue.c:447
+site   25 live   1 bytes     84 allocs      1 frees      0 -         xQueueGenericCreate freertos/queue.c:447
+site   26 live   1 bytes     84 allocs      1 frees      0 -         xQueueGenericCreate freertos/queue.c:447
+site   27 live   1 bytes     84 allocs      1 frees      0 -         _GLOBAL__sub_I_timerSerial esp32/esp32_main.cpp:950 < _GLOBAL__sub_I_timerSerial esp32/esp32_main.cpp:6080
+site   48 live   1 bytes     84 allocs      1 frees      0 main      xQueueGenericCreate freertos/queue.c:447
+site   60 live   1 bytes     84 allocs      1 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site   61 live   1 bytes     84 allocs      1 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site   70 live   1 bytes     84 allocs      9 frees      8 loopTask  xQueueGenericCreate freertos/queue.c:447
+site   71 live   1 bytes     84 allocs      9 frees      8 loopTask  xQueueGenericCreate freertos/queue.c:447
+site   72 live   1 bytes     84 allocs      9 frees      8 loopTask  xQueueGenericCreate freertos/queue.c:447
+site   73 live   1 bytes     84 allocs      9 frees      8 loopTask  xQueueGenericCreate freertos/queue.c:447
+site   74 live   1 bytes     84 allocs      9 frees      8 loopTask  xQueueGenericCreate freertos/queue.c:447
+site   78 live   1 bytes     84 allocs      1 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site  101 live   1 bytes     84 allocs      1 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site  185 live   1 bytes     84 allocs      1 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site  187 live   1 bytes     84 allocs      1 frees      0 loopTask  esp_bt_power_domain_on esp32c3/bt.c:450 < esp_bt_controller_init esp32c3/bt.c:1201
+site  226 live   1 bytes     84 allocs      1 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site  228 live   1 bytes     84 allocs      1 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site  229 live   1 bytes     84 allocs      1 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site  230 live   1 bytes     84 allocs      1 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site  232 live   1 bytes     84 allocs      1 frees      0 loopTask  xQueueGenericCreate freertos/queue.c:447
+site  253 live   1 bytes     84 allocs      1 frees      0 loopTask  NimBLEService::start() src/NimBLEService.cpp:124 (discriminator 4)
+site  245 live   1 bytes     68 allocs      1 frees      0 loopTask  NimBLEServer::createService(NimBLEUUID const&) src/NimBLEServer.cpp:95
+site  248 live   1 bytes     64 allocs      1 frees      0 loopTask  NimBLEService::createCharacteristic(NimBLEUUID const&, unsigned int, unsigned short) src/NimBLEService.cpp:206
+site  252 live   1 bytes     64 allocs      1 frees      0 loopTask  NimBLEService::createCharacteristic(NimBLEUUID const&, unsigned int, unsigned short) src/NimBLEService.cpp:206
+site   28 live   1 bytes     48 allocs      1 frees      0 -         Module::Module(unsigned int, unsigned int, unsigned int, unsigned int) src/Module.cpp:11
+site   38 live   1 bytes     48 allocs      1 frees      0 -         coex_rom_osi_funcs_init ??:?
+site  249 live   2 bytes     48 allocs      2 frees      0 loopTask  NimBLEAttValue::NimBLEAttValue(unsigned short, unsigned short) src/NimBLEAttValue.cpp:33
+site   49 live   1 bytes     40 allocs      1 frees      0 main      nvs::NVSPartitionManager::get_instance() src/nvs_partition_manager.cpp:22
+site   75 live   1 bytes     40 allocs      9 frees      8 loopTask  uart_pattern_queue_reset driver/uart.c:520 (discriminator 2)
+site  192 live   1 bytes     40 allocs      1 frees      0 loopTask  btdm_controller_init ??:?
+site   77 live   1 bytes     32 allocs    239 frees    238 loopTask  String::changeBuffer(unsigned int) esp32/WString.cpp:200 (discriminator 4)
+site  231 live   1 bytes     32 allocs      1 frees      0 loopTask  npl_freertos_callout_init src/npl_os_freertos.c:1799
+site  237 live   1 bytes     32 allocs      1 frees      0 nimble_h  npl_freertos_callout_init src/npl_os_freertos.c:1799
+site  238 live   1 bytes     32 allocs      1 frees      0 nimble_h  npl_freertos_callout_init src/npl_os_freertos.c:1799
+site  179 live   1 bytes     28 allocs      1 frees      0 loopTask  _Balloc stdlib/mprec.c:127
+site  180 live   1 bytes     24 allocs      1 frees      0 loopTask  _Balloc stdlib/mprec.c:127
+site  241 live   1 bytes     24 allocs      1 frees      0 loopTask  NimBLEDevice::createServer() src/NimBLEDevice.cpp:127
+site   51 live   1 bytes     16 allocs      1 frees      0 main      ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&) src/nvs_memory_management.hpp:53 < nvs::partition_lookup::lookup_nvs_partition(char 
+site   62 live   1 bytes     16 allocs      1 frees      0 loopTask  addApbChangeCallback esp32/esp32-hal-cpu.c:93
+site   85 live   2 bytes     16 allocs      2 frees      0 loopTask  esp_intr_alloc esp_hw_support/intr_alloc.c:605
+site   99 live   1 bytes     16 allocs      1 frees      0 loopTask  Adafruit_MCP23XXX::begin_I2C(unsigned char, TwoWire*) /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/Adafruit MCP23017
+site  100 live   1 bytes     16 allocs      1 frees      0 loopTask  RTC_DS3231::begin(TwoWire*) src/RTC_DS3231.cpp:23
+site  177 live   1 bytes     16 allocs      1 frees      0 loopTask  _dtoa_r stdlib/dtoa.c:234 (discriminator 1)
+site    7 live   1 bytes     12 allocs      1 frees      0 -         pthread_key_create pthread/pthread_local_storage.c:60
+site   12 live   1 bytes     12 allocs      1 frees      0 -         pthread_key_create pthread/pthread_local_storage.c:60
+site  202 live   1 bytes     12 allocs      1 frees      0 loopTask  btdm_controller_init ??:?
+site   10 live   1 bytes      8 allocs      1 frees      0 -         pthread_mutex_init pthread/pthread.c:545
+site   30 live   1 bytes      8 allocs      1 frees      0 -         esp_intr_alloc esp_hw_support/intr_alloc.c:605
+site   76 live   1 bytes      8 allocs      9 frees      8 loopTask  esp_intr_alloc esp_hw_support/intr_alloc.c:605
+site  181 live   1 bytes      8 allocs      1 frees      0 ipc1      ?? ??:0
+site  250 live   1 bytes      8 allocs      2 frees      1 loopTask  __gnu_cxx::new_allocator<NimBLECharacteristic*>::allocate(unsigned int, void const*) ext/new_allocator.h:111 < std::allocator_traits<std::allocator<NimBLECharac
+site    0 live   1 bytes      4 allocs      1 frees      0 -         esp_newlib_init newlib/newlib_init.c:147
+site  246 live   1 bytes      4 allocs      1 frees      0 loopTask  __gnu_cxx::new_allocator<NimBLEService*>::allocate(unsigned int, void const*) ext/new_allocator.h:111 < std::allocator_traits<std::allocator<NimBLEService*> >::

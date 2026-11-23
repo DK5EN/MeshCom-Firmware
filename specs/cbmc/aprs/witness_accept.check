@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-Istubs -I$ROOT/test/support -I$ROOT/src -DNATIVE_BUILD=1 -DUNIT_TEST=1 -DMAXLEN=40 -DWITNESS_TEXT"
+FLAGS="--no-unwinding-assertions --unwind 46"
+EXPECT=fail
+CHECKS="witness: a frame with non-empty text is accepted (accept path reachable)"
+EXPECT_PROP='assertion'

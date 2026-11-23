@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DDEFNUL -DSTRICT_URL"
+FLAGS="--unwind 90"
+EXPECT=fail
+CHECKS="DEFECT: raw NUL byte inside browser_download_url gives found with an empty url"
+EXPECT_PROP='assertion out.url'

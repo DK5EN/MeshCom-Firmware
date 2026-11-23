@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="step.cpp"
+CFLAGS="-I$ROOT/src"
+FLAGS="--unwind 600"
+EXPECT=pass
+CHECKS="inductive step: any invariant state + any byte stays safe, keeps the invariant, result fields NUL-terminated (unbounded input)"

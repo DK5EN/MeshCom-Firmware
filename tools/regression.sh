@@ -21,7 +21,9 @@
 #                  tools/bench, tools/tests, tools/mock; the PEP-723 scripts
 #                  in test/test_nbrlog; node --test over tools/tests/*.mjs;
 #                  the jsdom-based safeboot and Remote page tests; the four --self-test
-#                  tools not covered by selftest.sh.
+#                  tools not covered by selftest.sh; the TLA+ models
+#                  (specs/tla/run_tlc.sh --all) and the ESBMC/CBMC jobs
+#                  (specs/cbmc/run_cbmc.sh --all), SKIP when the tools are missing.
 # Stage 3  bench:  tools/bench/bench_suite.py -- identity guard, per-board
 #                  harness, OTA regression, optional flash/EXTUDP/deep-sleep
 #                  on every fleet.json node that is attached over USB.
@@ -241,6 +243,21 @@ stage2() {
         run_step "self-test $(basename "$f")" "stage2-selftest-$(basename "$f" .py)" \
             uv run --quiet "$f" --self-test
     done
+    # FORMAL-01: TLA+ models (every cfg incl. expect-fail mutations) and bounded model checking
+    # (ESBMC/CBMC jobs incl. mutations). Missing tools are a SKIP, not a pass.
+    if [ -s "${TLA_JAR:-$HOME/.local/share/tla/tla2tools.jar}" ]; then
+        run_step "TLA+ models (run_tlc.sh --all)" stage2-tla specs/tla/run_tlc.sh --all
+    else
+        record "TLA+ models" SKIP "tla2tools.jar not found (TLA_JAR)"
+    fi
+    # Disabled 2026-11-23 (operator): run_cbmc.sh --all ran >13 min in the gate (ESBMC on byte_fifo).
+    # Run it by hand until FORMAL-01 bounds its runtime.
+    # if command -v esbmc >/dev/null 2>&1 && command -v cbmc >/dev/null 2>&1; then
+    #     run_step "bounded model checking (run_cbmc.sh --all)" stage2-cbmc specs/cbmc/run_cbmc.sh --all
+    # else
+    #     record "bounded model checking" SKIP "esbmc/cbmc not installed (brew install esbmc cbmc)"
+    # fi
+    record "bounded model checking" SKIP "disabled in the gate (operator 2026-11-23), run specs/cbmc/run_cbmc.sh --all by hand"
 }
 
 # ---------------------------------------------------------------- stage 3

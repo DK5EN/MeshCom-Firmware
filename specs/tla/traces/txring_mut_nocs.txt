@@ -1,0 +1,193 @@
+Error: Invariant NoSharedSlot is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ ln = <<0, 0>>
+/\ tout = "none"
+/\ wsl = [loop |-> 0, lora |-> 0]
+/\ d1 = <<0, 0>>
+/\ d2 = <<0, 0>>
+/\ evInf = FALSE
+/\ cs = "none"
+/\ pc = [loop |-> "idle", lora |-> "idle"]
+/\ evictCnt = 0
+/\ r1 = 0
+/\ sentLog = {}
+/\ r2 = 0
+/\ tfid = 0
+/\ st = <<"DONE", "DONE">>
+/\ bud = [rb |-> 0, sw |-> 0, ak |-> 0]
+/\ tsl = 0
+/\ fid = [loop |-> 0, lora |-> 0]
+/\ todo = [loop |-> {1}, lora |-> {2}]
+/\ enqDone = 0
+/\ wmode = [loop |-> "none", lora |-> "none"]
+/\ expInf = FALSE
+/\ tstamp = 0
+/\ gen = <<0, 0>>
+/\ fate = <<"new", "new">>
+/\ tprev = "DONE"
+
+State 2: <EStart line 66, col 14 to line 70, col 88 of module txring>
+/\ ln = <<0, 0>>
+/\ tout = "none"
+/\ wsl = [loop |-> 0, lora |-> 0]
+/\ d1 = <<0, 0>>
+/\ d2 = <<0, 0>>
+/\ evInf = FALSE
+/\ cs = "none"
+/\ pc = [loop |-> "eLock", lora |-> "idle"]
+/\ evictCnt = 0
+/\ r1 = 0
+/\ sentLog = {}
+/\ r2 = 0
+/\ tfid = 0
+/\ st = <<"DONE", "DONE">>
+/\ bud = [rb |-> 0, sw |-> 0, ak |-> 0]
+/\ tsl = 0
+/\ fid = [loop |-> 1, lora |-> 0]
+/\ todo = [loop |-> {1}, lora |-> {2}]
+/\ enqDone = 0
+/\ wmode = [loop |-> "none", lora |-> "none"]
+/\ expInf = FALSE
+/\ tstamp = 0
+/\ gen = <<0, 0>>
+/\ fate = <<"new", "new">>
+/\ tprev = "DONE"
+
+State 3: <EStart line 66, col 14 to line 70, col 88 of module txring>
+/\ ln = <<0, 0>>
+/\ tout = "none"
+/\ wsl = [loop |-> 0, lora |-> 0]
+/\ d1 = <<0, 0>>
+/\ d2 = <<0, 0>>
+/\ evInf = FALSE
+/\ cs = "none"
+/\ pc = [loop |-> "eLock", lora |-> "eLock"]
+/\ evictCnt = 0
+/\ r1 = 0
+/\ sentLog = {}
+/\ r2 = 0
+/\ tfid = 0
+/\ st = <<"DONE", "DONE">>
+/\ bud = [rb |-> 0, sw |-> 0, ak |-> 0]
+/\ tsl = 0
+/\ fid = [loop |-> 1, lora |-> 2]
+/\ todo = [loop |-> {1}, lora |-> {2}]
+/\ enqDone = 0
+/\ wmode = [loop |-> "none", lora |-> "none"]
+/\ expInf = FALSE
+/\ tstamp = 0
+/\ gen = <<0, 0>>
+/\ fate = <<"new", "new">>
+/\ tprev = "DONE"
+
+State 4: <ELock line 73, col 13 to line 77, col 87 of module txring>
+/\ ln = <<0, 0>>
+/\ tout = "none"
+/\ wsl = [loop |-> 0, lora |-> 0]
+/\ d1 = <<0, 0>>
+/\ d2 = <<0, 0>>
+/\ evInf = FALSE
+/\ cs = "none"
+/\ pc = [loop |-> "ePick", lora |-> "eLock"]
+/\ evictCnt = 0
+/\ r1 = 0
+/\ sentLog = {}
+/\ r2 = 0
+/\ tfid = 0
+/\ st = <<"DONE", "DONE">>
+/\ bud = [rb |-> 0, sw |-> 0, ak |-> 0]
+/\ tsl = 0
+/\ fid = [loop |-> 1, lora |-> 2]
+/\ todo = [loop |-> {1}, lora |-> {2}]
+/\ enqDone = 0
+/\ wmode = [loop |-> "none", lora |-> "none"]
+/\ expInf = FALSE
+/\ tstamp = 0
+/\ gen = <<0, 0>>
+/\ fate = <<"new", "new">>
+/\ tprev = "DONE"
+
+State 5: <EPick line 82, col 5 to line 105, col 41 of module txring>
+/\ ln = <<0, 0>>
+/\ tout = "none"
+/\ wsl = [loop |-> 1, lora |-> 0]
+/\ d1 = <<0, 0>>
+/\ d2 = <<0, 0>>
+/\ evInf = FALSE
+/\ cs = "none"
+/\ pc = [loop |-> "eWr1", lora |-> "eLock"]
+/\ evictCnt = 0
+/\ r1 = 0
+/\ sentLog = {}
+/\ r2 = 0
+/\ tfid = 0
+/\ st = <<"DONE", "DONE">>
+/\ bud = [rb |-> 0, sw |-> 0, ak |-> 0]
+/\ tsl = 0
+/\ fid = [loop |-> 1, lora |-> 2]
+/\ todo = [loop |-> {1}, lora |-> {2}]
+/\ enqDone = 0
+/\ wmode = [loop |-> "w", lora |-> "none"]
+/\ expInf = FALSE
+/\ tstamp = 0
+/\ gen = <<0, 0>>
+/\ fate = <<"new", "new">>
+/\ tprev = "DONE"
+
+State 6: <ELock line 73, col 13 to line 77, col 87 of module txring>
+/\ ln = <<0, 0>>
+/\ tout = "none"
+/\ wsl = [loop |-> 1, lora |-> 0]
+/\ d1 = <<0, 0>>
+/\ d2 = <<0, 0>>
+/\ evInf = FALSE
+/\ cs = "none"
+/\ pc = [loop |-> "eWr1", lora |-> "ePick"]
+/\ evictCnt = 0
+/\ r1 = 0
+/\ sentLog = {}
+/\ r2 = 0
+/\ tfid = 0
+/\ st = <<"DONE", "DONE">>
+/\ bud = [rb |-> 0, sw |-> 0, ak |-> 0]
+/\ tsl = 0
+/\ fid = [loop |-> 1, lora |-> 2]
+/\ todo = [loop |-> {1}, lora |-> {2}]
+/\ enqDone = 0
+/\ wmode = [loop |-> "w", lora |-> "none"]
+/\ expInf = FALSE
+/\ tstamp = 0
+/\ gen = <<0, 0>>
+/\ fate = <<"new", "new">>
+/\ tprev = "DONE"
+
+State 7: <EPick line 82, col 5 to line 105, col 41 of module txring>
+/\ ln = <<0, 0>>
+/\ tout = "none"
+/\ wsl = [loop |-> 1, lora |-> 1]
+/\ d1 = <<0, 0>>
+/\ d2 = <<0, 0>>
+/\ evInf = FALSE
+/\ cs = "none"
+/\ pc = [loop |-> "eWr1", lora |-> "eWr1"]
+/\ evictCnt = 0
+/\ r1 = 0
+/\ sentLog = {}
+/\ r2 = 0
+/\ tfid = 0
+/\ st = <<"DONE", "DONE">>
+/\ bud = [rb |-> 0, sw |-> 0, ak |-> 0]
+/\ tsl = 0
+/\ fid = [loop |-> 1, lora |-> 2]
+/\ todo = [loop |-> {1}, lora |-> {2}]
+/\ enqDone = 0
+/\ wmode = [loop |-> "w", lora |-> "w"]
+/\ expInf = FALSE
+/\ tstamp = 0
+/\ gen = <<0, 0>>
+/\ fate = <<"new", "new">>
+/\ tprev = "DONE"
+
+The depth of the complete state graph search is 8.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 2 and the 95th percentile is 2).

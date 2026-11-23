@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/byte_fifo.cpp"
+CFLAGS="-I$ROOT/src -DWITNESS_WRAP"
+FLAGS="--unwind 10"
+EXPECT=fail
+CHECKS="witness: wrap-around reachable"
+EXPECT_PROP='assertion pos '

@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DMODE_STRING"
+FLAGS="--unwind 11"
+EXPECT=pass
+CHECKS="unescape_string: no write past cap, NUL, no read past value_len"

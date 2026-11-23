@@ -1,0 +1,70 @@
+Error: Invariant NoRejectGood is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ sfd = 0
+/\ stops = 0
+/\ peerClosed = {}
+/\ authed = {}
+/\ nconn = 0
+/\ cmdBad = FALSE
+/\ rpc = "idle"
+/\ rconn = 0
+/\ open = <<0, 0>>
+/\ kind = <<"good", "good">>
+/\ wrongTear = FALSE
+/\ rfd = 0
+/\ sAuth = FALSE
+/\ aconn = 0
+/\ apc = "none"
+/\ hs = FALSE
+/\ rejGood = FALSE
+/\ started = TRUE
+/\ dblClose = FALSE
+/\ afd = 0
+
+State 2: <Accept line 72, col 5 to line 89, col 108 of module netconsole>
+/\ sfd = 0
+/\ stops = 0
+/\ peerClosed = {}
+/\ authed = {}
+/\ nconn = 1
+/\ cmdBad = FALSE
+/\ rpc = "idle"
+/\ rconn = 0
+/\ open = <<1, 0>>
+/\ kind = <<"bad", "good">>
+/\ wrongTear = FALSE
+/\ rfd = 0
+/\ sAuth = FALSE
+/\ aconn = 1
+/\ apc = "await"
+/\ hs = TRUE
+/\ rejGood = FALSE
+/\ started = TRUE
+/\ dblClose = FALSE
+/\ afd = 1
+
+State 3: <Accept line 72, col 5 to line 89, col 108 of module netconsole>
+/\ sfd = 0
+/\ stops = 0
+/\ peerClosed = {}
+/\ authed = {}
+/\ nconn = 2
+/\ cmdBad = FALSE
+/\ rpc = "idle"
+/\ rconn = 0
+/\ open = <<1, 0>>
+/\ kind = <<"bad", "good">>
+/\ wrongTear = FALSE
+/\ rfd = 0
+/\ sAuth = FALSE
+/\ aconn = 1
+/\ apc = "await"
+/\ hs = TRUE
+/\ rejGood = TRUE
+/\ started = TRUE
+/\ dblClose = FALSE
+/\ afd = 1
+
+The depth of the complete state graph search is 3.
+The average outdegree of the complete state graph is 4 (minimum is 4, the maximum 4 and the 95th percentile is 4).

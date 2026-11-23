@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/conf_frame.cpp"
+CFLAGS="-I$ROOT/src "
+FLAGS="--unwind 257"
+EXPECT=pass
+CHECKS="memory safety + NUL-terminated fields, len 0..255 (full UDP frame)"

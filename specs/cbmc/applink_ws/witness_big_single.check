@@ -1,0 +1,8 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/applink_ws.cpp"
+CFLAGS="-I$ROOT/src -DMODE_BIG -DBIG_SINGLE -DBIG_FIXED -DBIGCALLS=2 -DWITNESS_BIG"
+FLAGS="--unwind 310"
+EXPECT=fail
+CHECKS="witness: a message filling msg[300] exactly is decoded"
+TIMEOUT=1800
+EXPECT_PROP='assertion g_d.msg_len != APPLINK_MAX_IN$'

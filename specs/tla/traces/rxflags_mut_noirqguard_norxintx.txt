@@ -1,0 +1,264 @@
+Error: Invariant NoRxInTx is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ arr = 0
+/\ processed = 0
+/\ blind = 0
+/\ E = TRUE
+/\ mode = "rx"
+/\ R = FALSE
+/\ T = FALSE
+/\ att = "rx"
+/\ pkt = FALSE
+/\ rxInTx = FALSE
+/\ ET = FALSE
+/\ silent = 0
+/\ air = "none"
+/\ pc = "idle"
+/\ ring = 0
+/\ txq = 1
+/\ txdone = FALSE
+/\ kind = "loop"
+
+State 2: <AirStart line 55, col 13 to line 57, col 119 of module rxflags>
+/\ arr = 1
+/\ processed = 0
+/\ blind = 0
+/\ E = TRUE
+/\ mode = "rx"
+/\ R = FALSE
+/\ T = FALSE
+/\ att = "rx"
+/\ pkt = FALSE
+/\ rxInTx = FALSE
+/\ ET = FALSE
+/\ silent = 0
+/\ air = "inflight"
+/\ pc = "idle"
+/\ ring = 0
+/\ txq = 1
+/\ txdone = FALSE
+/\ kind = "loop"
+
+State 3: <LDispatch line 69, col 14 to line 73, col 120 of module rxflags>
+/\ arr = 1
+/\ processed = 0
+/\ blind = 0
+/\ E = TRUE
+/\ mode = "rx"
+/\ R = FALSE
+/\ T = FALSE
+/\ att = "rx"
+/\ pkt = FALSE
+/\ rxInTx = FALSE
+/\ ET = FALSE
+/\ silent = 0
+/\ air = "inflight"
+/\ pc = "txA"
+/\ ring = 0
+/\ txq = 1
+/\ txdone = FALSE
+/\ kind = "loop"
+
+State 4: <AirDone line 59, col 12 to line 62, col 112 of module rxflags>
+/\ arr = 1
+/\ processed = 0
+/\ blind = 0
+/\ E = TRUE
+/\ mode = "rx"
+/\ R = TRUE
+/\ T = FALSE
+/\ att = "rx"
+/\ pkt = TRUE
+/\ rxInTx = FALSE
+/\ ET = FALSE
+/\ silent = 0
+/\ air = "none"
+/\ pc = "txA"
+/\ ring = 0
+/\ txq = 1
+/\ txdone = FALSE
+/\ kind = "loop"
+
+State 5: <TxA line 134, col 8 to line 136, col 120 of module rxflags>
+/\ arr = 1
+/\ processed = 0
+/\ blind = 0
+/\ E = TRUE
+/\ mode = "rx"
+/\ R = TRUE
+/\ T = FALSE
+/\ att = "rx"
+/\ pkt = TRUE
+/\ rxInTx = FALSE
+/\ ET = FALSE
+/\ silent = 0
+/\ air = "none"
+/\ pc = "txB"
+/\ ring = 0
+/\ txq = 1
+/\ txdone = FALSE
+/\ kind = "loop"
+
+State 6: <TxB line 137, col 8 to line 138, col 112 of module rxflags>
+/\ arr = 1
+/\ processed = 0
+/\ blind = 0
+/\ E = FALSE
+/\ mode = "rx"
+/\ R = TRUE
+/\ T = FALSE
+/\ att = "none"
+/\ pkt = TRUE
+/\ rxInTx = FALSE
+/\ ET = FALSE
+/\ silent = 0
+/\ air = "none"
+/\ pc = "txD"
+/\ ring = 0
+/\ txq = 1
+/\ txdone = FALSE
+/\ kind = "loop"
+
+State 7: <TxD line 140, col 8 to line 142, col 120 of module rxflags>
+/\ arr = 1
+/\ processed = 0
+/\ blind = 0
+/\ E = FALSE
+/\ mode = "rx"
+/\ R = TRUE
+/\ T = FALSE
+/\ att = "none"
+/\ pkt = TRUE
+/\ rxInTx = FALSE
+/\ ET = FALSE
+/\ silent = 0
+/\ air = "none"
+/\ pc = "txE"
+/\ ring = 0
+/\ txq = 1
+/\ txdone = FALSE
+/\ kind = "loop"
+
+State 8: <TxE line 143, col 8 to line 144, col 111 of module rxflags>
+/\ arr = 1
+/\ processed = 0
+/\ blind = 0
+/\ E = FALSE
+/\ mode = "rx"
+/\ R = TRUE
+/\ T = FALSE
+/\ att = "tx"
+/\ pkt = TRUE
+/\ rxInTx = FALSE
+/\ ET = TRUE
+/\ silent = 0
+/\ air = "none"
+/\ pc = "txG"
+/\ ring = 0
+/\ txq = 1
+/\ txdone = FALSE
+/\ kind = "loop"
+
+State 9: <TxG line 146, col 8 to line 149, col 84 of module rxflags>
+/\ arr = 1
+/\ processed = 0
+/\ blind = 1
+/\ E = FALSE
+/\ mode = "tx"
+/\ R = TRUE
+/\ T = FALSE
+/\ att = "tx"
+/\ pkt = FALSE
+/\ rxInTx = FALSE
+/\ ET = TRUE
+/\ silent = 0
+/\ air = "none"
+/\ pc = "idle"
+/\ ring = 0
+/\ txq = 0
+/\ txdone = FALSE
+/\ kind = "loop"
+
+State 10: <LDispatch line 69, col 14 to line 73, col 120 of module rxflags>
+/\ arr = 1
+/\ processed = 0
+/\ blind = 1
+/\ E = FALSE
+/\ mode = "tx"
+/\ R = TRUE
+/\ T = FALSE
+/\ att = "tx"
+/\ pkt = FALSE
+/\ rxInTx = FALSE
+/\ ET = TRUE
+/\ silent = 0
+/\ air = "none"
+/\ pc = "rxE"
+/\ ring = 0
+/\ txq = 0
+/\ txdone = FALSE
+/\ kind = "loop"
+
+State 11: <RxE line 83, col 8 to line 84, col 117 of module rxflags>
+/\ arr = 1
+/\ processed = 0
+/\ blind = 1
+/\ E = FALSE
+/\ mode = "tx"
+/\ R = TRUE
+/\ T = FALSE
+/\ att = "tx"
+/\ pkt = FALSE
+/\ rxInTx = FALSE
+/\ ET = TRUE
+/\ silent = 0
+/\ air = "none"
+/\ pc = "rxR"
+/\ ring = 0
+/\ txq = 0
+/\ txdone = FALSE
+/\ kind = "loop"
+
+State 12: <RxR line 85, col 8 to line 87, col 117 of module rxflags>
+/\ arr = 1
+/\ processed = 0
+/\ blind = 1
+/\ E = FALSE
+/\ mode = "tx"
+/\ R = FALSE
+/\ T = FALSE
+/\ att = "tx"
+/\ pkt = FALSE
+/\ rxInTx = FALSE
+/\ ET = TRUE
+/\ silent = 0
+/\ air = "none"
+/\ pc = "rxRead"
+/\ ring = 0
+/\ txq = 0
+/\ txdone = FALSE
+/\ kind = "loop"
+
+State 13: <RxRead line 89, col 11 to line 99, col 85 of module rxflags>
+/\ arr = 1
+/\ processed = 0
+/\ blind = 1
+/\ E = FALSE
+/\ mode = "tx"
+/\ R = FALSE
+/\ T = FALSE
+/\ att = "tx"
+/\ pkt = FALSE
+/\ rxInTx = TRUE
+/\ ET = TRUE
+/\ silent = 0
+/\ air = "none"
+/\ pc = "rA"
+/\ ring = 0
+/\ txq = 0
+/\ txdone = FALSE
+/\ kind = "loop"
+
+The depth of the complete state graph search is 14.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 2 and the 95th percentile is 2).

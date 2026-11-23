@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="pos_harness.cpp $ROOT/src/charset_filter.cpp"
+CFLAGS="-Istubs -I$ROOT/test/support -I$ROOT/src -DNATIVE_BUILD=1 -DUNIT_TEST=1 -DMAXLEN=24"
+FLAGS="--unwind 30"
+EXPECT=pass
+CHECKS="decodeAPRSPOS memory safety"

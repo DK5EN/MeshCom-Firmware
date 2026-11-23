@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DPRIME -DNFREE=8"
+FLAGS="--unwind 400"
+EXPECT=pass
+CHECKS="250-char url prefix + 8 free bytes (cap 255 edge): safety + url NUL-terminated within cap"

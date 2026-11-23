@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/conf_frame.cpp"
+CFLAGS="-I$ROOT/src -DMUT_SHORT_BUF"
+FLAGS="--unwind 257"
+EXPECT=fail
+CHECKS="mutation mut_short_buf"
+EXPECT_PROP='dereference failure|upper bound|out of bounds'

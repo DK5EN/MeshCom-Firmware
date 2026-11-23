@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DMUT_SHORT -DNFREE=4"
+FLAGS="--unwind 12"
+EXPECT=fail
+CHECKS="mutation mut_short: declared length = array size + 1"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

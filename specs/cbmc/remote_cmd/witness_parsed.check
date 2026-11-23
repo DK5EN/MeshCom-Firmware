@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp hmac_model.cpp $ROOT/src/remote_cmd.cpp"
+CFLAGS="-I$ROOT/src -Ishim -DNATIVE_BUILD=1 -DSTRUCT -DPARSE_ONLY -DWITNESS_PARSED"
+FLAGS="--unwind 95"
+EXPECT=fail
+EXPECT_PROP='assertion !parsed$'
+CHECKS="witness: rmParse accepts a frame-shaped text"

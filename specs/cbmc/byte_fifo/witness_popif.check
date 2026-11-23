@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/byte_fifo.cpp"
+CFLAGS="-I$ROOT/src -DWITNESS_POPIF"
+FLAGS="--unwind 10"
+EXPECT=fail
+CHECKS="witness: pop_if success reachable"
+EXPECT_PROP='assertion !ok$'

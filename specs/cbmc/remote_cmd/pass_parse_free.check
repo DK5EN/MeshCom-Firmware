@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp hmac_model.cpp $ROOT/src/remote_cmd.cpp"
+CFLAGS="-I$ROOT/src -Ishim -DNATIVE_BUILD=1 -DPARSE_ONLY"
+FLAGS="--unwind 45"
+EXPECT=pass
+CHECKS="rmParse on free text up to 32 B, NUL anywhere: memory safety + output shape"

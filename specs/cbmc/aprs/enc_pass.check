@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="enc_harness.cpp $ROOT/src/charset_filter.cpp"
+CFLAGS="-Istubs -I$ROOT/test/support -I$ROOT/src -DNATIVE_BUILD=1 -DUNIT_TEST=1"
+FLAGS="--unwind 260"
+EXPECT=pass
+CHECKS="encodeStartAPRS vs 255-byte target (F3-8)"

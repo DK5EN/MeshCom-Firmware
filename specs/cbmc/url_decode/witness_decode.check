@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/url_decode.cpp"
+CFLAGS="-I$ROOT/src -DWITNESS_DECODE"
+FLAGS="--unwind 5"
+EXPECT=fail
+CHECKS="witness: escape decode reachable"
+EXPECT_PROP='assertion|r != 1'

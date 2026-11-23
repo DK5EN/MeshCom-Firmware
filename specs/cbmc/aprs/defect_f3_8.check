@@ -1,0 +1,9 @@
+TOOL=esbmc
+# gen/aprs_structures.h: the live header with the path width raised (generated, not stored)
+mkdir -p gen && sed 's/^#define MC_PATH_LEN .*/#define MC_PATH_LEN     140/' "$ROOT/src/aprs_structures.h" > gen/aprs_structures.h
+SOURCES="enc_harness.cpp $ROOT/src/charset_filter.cpp"
+CFLAGS="-Igen -Istubs -I$ROOT/test/support -I$ROOT/src -DNATIVE_BUILD=1 -DUNIT_TEST=1"
+FLAGS="--no-unwinding-assertions --unwind 420"
+EXPECT=fail
+CHECKS="F3-8 latent: path fields wider than 121 -> encodeStartAPRS writes 5 bytes past the 255-byte target"
+EXPECT_PROP='assertion r <= UDP_TX_BUF_SIZE|memcpy_impl'

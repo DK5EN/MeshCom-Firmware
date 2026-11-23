@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-Istubs -I$ROOT/test/support -I$ROOT/src -DNATIVE_BUILD=1 -DUNIT_TEST=1"
+FLAGS="--no-unwinding-assertions --unwind 270"
+EXPECT=pass
+CHECKS="decodeAPRS memory safety + NUL-terminated fields, rsize 0..255 (full UDP frame), charset filter modelled"

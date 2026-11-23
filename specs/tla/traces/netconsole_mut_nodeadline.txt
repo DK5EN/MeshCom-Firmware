@@ -1,0 +1,138 @@
+Error: Temporal properties were violated.
+
+Error: The following behavior constitutes a counter-example:
+
+State 1: <Initial predicate>
+/\ sfd = 0
+/\ stops = 0
+/\ peerClosed = {}
+/\ authed = {}
+/\ nconn = 0
+/\ cmdBad = FALSE
+/\ rpc = "idle"
+/\ rconn = 0
+/\ open = <<0, 0>>
+/\ kind = <<"good", "good", "good">>
+/\ wrongTear = FALSE
+/\ rfd = 0
+/\ sAuth = FALSE
+/\ aconn = 0
+/\ apc = "none"
+/\ hs = FALSE
+/\ rejGood = FALSE
+/\ started = TRUE
+/\ dblClose = FALSE
+/\ afd = 0
+
+State 2: <Stop line 166, col 5 to line 169, col 107 of module netconsole>
+/\ sfd = 0
+/\ stops = 1
+/\ peerClosed = {}
+/\ authed = {}
+/\ nconn = 0
+/\ cmdBad = FALSE
+/\ rpc = "idle"
+/\ rconn = 0
+/\ open = <<0, 0>>
+/\ kind = <<"good", "good", "good">>
+/\ wrongTear = FALSE
+/\ rfd = 0
+/\ sAuth = FALSE
+/\ aconn = 0
+/\ apc = "none"
+/\ hs = FALSE
+/\ rejGood = FALSE
+/\ started = FALSE
+/\ dblClose = FALSE
+/\ afd = 0
+
+State 3: <Start line 172, col 5 to line 175, col 57 of module netconsole>
+/\ sfd = 0
+/\ stops = 1
+/\ peerClosed = {}
+/\ authed = {}
+/\ nconn = 0
+/\ cmdBad = FALSE
+/\ rpc = "idle"
+/\ rconn = 0
+/\ open = <<0, 0>>
+/\ kind = <<"good", "good", "good">>
+/\ wrongTear = FALSE
+/\ rfd = 0
+/\ sAuth = FALSE
+/\ aconn = 0
+/\ apc = "none"
+/\ hs = FALSE
+/\ rejGood = FALSE
+/\ started = TRUE
+/\ dblClose = FALSE
+/\ afd = 0
+
+State 4: <Accept line 72, col 5 to line 89, col 108 of module netconsole>
+/\ sfd = 0
+/\ stops = 1
+/\ peerClosed = {}
+/\ authed = {}
+/\ nconn = 1
+/\ cmdBad = FALSE
+/\ rpc = "idle"
+/\ rconn = 0
+/\ open = <<1, 0>>
+/\ kind = <<"good", "good", "good">>
+/\ wrongTear = FALSE
+/\ rfd = 0
+/\ sAuth = FALSE
+/\ aconn = 1
+/\ apc = "await"
+/\ hs = TRUE
+/\ rejGood = FALSE
+/\ started = TRUE
+/\ dblClose = FALSE
+/\ afd = 1
+
+State 5: <Accept line 72, col 5 to line 89, col 108 of module netconsole>
+/\ sfd = 0
+/\ stops = 1
+/\ peerClosed = {}
+/\ authed = {}
+/\ nconn = 2
+/\ cmdBad = FALSE
+/\ rpc = "idle"
+/\ rconn = 0
+/\ open = <<1, 0>>
+/\ kind = <<"good", "good", "good">>
+/\ wrongTear = FALSE
+/\ rfd = 0
+/\ sAuth = FALSE
+/\ aconn = 1
+/\ apc = "await"
+/\ hs = TRUE
+/\ rejGood = TRUE
+/\ started = TRUE
+/\ dblClose = FALSE
+/\ afd = 1
+
+State 6: <Accept line 72, col 5 to line 89, col 108 of module netconsole>
+/\ sfd = 0
+/\ stops = 1
+/\ peerClosed = {}
+/\ authed = {}
+/\ nconn = 3
+/\ cmdBad = FALSE
+/\ rpc = "idle"
+/\ rconn = 0
+/\ open = <<1, 0>>
+/\ kind = <<"good", "good", "slow">>
+/\ wrongTear = FALSE
+/\ rfd = 0
+/\ sAuth = FALSE
+/\ aconn = 1
+/\ apc = "await"
+/\ hs = TRUE
+/\ rejGood = TRUE
+/\ started = TRUE
+/\ dblClose = FALSE
+/\ afd = 1
+
+State 7: Stuttering
+Finished checking temporal properties in 00s at 2026-11-23 12:57:52

@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/applink_ws.cpp"
+CFLAGS="-I$ROOT/src -DMODE_BIG -DBIG_FIXED -DBIG_COARSE -DBIGCALLS=2 -DL2MIN=150 -DL2MAX=151"
+FLAGS="--unwind 170 --unwindset 18:16"
+EXPECT=pass
+CHECKS="BIN(FIN=0,150)+CONT(150..151 = 300 / 301), one chunk per frame (2 calls), unwind 170: reassembly limit at 300, no overrun"
+TIMEOUT=1800

@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DMODE_SIGNED"
+FLAGS="--unwind 12"
+EXPECT=pass
+CHECKS="decode_signed: no OOB read, result inside native width and range"

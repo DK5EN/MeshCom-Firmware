@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DMODE_STRING -DWITNESS"
+FLAGS="--unwind 11"
+EXPECT=fail
+CHECKS="witness: unescape_string accepts non-empty value"
+EXPECT_PROP='assertion'

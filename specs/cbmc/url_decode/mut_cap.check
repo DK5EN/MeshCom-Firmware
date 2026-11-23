@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/url_decode.cpp"
+CFLAGS="-I$ROOT/src -DMUT_CAP"
+FLAGS="--unwind 26"
+EXPECT=fail
+CHECKS="mutation: buffer one byte short"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-Istubs -I$ROOT/test/support -I$ROOT/src -DNATIVE_BUILD=1 -DUNIT_TEST=1 -DMAXLEN=40 -DMUT_SHORT_BUF"
+FLAGS="--no-unwinding-assertions --unwind 46"
+EXPECT=fail
+CHECKS="mutation mut_short_buf (decodeAPRS buffer one byte short)"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

@@ -1,0 +1,15 @@
+pid=28078
+host=192.168.68.77
+start=2026-11-22 14:24:11
+now=2026-11-22 22:22:36
+tz=Europe/Berlin
+utc_offset=+01:00
+start_iso=2026-11-22T14:24:11+01:00
+now_iso=2026-11-22T22:22:36+01:00
+elapsed_h=7.97
+remaining_h=9.13
+lines=43717
+bytes=3712046
+reconnects=2
+free_mb=124
+status=running

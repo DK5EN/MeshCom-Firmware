@@ -2,7 +2,8 @@
 # Run TLC (or SANY) on one spec + cfg.
 #   run_tlc.sh <Spec.tla> <config.cfg>   model check
 #   run_tlc.sh --sany <Spec.tla>         parse check only
-#   run_tlc.sh --all                     every cfg here (spec = heap.tla for heap*.cfg, heap_frag.tla for heap_frag*.cfg),
+#   run_tlc.sh --all                     every cfg here (spec = heap.tla for heap*.cfg, heap_frag.tla for heap_frag*.cfg,
+#                                        any other cfg names its spec with the marker "tlc: spec=<Spec>.tla"),
 #                                        counterexamples of heap_frag cfgs into traces/<cfg>.txt, results table on stdout
 # Env: TLA_JAR (default ~/.local/share/tla/tla2tools.jar), JAVA (default /opt/homebrew/opt/openjdk/bin/java),
 #      TRACE_OUT=<file> saves the counterexample (error header + trace) of an expected-to-fail run,
@@ -14,18 +15,23 @@ set -u
 JAR="${TLA_JAR:-$HOME/.local/share/tla/tla2tools.jar}"
 JAVA="${JAVA:-/opt/homebrew/opt/openjdk/bin/java}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# TRACE_OUT is taken relative to the caller's directory (two agents wrote specs/tla/specs/tla/traces/ when it was
+# resolved after the cd below); --all passes paths relative to specs/tla and runs from there.
+case "${TRACE_OUT:-}" in ""|/*) ;; *) TRACE_OUT="$(pwd)/$TRACE_OUT" ;; esac
 if [ "${1:-}" = "--sany" ]; then
   cd "$HERE" && exec "$JAVA" -cp "$JAR" tla2sany.SANY "$2"
 fi
 if [ "${1:-}" = "--all" ]; then
   cd "$HERE" || exit 2
   ROWS="$(mktemp "${TMPDIR:-/tmp}/tlc-rows.XXXXXX")"; BAD=0
-  for CFGF in heap.cfg heap_restart.cfg heap_mut_*.cfg heap_frag.cfg heap_frag_*.cfg; do
-    case "$CFGF" in heap_frag*) SP=heap_frag.tla ;; *) SP=heap.tla ;; esac
+  for CFGF in heap.cfg heap_restart.cfg heap_mut_*.cfg heap_frag.cfg heap_frag_*.cfg $(grep -l 'tlc: spec=' *.cfg | sort); do
+    MARK="$(head -10 "$CFGF" | sed -n 's/.*tlc: spec=\([A-Za-z0-9_]*\.tla\).*/\1/p' | head -1)"
+    if [ -n "$MARK" ]; then SP="$MARK"; else case "$CFGF" in heap_frag*) SP=heap_frag.tla ;; *) SP=heap.tla ;; esac; fi
     TRACE_OUT=""; case "$CFGF" in heap_frag*) case "$CFGF" in *_reach_*) ;; *) head -10 "$CFGF" | grep -q 'tlc: expect-fail' && TRACE_OUT="traces/${CFGF%.cfg}.txt" ;; esac ;; esac
+    [ -n "$MARK" ] && head -10 "$CFGF" | grep -q 'tlc: expect-fail' && TRACE_OUT="traces/${CFGF%.cfg}.txt"
     export TRACE_OUT
     LOGF="$(mktemp "${TMPDIR:-/tmp}/tlc-log.XXXXXX")"
-    "$0" "$SP" "$CFGF" >"$LOGF" 2>&1; RCX=$?
+    "$HERE/$(basename "$0")" "$SP" "$CFGF" >"$LOGF" 2>&1; RCX=$?   # $0 may be relative to the caller; we cd-ed to $HERE
     cat "$LOGF" >&2; grep '^RESULT|' "$LOGF" >>"$ROWS"; rm -f "$LOGF"
     [ "$RCX" -eq 0 ] || { BAD=1; echo "FAILED: $CFGF (rc=$RCX)" >&2; }
   done

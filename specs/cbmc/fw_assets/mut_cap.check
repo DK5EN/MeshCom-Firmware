@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="step.cpp"
+CFLAGS="-I$ROOT/src -DMUT_CAP"
+FLAGS="--unwind 600"
+EXPECT=fail
+CHECKS="mutation mut_cap: url cap + 1"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

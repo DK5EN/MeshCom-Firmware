@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DMODE_UNSIGNED -DWITNESS"
+FLAGS="--unwind 12"
+EXPECT=fail
+CHECKS="witness: decode_unsigned accepts a value"
+EXPECT_PROP='assertion'

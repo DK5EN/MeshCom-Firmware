@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp hmac_model.cpp $ROOT/src/remote_cmd.cpp"
+CFLAGS="-I$ROOT/src -Ishim -DNATIVE_BUILD=1 -DSTRUCT -DPARSE_ONLY"
+FLAGS="--unwind 95"
+EXPECT=pass
+CHECKS="rmParse on frame-shaped text up to 90 B (cmd/args caps, 32-bit ctr overflow): memory safety + output shape"

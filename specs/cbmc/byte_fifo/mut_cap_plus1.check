@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/byte_fifo.cpp"
+CFLAGS="-I$ROOT/src -DMUT_CAP_PLUS1"
+FLAGS="--unwind 10"
+EXPECT=fail
+CHECKS="mutation: cap reported one larger -> caught by the cap invariant"
+EXPECT_PROP='assertion f.cap <= CAP'

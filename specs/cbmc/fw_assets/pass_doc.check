@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DDOC -DNFREE=8"
+FLAGS="--unwind 90"
+EXPECT=pass
+CHECKS="valid release doc with 8 free bytes inside browser_download_url: safety + result fields"

@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DMODE_REAL"
+FLAGS="--unwind 12"
+EXPECT=pass
+CHECKS="decode_real/decode_bool no OOB read"

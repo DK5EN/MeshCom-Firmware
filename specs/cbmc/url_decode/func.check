@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/url_decode.cpp"
+CFLAGS="-I$ROOT/src -DFUNC"
+FLAGS="--unwind 5"
+EXPECT=pass
+CHECKS="valid hex pair %XX decodes to that byte (len 3)"

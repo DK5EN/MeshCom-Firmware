@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/url_decode.cpp"
+CFLAGS="-I$ROOT/src "
+FLAGS="--unwind 26"
+EXPECT=pass
+CHECKS="memory safety, ret<=len, NUL at buf[ret]; len 0..24, buffer len+1, any bytes"

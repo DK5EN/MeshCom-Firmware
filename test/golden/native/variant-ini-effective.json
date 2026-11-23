@@ -1230,8 +1230,8 @@
   ],
   "lib_compat_mode": "strict",
   "lib_deps": [
-   "mathieucarbou/AsyncTCP @ 3.2.14",
-   "mathieucarbou/ESPAsyncWebServer @ 3.3.23"
+   "ESP32Async/AsyncTCP @ 3.6.1",
+   "ESP32Async/ESPAsyncWebServer @ 3.12.1"
   ],
   "lib_ldf_mode": "chain",
   "monitor_filters": [
@@ -1637,8 +1637,8 @@
   ],
   "lib_compat_mode": "strict",
   "lib_deps": [
-   "mathieucarbou/AsyncTCP @ 3.2.14",
-   "mathieucarbou/ESPAsyncWebServer @ 3.3.23"
+   "ESP32Async/AsyncTCP @ 3.6.1",
+   "ESP32Async/ESPAsyncWebServer @ 3.12.1"
   ],
   "lib_ldf_mode": "chain",
   "monitor_filters": [

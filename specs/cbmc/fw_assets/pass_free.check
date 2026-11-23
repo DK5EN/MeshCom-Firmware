@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DNFREE=8"
+FLAGS="--unwind 12"
+EXPECT=pass
+CHECKS="memory safety + UB + result fields, 8 free bytes (any value), nondet chunk split"

@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/applink_ws.cpp"
+CFLAGS="-I$ROOT/src -DMUT_SHORT_IN"
+FLAGS="--unwind 12"
+EXPECT=fail
+CHECKS="mutation: input one byte short"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

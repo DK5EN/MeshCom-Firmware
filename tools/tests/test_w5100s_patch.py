@@ -1,4 +1,4 @@
-"""ETH-06: tools/w5100s_patch.py bounds the W5100S socketSendUDP() wait, and the firmware
+"""ETH-06/ETH-07: tools/w5100s_patch.py bounds the W5100S socketSendUDP() wait, and the firmware
 drops the EXTUDP socket before every W5100S hardware reset (DB0AIS-12, 2026-11-14)."""
 
 import configparser
@@ -200,3 +200,100 @@ def test_applink_costs_no_static_ram_while_off():
         # nested-command use-after-free this test exists for; advisor mutation 2026-11-21)
         assert src.count("free(s_mem)") == 1 and src.count("calloc(1, sizeof(AlMem))") == 1, path
         assert "free(s_mem)" in _func_body(src, "static void " + release), path
+
+
+# ---- ETH-07: socket index bounds guards (RAKWireless ebea549) ----
+
+
+def _pristine07(wp, name: str, eol: str) -> str:
+    """Synthetic unpatched library file: every anchor followed by a body line, as in the library."""
+    parts = [f"{sig}{eol}{{{eol}\tbody();{eol}}}{eol}{eol}" for sig, _ in wp.ETH07[name]]
+    return "".join(parts)
+
+
+ETH07_FILES = ["socket.cpp", "EthernetUdp.cpp", "EthernetClient.cpp"]
+
+
+@pytest.mark.parametrize("eol", ["\r\n", "\n"])
+@pytest.mark.parametrize("name", ETH07_FILES)
+def test_eth07_applies_to_pristine_text(name, eol):
+    wp = _load()
+    src = _pristine07(wp, name, eol)
+    assert wp.MARKER07 not in src
+    out = wp.patch_text07(name, src)
+    assert out.count(wp.MARKER07) == len(wp.ETH07[name])
+    for sig, guard in wp.ETH07[name]:
+        # guard is the first statement of its function
+        assert f"{sig}{eol}{{{eol}\t{guard} {wp.MARKER07}{eol}\tbody();" in out
+    assert out.count("MAX_SOCK_NUM") == len(wp.ETH07[name])
+    if eol == "\r\n":
+        assert "\n" not in out.replace("\r\n", "")
+    else:
+        assert "\r" not in out
+
+
+def test_eth07_covers_all_upstream_entry_points():
+    wp = _load()
+    assert len(wp.ETH07["socket.cpp"]) == 13
+    assert len(wp.ETH07["EthernetUdp.cpp"]) == 6
+    assert len(wp.ETH07["EthernetClient.cpp"]) == 1
+    # a failed allocation must not reach the chip: return values are the neutral ones
+    guards = dict(wp.ETH07["socket.cpp"])
+    assert guards["bool EthernetClass::socketSendUDP(uint8_t s)"].endswith("false;")
+    assert guards["void EthernetClass::socketClose(uint8_t s)"].endswith("return;")
+
+
+@pytest.mark.parametrize("name", ETH07_FILES)
+def test_eth07_is_idempotent(name):
+    wp = _load()
+    once = wp.patch_text07(name, _pristine07(wp, name, "\r\n"))
+    assert wp.patch_text07(name, once) == once
+
+
+@pytest.mark.parametrize("name", ETH07_FILES)
+def test_eth07_raises_on_changed_text(name):
+    wp = _load()
+    src = _pristine07(wp, name, "\n")
+    sig = wp.ETH07[name][0][0]
+    with pytest.raises(RuntimeError, match="ETH-07"):
+        wp.patch_text07(name, src.replace(sig, sig.replace("(", " (", 1)))  # signature drifted
+    with pytest.raises(RuntimeError, match="ETH-07"):
+        wp.patch_text07(name, src + src)  # anchor twice
+
+
+def test_eth07_completes_a_partly_patched_file():
+    wp = _load()
+    name = "EthernetUdp.cpp"
+    src = _pristine07(wp, name, "\n")
+    orig, patched = wp.eth07_edits(name)[0]
+    part = src.replace(orig, patched)
+    assert part.count(wp.MARKER07) == 1
+    assert wp.patch_text07(name, part) == wp.patch_text07(name, src)
+
+
+@pytest.mark.parametrize("eol", ["\r\n", "\n"])
+def test_eth06_and_eth07_compose_in_either_order(eol):
+    wp = _load()
+    src = _fixture(eol)  # holds the real socketSendUDP() text
+    # fixture lacks the other socket*() anchors: add them around it
+    full = _pristine07(wp, "socket.cpp", eol).replace(
+        f"bool EthernetClass::socketSendUDP(uint8_t s){eol}{{{eol}\tbody();{eol}}}{eol}{eol}", ""
+    ) + src
+    six_first = wp.patch_text07("socket.cpp", wp.patch_text(full))
+    seven_first = wp.patch_text(wp.patch_text07("socket.cpp", full))
+    assert six_first == seven_first
+    assert wp.MARKER in six_first and wp.MARKER07 in six_first
+    body = _func_body(six_first.replace("\r\n", "\n"), "bool EthernetClass::socketSendUDP(uint8_t s)")
+    # ETH-07 guard first, then the SPI transaction, then the ETH-06 deadline
+    assert body.index("MAX_SOCK_NUM") < body.index("beginTransaction") < body.index("meshcom_send_t0")
+    assert wp.patch_text07("socket.cpp", wp.patch_text(six_first)) == six_first
+
+
+def test_eth07_patch_file_roundtrip(tmp_path):
+    wp = _load()
+    p = tmp_path / "EthernetClient.cpp"
+    p.write_bytes(_pristine07(wp, "EthernetClient.cpp", "\r\n").encode())
+    fn = lambda t: wp.patch_text07("EthernetClient.cpp", t)  # noqa: E731
+    assert wp.patch_file(p, fn) is True
+    assert wp.patch_file(p, fn) is False
+    assert wp.MARKER07 in p.read_bytes().decode()

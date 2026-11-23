@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DMODE_FIELD"
+FLAGS="--unwind 12"
+EXPECT=pass
+CHECKS="decode_field_value all types: no OOB read, no write past field"

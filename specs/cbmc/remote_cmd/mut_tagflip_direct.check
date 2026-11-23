@@ -1,0 +1,8 @@
+TOOL=esbmc
+SOURCES="harness.cpp hmac_model.cpp $ROOT/src/remote_cmd.cpp"
+CFLAGS="-I$ROOT/src -Ishim -DNATIVE_BUILD=1 -DDIRECT -DMUT_TAGFLIP"
+FLAGS="--unwind 110"
+EXPECT=fail
+CHECKS="opposite property: dispatched tag differs from MAC -> must fail"
+EXPECT_PROP='assertion memcmp.*!= 0'
+TIMEOUT=2400
