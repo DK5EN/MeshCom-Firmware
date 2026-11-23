@@ -49,11 +49,7 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
     downloads, then fails `nomem` on the 32 KB inflate dictionary (largest block 22.5 KB). T-Beam PSRAM: built with
     `BOARD_HAS_PSRAM`, reports 0 at runtime (open).
   - 2026-11-23 evening: mbedTLS output buffer 4 KB + (a') arena committed (`469bb942`, advisor ok, gate PASS, link
-    proof esp32/esp32s3). Bench: check job runs with the arena on V3 and T-Beam. **Two stops for the operator:**
-    (1) T-Beam install job gets no arena (largest block 27.6 KB after the check; recommendation: hand the check
-    job's arena to the install job, else fallback (b)); (2) the download fails on every image incl. pre-FORMAL-01
-    builds since about 18:10 (`tls 51/52` is the socket fd, a logging bug; Mac download works; likely GitHub-side,
-    not proven). With an arena the 4 KB buffer saves no job peak (advisor, accepted). T-Beam PSRAM: unflagged on
+    proof esp32/esp32s3). Bench: check job runs with the arena on V3 and T-Beam. T-Beam gets the 32 KB buffer in both jobs on the plain image and passes the gate with web on (the earlier "no buffer" came from the heapwatch image; plain images only from now on). **Open:** the download fails on every image incl. pre-FORMAL-01 builds since about 18:10 (`tls 51/52` is the socket fd, a logging bug; Mac download works; likely GitHub-side, not proven), so the image check after the download is unmeasured. With the reserved buffer the 4 KB send buffer saves no job peak (accepted). T-Beam PSRAM: unflagged on
     purpose (R3-02/MEM-04), closed. Resume: campaign doc, last section. Desktop:
     `ota-lowheap-checkliste-20261123.html`, `-heapmap-`.
 - **PR #1316 merged upstream (2026-11-22), synced:** [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md).
