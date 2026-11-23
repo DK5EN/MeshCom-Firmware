@@ -1,0 +1,6 @@
+2026-11-23 19:05:10 DK5EN-92 R0 toggled=- idle_free=52652 verdict=refused fails=0 console_shed=3 status_err=lowheap_ble_off
+2026-11-23 19:08:02 DK5EN-92 R1 toggled=web:0 idle_free=58956 verdict=other fails=0 console_shed=0 status_err=tls 51 check_gate_free=47384 dl_gate_free=79080 check_lowest=44700 dl_lowest=44700 check_used=2684
+2026-11-23 19:08:55 DK5EN-92 restore=ok
+2026-11-23 19:11:51 DK5EN-1 R0 toggled=- idle_free=75572 verdict=refused fails=0 console_shed=0 status_err=lowheap check_gate_free=28284 dl_gate_free=28124 check_lowest=27280 dl_lowest=27240 check_used=1004 dl_used=884
+2026-11-23 19:14:44 DK5EN-1 R1 toggled=web:0 idle_free=81700 verdict=refused fails=0 console_shed=0 status_err=lowheap check_gate_free=34280 dl_gate_free=34260 check_lowest=33196 dl_lowest=33360 check_used=1084 dl_used=900
+2026-11-23 19:15:38 DK5EN-1 restore=ok

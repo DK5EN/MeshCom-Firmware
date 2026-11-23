@@ -1,0 +1,3 @@
+2026-11-23 19:21:27 DK5EN-1 R0 toggled=- idle_free=100296 verdict=other fails=0 console_shed=0 status_err=tls 52 check_gate_free=53024 dl_gate_free=52388 check_lowest=27044 dl_lowest=50196 check_used=25980 dl_used=2192
+2026-11-23 19:24:19 DK5EN-1 R1 toggled=web:0 idle_free=106408 verdict=other fails=0 console_shed=0 status_err=tls 51 check_gate_free=59140 dl_gate_free=58484 check_lowest=30668 dl_lowest=57500 check_used=28472 dl_used=984
+2026-11-23 19:25:13 DK5EN-1 restore=ok

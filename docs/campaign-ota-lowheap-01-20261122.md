@@ -328,3 +328,84 @@ Session stopped before the measurement campaign (operator). Uncommitted in the t
   Risk: at the install-job start of the measured T-Beam case the largest block was 22.5 KB (< 33440) after a separate
   check job; the design assumes the check job's records in the arena no longer fragment the heap. Measure.
 - Not done: advisor review of both, board builds, gate, golden baseline (new env `native_fw_tls_arena`), bench.
+  Done in the next section.
+
+## 2026-11-23 evening: gate and bench of the 4 KB output buffer + arena (`469bb942`); two stops
+
+**Committed on fork-dev (`469bb942`).** On the bench the check job runs with the arena on both boards. The T-Beam
+install job gets no arena (`[AU];arena;none`), and the download now fails on every image tested, including
+images built before today's commits. Both need an operator decision; measurement stopped there.
+
+- **Advisor (Opus, 2 passes):** approved after rework. Changes from the review:
+  - The arena is now 32768 B = max(in 16720 + out 4432, dictionary). Before it was 33440 B.
+  - Without an arena the probe tests in 16717 + out 4429 (`FWNET_TLS_OUT_BUF`, `src/fw_update.h`).
+  - On a restart the idle arena is handed to the new task (`arenaDetach`, log `[AU];arena;ok;32768;adopt`).
+  - A link marker `mc_mbedtls_out4k_marker` makes a missing override fail the link.
+  - New log lines: `[AU];arena;badfree;N`, `[AU];arena;rec;hit;H;miss;M`, `[AU];dry;dict;heap;arena;..;live;..;lent;..`.
+  - Two new tests (alignment, gap). Both fail when the rounding is mutated out.
+- **Consequence the advisor found (accepted):** while an arena exists it holds the dictionary's 32 KB from the job
+  start, so the 4 KB output record does not lower the job peak. The 12 KB saving applies only without an arena and
+  to TLS outside the AU job. The target "V3 download peak about 12 KB lower" does not hold with the arena.
+- **Gate:** 7 board builds green. `tools/regression.sh --stage 1,2` PASS (130 envs, 4243 cases). The golden
+  variant-ini baseline was regenerated (new env `native_fw_tls_arena`).
+- **Link proof** for `heltec_wifi_lora_32_V3`, `ttgo_tbeam`, `T-ETH-ELITE_1262` and `t_deck_pro` (esp32 and esp32s3):
+  - From `libmbedtls_2.a` only `net_sockets` and `ssl_ciphersuites` are pulled.
+  - The `mbedtls_ssl_setup` literals are 0x414d (16717, in) and 0x114d (4429, out).
+  - The marker symbol is present in all four images.
+- **Measurement images:**
+  - The T-Beam with the full heapwatch table overflows DRAM by 13 KB. It was built with
+    `-DHW_OWNER_ONLY=1 -DHW_LIVE_N=256`; its static DRAM is 5.2 KB below the morning's heapwatch image.
+  - On the V3 the heapwatch image costs 22 KB (idle 75.6 KB; the gate refuses even the check). It was
+    discarded and replaced by a plain `INSTRUMENT_ENABLED=1` image, as in round 2.
+  - Images and ELFs: `tools/bench/runs/harness/ota-lowheap-arena-20261123/` (not committed).
+- **Tool fix:** `ota_lowheap_knockout.py` now survives a console shed in the check job too (`au_job`).
+  `console_shed` is a bit field: 1 = check, 2 = install.
+
+| Node / run          | Idle free | Check job                                                                                  | Install job                                                                     |
+| ------------------- | --------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| T-Beam R0 (web on)  | 52.7 KB   | block 51.2 KB after the BLE pause, `arena;ok`; gate 43044 + 32768 = 75812 < 76000, refused | not reached (`lowheap_ble_off`)                                                 |
+| T-Beam R1 (web off) | 59.0 KB   | start block 43.0 KB, `arena;ok`, gate ok, `rec;hit;2;miss;0`, lowest 24.3 KB               | start block **27.6 KB, `arena;none`**; gate ok 79.1 KB; download fails `tls 51` |
+| V3 R0 (web on)      | 100.3 KB  | `arena;ok`, gate ok, hit 2 miss 0; need with arena 58.7 KB (before 59-61)                  | `arena;ok`, gate ok; download fails `tls 52` after 10 s, 0 failed allocs        |
+| V3 R1 (web off)     | 106.4 KB  | `arena;ok`, need 61.2 KB                                                                   | `arena;ok`; download fails `tls 51`                                             |
+
+- **Stop 1, T-Beam install job without arena:** the risk named before the run. The check job's session splits the
+  big block (43.0 -> 27.6 KB) between the jobs, so the arena (32 KB) does not fit at the install start.
+  Options for the operator:
+  - Keep the check job's arena alive and hand it to the install job (same mechanism as the restart adopt). This
+    is the recommendation: the block exists at the check start.
+  - Fallback (b), the streaming check (operator 2026-11-23).
+- **Stop 2, the download fails on every image, not caused by `469bb942`:** about 10 s after the gate, with no
+  failed allocation.
+  - `tls 51/52` is not a TLS error. `McTlsClient::connectTo` stores the positive return of `mc_ssl_connect` (the socket
+    fd) in `_lastError`, and `httpFail` prints it. This logging bug predates the change (new finding).
+  - Bisect on the V3: `38041491` (before `469bb942`) and `6bbca7a2` (before FORMAL-01 `9696a3ba`) fail the
+    same way. Round 2 downloaded fine at 17:39-18:10.
+  - Only one session's records were allocated (`hit;2`), so the redirect hop never started. The first GET to
+    github.com gets no usable answer.
+  - From the Mac the same URL works (302 to `release-assets.githubusercontent.com`, 200, 1205064 B), also with
+    TLS 1.2 and HTTP/1.1. The redirect URL is 947 characters and now carries a `jwt=` parameter; the response
+    header is 5.8 KB. Assumption, not proven: a change on the GitHub side after 18:10.
+  - Next step: a V3 image with HTTPClient/TLS debug output.
+- **T-Beam PSRAM (open item closed):** `variants/ttgo_tbeam/platformio.ini` removes `-DBOARD_HAS_PSRAM` on purpose via
+  `build_unflags` (R3-02 / MEM-04: `psramInit` costs 4427 B of IRAM). The image links neither `psramInit` nor
+  `esp_spiram_init`. `psram 0` is by design; the 4 MB chip is present (earlier measurement in the ini comment).
+- Fleet after the run: DK5EN-1 on the plain INSTRUMENT image of `469bb942`, DK5EN-92 on the heapwatch image of
+  `469bb942`, both identity-guard ok, baseline restored (`restore=ok`).
+- Evidence: `tools/bench/runs/harness/ota-lowheap-arena-20261123/` (`knockout.summary` T-Beam with the heapwatch V3
+  run, `v3-plain/`, `v3-bisect-38041491/`, `v3-bisect-6bbca7a2/`; raw logs and `tbeam-serial.log` are local).
+
+### Re-measurement on the plain INSTRUMENT image (19:50, operator: keep the 32 KB allocation)
+
+- **Stop 1 resolved, it was the measurement image.** T-Beam on a plain `INSTRUMENT_ENABLED=1` image of `469bb942`
+  (no heapwatch table; static DRAM 4.6 KB lower than the heapwatch image):
+  - Install job after the BLE pause: largest block 42996 B (web on) and 49140 B (web off). The 32 KB buffer is
+    allocated in both runs.
+  - Gate passes with the web server on: 44660 + 32768 = 77428 >= 76000.
+  - Check-job need: 53908 B (web on), 54588 B (web off).
+  - No hand-over between jobs is needed; the design stays one 32 KB allocation per job (operator).
+- **Rule:** measurement images are plain INSTRUMENT from now on. The heapwatch table changes both free heap and
+  fragmentation.
+- **Naming (operator):** "arena" is replaced by plain terms with the next code change: `src/fw_au_buf.h`, logs
+  `[AU];buf32;ok|none`, `[AU];dry;dict;buf32`. Docs: "reserved 32 KB buffer".
+- Still open: the download failure (stop 2); with it, the image check after the download.
+- Breakdown per board: Desktop `ota-lowheap-heapmap-20261123.html`, section 1b. Evidence: `ota-lowheap-arena-20261123/tbeam-plain/`.

@@ -121,25 +121,30 @@ def reboot_and_reconnect(s: KoSession, settle: float) -> None:
     s.drain(settle)
 
 
-def au_round(s: KoSession) -> dict:
-    got: list[str] = []
+def au_job(s: KoSession, c: str, limit: float) -> tuple[list[str], int]:
+    """Run one AU job (check or install) to its end; returns (lines, 1 if the job shed the console)."""
     t0 = time.monotonic()
-    got += s.cmd("--update check", 3.0)
-    got += trig.wait_done(s, 180, t0)
-    t1 = time.monotonic()
-    shed = 0
     try:
-        got += s.cmd("--update install", 3.0)
-        got += trig.wait_done(s, 600, t1)
+        got = s.cmd(c, 3.0)
+        return got + trig.wait_done(s, limit, t0), 0
     except ConnectionError:
-        # Fix A sheds the HMAC console during the AU job on a tight node (T-Beam): not a reset. The download's
-        # heap lines are only on the serial port then; reconnect once the job restored the console.
-        shed = 1
+        # Fix A sheds the HMAC console during the AU job on a tight node (T-Beam; since the (a') arena also the
+        # check job): not a reset. The job's heap lines are only on the serial port then; reconnect once the job
+        # restored the console.
         s.con.close()
-        s.w("[KO] console shed by the AU job, reconnecting after the job")
+        s.w(f"[KO] console shed by the AU job ({c}), reconnecting after the job")
         time.sleep(45)
         s.connect(tries=40)
-        got += trig.wait_done(s, 600, time.monotonic())
+        return trig.wait_done(s, limit, time.monotonic()), 1
+
+
+def au_round(s: KoSession) -> dict:
+    got: list[str] = []
+    lines, shed_c = au_job(s, "--update check", 180)
+    got += lines
+    lines, shed_i = au_job(s, "--update install", 600)
+    got += lines
+    shed = shed_c + 2 * shed_i  # bit 0: check shed, bit 1: install shed
     st = s.cmd("--update status", 2.0)
     got += st
     txt = "\n".join(got)

@@ -48,12 +48,13 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
     switch (+6 KiB). Half the peak are the two 16717 B mbedTLS record buffers. T-Beam with web off passes the gate and
     downloads, then fails `nomem` on the 32 KB inflate dictionary (largest block 22.5 KB). T-Beam PSRAM: built with
     `BOARD_HAS_PSRAM`, reports 0 at runtime (open).
-  - Running: mbedTLS output buffer 16 KB -> 4 KB as an object override (operator, input stays 16 KB), ~12 KB per TLS
-    session. Operator: (a) reserve the dictionary before the download, (b) streaming check only if (a) fails. The
-    numbers rule out (a) and (b) on the T-Beam (block gone after the check; 32 KB + download > 76 KB free); proposed
-    (a'): a 34 KB arena at AU-session start that holds the TLS record buffers and becomes the dictionary afterwards.
-    Operator go on (a') 2026-11-23. Both written (mbedTLS override + arena), NOT built, NOT committed; session
-    stopped before the measurement campaign. Resume: campaign doc, last section. Desktop:
+  - 2026-11-23 evening: mbedTLS output buffer 4 KB + (a') arena committed (`469bb942`, advisor ok, gate PASS, link
+    proof esp32/esp32s3). Bench: check job runs with the arena on V3 and T-Beam. **Two stops for the operator:**
+    (1) T-Beam install job gets no arena (largest block 27.6 KB after the check; recommendation: hand the check
+    job's arena to the install job, else fallback (b)); (2) the download fails on every image incl. pre-FORMAL-01
+    builds since about 18:10 (`tls 51/52` is the socket fd, a logging bug; Mac download works; likely GitHub-side,
+    not proven). With an arena the 4 KB buffer saves no job peak (advisor, accepted). T-Beam PSRAM: unflagged on
+    purpose (R3-02/MEM-04), closed. Resume: campaign doc, last section. Desktop:
     `ota-lowheap-checkliste-20261123.html`, `-heapmap-`.
 - **PR #1316 merged upstream (2026-11-22), synced:** [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md).
   21 issues closed (#1287-#1302, #1304, #1310, #1312, #1314, #1315). Merge `dc5ea81c` keeps fork-dev on every path
