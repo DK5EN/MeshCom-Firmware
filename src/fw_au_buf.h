@@ -1,9 +1,9 @@
-// OTA-LOWHEAP-01 (a'): one arena per Auto Update job (pure, host-testable, no Arduino / mbedTLS includes).
+// OTA-LOWHEAP-01 (a'): one AU buffer per Auto Update job (pure, host-testable, no Arduino / mbedTLS includes).
 //
-// The arena is one block the job allocates while the big free block still exists. While TLS sessions run it
+// The AU buffer is one block the job allocates while the big free block still exists. While TLS sessions run it
 // hosts their record buffers (slot allocator below); once the last record is released the whole block is lent
 // to the dry-run inflate check as the 32 KB dictionary. Records and dictionary never need memory at the same
-// time, so the records no longer fragment the heap. Cost: the arena is dictionary-sized (32 KB) from the job start,
+// time, so the records no longer fragment the heap. Cost: the AU buffer is dictionary-sized (32 KB) from the job start,
 // so while it exists the smaller output record (4 KB patch) does not lower the job's peak.
 //
 // Not thread-safe by itself: the caller (fw_update_net.cpp) serialises every call with one lock.
@@ -12,36 +12,36 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define FW_ARENA_SLOTS 3u            // 2 records of one session, one spare
-#define FW_ARENA_MIN_RECORD 4000u    // smaller requests (certificates, contexts) stay on the heap
-#define FW_ARENA_ALIGN 16u
+#define FW_AUBUF_SLOTS 3u            // 2 records of one session, one spare
+#define FW_AUBUF_MIN_RECORD 4000u    // smaller requests (certificates, contexts) stay on the heap
+#define FW_AUBUF_ALIGN 16u
 
-struct FwArenaSlot
+struct FwAuBufSlot
 {
     size_t off;
-    size_t size; // rounded up to FW_ARENA_ALIGN
+    size_t size; // rounded up to FW_AUBUF_ALIGN
     bool used;
 };
 
-struct FwArena
+struct FwAuBuf
 {
     uint8_t *buf;
     size_t len;
     bool lent;
-    FwArenaSlot slot[FW_ARENA_SLOTS];
+    FwAuBufSlot slot[FW_AUBUF_SLOTS];
 };
 
-inline size_t fwArenaRound(size_t n)
+inline size_t fwAuBufRound(size_t n)
 {
-    return (n + (FW_ARENA_ALIGN - 1u)) & ~(size_t)(FW_ARENA_ALIGN - 1u);
+    return (n + (FW_AUBUF_ALIGN - 1u)) & ~(size_t)(FW_AUBUF_ALIGN - 1u);
 }
 
-inline void fwArenaInit(FwArena *a, uint8_t *buf, size_t len)
+inline void fwAuBufInit(FwAuBuf *a, uint8_t *buf, size_t len)
 {
     a->buf = buf;
     a->len = (buf != nullptr) ? len : 0;
     a->lent = false;
-    for (unsigned i = 0; i < FW_ARENA_SLOTS; i++)
+    for (unsigned i = 0; i < FW_AUBUF_SLOTS; i++)
     {
         a->slot[i].off = 0;
         a->slot[i].size = 0;
@@ -49,17 +49,17 @@ inline void fwArenaInit(FwArena *a, uint8_t *buf, size_t len)
     }
 }
 
-inline unsigned fwArenaLive(const FwArena *a)
+inline unsigned fwAuBufLive(const FwAuBuf *a)
 {
     unsigned n = 0;
-    for (unsigned i = 0; i < FW_ARENA_SLOTS; i++)
+    for (unsigned i = 0; i < FW_AUBUF_SLOTS; i++)
         if (a->slot[i].used)
             n++;
     return n;
 }
 
 // Pointer inside [buf, buf + len); one past the end is not owned.
-inline bool fwArenaOwns(const FwArena *a, const void *p)
+inline bool fwAuBufOwns(const FwAuBuf *a, const void *p)
 {
     if (a->buf == nullptr || p == nullptr)
         return false;
@@ -68,17 +68,17 @@ inline bool fwArenaOwns(const FwArena *a, const void *p)
 }
 
 // First fit over the buffer: the lowest offset (0 or the end of a live slot) where `size` fits and no live slot
-// overlaps. nullptr when the request is below the threshold, the arena is lent, no slot is free or it does not fit
+// overlaps. nullptr when the request is below the threshold, the AU buffer is lent, no slot is free or it does not fit
 // (the caller then takes the heap). The slot is rounded up, so the whole `size` is usable.
-inline void *fwArenaAllocRecord(FwArena *a, size_t size)
+inline void *fwAuBufAllocRecord(FwAuBuf *a, size_t size)
 {
-    if (a->buf == nullptr || a->lent || size < FW_ARENA_MIN_RECORD || size > a->len)
+    if (a->buf == nullptr || a->lent || size < FW_AUBUF_MIN_RECORD || size > a->len)
         return nullptr;
-    const size_t rs = fwArenaRound(size);
+    const size_t rs = fwAuBufRound(size);
     if (rs < size || rs > a->len)
         return nullptr;
     int freeIdx = -1;
-    for (unsigned i = 0; i < FW_ARENA_SLOTS; i++)
+    for (unsigned i = 0; i < FW_AUBUF_SLOTS; i++)
         if (!a->slot[i].used)
         {
             freeIdx = (int)i;
@@ -87,10 +87,10 @@ inline void *fwArenaAllocRecord(FwArena *a, size_t size)
     if (freeIdx < 0)
         return nullptr;
     // candidates: offset 0 and the end of every live slot, tried in ascending order
-    size_t cand[FW_ARENA_SLOTS + 1];
+    size_t cand[FW_AUBUF_SLOTS + 1];
     unsigned nc = 0;
     cand[nc++] = 0;
-    for (unsigned i = 0; i < FW_ARENA_SLOTS; i++)
+    for (unsigned i = 0; i < FW_AUBUF_SLOTS; i++)
         if (a->slot[i].used)
             cand[nc++] = a->slot[i].off + a->slot[i].size;
     for (unsigned i = 1; i < nc; i++) // insertion sort, nc <= 4
@@ -106,7 +106,7 @@ inline void *fwArenaAllocRecord(FwArena *a, size_t size)
         if (off > a->len || rs > a->len - off)
             continue;
         bool clash = false;
-        for (unsigned i = 0; i < FW_ARENA_SLOTS && !clash; i++)
+        for (unsigned i = 0; i < FW_AUBUF_SLOTS && !clash; i++)
             if (a->slot[i].used && off < a->slot[i].off + a->slot[i].size && a->slot[i].off < off + rs)
                 clash = true;
         if (clash)
@@ -121,12 +121,12 @@ inline void *fwArenaAllocRecord(FwArena *a, size_t size)
 
 // Releases the slot that starts at p. Returns the slot size (so the caller can keep its byte accounting), 0 when p
 // is not the start of a live slot (foreign pointer, inside a slot, double free).
-inline size_t fwArenaFree(FwArena *a, void *p)
+inline size_t fwAuBufFree(FwAuBuf *a, void *p)
 {
-    if (!fwArenaOwns(a, p))
+    if (!fwAuBufOwns(a, p))
         return 0;
     const size_t off = (size_t)((uint8_t *)p - a->buf);
-    for (unsigned i = 0; i < FW_ARENA_SLOTS; i++)
+    for (unsigned i = 0; i < FW_AUBUF_SLOTS; i++)
         if (a->slot[i].used && a->slot[i].off == off)
         {
             const size_t sz = a->slot[i].size;
@@ -138,15 +138,15 @@ inline size_t fwArenaFree(FwArena *a, void *p)
 }
 
 // Lends the whole buffer (the inflate dictionary) when no record slot is live, it is not lent yet and `need` fits.
-inline void *fwArenaTakeWhole(FwArena *a, size_t need)
+inline void *fwAuBufTakeWhole(FwAuBuf *a, size_t need)
 {
-    if (a->buf == nullptr || a->lent || need == 0 || need > a->len || fwArenaLive(a) != 0)
+    if (a->buf == nullptr || a->lent || need == 0 || need > a->len || fwAuBufLive(a) != 0)
         return nullptr;
     a->lent = true;
     return a->buf;
 }
 
-inline bool fwArenaReturnWhole(FwArena *a, void *p)
+inline bool fwAuBufReturnWhole(FwAuBuf *a, void *p)
 {
     if (!a->lent || p != (void *)a->buf)
         return false;

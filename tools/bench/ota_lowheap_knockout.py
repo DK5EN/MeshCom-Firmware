@@ -128,7 +128,7 @@ def au_job(s: KoSession, c: str, limit: float) -> tuple[list[str], int]:
         got = s.cmd(c, 3.0)
         return got + trig.wait_done(s, limit, t0), 0
     except ConnectionError:
-        # Fix A sheds the HMAC console during the AU job on a tight node (T-Beam; since the (a') arena also the
+        # Fix A sheds the HMAC console during the AU job on a tight node (T-Beam; since the (a') 32 KB AU buffer also the
         # check job): not a reset. The job's heap lines are only on the serial port then; reconnect once the job
         # restored the console.
         s.con.close()

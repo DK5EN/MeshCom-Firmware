@@ -1761,6 +1761,16 @@ static void test_tls_fail_token_blames_heap_when_allocations_failed(void)
     TEST_ASSERT_FALSE(fwGuardRefusedErr(fwTlsFailToken(0u)));
 }
 
+// mc_ssl_connect returns the socket fd (>= 0) on success: it must not be stored as the TLS error. Bench 23.11.2026:
+// a failed HTTP GET after a good handshake logged "[AU];tls;51;UNKNOWN ERROR CODE (0033)", 51 being the fd.
+static void test_tls_connect_err_ignores_socket_fd(void)
+{
+    TEST_ASSERT_EQUAL_INT(0, fwTlsConnectErr(51));
+    TEST_ASSERT_EQUAL_INT(0, fwTlsConnectErr(0));
+    TEST_ASSERT_EQUAL_INT(-1, fwTlsConnectErr(-1));
+    TEST_ASSERT_EQUAL_INT(-9984, fwTlsConnectErr(-9984));
+}
+
 static void test_shed_settled_waits_for_the_tft_sprite(void)
 {
     TEST_ASSERT_EQUAL_UINT8(4u, FW_SHED_TFT);
@@ -1877,6 +1887,7 @@ int main(int, char **)
     RUN_TEST(test_web_admit_status_and_assets_during_session);
     RUN_TEST(test_web_refuse_pages_and_actions_during_session);
     RUN_TEST(test_tls_fail_token_blames_heap_when_allocations_failed);
+    RUN_TEST(test_tls_connect_err_ignores_socket_fd);
     RUN_TEST(test_shed_settled_waits_for_the_tft_sprite);
     RUN_TEST(test_tft_sprite_wanted_needs_display_on_and_no_shed);
     RUN_TEST(test_chan_decide_verdicts);

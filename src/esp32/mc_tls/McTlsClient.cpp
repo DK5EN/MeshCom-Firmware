@@ -25,6 +25,7 @@
 #include <esp_heap_caps.h>
 #include "fw_update_roots.h"
 #include "fw_tls_time.h"
+#include "fw_update.h" // fwTlsConnectErr
 #include "esp32/mc_dns.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
@@ -208,7 +209,7 @@ int McTlsClient::connectTo(const char *host, IPAddress ip, uint16_t port, const 
         return 0;
     }
     ret = mc_ssl_connect(sslclient, ip, port, _timeout);
-    _lastError = ret;
+    _lastError = fwTlsConnectErr(ret); // success returns the socket fd, which is not an error
     _lastTimeFlags = sslclient->time_flags; // before stop() re-initialises the context
     if (ret < 0) {
         log_e("mc_ssl_connect: %d", ret);

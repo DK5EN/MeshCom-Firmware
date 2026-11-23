@@ -1188,6 +1188,13 @@ inline const char *fwTlsFailToken(uint32_t allocFails)
     return allocFails > 0 ? "lowheap_tls" : "tls";
 }
 
+// mc_ssl_connect returns the socket fd (>= 0) on success and a negative code on failure. Only a negative value is a
+// TLS error; storing the fd made a later HTTP failure log "[AU];tls;51" (51 = the socket) instead of "conn <code>".
+inline int fwTlsConnectErr(int connectRet)
+{
+    return connectRet < 0 ? connectRet : 0;
+}
+
 // The stored `--display off` setting (bDisplayOff), not the screensaver, decides whether the TFT sprite is
 // wanted (operator decision 2026-10-24); shedHeld = the update has released it; jobBusy = an AU job runs (no
 // 25.6 KB allocation in the middle of a TLS handshake, also when the job started without the hold).
