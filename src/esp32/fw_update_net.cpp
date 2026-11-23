@@ -45,6 +45,7 @@
 #include <loop_functions_extern.h> // schedule: node settings + clock source (after configuration_global.h)
 #include <meshcom_settings.h>
 #include "../fw_tls_alloc_cap.h"
+#include "../fw_tls_arena.h"   // OTA-LOWHEAP-01 (a'): per-job record / dictionary arena
 #include "../fw_update.h"
 #include "../fw_update_assets.h"
 #include "../fw_update_http.h"
@@ -318,6 +319,47 @@ volatile bool s_tlsCapArmed = false;
 volatile uint32_t s_tlsCapLive = 0;
 volatile uint32_t s_tlsCapRefused = 0;
 
+// OTA-LOWHEAP-01 (a'): one arena per CHECK/DOWNLOAD job, allocated at the job start while the big free block still
+// exists (arenaAcquire). While TLS sessions run it hosts their record buffers (the hook below serves every request of
+// the job task >= FW_ARENA_MIN_RECORD from it first); after the last session is closed the dry-run inflate lends the
+// whole block as its 32 KB dictionary (stageDryRun). Size = max(in + out record as compiled (16720 + 4432 B in
+// 16-byte slots = 21152 B), TINFL_LZ_DICT_SIZE) = 32768 B; the DryMem state (~11 KB) stays on the heap, dict + DryMem
+// (~44 KB) does not fit the ~40.9 KB block of a job start. Cost: while the arena exists the 4 KB output record saves
+// no peak (the arena holds the dictionary's 32 KB from the job start); the saving applies when there is no arena and
+// to TLS outside the AU job. Never created when PSRAM is present (the PSRAM path stays as is). All arena state is
+// touched under s_arenaMux only.
+#define FWNET_ARENA_RND(n) (((n) + (FW_ARENA_ALIGN - 1u)) & ~(FW_ARENA_ALIGN - 1u))
+#define FWNET_ARENA_RECS (FWNET_ARENA_RND(FWNET_TLS_REC_BUF) + FWNET_ARENA_RND(FWNET_TLS_OUT_BUF))
+#define FWNET_ARENA_LEN (FWNET_ARENA_RECS > TINFL_LZ_DICT_SIZE ? FWNET_ARENA_RECS : TINFL_LZ_DICT_SIZE)
+static_assert(FWNET_ARENA_LEN >= TINFL_LZ_DICT_SIZE, "arena must hold the inflate dictionary");
+static_assert(FWNET_ARENA_LEN >= FWNET_ARENA_RECS, "arena must hold the in + out record of one session");
+FwArena s_arena;                         // zero = no arena (buf == nullptr)
+TaskHandle_t s_arenaTask = nullptr;      // only this task's TLS sessions use the arena (net_console etc. stay on the heap)
+portMUX_TYPE s_arenaMux = portMUX_INITIALIZER_UNLOCKED;
+volatile uint32_t s_arenaBadFree = 0;   // arena pointers that were not the start of a live slot (double free / interior)
+volatile uint32_t s_arenaHit = 0;       // job-task requests >= FW_ARENA_MIN_RECORD served by the arena
+volatile uint32_t s_arenaMiss = 0;      // ... that did not fit and went to the heap (logged by arenaRelease)
+
+void tlsCapSub(uint32_t sz)
+{
+    uint32_t cur = __atomic_load_n(&s_tlsCapLive, __ATOMIC_RELAXED);
+    uint32_t nxt;
+    do
+        nxt = cur > sz ? cur - sz : 0u;
+    while (!__atomic_compare_exchange_n(&s_tlsCapLive, &cur, nxt, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+}
+
+// Free bytes the arena holds for the gate (0 = no arena, or lent as the dictionary).
+uint32_t arenaHeld()
+{
+    uint32_t n = 0;
+    portENTER_CRITICAL(&s_arenaMux);
+    if (s_arena.buf != nullptr && !s_arena.lent && s_arenaTask != nullptr)
+        n = (uint32_t)s_arena.len;
+    portEXIT_CRITICAL(&s_arenaMux);
+    return n;
+}
+
 void *tlsCalloc(size_t n, size_t size)
 {
     size_t total;
@@ -334,6 +376,19 @@ void *tlsCalloc(size_t n, size_t size)
         }
     }
     void *p = nullptr;
+    if (armed && total >= FW_ARENA_MIN_RECORD && s_arena.buf != nullptr && xTaskGetCurrentTaskHandle() == s_arenaTask)
+    {
+        portENTER_CRITICAL(&s_arenaMux);
+        p = fwArenaAllocRecord(&s_arena, total);
+        portEXIT_CRITICAL(&s_arenaMux);
+        __atomic_fetch_add(p != nullptr ? &s_arenaHit : &s_arenaMiss, 1u, __ATOMIC_RELAXED);
+        if (p != nullptr)
+        {
+            memset(p, 0, total); // calloc contract; outside the lock
+            __atomic_fetch_add(&s_tlsCapLive, (uint32_t)fwArenaRound(total), __ATOMIC_RELAXED);
+            return p;
+        }
+    }
     if (s_tlsPsram)
         p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (p == nullptr)
@@ -345,15 +400,28 @@ void *tlsCalloc(size_t n, size_t size)
 
 void tlsFree(void *p)
 {
-    if (p != nullptr && s_tlsCapArmed)
+    if (p != nullptr && s_arena.buf != nullptr)
     {
-        const uint32_t sz = (uint32_t)heap_caps_get_allocated_size(p);
-        uint32_t cur = __atomic_load_n(&s_tlsCapLive, __ATOMIC_RELAXED);
-        uint32_t nxt;
-        do
-            nxt = cur > sz ? cur - sz : 0u;
-        while (!__atomic_compare_exchange_n(&s_tlsCapLive, &cur, nxt, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+        // An arena pointer is never handed to the heap: the slot is released instead. Decided under the lock so
+        // that an arena freed meanwhile (arenaRelease) cannot leave a recycled heap address looking like ours.
+        bool owned;
+        size_t slot = 0;
+        portENTER_CRITICAL(&s_arenaMux);
+        owned = fwArenaOwns(&s_arena, p);
+        if (owned)
+            slot = fwArenaFree(&s_arena, p);
+        portEXIT_CRITICAL(&s_arenaMux);
+        if (owned)
+        {
+            if (slot == 0)
+                __atomic_fetch_add(&s_arenaBadFree, 1u, __ATOMIC_RELAXED); // logged by arenaRelease
+            else if (s_tlsCapArmed)
+                tlsCapSub((uint32_t)slot);
+            return;
+        }
     }
+    if (p != nullptr && s_tlsCapArmed)
+        tlsCapSub((uint32_t)heap_caps_get_allocated_size(p));
     heap_caps_free(p);
 }
 
@@ -391,6 +459,94 @@ void tlsCapDisarm()
     if (r != 0u)
         auLog("[AU];tlscap;refused;%lu\n", (unsigned long)r);
 }
+
+// Job start (fwNetTask, TLS jobs, after BLE pause / TFT shed and before the gate and the first TLS session): the
+// arena is taken from the biggest block there is. No arena (PSRAM board, no block) = exactly the old behaviour.
+void arenaRelease(); // below
+
+void arenaAcquire()
+{
+    // Restart path: the old task detached its idle arena (arenaDetach) instead of freeing it, so the new task's stack
+    // cannot land in the freed block before this task allocates again. Adopt it.
+    bool adopted = false;
+    portENTER_CRITICAL(&s_arenaMux);
+    if (s_arena.buf != nullptr && s_arenaTask == nullptr && !s_arena.lent && fwArenaLive(&s_arena) == 0)
+    {
+        s_arenaTask = xTaskGetCurrentTaskHandle();
+        adopted = true;
+    }
+    portEXIT_CRITICAL(&s_arenaMux);
+    if (adopted)
+    {
+        auLog("[AU];arena;ok;%u;adopt\n", (unsigned)FWNET_ARENA_LEN);
+        return;
+    }
+    arenaRelease(); // a previous job's arena that could not be freed then (live record) is retried here
+    if (!s_tlsHookInstalled || psramFound() || s_arena.buf != nullptr)
+        return; // PSRAM boards: records are in PSRAM already; leftover arena: keep it unused
+    const uint32_t blk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    uint8_t *b = blk >= FWNET_ARENA_LEN ? (uint8_t *)heap_caps_malloc(FWNET_ARENA_LEN, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)
+                                        : nullptr;
+    if (b == nullptr)
+    {
+        auLog("[AU];arena;none;iblk;%u\n", (unsigned)blk);
+        return;
+    }
+    portENTER_CRITICAL(&s_arenaMux);
+    fwArenaInit(&s_arena, b, FWNET_ARENA_LEN);
+    s_arenaTask = xTaskGetCurrentTaskHandle();
+    portEXIT_CRITICAL(&s_arenaMux);
+    auLog("[AU];arena;ok;%u\n", (unsigned)FWNET_ARENA_LEN);
+}
+
+// Job end (after tlsCapDisarm and the restart branch; a restart hands the idle arena to the new task via arenaDetach
+// instead, so the new task's stack cannot take the freed block). Freed only when no record slot is
+// live and the dictionary is not lent; otherwise it stays (never freed under a live session), unused by new
+// requests, and arenaAcquire() retries at the next job.
+void arenaRelease()
+{
+    if (s_arena.buf == nullptr)
+        return;
+    uint8_t *b = nullptr;
+    unsigned live;
+    portENTER_CRITICAL(&s_arenaMux);
+    s_arenaTask = nullptr; // no new slots from here on
+    live = fwArenaLive(&s_arena) + (s_arena.lent ? 1u : 0u);
+    if (live == 0)
+    {
+        b = s_arena.buf;
+        fwArenaInit(&s_arena, nullptr, 0);
+    }
+    portEXIT_CRITICAL(&s_arenaMux);
+    if (b != nullptr)
+        heap_caps_free(b);
+    else
+        auLog("[AU];arena;busy;%u\n", live);
+    const uint32_t hit = __atomic_exchange_n(&s_arenaHit, 0u, __ATOMIC_RELAXED);
+    const uint32_t miss = __atomic_exchange_n(&s_arenaMiss, 0u, __ATOMIC_RELAXED);
+    if (hit != 0 || miss != 0)
+        auLog("[AU];arena;rec;hit;%lu;miss;%lu\n", (unsigned long)hit, (unsigned long)miss);
+    const uint32_t bad = __atomic_exchange_n(&s_arenaBadFree, 0u, __ATOMIC_RELAXED);
+    if (bad != 0)
+        auLog("[AU];arena;badfree;%lu\n", (unsigned long)bad);
+}
+
+#if AU_BLE_PAUSE
+// Restart path: keeps an idle arena for the new task (arenaAcquire adopts it); no task may take slots meanwhile.
+// A busy arena (cannot happen after the job body: every session is closed) is released the normal way.
+bool arenaDetach()
+{
+    bool kept = false;
+    portENTER_CRITICAL(&s_arenaMux);
+    if (s_arena.buf != nullptr && !s_arena.lent && fwArenaLive(&s_arena) == 0)
+    {
+        s_arenaTask = nullptr;
+        kept = true;
+    }
+    portEXIT_CRITICAL(&s_arenaMux);
+    return kept;
+}
+#endif
 
 // Failed heap allocations while a job runs (heap_caps failed-alloc hook). mbedtls maps an
 // allocation failure inside the signature check of the chain verification to the same
@@ -715,17 +871,18 @@ static uint8_t s_twoBuf = 2;
 // The client context and the CA chain parse are not modelled (many small pieces).
 #define FWNET_PROBE_JOB (FWNET_BLK + 2048u)
 
-// Allocates the job block and two FWNET_TLS_REC_BUF internal blocks at once (what the job and
+// Allocates the job block, one FWNET_TLS_REC_BUF and one FWNET_TLS_OUT_BUF internal block at once (what the job and
 // mbedTLS then do), frees all three. The probe's own failed malloc must not count as the job's
 // first alloc failure (allocFailArm() is armed before the gate): the counters are put back.
-static bool twoRecBufProbe()
+static bool twoRecBufProbe(bool withRecords = true)
 {
     const uint32_t afN = s_afN, afSize = s_afFirstSize, afCaps = s_afFirstCaps, afMax = s_afMaxSize;
     const char *afFn = s_afFirstFn;
     void *j = heap_caps_malloc(FWNET_PROBE_JOB, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    void *a = j ? heap_caps_malloc(FWNET_TLS_REC_BUF, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) : nullptr;
-    void *b = a ? heap_caps_malloc(FWNET_TLS_REC_BUF, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) : nullptr;
-    const bool ok = (b != nullptr);
+    // withRecords false: the arena holds the records, only the job's own block is probed
+    void *a = (j && withRecords) ? heap_caps_malloc(FWNET_TLS_REC_BUF, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) : nullptr;
+    void *b = a ? heap_caps_malloc(FWNET_TLS_OUT_BUF, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) : nullptr;
+    const bool ok = withRecords ? (b != nullptr) : (j != nullptr);
     if (b)
         heap_caps_free(b);
     if (a)
@@ -777,6 +934,11 @@ bool heapGateEval(uint32_t &fr, uint32_t &bk, uint32_t &pb, bool &ps, uint32_t &
     fr = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     bk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     pb = ps ? (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : 0u;
+    // (a') the arena is the two record buffers of this job: its bytes count as free and as the record block
+    const uint32_t arenaB = ps ? 0u : arenaHeld();
+    fr += arenaB;
+    if (bk < arenaB)
+        bk = arenaB;
     uint32_t minFree = fwGateMinFree(FWNET_CLASSIC_TARGET, ps);
     uint32_t minIFree = FWNET_MIN_IFREE_PSRAM;
 #if INSTRUMENT_ENABLED
@@ -792,7 +954,7 @@ bool heapGateEval(uint32_t &fr, uint32_t &bk, uint32_t &pb, bool &ps, uint32_t &
         return false; // cheap checks refuse: no probe allocation
     if (ps)
         return true; // record buffers live in PSRAM
-    s_twoBuf = twoRecBufProbe() ? 1 : 0;
+    s_twoBuf = twoRecBufProbe(arenaB == 0u) ? 1 : 0;
     return fwNetHeapGate(ps, fr, bk, pb, minFree, FWNET_MIN_BLOCK, minIFree, s_twoBuf == 1);
 }
 
@@ -1211,6 +1373,30 @@ const char *stageDryRun(const Stage &sg, uint8_t *in, uint32_t ilen)
     const uint32_t caps[2] = {MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT};
     DryMem *m = nullptr;
     uint8_t *dict = nullptr;
+    // (a') no record slot live (the TLS sessions are closed): the arena block is the dictionary. DryMem stays on the heap.
+    uint8_t *arenaDict = nullptr;
+    if (s_arena.buf != nullptr)
+    {
+        portENTER_CRITICAL(&s_arenaMux);
+        arenaDict = (uint8_t *)fwArenaTakeWhole(&s_arena, TINFL_LZ_DICT_SIZE);
+        portEXIT_CRITICAL(&s_arenaMux);
+        dict = arenaDict;
+    }
+    if (!psramFound())
+    {
+        if (arenaDict != nullptr)
+            auLog("[AU];dry;dict;arena\n");
+        else
+        {
+            unsigned live = 0, lent = 0, have = 0;
+            portENTER_CRITICAL(&s_arenaMux);
+            have = s_arena.buf != nullptr ? 1u : 0u;
+            live = fwArenaLive(&s_arena);
+            lent = s_arena.lent ? 1u : 0u;
+            portEXIT_CRITICAL(&s_arenaMux);
+            auLog("[AU];dry;dict;heap;arena;%u;live;%u;lent;%u\n", have, live, lent);
+        }
+    }
     for (int i = psramFound() ? 0 : 1; i < 2; i++)
     {
         if (m == nullptr)
@@ -1246,7 +1432,14 @@ const char *stageDryRun(const Stage &sg, uint8_t *in, uint32_t ilen)
             why = "env";
         }
     }
-    heap_caps_free(dict);
+    if (arenaDict != nullptr)
+    {
+        portENTER_CRITICAL(&s_arenaMux);
+        fwArenaReturnWhole(&s_arena, arenaDict);
+        portEXIT_CRITICAL(&s_arenaMux);
+    }
+    else
+        heap_caps_free(dict);
     heap_caps_free(m);
     return why;
 }
@@ -1600,6 +1793,10 @@ void fwNetTask(void *)
         shedHold(FW_SHED_TFT);
         auLog("[AU];shed;tft\n");
     }
+    // OTA-LOWHEAP-01 (a'): after the BLE pause / TFT release (they only add free memory, so the block is the biggest
+    // it gets) and before the gate and the first TLS session. The restart path runs this again in the new task.
+    if (tlsJob)
+        arenaAcquire();
     s_shedAllowed = fwShedAllowed(blePaused, guarded, phoneHeld);
     s_gateFragmented = false;
 #if AU_BLE_PAUSE
@@ -1621,11 +1818,15 @@ void fwNetTask(void *)
     {
         s_jobRestart = true;
         auLog("[AU];shed;restart\n");
+        // (a') the idle arena goes to the new task (it adopts it in arenaAcquire): freeing it first would let the new
+        // stack land in that block. All TLS sessions of the job body are closed here.
+        arenaDetach();
         if (xTaskCreatePinnedToCore(fwNetTask, "fwnet", FWNET_TASK_STACK, nullptr, 1, nullptr, FWNET_CORE) == pdPASS)
             vTaskDelete(nullptr);
         s_jobRestart = false;
     }
 #endif
+    arenaRelease(); // all TLS sessions of the job body are closed (every exit; a failed restart lands here too)
     auHeapLine("peak", "", true);
     heapMark("end"); // after every client object is gone
     allocFailMark("end");

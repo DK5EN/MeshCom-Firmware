@@ -875,7 +875,12 @@ inline bool fwNetHeapOk(uint32_t freeB, uint32_t largestBlk, uint32_t minFree, u
 #ifndef FWNET_TLS_REC_BUF
 #define FWNET_TLS_REC_BUF 16717u
 #endif
-// twoBufOk: result of the caller's probe (two FWNET_TLS_REC_BUF internal allocations held at once);
+// OTA-LOWHEAP-01: the OUTPUT record buffer on ESP32 IDF-4 builds (src/esp32/idf_override/mbedtls, content 4096 B
+// + 13 header + 320 payload overhead). The input buffer stays FWNET_TLS_REC_BUF.
+#ifndef FWNET_TLS_OUT_BUF
+#define FWNET_TLS_OUT_BUF 4429u
+#endif
+// twoBufOk: result of the caller's probe (FWNET_TLS_REC_BUF + FWNET_TLS_OUT_BUF internal allocations held at once);
 // only consulted on the classic (non-PSRAM) path.
 inline bool fwNetHeapGate(bool psramTls, uint32_t internalFree, uint32_t internalBlk,
                           uint32_t psramLargestBlk, uint32_t minFree, uint32_t minBlk,

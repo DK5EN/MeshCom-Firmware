@@ -22,6 +22,13 @@
 #include <lwip/sys.h>
 #include <lwip/netdb.h>
 #include <string.h>
+#include <esp_idf_version.h>
+
+#if ESP_IDF_VERSION_MAJOR == 4
+// OTA-LOWHEAP-01: defined by src/esp32/idf_override/mbedtls/ssl_tls.c (4 KB output record). Undefined reference =
+// the override is missing and the stock 16 KB objects were linked.
+extern "C" const int mc_mbedtls_out4k_marker;
+#endif
 
 static const char *mc_pers = "esp32-tls";
 
@@ -294,10 +301,23 @@ int mc_ssl_data_to_read(mc_ssl_context *ctx)
 
 int mc_ssl_send(mc_ssl_context *ctx, const uint8_t *data, size_t len)
 {
-    int ret = -1;
+    // OTA-LOWHEAP-01: the output record buffer is 4096 B of content (src/esp32/idf_override/mbedtls), so
+    // mbedtls_ssl_write takes at most that much per call and returns the count it took. Send all of `len`:
+    // callers (HTTPClient::sendHeader) treat a short write as a failed send. The timeout restarts with every
+    // chunk that went out; a retry after WANT_READ/WANT_WRITE passes the same arguments, as mbedTLS requires.
+    size_t sent = 0;
     unsigned long write_start_time = millis();
+#if ESP_IDF_VERSION_MAJOR == 4
+    (void)*(const volatile int *)&mc_mbedtls_out4k_marker; // keeps the link-time check (see top of file)
+#endif
 
-    while ((ret = mbedtls_ssl_write(&ctx->ssl_ctx, data, len)) <= 0) {
+    while (sent < len) {
+        int ret = mbedtls_ssl_write(&ctx->ssl_ctx, data + sent, len - sent);
+        if (ret > 0) {
+            sent += (size_t)ret;
+            write_start_time = millis();
+            continue;
+        }
         if ((millis() - write_start_time) > ctx->socket_timeout) {
             log_v("SSL write timed out.");
             return -1;
@@ -308,7 +328,7 @@ int mc_ssl_send(mc_ssl_context *ctx, const uint8_t *data, size_t len)
         }
         vTaskDelay(2); // wait for space to become available
     }
-    return ret;
+    return (int)sent;
 }
 
 int mc_ssl_receive(mc_ssl_context *ctx, uint8_t *data, int length)
