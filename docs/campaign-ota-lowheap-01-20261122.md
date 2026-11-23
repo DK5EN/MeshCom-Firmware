@@ -254,3 +254,59 @@ Scope: S3 boards without PSRAM only; PSRAM boards and the RAK4631 keep the large
   display / sensors off (control), R7 everything that can be switched off. B1 image with `DISABLE_BLE`, B2 without
   BLE, AppLink and KISS. R4 runs on DK5EN-1 only with an operator OK (it interrupts the gateway); without it, R4
   runs on the T-Beam only.
+
+## 2026-11-23: knockout runs R0-R7 (round 1, `tools/bench/ota_lowheap_knockout.py`)
+
+Operator OK 2026-11-23 for DK5EN-1 and DK5EN-92, R4 included. Each run toggles one feature against the node's own
+baseline (on -> off, off -> on), reboots, samples idle heap, runs AU check + install (stage only), restores the
+baseline (`restore=ok` on both nodes). Round 1 download values on DK5EN-1 are void after R0 (the staged image was
+not dropped, install answered `already_staged`); round 2 (`-v2`, with `--update unstage`) repeats them.
+
+| Run | Feature (toggle)       | V3 idle free (KB) | V3 delta | T-Beam idle free (KB) | T-Beam delta |
+| --- | ---------------------- | ----------------- | -------- | --------------------- | ------------ |
+| R0  | baseline               | 100.0             | -        | 47.5                  | -            |
+| R1  | web server off         | 106.1             | +6.1     | (see below)           |              |
+| R2  | KISS on                | 99.6              | -0.4     | 47.0                  | -0.4         |
+| R3  | AppLink on             | 95.5              | -4.5     | 43.2                  | -4.3         |
+| R4  | gateway off            | 100.0             | 0.0      | already off (repeat)  | 0.0          |
+| R5  | mailbox (store own) on | 100.0             | 0.0      | not readable          | -            |
+| R6  | display on (control)   | 100.0             | 0.0      | 47.5                  | 0.0          |
+| R7  | everything on -> off   | 106.1             | +6.1     | (see below)           |              |
+
+- AU check usage on the V3 stays at 59-61 KB in every run: no feature changes the AU's own need.
+- Mailbox: switching the store mode changes nothing, the 13.5 KB tables are static (D7: allocate only when on).
+- Gateway mode holds no extra heap on the V3.
+- **T-Beam with the web server off (R1, R7, repro with serial capture):** the gate passes at 76.4 KB, the
+  download runs to the end (1,240,686 B in 17.9 s), then `[AU];refuse;nomem`: 2 failed allocations, max 32768 B
+  (`heap_caps_realloc`), largest block 22.5 KB. Cause: the dry-run inflate check after the download needs the 32 KB
+  dictionary (`TINFL_LZ_DICT_SIZE`, `fw_update_net.cpp:1218`) as one block (TLA+ F6). The console closes because
+  fix A sheds it during the job (`[AU];shed;services;console;1`), not a reset. Evidence:
+  `tools/bench/runs/harness/ota-lowheap-knockout-20261123/tbeam-r1-serial.log`.
+- Levers for the T-Beam to decide (operator): allocate the 32 KB dictionary before the download while the block
+  exists, or verify the inflate stream during the download; plus web server off during the AU session (+6 KB).
+
+### Round 2 (`ota-lowheap-knockout-20261123-v2/`, with `--update unstage`, values in KiB)
+
+| Run | Toggle            | V3 idle | V3 dl gate | V3 dl low | V3 dl used | T-Beam idle | T-Beam result              |
+| --- | ----------------- | ------- | ---------- | --------- | ---------- | ----------- | -------------------------- |
+| R0  | baseline          | 97.6    | 83.1       | 14.7      | 68.3       | 46.4        | refused `lowheap_ble_off`  |
+| R1  | web server off    | 103.6   | 89.1       | 20.7      | 68.4       | 52.4        | gate ok, download, `nomem` |
+| R2  | KISS on           | 97.2    | 82.4       | 16.7      | 65.8       |             |                            |
+| R3  | AppLink on        | 93.3    | 78.7       | 12.9      | 65.8       |             |                            |
+| R4  | gateway off       | 95.8    | 82.0       | 12.8      | 69.3       |             |                            |
+| R5  | mailbox on        | 97.7    | 83.1       | 16.8      | 66.3       |             |                            |
+| R6  | display on        | 97.7    | 83.1       | 13.9      | 69.2       |             |                            |
+| R7  | web + gateway off | 103.6   | 89.1       | 20.0      | 69.1       | 52.5        | gate ok, download, `nomem` |
+
+- The download needs 66-69 KiB in every configuration (spread ~3.5 KiB); features only shift the starting level.
+  The only switchable lever is the web server (+6 KiB); AppLink costs 4.3 KiB when on.
+- Download breakdown from the T-Beam INSTR-STEP trace: 2 x 16717 B mbedTLS record buffers (33.4 KB, half of the
+  total), TLS session + handshake ~10-15 KB (largest block down to 6.6 KB), WiFi RX in flight ~4-6 KB (1458 B
+  alloc / 1460 B free alternate, no pile-up: flash is not the bottleneck, the TCP window caps it), loopTask
+  1460 B blocks ~6 KB (site unresolved, "site 63"), download buffers ~3 KB.
+- Operator 2026-11-23: patch the mbedTLS output record buffer to 4096 B (input stays 16 KB: the CDN sends 16 KB
+  records). A calloc hook cannot do it (ssl_free/reset zeroize the full compiled length); object override of the
+  mbedTLS TUs compiled with `MBEDTLS_SSL_OUT_CONTENT_LEN=4096`, like `src/esp32/idf_override/mdns.c`. Expected
+  saving ~12.3 KB per TLS session on every ESP32.
+- T-Beam: built with `BOARD_HAS_PSRAM`, but `psram 0`, `pfree 0` at runtime: PSRAM missing or not detected; the TLS
+  records land in internal RAM. To check on the board.

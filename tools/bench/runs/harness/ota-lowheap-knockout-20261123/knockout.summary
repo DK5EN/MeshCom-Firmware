@@ -1,0 +1,15 @@
+2026-11-23 17:12:07 DK5EN-92 R0 toggled=- idle_free=47468 verdict=refused fails=0 check_gate_free=68296 dl_gate_free=68648 check_lowest=35084 dl_lowest=33716 check_used=33212 dl_used=34932
+2026-11-23 17:12:18 DK5EN-1 R0 toggled=- idle_free=100004 verdict=staged fails=0 check_gate_free=85520 dl_gate_free=85096 check_lowest=24408 dl_lowest=15248 check_used=61112 dl_used=69848
+2026-11-23 17:15:07 DK5EN-1 R1 toggled=web:0 idle_free=106124 verdict=staged fails=0 check_gate_free=91628 dl_gate_free=91628 check_lowest=30792 dl_lowest=30792 check_used=60836
+2026-11-23 17:18:46 DK5EN-1 R2 toggled=kiss:1 idle_free=99576 verdict=staged fails=0 check_gate_free=85080 dl_gate_free=85080 check_lowest=23772 dl_lowest=23772 check_used=61308
+2026-11-23 17:19:13 DK5EN-92 R2 toggled=kiss:1 idle_free=47048 verdict=refused fails=0 check_gate_free=68112 dl_gate_free=66776 check_lowest=33176 dl_lowest=33092 check_used=34936 dl_used=33684
+2026-11-23 17:22:25 DK5EN-1 R3 toggled=applink:1 idle_free=95540 verdict=staged fails=0 check_gate_free=81064 dl_gate_free=81064 check_lowest=21900 dl_lowest=21900 check_used=59164
+2026-11-23 17:22:51 DK5EN-92 R3 toggled=applink:1 idle_free=43160 verdict=refused fails=0 check_gate_free=64132 dl_gate_free=63992 check_lowest=29660 dl_lowest=29648 check_used=34472 dl_used=34344
+2026-11-23 17:26:04 DK5EN-1 R4 toggled=gateway:0 idle_free=100004 verdict=staged fails=0 check_gate_free=85520 dl_gate_free=85520 check_lowest=26336 dl_lowest=26336 check_used=59184
+2026-11-23 17:26:27 DK5EN-92 R4 toggled=- idle_free=47432 verdict=refused fails=0 check_gate_free=68388 dl_gate_free=68628 check_lowest=33944 dl_lowest=33908 check_used=34444 dl_used=34720
+2026-11-23 17:29:14 DK5EN-92 R5 toggled=- idle_free=47448 verdict=refused fails=0 check_gate_free=63636 dl_gate_free=68408 check_lowest=33844 dl_lowest=33924 check_used=29792 dl_used=34484
+2026-11-23 17:29:43 DK5EN-1 R5 toggled=store:1 idle_free=100000 verdict=staged fails=0 check_gate_free=85496 dl_gate_free=85496 check_lowest=26544 dl_lowest=26544 check_used=58952
+2026-11-23 17:32:04 DK5EN-92 R6 toggled=display:1 idle_free=47520 verdict=refused fails=0 check_gate_free=68372 dl_gate_free=68724 check_lowest=35136 dl_lowest=33796 check_used=33236 dl_used=34928
+2026-11-23 17:33:21 DK5EN-1 R6 toggled=display:1 idle_free=100040 verdict=staged fails=0 check_gate_free=85552 dl_gate_free=85552 check_lowest=26144 dl_lowest=26144 check_used=59408
+2026-11-23 17:37:04 DK5EN-1 R7 toggled=web:0,gateway:0 idle_free=106124 verdict=staged fails=0 check_gate_free=91636 dl_gate_free=91636 check_lowest=32680 dl_lowest=32680 check_used=58956
+2026-11-23 17:38:01 DK5EN-1 restore=ok

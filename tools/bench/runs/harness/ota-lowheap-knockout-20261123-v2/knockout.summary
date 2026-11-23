@@ -1,0 +1,13 @@
+2026-11-23 17:42:39 DK5EN-92 R0 toggled=- idle_free=47484 verdict=refused fails=0 console_shed=0 status_err=lowheap_ble_off check_gate_free=68452 dl_gate_free=68428 check_lowest=34028 dl_lowest=33928 check_used=34424 dl_used=34500
+2026-11-23 17:42:51 DK5EN-1 R0 toggled=- idle_free=99992 verdict=staged fails=0 console_shed=0 status_err=none check_gate_free=85488 dl_gate_free=85056 check_lowest=26348 dl_lowest=15084 check_used=59140 dl_used=69972
+2026-11-23 17:45:56 DK5EN-1 R1 toggled=web:0 idle_free=106124 verdict=staged fails=0 console_shed=0 status_err=none check_gate_free=91640 dl_gate_free=91216 check_lowest=30264 dl_lowest=21200 check_used=61376 dl_used=70016
+2026-11-23 17:46:13 DK5EN-92 R1 toggled=web:0 idle_free=53616 verdict=other fails=0 console_shed=1 status_err=nomem check_gate_free=69544 dl_gate_free=69544
+2026-11-23 17:49:50 DK5EN-1 R2 toggled=kiss:1 idle_free=99488 verdict=staged fails=0 console_shed=0 status_err=none check_gate_free=84820 dl_gate_free=84428 check_lowest=25864 dl_lowest=17052 check_used=58956 dl_used=67376
+2026-11-23 17:50:37 DK5EN-92 R7 toggled=web:0 idle_free=53716 verdict=other fails=0 console_shed=1 status_err=nomem check_gate_free=74544 dl_gate_free=74544
+2026-11-23 17:51:31 DK5EN-92 restore=ok
+2026-11-23 17:53:44 DK5EN-1 R3 toggled=applink:1 idle_free=95544 verdict=staged fails=0 console_shed=0 status_err=none check_gate_free=81028 dl_gate_free=80632 check_lowest=22272 dl_lowest=13216 check_used=58756 dl_used=67416
+2026-11-23 17:57:37 DK5EN-1 R4 toggled=gateway:0 idle_free=98144 verdict=staged fails=0 console_shed=0 status_err=none check_gate_free=84336 dl_gate_free=84008 check_lowest=25112 dl_lowest=13084 check_used=59224 dl_used=70924
+2026-11-23 18:01:31 DK5EN-1 R5 toggled=store:1 idle_free=100004 verdict=staged fails=0 console_shed=0 status_err=none check_gate_free=85520 dl_gate_free=85096 check_lowest=26152 dl_lowest=17228 check_used=59368 dl_used=67868
+2026-11-23 18:05:25 DK5EN-1 R6 toggled=display:1 idle_free=100000 verdict=staged fails=0 console_shed=0 status_err=none check_gate_free=85512 dl_gate_free=85092 check_lowest=24184 dl_lowest=14260 check_used=61328 dl_used=70832
+2026-11-23 18:09:21 DK5EN-1 R7 toggled=web:0,gateway:0 idle_free=106112 verdict=staged fails=0 console_shed=0 status_err=none check_gate_free=91628 dl_gate_free=91212 check_lowest=30184 dl_lowest=20452 check_used=61444 dl_used=70760
+2026-11-23 18:10:18 DK5EN-1 restore=ok
