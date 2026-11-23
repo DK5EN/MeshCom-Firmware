@@ -42,8 +42,17 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
     `reboot-events.log`; red = `lowheap` refusal. Then the fix wave (update after a fresh boot, D7-D10) with
     red-before tests; DK5EN-1 stays gateway and DK5EN-98 stays on the INSTRUMENT image until the new fork release on 2026-11-23, which upgrades the whole fleet (operator).
   - 2026-11-23: fixes A + B committed (`878ebef4`), V3 green on the INSTRUMENT image. A/B test: chain verification
-    off on the download host saves nothing measurable (67.0 vs 66.6 KB), switch removed. Next: knockout runs R0-R7
-    (campaign doc), then T-Beam budget.
+    off on the download host saves nothing measurable (67.0 vs 66.6 KB), switch removed.
+  - 2026-11-23 evening: knockout runs R0-R7 done on DK5EN-1 and DK5EN-92 (`52f044b9`,
+    `tools/bench/ota_lowheap_knockout.py`): the download needs 66-69 KiB whatever is on; web server off is the only
+    switch (+6 KiB). Half the peak are the two 16717 B mbedTLS record buffers. T-Beam with web off passes the gate and
+    downloads, then fails `nomem` on the 32 KB inflate dictionary (largest block 22.5 KB). T-Beam PSRAM: built with
+    `BOARD_HAS_PSRAM`, reports 0 at runtime (open).
+  - Running: mbedTLS output buffer 16 KB -> 4 KB as an object override (operator, input stays 16 KB), ~12 KB per TLS
+    session. Operator: (a) reserve the dictionary before the download, (b) streaming check only if (a) fails. The
+    numbers rule out (a) and (b) on the T-Beam (block gone after the check; 32 KB + download > 76 KB free); proposed
+    (a'): a 34 KB arena at AU-session start that holds the TLS record buffers and becomes the dictionary afterwards.
+    Waiting for the operator's go on (a'). Desktop: `ota-lowheap-checkliste-20261123.html`, `-heapmap-`.
 - **PR #1316 merged upstream (2026-11-22), synced:** [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md).
   21 issues closed (#1287-#1302, #1304, #1310, #1312, #1314, #1315). Merge `dc5ea81c` keeps fork-dev on every path
   (upstream copies differ only in comments); tree unchanged, gate stage 1,2 PASS, V3 and RAK4631 build. Worktree
