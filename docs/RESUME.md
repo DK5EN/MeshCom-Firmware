@@ -52,7 +52,9 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
     session. Operator: (a) reserve the dictionary before the download, (b) streaming check only if (a) fails. The
     numbers rule out (a) and (b) on the T-Beam (block gone after the check; 32 KB + download > 76 KB free); proposed
     (a'): a 34 KB arena at AU-session start that holds the TLS record buffers and becomes the dictionary afterwards.
-    Waiting for the operator's go on (a'). Desktop: `ota-lowheap-checkliste-20261123.html`, `-heapmap-`.
+    Operator go on (a') 2026-11-23. Both written (mbedTLS override + arena), NOT built, NOT committed; session
+    stopped before the measurement campaign. Resume: campaign doc, last section. Desktop:
+    `ota-lowheap-checkliste-20261123.html`, `-heapmap-`.
 - **PR #1316 merged upstream (2026-11-22), synced:** [campaign-pr-wave3-20261122.md](campaign-pr-wave3-20261122.md).
   21 issues closed (#1287-#1302, #1304, #1310, #1312, #1314, #1315). Merge `dc5ea81c` keeps fork-dev on every path
   (upstream copies differ only in comments); tree unchanged, gate stage 1,2 PASS, V3 and RAK4631 build. Worktree

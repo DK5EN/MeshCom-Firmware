@@ -310,3 +310,21 @@ not dropped, install answered `already_staged`); round 2 (`-v2`, with `--update 
   saving ~12.3 KB per TLS session on every ESP32.
 - T-Beam: built with `BOARD_HAS_PSRAM`, but `psram 0`, `pfree 0` at runtime: PSRAM missing or not detected; the TLS
   records land in internal RAM. To check on the board.
+
+## 2026-11-23 late: mbedTLS 4 KB output buffer + TLS/dictionary arena (written, NOT built, NOT committed)
+
+Session stopped before the measurement campaign (operator). Uncommitted in the tree:
+
+- **mbedTLS output record 16717 -> 4429 B** (`MBEDTLS_SSL_OUT_CONTENT_LEN=4096`, input stays 16384): object override
+  `src/esp32/idf_override/mbedtls/` (ssl_tls.c, ssl_msg.c, ssl_cli.c, ssl_srv.c from v2.28.7, shim
+  `mc_mbedtls_out4k.h`, `#error` guard `mc_mbedtls_check.h`), `README-mbedtls.md`. At 16384 the vendored objects are
+  identical to `libmbedtls_2.a` of 3.20017.241212 (symbols, sizes, disassembly). `mc_ssl_send` now loops over partial
+  writes (`src/esp32/mc_tls/mc_ssl_client.cpp`); `WiFiClientSecure` users (ESP32-audioI2S) have no loop: requests
+  must stay < 4096 B. Expected: -12288 B per TLS session.
+- **(a') arena** (operator go 2026-11-23): `src/fw_tls_arena.h`, `test/test_fw_tls_arena` (14/14),
+  `src/esp32/fw_update_net.cpp`: 33440 B per AU job (allocated after the BLE pause, :1737; released :1749), hosts
+  the job task's record buffers via tlsCalloc/tlsFree, then lends 32 KB as the dry-run dictionary
+  (`[AU];dry;dict;arena`). PSRAM boards unchanged. `heapGateEval` counts the arena as free (gate otherwise refuses).
+  Risk: at the install-job start of the measured T-Beam case the largest block was 22.5 KB (< 33440) after a separate
+  check job; the design assumes the check job's records in the arena no longer fragment the heap. Measure.
+- Not done: advisor review of both, board builds, gate, golden baseline (new env `native_fw_tls_arena`), bench.
