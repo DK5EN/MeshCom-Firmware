@@ -154,6 +154,13 @@ def test_moved_out_realloc_releases_the_shadow_first():
     assert not s.shadow
 
 
+def test_marker_untracked_bytes():
+    s = seg_of([a(1, "20000000", 100), P + "[HT];m;2;idle;ifree;800;iblk;700;itotal;1000;drops;0;waitms;5"])
+    m = s.markers[0]
+    assert (m.itotal, m.waitms) == (1000, 5)
+    assert m.itotal - m.ifree - sum(b.size for b in m.live.values()) == 100
+
+
 def test_shadow_count_in_report():
     s = seg_of([a(1, "20000000", 10), a(2, "20000000", 30)])
     assert "shadowed 1" in heaptrace.render(s, [], 5)

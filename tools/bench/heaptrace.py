@@ -51,6 +51,8 @@ class Marker:
     iblk: int
     drops: int
     live: dict[int, Block]  # snapshot at marker time
+    itotal: int = 0  # internal heap size (8BIT); 0 = not in the line (older firmware)
+    waitms: int = 0  # time producers waited for ring room so far (perturbation)
 
 
 @dataclass
@@ -139,7 +141,7 @@ def parse_log(lines: list[str]) -> list[Segment]:
             kv = dict(zip(f[4::2], f[5::2]))
             seg.markers.append(
                 Marker(f[3], t, _int(kv.get("ifree", "0")), _int(kv.get("iblk", "0")),
-                       _int(kv.get("drops", "0")), dict(seg.live))
+                       _int(kv.get("drops", "0")), dict(seg.live), itotal=_int(kv.get("itotal", "0")), waitms=_int(kv.get("waitms", "0")))
             )
             continue
         if kind not in ("a", "r", "f", "o") or len(f) < 6:
@@ -258,6 +260,10 @@ def analyse(seg: Segment, at: Optional[list[str]], skip_fn: str, elf: Optional[s
         live_total = sum(b.size for b in m.live.values())
         rep: dict = {"marker": m.name, "t": m.t, "ifree": m.ifree, "iblk": m.iblk,
                      "drops": m.drops, "live_total": live_total, "live_blocks": len(m.live),
+                     "itotal": m.itotal, "waitms": m.waitms,
+                     # bytes neither free nor in the trace: allocated before the trace started, heap block headers,
+                     # the drain task (untraced). Only meaningful when the firmware sends itotal.
+                     "untracked": (m.itotal - m.ifree - live_total) if m.itotal else None,
                      "by_caller": group(m.live, info, None),
                      "by_first_outside_allocator": group(m.live, info, skip),
                      "delta": None}
@@ -291,7 +297,8 @@ def render(seg: Segment, reports: list[dict], top: int) -> str:
            f"shadowed {seg.shadowed}, untraced bytes (drain stack) {seg.untraced_bytes}"]
     for r in reports:
         out.append(f"-- marker {r['marker']} t={r['t']}ms  live_total={r['live_total']} "
-                   f"({r['live_blocks']} blocks)  ifree={r['ifree']} iblk={r['iblk']} drops={r['drops']}")
+                   f"({r['live_blocks']} blocks)  ifree={r['ifree']} iblk={r['iblk']} drops={r['drops']} "
+                   f"itotal={r['itotal']} untracked={r['untracked']} waitms={r['waitms']}")
         d = r["delta"]
         if d:
             ov = "n/a" if d["overhead_per_block"] is None else f"{d['overhead_per_block']:.1f}"

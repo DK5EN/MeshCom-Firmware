@@ -1,0 +1,3021 @@
+{
+ "segment": 0,
+ "shadowed": 69,
+ "untraced_bytes": 0,
+ "markers": [
+  {
+   "marker": "after_check",
+   "t": 645669,
+   "ifree": 22076,
+   "iblk": 9204,
+   "drops": 108,
+   "live_total": 206564,
+   "live_blocks": 479,
+   "itotal": 246712,
+   "waitms": 58533,
+   "untracked": 18072,
+   "by_caller": [
+    {
+     "bytes": 32768,
+     "blocks": 1,
+     "function": "??",
+     "location": "??:0",
+     "pc": null,
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24920,
+     "blocks": 3,
+     "function": "_ZN12_GLOBAL__N_18startJobE8FwNetJobhPKNS_6LanArgE$part$2",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/fw_update_net.cpp:2019",
+     "pc": "0x42022e84",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 17072,
+     "blocks": 4,
+     "function": "xTaskCreate",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/freertos/include/freertos/task.h:450",
+     "pc": "0x420a09ac",
+     "tasks": [
+      "loopTask",
+      "main"
+     ]
+    },
+    {
+     "bytes": 10298,
+     "blocks": 75,
+     "function": "mbedtls_calloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/mbedtls/mbedtls/library/platform.c:49",
+     "pc": "0x420ef254",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 9356,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2e84",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 8864,
+     "blocks": 4,
+     "function": "wDev_Rxbuf_Init",
+     "location": "??:?",
+     "pc": "0x4211661d",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 8640,
+     "blocks": 69,
+     "function": "xQueueGenericCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/queue.c:447",
+     "pc": "0x40381ef8",
+     "tasks": [
+      "-",
+      "arduino_",
+      "fwnet",
+      "loopTask",
+      "main",
+      "mdns",
+      "sys_evt",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 7000,
+     "blocks": 2,
+     "function": "task_create_pinned_to_core_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_wifi/esp32s3/esp_adapter.c:439 (discriminator 4)",
+     "pc": "0x420b8d98",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 4952,
+     "blocks": 2,
+     "function": "esp_timer_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/esp_timer.c:475",
+     "pc": "0x420cfb31",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4944,
+     "blocks": 3,
+     "function": "(anonymous namespace)::fwNetTask(void*)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/fw_update_net.cpp:1805 (discriminator 1)",
+     "pc": "0x420276f1",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4608,
+     "blocks": 1,
+     "function": "esp_startup_start_app_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/port/port_common.c:78",
+     "pc": "0x403849eb",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4440,
+     "blocks": 2,
+     "function": "_mdns_service_task_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/idf_override/mdns.c:4739",
+     "pc": "0x42035428",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 4440,
+     "blocks": 2,
+     "function": "task_create_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32c3/bt.c:682 (discriminator 4)",
+     "pc": "0x420d0454",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 4140,
+     "blocks": 36,
+     "function": "mem_malloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/mem.c:237",
+     "pc": "0x420bca2b",
+     "tasks": [
+      "fwnet",
+      "loopTask",
+      "mdns",
+      "tiT",
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 3416,
+     "blocks": 2,
+     "function": "esp_nimble_enable",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/nimble_port_freertos.c:60",
+     "pc": "0x420985e4",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 3416,
+     "blocks": 2,
+     "function": "sys_thread_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/port/esp32/freertos/sys_arch.c:416",
+     "pc": "0x420cbd86",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 3000,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:241",
+     "pc": "0x42097909",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 2904,
+     "blocks": 2,
+     "function": "esp_event_loop_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_event/esp_event.c:493",
+     "pc": "0x4214a418",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "esp_ipc_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ipc/src/esp_ipc.c:113",
+     "pc": "0x420de7cd",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "prvCreateIdleTasks",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/tasks.c:2382",
+     "pc": "0x40384371",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2528,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2bc8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 2448,
+     "blocks": 9,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd760",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 2304,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:882",
+     "pc": "0x40381007",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 2088,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2e01",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1868,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2ec6",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1864,
+     "blocks": 1,
+     "function": "McTlsClient::McTlsClient()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/mc_tls/McTlsClient.cpp:45",
+     "pc": "0x4203629b",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1692,
+     "blocks": 2,
+     "function": "wifi_create_queue_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_wifi/esp32s3/esp_adapter.c:158",
+     "pc": "0x420b908c",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1472,
+     "blocks": 2,
+     "function": "esf_buf_alloc_dynamic",
+     "location": "??:?",
+     "pc": "0x42148d64",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 1460,
+     "blocks": 1,
+     "function": "WiFiUDP::begin(IPAddress, unsigned short)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src/WiFiUdp.cpp:47",
+     "pc": "0x42085c74",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1392,
+     "blocks": 9,
+     "function": "String::changeBuffer(unsigned int)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/WString.cpp:200 (discriminator 4)",
+     "pc": "0x4209ecde",
+     "tasks": [
+      "fwnet",
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1260,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd592",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 1168,
+     "blocks": 1,
+     "function": "os_msys_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/porting/nimble/src/os_msys_init.c:153",
+     "pc": "0x42098556",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1152,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:234",
+     "pc": "0x420978e9",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1080,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd47e",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 1024,
+     "blocks": 8,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x420ac212",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 976,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2bb5",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 784,
+     "blocks": 1,
+     "function": "wdev_funcs_init",
+     "location": "??:?",
+     "pc": "0x42116bc8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 768,
+     "blocks": 4,
+     "function": "esp_vfs_register_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/vfs/vfs.c:76",
+     "pc": "0x420b05e1",
+     "tasks": [
+      "-",
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 750,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd64a",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 616,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd4da",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 608,
+     "blocks": 1,
+     "function": "llm_hci_env_init",
+     "location": "??:?",
+     "pc": "0x420d9171",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 584,
+     "blocks": 2,
+     "function": "esp_netif_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_netif/lwip/esp_netif_lwip.c:565",
+     "pc": "0x420b320e",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 544,
+     "blocks": 17,
+     "function": "ets_timer_setfn",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/ets_timer_legacy.c:69",
+     "pc": "0x420cfc5d",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 540,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd5ee",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 520,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:238",
+     "pc": "0x420978f9",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 472,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:881",
+     "pc": "0x40380ff9",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 444,
+     "blocks": 1,
+     "function": "??",
+     "location": "??:0",
+     "pc": "0x4000710d",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 428,
+     "blocks": 1,
+     "function": "__sfmoreglue",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/1/idf/crosstool-NG/.build/xtensa-esp32s3-elf/src/newlib/newlib/libc/stdio/findfp.c:132",
+     "pc": "0x42129415",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 424,
+     "blocks": 1,
+     "function": "nvs::PageManager::load(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_pagemanager.cpp:20 (discriminator 4)",
+     "pc": "0x420ad4a1",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 408,
+     "blocks": 1,
+     "function": "r_llm_env_init",
+     "location": "??:?",
+     "pc": "0x420d9f53",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 400,
+     "blocks": 1,
+     "function": "ble_att_svr_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/nimble/host/src/ble_att_svr.c:3163",
+     "pc": "0x4208d984",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 328,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd425",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 308,
+     "blocks": 11,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x420abb96",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 288,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:230",
+     "pc": "0x420978d8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 284,
+     "blocks": 1,
+     "function": "r_lld_env_init",
+     "location": "??:?",
+     "pc": "0x420d5489",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 280,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2ba1",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 260,
+     "blocks": 1,
+     "function": "r_hci_tl_env_init",
+     "location": "??:?",
+     "pc": "0x420ddbd4",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 2,
+     "function": "__smakebuf_r",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/1/idf/crosstool-NG/.build/xtensa-esp32s3-elf/src/newlib/newlib/libc/stdio/makebuf.c:53",
+     "pc": "0x4212a5e9",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 244,
+     "blocks": 1,
+     "function": "uartBegin",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-uart.c:433",
+     "pc": "0x420a2017",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 240,
+     "blocks": 5,
+     "function": "load_partitions",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/spi_flash/partition.c:214",
+     "pc": "0x420a9f14",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 220,
+     "blocks": 1,
+     "function": "r_llm_env_init",
+     "location": "??:?",
+     "pc": "0x420d9f0d",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 216,
+     "blocks": 1,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32c3/bt.c:1205",
+     "pc": "0x420d09b3",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 216,
+     "blocks": 1,
+     "function": "net80211_funcs_init",
+     "location": "??:?",
+     "pc": "0x420f7dac",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 200,
+     "blocks": 1,
+     "function": "i2c_driver_install",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/driver/i2c.c:252",
+     "pc": "0x420a3ce9",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 200,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd536",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 184,
+     "blocks": 2,
+     "function": "esp_netif_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_netif/lwip/esp_netif_lwip.c:536",
+     "pc": "0x420b315a",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 180,
+     "blocks": 4,
+     "function": "crypto_shared_gdma_new_channel",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/mbedtls/port/crypto_shared_gdma/esp_crypto_shared_gdma.c:33",
+     "pc": "0x420f5016",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 156,
+     "blocks": 1,
+     "function": "mdns_init",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/idf_override/mdns.c:4822",
+     "pc": "0x420351f2",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 1,
+     "function": "_Balloc",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/1/idf/crosstool-NG/.build/xtensa-esp32s3-elf/src/newlib/newlib/libc/stdlib/mprec.c:106",
+     "pc": "0x4213af24",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2ffd",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 2,
+     "function": "NimBLEService::createCharacteristic(NimBLEUUID const&, unsigned int, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/NimBLEService.cpp:207",
+     "pc": "0x4208b920",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 1,
+     "function": "TwoWire::allocateWireBuffer()",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src/Wire.cpp:150",
+     "pc": "0x4207bce0",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 1,
+     "function": "TwoWire::allocateWireBuffer()",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src/Wire.cpp:157",
+     "pc": "0x4207bcc8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 120,
+     "blocks": 15,
+     "function": "handler_instances_add",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_event/esp_event.c:164",
+     "pc": "0x4214a085",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 120,
+     "blocks": 15,
+     "function": "handler_instances_add",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_event/esp_event.c:168",
+     "pc": "0x4214a098",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 112,
+     "blocks": 7,
+     "function": "loop_node_add_handler",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_event/esp_event.c:290",
+     "pc": "0x4214a238",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x420abff6",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 102,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd6f6",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 96,
+     "blocks": 1,
+     "function": "esp_supplicant_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/wpa_supplicant/esp_supplicant/src/esp_wpa_main.c:241",
+     "pc": "0x420e0a1b",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 96,
+     "blocks": 3,
+     "function": "npl_freertos_callout_init",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/npl_os_freertos.c:1799",
+     "pc": "0x42098a06",
+     "tasks": [
+      "loopTask",
+      "nimble_h"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d30d8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d301a",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d3035",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x420f6d51",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_schm_init",
+     "location": "??:?",
+     "pc": "0x420f769a",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "r_vhci_init",
+     "location": "??:?",
+     "pc": "0x420dcde8",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 88,
+     "blocks": 1,
+     "function": "esp_netif_start_api",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_netif/lwip/esp_netif_lwip.c:850",
+     "pc": "0x420b2ec6",
+     "tasks": [
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "NimBLEService::start()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/NimBLEService.cpp:124 (discriminator 4)",
+     "pc": "0x4208b62e",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "_GLOBAL__sub_I_timerSerial",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/esp32_main.cpp:971",
+     "pc": "0x42022687",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 7,
+     "function": "base_node_add_handler",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_event/esp_event.c:232",
+     "pc": "0x4214a142",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32c3/bt.c:1200",
+     "pc": "0x420d09a1",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 72,
+     "blocks": 6,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:255",
+     "pc": "0x420adaf5",
+     "tasks": [
+      "arduino_",
+      "fwnet",
+      "loopTask",
+      "mdns",
+      "sys_evt"
+     ]
+    },
+    {
+     "bytes": 72,
+     "blocks": 2,
+     "function": "xEventGroupCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/event_groups.c:182",
+     "pc": "0x4038192d",
+     "tasks": [
+      "arduino_",
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 68,
+     "blocks": 1,
+     "function": "HTTPClient::collectHeaders(char const**, unsigned int)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/libraries/HTTPClient/src/HTTPClient.cpp:1075 (discriminator 4)",
+     "pc": "0x4209c923",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 68,
+     "blocks": 1,
+     "function": "NimBLEServer::createService(NimBLEUUID const&)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/NimBLEServer.cpp:95",
+     "pc": "0x4208b134",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 64,
+     "blocks": 1,
+     "function": "NimBLEDevice::getAdvertising()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/NimBLEDevice.cpp:191",
+     "pc": "0x4208a871",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 60,
+     "blocks": 1,
+     "function": "misc_nvs_load",
+     "location": "??:?",
+     "pc": "0x4211a59f",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 52,
+     "blocks": 2,
+     "function": "_Balloc",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/1/idf/crosstool-NG/.build/xtensa-esp32s3-elf/src/newlib/newlib/libc/stdlib/mprec.c:123",
+     "pc": "0x4213af50",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 6,
+     "function": "??",
+     "location": "??:0",
+     "pc": "0x400509e5",
+     "tasks": [
+      "loopTask",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "Module::Module(unsigned int, unsigned int, unsigned int, unsigned int)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/RadioLib/src/Module.cpp:11",
+     "pc": "0x42085e04",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "coex_rom_osi_funcs_init",
+     "location": "??:?",
+     "pc": "0x420f6ed1",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 4,
+     "function": "pthread_key_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:60",
+     "pc": "0x420ada00",
+     "tasks": [
+      "-",
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "wDev_Rxbuf_Init",
+     "location": "??:?",
+     "pc": "0x421165b3",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 42,
+     "blocks": 2,
+     "function": "NimBLEAttValue::NimBLEAttValue(unsigned short, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/NimBLEAttValue.cpp:34",
+     "pc": "0x4208a580",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x420abefe",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 2,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x420abf8e",
+     "tasks": [
+      "loopTask",
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 2,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x420aa6c8",
+     "tasks": [
+      "loopTask",
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2d2d",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 32,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<WiFiEventCbList>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32s3/xtensa-esp32s3-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x42084f55",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 32,
+     "blocks": 1,
+     "function": "_mdns_start_timer",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/idf_override/mdns.c:4699",
+     "pc": "0x4203535a",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 32,
+     "blocks": 1,
+     "function": "pmksa_cache_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/wpa_supplicant/src/rsn_supp/pmksa_cache.c:520",
+     "pc": "0x420b8155",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "NimBLEDevice::createServer()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/NimBLEDevice.cpp:127",
+     "pc": "0x4208a83a",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1658",
+     "pc": "0x420904df",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1678",
+     "pc": "0x4209045a",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "esp_event_loop_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_event/esp_event.c:463",
+     "pc": "0x4214a366",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 2,
+     "function": "esp_netif_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_netif/lwip/esp_netif_lwip.c:544",
+     "pc": "0x420b3190",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 2,
+     "function": "esp_netif_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_netif/lwip/esp_netif_lwip.c:554",
+     "pc": "0x420b31d1",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 2,
+     "function": "esp_wifi_create_if_driver",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_wifi/src/wifi_netif.c:98",
+     "pc": "0x420b8b31",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "pmksa_cache_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/wpa_supplicant/src/rsn_supp/pmksa_cache.c:506",
+     "pc": "0x420b8121",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 20,
+     "blocks": 1,
+     "function": "??",
+     "location": "??:0",
+     "pc": "0x4000a674",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 20,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<unsigned char>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32s3/xtensa-esp32s3-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x42098c02",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 20,
+     "blocks": 5,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:230",
+     "pc": "0x420adacc",
+     "tasks": [
+      "arduino_",
+      "fwnet",
+      "loopTask",
+      "mdns",
+      "sys_evt"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "Adafruit_MCP23XXX::begin_I2C(unsigned char, TwoWire*)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/Adafruit MCP23017 Arduino Library/src/Adafruit_MCP23XXX.cpp:34",
+     "pc": "0x4207ec84",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x420ad7b8",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "RTC_DS3231::begin(TwoWire*)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/RTClib/src/RTC_DS3231.cpp:23",
+     "pc": "0x4207f251",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "_dtoa_r",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/1/idf/crosstool-NG/.build/xtensa-esp32s3-elf/src/newlib/newlib/libc/stdlib/dtoa.c:234 (discriminator 1)",
+     "pc": "0x42139965",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "addApbChangeCallback",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-cpu.c:93",
+     "pc": "0x4209fe8a",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 2,
+     "function": "esp_intr_alloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_hw_support/intr_alloc.c:604",
+     "pc": "0x420cee60",
+     "tasks": [
+      "-",
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 2,
+     "function": "esp_netif_add_to_list",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_netif/esp_netif_objects.c:79",
+     "pc": "0x420b24b7",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2f34",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 1,
+     "function": "esp_event_handler_register_with_internal",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_event/esp_event.c:725",
+     "pc": "0x4214a6da",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLECharacteristic*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32s3/xtensa-esp32s3-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x4208b881",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "pthread_mutex_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread.c:545",
+     "pc": "0x420ad8b2",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "wifi_init_in_caller_task",
+     "location": "??:?",
+     "pc": "0x420f7afa",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLEService*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32s3/xtensa-esp32s3-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x4208b0fd",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "esp_newlib_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/newlib/newlib_init.c:147",
+     "pc": "0x420cfe34",
+     "tasks": [
+      "-"
+     ]
+    }
+   ],
+   "by_first_outside_allocator": [
+    {
+     "bytes": 32768,
+     "blocks": 1,
+     "function": "??",
+     "location": "??:0",
+     "pc": null,
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24920,
+     "blocks": 3,
+     "function": "_ZN12_GLOBAL__N_18startJobE8FwNetJobhPKNS_6LanArgE$part$2",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/fw_update_net.cpp:2019",
+     "pc": "0x42022e84",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 17072,
+     "blocks": 4,
+     "function": "xTaskCreate",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/freertos/include/freertos/task.h:450",
+     "pc": "0x420a09ac",
+     "tasks": [
+      "loopTask",
+      "main"
+     ]
+    },
+    {
+     "bytes": 9356,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2e84",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 8864,
+     "blocks": 4,
+     "function": "wDev_Rxbuf_Init",
+     "location": "??:?",
+     "pc": "0x4211661d",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 8640,
+     "blocks": 69,
+     "function": "xQueueGenericCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/queue.c:447",
+     "pc": "0x40381ef8",
+     "tasks": [
+      "-",
+      "arduino_",
+      "fwnet",
+      "loopTask",
+      "main",
+      "mdns",
+      "sys_evt",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 7000,
+     "blocks": 2,
+     "function": "task_create_pinned_to_core_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_wifi/esp32s3/esp_adapter.c:439 (discriminator 4)",
+     "pc": "0x420b8d98",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 4952,
+     "blocks": 2,
+     "function": "esp_timer_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/esp_timer.c:475",
+     "pc": "0x420cfb31",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4944,
+     "blocks": 3,
+     "function": "(anonymous namespace)::fwNetTask(void*)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/fw_update_net.cpp:1805 (discriminator 1)",
+     "pc": "0x420276f1",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4608,
+     "blocks": 1,
+     "function": "esp_startup_start_app_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/port/port_common.c:78",
+     "pc": "0x403849eb",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4440,
+     "blocks": 2,
+     "function": "_mdns_service_task_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/idf_override/mdns.c:4739",
+     "pc": "0x42035428",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 4440,
+     "blocks": 2,
+     "function": "task_create_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32c3/bt.c:682 (discriminator 4)",
+     "pc": "0x420d0454",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 3416,
+     "blocks": 2,
+     "function": "esp_nimble_enable",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/nimble_port_freertos.c:60",
+     "pc": "0x420985e4",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 3416,
+     "blocks": 2,
+     "function": "sys_thread_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/port/esp32/freertos/sys_arch.c:416",
+     "pc": "0x420cbd86",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 3299,
+     "blocks": 4,
+     "function": "x509_crt_parse_der_core",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/mbedtls/mbedtls/library/x509_crt.c:1133",
+     "pc": "0x420f5bf7",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 3000,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:241",
+     "pc": "0x42097909",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 2904,
+     "blocks": 2,
+     "function": "esp_event_loop_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_event/esp_event.c:493",
+     "pc": "0x4214a418",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "esp_ipc_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ipc/src/esp_ipc.c:113",
+     "pc": "0x420de7cd",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "prvCreateIdleTasks",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/tasks.c:2382",
+     "pc": "0x40384371",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2680,
+     "blocks": 2,
+     "function": "tcp_pbuf_prealloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/tcp_out.c:263",
+     "pc": "0x420c3970",
+     "tasks": [
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 2528,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2bc8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 2448,
+     "blocks": 9,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd760",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 2304,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:882",
+     "pc": "0x40381007",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 2280,
+     "blocks": 1,
+     "function": "ssl_handshake_init",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/idf_override/mbedtls/ssl_tls.c:3752",
+     "pc": "0x4202f9b9",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 2088,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2e01",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1868,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2ec6",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1864,
+     "blocks": 1,
+     "function": "McTlsClient::McTlsClient()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/mc_tls/McTlsClient.cpp:45",
+     "pc": "0x4203629b",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1692,
+     "blocks": 2,
+     "function": "wifi_create_queue_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_wifi/esp32s3/esp_adapter.c:158",
+     "pc": "0x420b908c",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1472,
+     "blocks": 2,
+     "function": "esf_buf_alloc_dynamic",
+     "location": "??:?",
+     "pc": "0x42148d64",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 1460,
+     "blocks": 1,
+     "function": "WiFiUDP::begin(IPAddress, unsigned short)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src/WiFiUdp.cpp:47",
+     "pc": "0x42085c74",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1400,
+     "blocks": 25,
+     "function": "memp_malloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/memp.c:350 (discriminator 2)",
+     "pc": "0x420bcb04",
+     "tasks": [
+      "fwnet",
+      "loopTask",
+      "tiT",
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 1284,
+     "blocks": 36,
+     "function": "mbedtls_mpi_grow",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/mbedtls/mbedtls/library/bignum.c:109",
+     "pc": "0x420e5ebb",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1260,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd592",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 1168,
+     "blocks": 1,
+     "function": "os_msys_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/porting/nimble/src/os_msys_init.c:153",
+     "pc": "0x42098556",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1152,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:234",
+     "pc": "0x420978e9",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1080,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd47e",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 1040,
+     "blocks": 1,
+     "function": "work_webpage()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/web_functions/web_functions.cpp:1051",
+     "pc": "0x42075ad8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 976,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2bb5",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 896,
+     "blocks": 7,
+     "function": "nvs::Page::mLoadEntryTable()",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_page.cpp:761",
+     "pc": "0x420ad06b",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 784,
+     "blocks": 1,
+     "function": "wdev_funcs_init",
+     "location": "??:?",
+     "pc": "0x42116bc8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 768,
+     "blocks": 4,
+     "function": "esp_vfs_register_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/vfs/vfs.c:76",
+     "pc": "0x420b05e1",
+     "tasks": [
+      "-",
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 750,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd64a",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 688,
+     "blocks": 4,
+     "function": "eckey_alloc_wrap",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/mbedtls/mbedtls/library/pk_wrap.c:387",
+     "pc": "0x420ee390",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 688,
+     "blocks": 2,
+     "function": "mbedtls_x509_crt_parse_der_internal",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/mbedtls/mbedtls/library/x509_crt.c:1361",
+     "pc": "0x420f5b51",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 616,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd4da",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 608,
+     "blocks": 1,
+     "function": "llm_hci_env_init",
+     "location": "??:?",
+     "pc": "0x420d9171",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 584,
+     "blocks": 2,
+     "function": "esp_netif_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_netif/lwip/esp_netif_lwip.c:565",
+     "pc": "0x420b320e",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 544,
+     "blocks": 17,
+     "function": "ets_timer_setfn",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/ets_timer_legacy.c:69",
+     "pc": "0x420cfc5d",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 540,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd5ee",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 520,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:238",
+     "pc": "0x420978f9",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 512,
+     "blocks": 16,
+     "function": "mbedtls_x509_get_name",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/mbedtls/mbedtls/library/x509.c:502",
+     "pc": "0x420f6884",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 472,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:881",
+     "pc": "0x40380ff9",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 444,
+     "blocks": 1,
+     "function": "??",
+     "location": "??:0",
+     "pc": "0x4000710d",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 428,
+     "blocks": 1,
+     "function": "__sfmoreglue",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/1/idf/crosstool-NG/.build/xtensa-esp32s3-elf/src/newlib/newlib/libc/stdio/findfp.c:132",
+     "pc": "0x42129415",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 424,
+     "blocks": 1,
+     "function": "nvs::PageManager::load(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_pagemanager.cpp:20 (discriminator 4)",
+     "pc": "0x420ad4a1",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 408,
+     "blocks": 1,
+     "function": "r_llm_env_init",
+     "location": "??:?",
+     "pc": "0x420d9f53",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 400,
+     "blocks": 1,
+     "function": "ble_att_svr_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/nimble/host/src/ble_att_svr.c:3163",
+     "pc": "0x4208d984",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 344,
+     "blocks": 1,
+     "function": "mbedtls_ssl_parse_certificate",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/idf_override/mbedtls/ssl_tls.c:2830",
+     "pc": "0x420300be",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 328,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd425",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 308,
+     "blocks": 11,
+     "function": "nvs::NVSPartitionManager::init_custom(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:92",
+     "pc": "0x420ac02a",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 304,
+     "blocks": 7,
+     "function": "String::copy(char const*, unsigned int)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/WString.cpp:224",
+     "pc": "0x4209ed84",
+     "tasks": [
+      "fwnet",
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 288,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:230",
+     "pc": "0x420978d8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 288,
+     "blocks": 1,
+     "function": "ecp_mul_comb",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/mbedtls/mbedtls/library/ecp.c:2363",
+     "pc": "0x420ea11b",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 284,
+     "blocks": 1,
+     "function": "r_lld_env_init",
+     "location": "??:?",
+     "pc": "0x420d5489",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 280,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2ba1",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 260,
+     "blocks": 1,
+     "function": "r_hci_tl_env_init",
+     "location": "??:?",
+     "pc": "0x420ddbd4",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 2,
+     "function": "__smakebuf_r",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/1/idf/crosstool-NG/.build/xtensa-esp32s3-elf/src/newlib/newlib/libc/stdio/makebuf.c:53",
+     "pc": "0x4212a5e9",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 1,
+     "function": "mbedtls_md_setup",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/mbedtls/mbedtls/library/md.c:451",
+     "pc": "0x420ed5aa",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 244,
+     "blocks": 1,
+     "function": "uartBegin",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-uart.c:433",
+     "pc": "0x420a2017",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 240,
+     "blocks": 5,
+     "function": "load_partitions",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/spi_flash/partition.c:214",
+     "pc": "0x420a9f14",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 224,
+     "blocks": 1,
+     "function": "mbedtls_md_setup",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/mbedtls/mbedtls/library/md.c:443",
+     "pc": "0x420ed596",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 220,
+     "blocks": 1,
+     "function": "r_llm_env_init",
+     "location": "??:?",
+     "pc": "0x420d9f0d",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 216,
+     "blocks": 1,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32c3/bt.c:1205",
+     "pc": "0x420d09b3",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 216,
+     "blocks": 1,
+     "function": "net80211_funcs_init",
+     "location": "??:?",
+     "pc": "0x420f7dac",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 212,
+     "blocks": 1,
+     "function": "ssl_handshake_init",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/idf_override/mbedtls/ssl_tls.c:3744",
+     "pc": "0x4202f991",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 200,
+     "blocks": 1,
+     "function": "i2c_driver_install",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/driver/i2c.c:252",
+     "pc": "0x420a3ce9",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 200,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd536",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 184,
+     "blocks": 2,
+     "function": "esp_netif_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_netif/lwip/esp_netif_lwip.c:536",
+     "pc": "0x420b315a",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 180,
+     "blocks": 4,
+     "function": "crypto_shared_gdma_new_channel",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/mbedtls/port/crypto_shared_gdma/esp_crypto_shared_gdma.c:33",
+     "pc": "0x420f5016",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 156,
+     "blocks": 1,
+     "function": "mdns_init",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/idf_override/mdns.c:4822",
+     "pc": "0x420351f2",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 1,
+     "function": "_Balloc",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/1/idf/crosstool-NG/.build/xtensa-esp32s3-elf/src/newlib/newlib/libc/stdlib/mprec.c:106",
+     "pc": "0x4213af24",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2ffd",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 2,
+     "function": "NimBLEService::createCharacteristic(NimBLEUUID const&, unsigned int, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/NimBLEService.cpp:207",
+     "pc": "0x4208b920",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 1,
+     "function": "TwoWire::allocateWireBuffer()",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src/Wire.cpp:150",
+     "pc": "0x4207bce0",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 1,
+     "function": "TwoWire::allocateWireBuffer()",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src/Wire.cpp:157",
+     "pc": "0x4207bcc8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 1,
+     "function": "nvs::Page::mLoadEntryTable()",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_page.cpp:679",
+     "pc": "0x420acf5b",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 1,
+     "function": "ssl_handshake_init",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/idf_override/mbedtls/ssl_tls.c:3748",
+     "pc": "0x4202f9a5",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 120,
+     "blocks": 15,
+     "function": "handler_instances_add",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_event/esp_event.c:164",
+     "pc": "0x4214a085",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 120,
+     "blocks": 15,
+     "function": "handler_instances_add",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_event/esp_event.c:168",
+     "pc": "0x4214a098",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 112,
+     "blocks": 7,
+     "function": "loop_node_add_handler",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_event/esp_event.c:290",
+     "pc": "0x4214a238",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 1,
+     "function": "nvs::NVSPartitionManager::init_partition(char const*)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:54",
+     "pc": "0x420ac0da",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 102,
+     "blocks": 1,
+     "function": "r_emi_em_base_init",
+     "location": "??:?",
+     "pc": "0x420dd6f6",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 96,
+     "blocks": 1,
+     "function": "esp_supplicant_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/wpa_supplicant/esp_supplicant/src/esp_wpa_main.c:241",
+     "pc": "0x420e0a1b",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 96,
+     "blocks": 3,
+     "function": "npl_freertos_callout_init",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/npl_os_freertos.c:1799",
+     "pc": "0x42098a06",
+     "tasks": [
+      "loopTask",
+      "nimble_h"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d30d8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d301a",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d3035",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x420f6d51",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_schm_init",
+     "location": "??:?",
+     "pc": "0x420f769a",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "r_vhci_init",
+     "location": "??:?",
+     "pc": "0x420dcde8",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 88,
+     "blocks": 1,
+     "function": "esp_netif_start_api",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_netif/lwip/esp_netif_lwip.c:850",
+     "pc": "0x420b2ec6",
+     "tasks": [
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "NimBLEService::start()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/NimBLEService.cpp:124 (discriminator 4)",
+     "pc": "0x4208b62e",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "_GLOBAL__sub_I_timerSerial",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/esp32_main.cpp:971",
+     "pc": "0x42022687",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 7,
+     "function": "base_node_add_handler",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_event/esp_event.c:232",
+     "pc": "0x4214a142",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32c3/bt.c:1200",
+     "pc": "0x420d09a1",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 72,
+     "blocks": 6,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:255",
+     "pc": "0x420adaf5",
+     "tasks": [
+      "arduino_",
+      "fwnet",
+      "loopTask",
+      "mdns",
+      "sys_evt"
+     ]
+    },
+    {
+     "bytes": 72,
+     "blocks": 2,
+     "function": "xEventGroupCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/event_groups.c:182",
+     "pc": "0x4038192d",
+     "tasks": [
+      "arduino_",
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 68,
+     "blocks": 1,
+     "function": "HTTPClient::collectHeaders(char const**, unsigned int)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/libraries/HTTPClient/src/HTTPClient.cpp:1075 (discriminator 4)",
+     "pc": "0x4209c923",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 68,
+     "blocks": 1,
+     "function": "NimBLEServer::createService(NimBLEUUID const&)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/NimBLEServer.cpp:95",
+     "pc": "0x4208b134",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 64,
+     "blocks": 1,
+     "function": "NimBLEDevice::getAdvertising()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/NimBLEDevice.cpp:191",
+     "pc": "0x4208a871",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 60,
+     "blocks": 1,
+     "function": "misc_nvs_load",
+     "location": "??:?",
+     "pc": "0x4211a59f",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 52,
+     "blocks": 2,
+     "function": "_Balloc",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/1/idf/crosstool-NG/.build/xtensa-esp32s3-elf/src/newlib/newlib/libc/stdlib/mprec.c:123",
+     "pc": "0x4213af50",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 6,
+     "function": "??",
+     "location": "??:0",
+     "pc": "0x400509e5",
+     "tasks": [
+      "loopTask",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "Module::Module(unsigned int, unsigned int, unsigned int, unsigned int)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/RadioLib/src/Module.cpp:11",
+     "pc": "0x42085e04",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "String::concat(char const*, unsigned int)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/WString.cpp:326",
+     "pc": "0x4209f11e",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "coex_rom_osi_funcs_init",
+     "location": "??:?",
+     "pc": "0x420f6ed1",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 4,
+     "function": "pthread_key_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:60",
+     "pc": "0x420ada00",
+     "tasks": [
+      "-",
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 6,
+     "function": "sys_mbox_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/port/esp32/freertos/sys_arch.c:221",
+     "pc": "0x420cbc14",
+     "tasks": [
+      "fwnet",
+      "loopTask",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "wDev_Rxbuf_Init",
+     "location": "??:?",
+     "pc": "0x421165b3",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 42,
+     "blocks": 2,
+     "function": "NimBLEAttValue::NimBLEAttValue(unsigned short, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/NimBLEAttValue.cpp:34",
+     "pc": "0x4208a580",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2d2d",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 1,
+     "function": "nvs_flash_init_partition",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_api.cpp:129",
+     "pc": "0x420aa663",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 2,
+     "function": "nvs_open",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_api.cpp:296",
+     "pc": "0x420aa73e",
+     "tasks": [
+      "loopTask",
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 2,
+     "function": "nvs_open_from_partition",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_api.cpp:279",
+     "pc": "0x420aa6ba",
+     "tasks": [
+      "loopTask",
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 32,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<WiFiEventCbList>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32s3/xtensa-esp32s3-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x42084f55",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 32,
+     "blocks": 1,
+     "function": "_mdns_start_timer",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/idf_override/mdns.c:4699",
+     "pc": "0x4203535a",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 32,
+     "blocks": 2,
+     "function": "asn1_get_sequence_of_cb",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/mbedtls/mbedtls/library/asn1parse.c:346",
+     "pc": "0x420f2e0c",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 32,
+     "blocks": 1,
+     "function": "pmksa_cache_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/wpa_supplicant/src/rsn_supp/pmksa_cache.c:520",
+     "pc": "0x420b8155",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 32,
+     "blocks": 2,
+     "function": "x509_get_certificate_policies",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/mbedtls/mbedtls/library/x509_crt.c:836",
+     "pc": "0x420f62c3",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "NimBLEDevice::createServer()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/NimBLEDevice.cpp:127",
+     "pc": "0x4208a83a",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1658",
+     "pc": "0x420904df",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1678",
+     "pc": "0x4209045a",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "esp_event_loop_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_event/esp_event.c:463",
+     "pc": "0x4214a366",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 2,
+     "function": "esp_netif_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_netif/lwip/esp_netif_lwip.c:544",
+     "pc": "0x420b3190",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 2,
+     "function": "esp_netif_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_netif/lwip/esp_netif_lwip.c:554",
+     "pc": "0x420b31d1",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 2,
+     "function": "esp_wifi_create_if_driver",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_wifi/src/wifi_netif.c:98",
+     "pc": "0x420b8b31",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "pmksa_cache_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/wpa_supplicant/src/rsn_supp/pmksa_cache.c:506",
+     "pc": "0x420b8121",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 20,
+     "blocks": 1,
+     "function": "??",
+     "location": "??:0",
+     "pc": "0x4000a674",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 20,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<unsigned char>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32s3/xtensa-esp32s3-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x42098c02",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 20,
+     "blocks": 5,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:230",
+     "pc": "0x420adacc",
+     "tasks": [
+      "arduino_",
+      "fwnet",
+      "loopTask",
+      "mdns",
+      "sys_evt"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "Adafruit_MCP23XXX::begin_I2C(unsigned char, TwoWire*)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/Adafruit MCP23017 Arduino Library/src/Adafruit_MCP23XXX.cpp:34",
+     "pc": "0x4207ec84",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "RTC_DS3231::begin(TwoWire*)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/heltec_wifi_lora_32_V3/RTClib/src/RTC_DS3231.cpp:23",
+     "pc": "0x4207f251",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "_dtoa_r",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/1/idf/crosstool-NG/.build/xtensa-esp32s3-elf/src/newlib/newlib/libc/stdlib/dtoa.c:234 (discriminator 1)",
+     "pc": "0x42139965",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "addApbChangeCallback",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-cpu.c:93",
+     "pc": "0x4209fe8a",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 2,
+     "function": "esp_intr_alloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_hw_support/intr_alloc.c:604",
+     "pc": "0x420cee60",
+     "tasks": [
+      "-",
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 2,
+     "function": "esp_netif_add_to_list",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_netif/esp_netif_objects.c:79",
+     "pc": "0x420b24b7",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "nvs::NVSPartitionManager::init_partition(char const*)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:46 (discriminator 2)",
+     "pc": "0x420ac0c0",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "x509_get_subject_alt_name",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/mbedtls/mbedtls/library/x509_crt.c:692",
+     "pc": "0x420f6192",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 15,
+     "blocks": 1,
+     "function": "mbedtls_ssl_set_hostname",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/idf_override/mbedtls/ssl_tls.c:4668",
+     "pc": "0x4202f6b5",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x420d2f34",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 1,
+     "function": "esp_event_handler_register_with_internal",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_event/esp_event.c:725",
+     "pc": "0x4214a6da",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 3,
+     "function": "sys_thread_sem_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/port/esp32/freertos/sys_arch.c:530",
+     "pc": "0x420cbe0c",
+     "tasks": [
+      "fwnet",
+      "loopTask",
+      "mdns"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLECharacteristic*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32s3/xtensa-esp32s3-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x4208b881",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "pthread_mutex_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread.c:545",
+     "pc": "0x420ad8b2",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "wifi_init_in_caller_task",
+     "location": "??:?",
+     "pc": "0x420f7afa",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLEService*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32s3/xtensa-esp32s3-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x4208b0fd",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "esp_newlib_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/newlib/newlib_init.c:147",
+     "pc": "0x420cfe34",
+     "tasks": [
+      "-"
+     ]
+    }
+   ],
+   "delta": {
+    "from": "idle",
+    "live": 75706,
+    "ifree_drop": 67604,
+    "blocks": 100,
+    "overhead_per_block": -81.02
+   }
+  }
+ ]
+}

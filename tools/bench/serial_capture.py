@@ -32,6 +32,8 @@ def main() -> int:
     ap.add_argument("--dtr", action="store_true", help="assert DTR (native-USB boards)")
     ap.add_argument("--until", help='end time, local, "YYYY-MM-DD HH:MM"')
     ap.add_argument("--cmd", action="append", default=[], help="command sent after every open")
+    ap.add_argument("--heaptrace-baud", type=int, default=0,
+                    help="follow the INSTR_HEAPTRACE switch: on '[HT];i;0;baud;N' change the port to N (115200 again after a reopen)")
     args = ap.parse_args()
     end = datetime.strptime(args.until, "%Y-%m-%d %H:%M") if args.until else None
 
@@ -67,6 +69,16 @@ def main() -> int:
                         line, buf = buf.split(b"\n", 1)
                         text = line.decode("utf-8", errors="replace").rstrip("\r")
                         f.write(f"{stamp()}  {text}\n")
+                        if args.heaptrace_baud and len(text) >= 24:
+                            bad = sum(1 for ch in text if ch == chr(0xFFFD) or (ord(ch) < 32 and ch != chr(9)))
+                            if bad * 4 > len(text):  # garbled: the node is on the other rate (switch missed, reset)
+                                s.baudrate = 115200 if s.baudrate != 115200 else args.heaptrace_baud
+                                f.write(f"{stamp()}  [CAPTURE] garbled, baud {s.baudrate}\n")
+                                buf = b""
+                                continue
+                        if args.heaptrace_baud and "[HT];i;0;baud;" in text:
+                            s.baudrate = args.heaptrace_baud  # the node switches 300 ms after this line
+                            f.write(f"{stamp()}  [CAPTURE] baud {args.heaptrace_baud}\n")
                     f.flush()
             s.close()
         except KeyboardInterrupt:

@@ -16,6 +16,7 @@
 #include <soc/soc_memory_layout.h>   /* esp_ptr_internal (inline, IRAM-safe) */
 #include <esp_attr.h>
 #include <esp_timer.h>
+#include <esp_task_wdt.h>   /* the waiting task keeps its watchdog fed */
 #include <driver/uart.h>
 #include <esp_spi_flash.h>   /* spi_flash_cache_enabled (IDF 4.4, IRAM) */
 #if __has_include(<esp_rom_sys.h>)
@@ -29,6 +30,8 @@
 #define HT_RING_BYTES   2048u    /* formatted lines incl. 1 length byte per line */
 #define HT_LINE_MAX     128u
 #define HT_PCS          3
+#define HT_BAUD         921600
+#define HT_BAUD_STR     "921600"
 #define HT_LINE_BUF     (HT_LINE_MAX + 1u)   /* sizeof(ht_line_t) */
 #define HT_MIN_STACK    (768u + HT_LINE_BUF) /* task stack that must be left when the hook is entered: backtrace + line buffer */
 #define HT_DRAIN_STACK  3072u
@@ -39,6 +42,7 @@ static uint8_t           s_ring[HT_RING_BYTES];
 static uint32_t          s_head = 0, s_tail = 0;            /* monotonic byte counters, guarded by s_mux */
 static portMUX_TYPE      s_mux = portMUX_INITIALIZER_UNLOCKED;
 static volatile uint32_t s_drops = 0;
+static volatile uint32_t s_wait_ticks = 0;   /* ticks producers spent waiting for ring room (perturbation) */
 static volatile uint32_t s_events = 0;                       /* also keeps the IRAM entry points from becoming tail calls */
 static volatile uint8_t  s_state = 0;                        /* 0 = not started, 1 = starting, 2 = drain task running, 3 = start failed */
 static volatile TaskHandle_t s_drain = NULL;
@@ -116,6 +120,16 @@ static void ht_drain_task(void *arg)
 {
     (void)arg;
     s_drain = xTaskGetCurrentTaskHandle();   /* before anything else: the task's own allocations make no events */
+    /* Bench 23.11.2026: 115200 baud carries ~250 lines/s; the waiting producers then stall the node (web 503, no
+     * console login). Switch UART0 to HT_BAUD: announce at the old rate, let it drain, pause so the capture
+     * (tools/bench/serial_capture.py --heaptrace-baud) can follow, then switch. Boot output before stays 115200. */
+    {
+        static const char k[] = "[HT];i;0;baud;" HT_BAUD_STR "\n";
+        uart_write_bytes(UART_NUM_0, k, sizeof(k) - 1);
+        uart_wait_tx_done(UART_NUM_0, pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(300));
+        uart_set_baudrate(UART_NUM_0, HT_BAUD);
+    }
     uint8_t buf[HT_DRAIN_CHUNK];
     for (;;)
     {
@@ -207,7 +221,13 @@ static bool ht_wait_room(uint8_t core, uint32_t need)
             return true;
         if (!ht_can_wait(core) || esp_timer_get_time() - t0 > HT_WAIT_MAX_US)
             return false;
+        /* Bench 23.11.2026: at 115200 baud loopTask waited here longer than the 5 s task watchdog in total and the
+         * V3 reset (TASK_WDT). The wait is the operator's choice (complete trace), so the waiting task feeds its own
+         * watchdog; only a task subscribed to it is touched (esp_task_wdt_status). */
+        if (esp_task_wdt_status(NULL) == ESP_OK)
+            esp_task_wdt_reset();
         vTaskDelay(1);
+        __atomic_fetch_add(&s_wait_ticks, 1, __ATOMIC_RELAXED);
     }
 }
 
@@ -428,8 +448,12 @@ void instrument_heaptrace_mark(const char *name)
     ht_dec(&l, (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
     ht_str(&l, ";iblk;");
     ht_dec(&l, (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    ht_str(&l, ";itotal;");
+    ht_dec(&l, (uint32_t)heap_caps_get_total_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
     ht_str(&l, ";drops;");
     ht_dec(&l, s_drops);
+    ht_str(&l, ";waitms;");
+    ht_dec(&l, (uint32_t)(s_wait_ticks * portTICK_PERIOD_MS));
     ht_c(&l, '\n');
     ht_emit(&l, core);
     ht_leave(core, me);
