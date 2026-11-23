@@ -3,7 +3,7 @@
 // Proves: no write past msg_buffer[UDP_TX_BUF_SIZE], no read past msg_start / the path fields; returned length <= 255.
 // Mutations / defect:
 //   -DMUT_SHORT_BUF   target one byte short of what the worst case writes -> write past the end must be found
-//   defect_f3_8.check  builds a copy of src/aprs_structures.h in gen/ with MC_PATH_LEN 121 -> 140 (sed at job time) and puts gen/
+//   enc_pass_widepath.check / enc_mut_widepath.check (-DMUT_F3_8) build a copy of src/aprs_structures.h in gen/ with MC_PATH_LEN 121 -> 140 (sed at job time) and puts gen/
 //                     first on the include path: with path fields wider than today the clamp "ilng >= 255 -> 254" forgets
 //                     the 6-byte header offset and the memcpy writes msg_buffer[6..259] into a 255-byte target = F3-8.
 //                     Unreachable at the current width (121 -> ilng <= 242); latent.

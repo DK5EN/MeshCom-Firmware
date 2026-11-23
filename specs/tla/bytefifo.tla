@@ -10,7 +10,7 @@
 \*   bf_peek :128   bf_peek_gen :143   bf_pop_if :159-172   bf_pop :175   bf_iter_begin :188   bf_iter_next :204
 \*   BF_LOCK = taskENTER_CRITICAL (nRF52 :10) / portMUX (ESP32 :20)
 \*   readers: BLE drain ble_phone_drain.h:182 (peek_gen) .. :200/:228/:262 (pop_if);
-\*            UDP drain src/esp32/udp_drain_esp32.cpp:54 (tail_gen), :56 (peek), :187 (tail_gen ==), :188 (bf_pop).
+\*            UDP drain (since 2026-11-23, F2-5 fixed): peek_gen / pop_if like the BLE drain. UdpStyle=TRUE keeps the OLD two-section reader (tail_gen, peek, tail_gen ==, bf_pop) for the bytefifo_was_udp_* cfgs.
 \*
 \* Abstractions: capacity C cells (a cell is one byte), frames of 1-2 payload bytes (+1 length byte); one
 \* ring, one drain reader (the ring has exactly one consumer by design, byte_fifo.h), one writer thread (the

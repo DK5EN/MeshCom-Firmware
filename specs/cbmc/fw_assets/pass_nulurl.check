@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DDEFNUL -DSTRICT_URL"
+FLAGS="--unwind 90"
+EXPECT=pass
+CHECKS="raw control byte (incl. NUL) inside browser_download_url fails the scan closed; an accepted asset never has an empty url"

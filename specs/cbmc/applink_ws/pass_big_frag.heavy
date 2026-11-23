@@ -1,3 +1,5 @@
+# PARKED 2026-11-23 (not run by --all): 4 and 2 onData calls both exceeded the 6 GB cap (25 GB unguarded),
+# nested alWsFeed loops 379 x 477 under symbolic L2. Needs a rebuilt harness with concrete lengths, one job per case.
 TOOL=esbmc
 SOURCES="harness.cpp $ROOT/src/applink_ws.cpp"
 CFLAGS="-I$ROOT/src -DMODE_BIG -DBIG_FIXED -DBIG_COARSE -DBIGCALLS=2 -DL2MIN=150 -DL2MAX=151"

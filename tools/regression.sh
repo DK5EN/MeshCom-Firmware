@@ -5,6 +5,7 @@
 #   tools/regression.sh --stage all     # stages 1, 2 and 3 (bench fleet on USB)
 #   tools/regression.sh --stage 2       # one stage only
 #   tools/regression.sh --list          # print the plan, run nothing
+#   tools/regression.sh --formal        # also TLA+ (run_tlc.sh) and ESBMC/CBMC (run_cbmc.sh), opt-in
 #   tools/regression.sh --stage 3 -- --flash --extudp   # pass-through to bench_suite.py
 #
 # Stage 1  host:   every [env:native*] in platformio.ini, one `pio test` each,
@@ -21,8 +22,8 @@
 #                  tools/bench, tools/tests, tools/mock; the PEP-723 scripts
 #                  in test/test_nbrlog; node --test over tools/tests/*.mjs;
 #                  the jsdom-based safeboot and Remote page tests; the four --self-test
-#                  tools not covered by selftest.sh; the TLA+ models
-#                  (specs/tla/run_tlc.sh --all) and the ESBMC/CBMC jobs
+#                  tools not covered by selftest.sh. Only with --formal: the TLA+
+#                  models (specs/tla/run_tlc.sh --all) and the ESBMC/CBMC jobs
 #                  (specs/cbmc/run_cbmc.sh --all), SKIP when the tools are missing.
 # Stage 3  bench:  tools/bench/bench_suite.py -- identity guard, per-board
 #                  harness, OTA regression, optional flash/EXTUDP/deep-sleep
@@ -41,6 +42,7 @@ cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
 STAGES="1,2"
+FORMAL=0
 OUT=""
 LIST=0
 BENCH_ARGS=()
@@ -49,6 +51,7 @@ while [ $# -gt 0 ]; do
         --stage) STAGES="$2"; shift 2 ;;
         --out) OUT="$2"; shift 2 ;;
         --list) LIST=1; shift ;;
+        --formal) FORMAL=1; shift ;;
         --) shift; BENCH_ARGS=("$@"); break ;;
         -h|--help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -244,20 +247,23 @@ stage2() {
             uv run --quiet "$f" --self-test
     done
     # FORMAL-01: TLA+ models (every cfg incl. expect-fail mutations) and bounded model checking
-    # (ESBMC/CBMC jobs incl. mutations). Missing tools are a SKIP, not a pass.
+    # (ESBMC/CBMC jobs incl. mutations). Opt-in with --formal (operator 2026-11-23: too heavy for every
+    # run; run_cbmc.sh --all took > 13 min, up to 6 GB per job). Missing tools are a SKIP, not a pass.
+    if [ "$FORMAL" != 1 ]; then
+        record "TLA+ models" SKIP "opt-in: tools/regression.sh --formal"
+        record "bounded model checking" SKIP "opt-in: tools/regression.sh --formal"
+        return
+    fi
     if [ -s "${TLA_JAR:-$HOME/.local/share/tla/tla2tools.jar}" ]; then
         run_step "TLA+ models (run_tlc.sh --all)" stage2-tla specs/tla/run_tlc.sh --all
     else
         record "TLA+ models" SKIP "tla2tools.jar not found (TLA_JAR)"
     fi
-    # Disabled 2026-11-23 (operator): run_cbmc.sh --all ran >13 min in the gate (ESBMC on byte_fifo).
-    # Run it by hand until FORMAL-01 bounds its runtime.
-    # if command -v esbmc >/dev/null 2>&1 && command -v cbmc >/dev/null 2>&1; then
-    #     run_step "bounded model checking (run_cbmc.sh --all)" stage2-cbmc specs/cbmc/run_cbmc.sh --all
-    # else
-    #     record "bounded model checking" SKIP "esbmc/cbmc not installed (brew install esbmc cbmc)"
-    # fi
-    record "bounded model checking" SKIP "disabled in the gate (operator 2026-11-23), run specs/cbmc/run_cbmc.sh --all by hand"
+    if command -v esbmc >/dev/null 2>&1 && command -v cbmc >/dev/null 2>&1; then
+        run_step "bounded model checking (run_cbmc.sh --all)" stage2-cbmc specs/cbmc/run_cbmc.sh --all
+    else
+        record "bounded model checking" SKIP "esbmc/cbmc not installed (brew install esbmc cbmc)"
+    fi
 }
 
 # ---------------------------------------------------------------- stage 3

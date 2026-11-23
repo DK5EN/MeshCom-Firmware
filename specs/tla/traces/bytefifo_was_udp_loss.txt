@@ -248,5 +248,5 @@ State 8: <UdpPop line 186, col 5 to line 192, col 25 of module bytefifo>
 /\ iterTorn = FALSE
 /\ head = 1
 
-The depth of the complete state graph search is 8.
+The depth of the complete state graph search is 9.
 The average outdegree of the complete state graph is 2 (minimum is 0, the maximum 4 and the 95th percentile is 4).

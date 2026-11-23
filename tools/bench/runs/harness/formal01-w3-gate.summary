@@ -1,0 +1,15 @@
+build heltec_wifi_lora_32_V3 rc=0 wraps=3 mdns_ours=1 dhcps_ours=1 dhcps_obj_syms=11 mcdns=1 | arduino_esp32_patch: present: AE-01@HTTPClient.cpp AE-02@WiFiUdp.cpp AE-02@WiFiClient.cpp AE-03@WiFiGeneric.cpp  | RAM: [==== ] 41.6% (used 136396 bytes from 327680 bytes) Flash: [===== ] 52.7% (used 1794061 bytes from 3403776 bytes) 
+build ttgo_tbeam rc=0 wraps=3 mdns_ours=1 dhcps_ours=1 dhcps_obj_syms=11 mcdns=1 | arduino_esp32_patch: present: AE-01@HTTPClient.cpp AE-02@WiFiUdp.cpp AE-02@WiFiClient.cpp AE-03@WiFiGeneric.cpp  | RAM: [= ] 8.1% (used 106552 bytes from 1310720 bytes) Flash: [====== ] 55.7% (used 1894853 bytes from 3403776 bytes) 
+build T-ETH-ELITE_1262 rc=0 wraps=3 mdns_ours=1 dhcps_ours=1 dhcps_obj_syms=11 mcdns=1 | arduino_esp32_patch: present: AE-01@HTTPClient.cpp AE-02@WiFiUdp.cpp AE-02@WiFiClient.cpp AE-03@WiFiGeneric.cpp  | RAM: [==== ] 41.8% (used 137068 bytes from 327680 bytes) Flash: [===== ] 53.6% (used 1825013 bytes from 3403776 bytes) 
+build E22_1262-DevKitC rc=0 wraps=3 mdns_ours=1 dhcps_ours=1 dhcps_obj_syms=11 mcdns=1 | arduino_esp32_patch: present: AE-01@HTTPClient.cpp AE-02@WiFiUdp.cpp AE-02@WiFiClient.cpp AE-03@WiFiGeneric.cpp  | RAM: [== ] 20.0% (used 106624 bytes from 532480 bytes) Flash: [====== ] 55.4% (used 1885105 bytes from 3403776 bytes) 
+build wireless-paper rc=0 wraps=3 mdns_ours=1 dhcps_ours=1 dhcps_obj_syms=11 mcdns=1 | arduino_esp32_patch: present: AE-01@HTTPClient.cpp AE-02@WiFiUdp.cpp AE-02@WiFiClient.cpp AE-03@WiFiGeneric.cpp  | RAM: [==== ] 42.4% (used 138988 bytes from 327680 bytes) Flash: [===== ] 51.4% (used 1750329 bytes from 3403776 bytes) 
+build t_deck_pro rc=0 wraps=3 mdns_ours=1 dhcps_ours=1 dhcps_obj_syms=11 mcdns=1 | arduino_esp32_patch: AE patches NOT applied: framework 3.20014.231204  | RAM: [===== ] 50.1% (used 164124 bytes from 327680 bytes) Flash: [== ] 17.7% (used 2225893 bytes from 12582912 bytes) 
+build wiscore_rak4631 rc=0  |  | RAM: [==== ] 41.7% (used 103764 bytes from 248832 bytes) Flash: [======== ] 83.7% (used 682056 bytes from 815104 bytes) 
+build heltec_t114 rc=0  |  | RAM: [==== ] 41.0% (used 96612 bytes from 235520 bytes) Flash: [===== ] 53.2% (used 433968 bytes from 815104 bytes) 
+build t_echo rc=0  |  | RAM: [==== ] 40.3% (used 100268 bytes from 248832 bytes) Flash: [====== ] 55.7% (used 454168 bytes from 815104 bytes) 
+build esp32-safeboot rc=0  |  | RAM: [= ] 14.8% (used 48444 bytes from 327680 bytes) Flash: [== ] 20.3% (used 689843 bytes from 3403776 bytes) 
+build esp32-S3-safeboot rc=0  |  | RAM: [= ] 13.3% (used 43740 bytes from 327680 bytes) Flash: [== ] 19.1% (used 651159 bytes from 3403776 bytes) 
+wrote /Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/test/golden/native/variant-ini-effective.json (165 envs, 1433 keys)
+regression rc=0
+RESULT: PASS
+DONE

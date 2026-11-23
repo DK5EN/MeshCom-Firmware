@@ -38,7 +38,10 @@ CONSTANTS
     BugFlagSurvive,     \* teardown leaves s_authenticated set (:120)
     BugNoReset,         \* a new connection becomes s_fd at accept, before auth, s_authenticated not reset
     BugNoClose,         \* the takeover does not close the old socket (:243)
-    BugStaleFd          \* teardown closes s_fd but does not reset it (:122)
+    BugStaleFd,         \* teardown closes s_fd but does not reset it (:122)
+    Takeover,           \* FIX F2-10-SLOT: a new connection takes the handshake slot from a peer that has sent no byte for N s
+    BugPreemptActive,   \* mutation: the takeover also preempts a handshake whose peer is sending
+    SilentFirst         \* scenario: conn 1 is a silent attacker (never sends), conn 2 an honest client
 
 VARIABLES
     started,            \* s_started
@@ -49,9 +52,10 @@ VARIABLES
     hs, apc, afd, aconn,            \* s_hs_running, authTask state, its fd and conn
     rpc, rfd, rconn,    \* reader between recv and teardownIfCurrent
     stops,
-    cmdBad, wrongTear, dblClose, rejGood    \* ghost verdict flags
+    sent,               \* the handshake peer has sent at least one byte (s_hs_rx)
+    cmdBad, wrongTear, dblClose, rejGood, kickAct    \* ghost verdict flags (kickAct: a sending handshake was preempted)
 
-vars == <<started, open, kind, nconn, peerClosed, authed, sfd, sAuth, hs, apc, afd, aconn, rpc, rfd, rconn, stops,
+vars == <<sent, kickAct, started, open, kind, nconn, peerClosed, authed, sfd, sAuth, hs, apc, afd, aconn, rpc, rfd, rconn, stops,
           cmdBad, wrongTear, dblClose, rejGood>>
 
 Conns == 1..MaxConn
@@ -62,43 +66,59 @@ Init ==
     /\ nconn = 0 /\ peerClosed = {} /\ authed = {}
     /\ sfd = 0 /\ sAuth = FALSE /\ hs = FALSE /\ apc = "none" /\ afd = 0 /\ aconn = 0
     /\ rpc = "idle" /\ rfd = 0 /\ rconn = 0 /\ stops = 0
+    /\ sent = FALSE /\ kickAct = FALSE
     /\ cmdBad = FALSE /\ wrongTear = FALSE /\ dblClose = FALSE /\ rejGood = FALSE
 
 FreeFds == {f \in Fds : open[f] = 0}
 LowFree == CHOOSE f \in FreeFds : \A g \in FreeFds : f <= g
 
 \* ---- loop task: accept :490-:527 --------------------------------------------------------------------
+PreemptOK == Takeover /\ hs /\ apc = "await" /\ (~sent \/ BugPreemptActive)
+    \* new rule (code: netConsoleSlotMayPreempt): the slot holder has sent no byte for N = 3 s (time abstracted: any
+    \* moment while ~sent); the old socket is shut down and its task unwinds (abstracted to one atomic close here)
+
 Accept ==
-    /\ started /\ nconn < MaxConn /\ FreeFds # {}
+    /\ started /\ nconn < MaxConn
     /\ (rpc = "idle" \/ AcceptAnyTime)
-    /\ \E k \in {"good", "bad", "slow"} :
-       LET c == nconn + 1
-           f == IF Reuse THEN LowFree ELSE c
-       IN /\ f \in FreeFds
-          /\ nconn' = c /\ kind' = [kind EXCEPT ![c] = k]
-          /\ IF hs
-             THEN \* :507-510 rejected: "auth already in progress", socket closed at once
-                  /\ open' = open
-                  /\ rejGood' = (rejGood \/ k = "good")
-                  /\ UNCHANGED <<hs, apc, afd, aconn, sfd>>
-             ELSE \* :521-523 slot taken, authTask spawned
-                  /\ open' = [open EXCEPT ![f] = c]
-                  /\ hs' = TRUE /\ apc' = "await" /\ afd' = f /\ aconn' = c
-                  /\ sfd' = IF BugNoReset THEN f ELSE sfd     \* mutation: connection installed before auth
-                  /\ UNCHANGED rejGood
+    /\ LET base == IF PreemptOK THEN [open EXCEPT ![afd] = 0] ELSE open
+           free == {g \in Fds : base[g] = 0}
+           c == nconn + 1
+       IN /\ free # {}
+          /\ \E k \in (IF SilentFirst THEN (IF c = 1 THEN {"slow"} ELSE {"good"}) ELSE {"good", "bad", "slow"}) :
+             LET f == IF Reuse THEN CHOOSE g \in free : \A h \in free : g <= h ELSE c
+             IN /\ f \in free
+                /\ nconn' = c /\ kind' = [kind EXCEPT ![c] = k]
+                /\ IF hs /\ ~PreemptOK
+                   THEN \* :507-510 rejected: "auth already in progress", socket closed at once
+                        /\ open' = open
+                        /\ rejGood' = (rejGood \/ k = "good")
+                        /\ UNCHANGED <<hs, apc, afd, aconn, sfd, sent, kickAct>>
+                   ELSE \* :521-523 slot taken (or taken over), authTask spawned
+                        /\ open' = [base EXCEPT ![f] = c]
+                        /\ hs' = TRUE /\ apc' = "await" /\ afd' = f /\ aconn' = c
+                        /\ sent' = FALSE
+                        /\ kickAct' = (kickAct \/ (hs /\ sent))
+                        /\ sfd' = IF BugNoReset THEN f ELSE sfd     \* mutation: connection installed before auth
+                        /\ UNCHANGED rejGood
     /\ UNCHANGED <<started, peerClosed, authed, sAuth, rpc, rfd, rconn, stops, cmdBad, wrongTear, dblClose>>
 
 \* ---- a peer hangs up whenever it likes -------------------------------------------------------------
 PeerClose ==
     /\ \E f \in Fds : open[f] # 0 /\ open[f] \notin peerClosed /\ peerClosed' = peerClosed \cup {open[f]}
-    /\ UNCHANGED <<started, open, kind, nconn, authed, sfd, sAuth, hs, apc, afd, aconn, rpc, rfd, rconn, stops,
+    /\ UNCHANGED <<sent, kickAct, started, open, kind, nconn, authed, sfd, sAuth, hs, apc, afd, aconn, rpc, rfd, rconn, stops,
                    cmdBad, wrongTear, dblClose, rejGood>>
 
 \* ---- authTask, outside the mutex -------------------------------------------------------------------
+Send ==         \* :189 the first byte of the peer arrives (s_hs_rx); a silent peer never sends
+    /\ apc = "await" /\ ~sent /\ kind[aconn] # "slow" /\ aconn \notin peerClosed
+    /\ sent' = TRUE
+    /\ UNCHANGED <<kickAct, started, open, kind, nconn, peerClosed, authed, sfd, sAuth, hs, apc, afd, aconn, rpc, rfd,
+                   rconn, stops, cmdBad, wrongTear, dblClose, rejGood>>
+
 Verify ==       \* :189-215 the peer answers correctly, HMAC compare ok, banner :229
-    /\ apc = "await" /\ kind[aconn] = "good" /\ aconn \notin peerClosed
+    /\ apc = "await" /\ sent /\ kind[aconn] = "good" /\ aconn \notin peerClosed
     /\ apc' = "verified" /\ authed' = authed \cup {aconn}
-    /\ UNCHANGED <<started, open, kind, nconn, peerClosed, sfd, sAuth, hs, afd, aconn, rpc, rfd, rconn, stops,
+    /\ UNCHANGED <<sent, kickAct, started, open, kind, nconn, peerClosed, sfd, sAuth, hs, afd, aconn, rpc, rfd, rconn, stops,
                    cmdBad, wrongTear, dblClose, rejGood>>
 
 AuthFail ==     \* :219-227 wrong response, EOF (:190 r <= 0) or the total deadline (:183); FAIL, close, slot freed
@@ -106,7 +126,7 @@ AuthFail ==     \* :219-227 wrong response, EOF (:190 r <= 0) or the total deadl
     /\ (kind[aconn] = "bad" \/ aconn \in peerClosed \/ HasDeadline)
     /\ open' = [open EXCEPT ![afd] = 0]
     /\ hs' = FALSE /\ apc' = "none"
-    /\ UNCHANGED <<started, kind, nconn, peerClosed, authed, sfd, sAuth, afd, aconn, rpc, rfd, rconn, stops,
+    /\ UNCHANGED <<sent, kickAct, started, kind, nconn, peerClosed, authed, sfd, sAuth, afd, aconn, rpc, rfd, rconn, stops,
                    cmdBad, wrongTear, dblClose, rejGood>>
 
 Install ==      \* :236-261 under the mutex
@@ -123,14 +143,14 @@ Install ==      \* :236-261 under the mutex
             /\ open' = [open EXCEPT ![afd] = 0]
             /\ UNCHANGED <<sfd, sAuth, dblClose>>
     /\ hs' = FALSE /\ apc' = "none"
-    /\ UNCHANGED <<started, kind, nconn, peerClosed, authed, afd, aconn, rpc, rfd, rconn, stops, cmdBad, wrongTear,
+    /\ UNCHANGED <<sent, kickAct, started, kind, nconn, peerClosed, authed, afd, aconn, rpc, rfd, rconn, stops, cmdBad, wrongTear,
                    rejGood>>
 
 \* ---- the loop task reads the session: recv under the mutex, the verdict acts after releasing it -------
 ReadData ==     \* :549-553 r == 1, the byte goes to the command path
     /\ rpc = "idle" /\ sAuth /\ sfd # 0 /\ open[sfd] # 0 /\ open[sfd] \notin peerClosed
     /\ cmdBad' = (cmdBad \/ open[sfd] \notin authed)
-    /\ UNCHANGED <<started, open, kind, nconn, peerClosed, authed, sfd, sAuth, hs, apc, afd, aconn, rpc, rfd, rconn,
+    /\ UNCHANGED <<sent, kickAct, started, open, kind, nconn, peerClosed, authed, sfd, sAuth, hs, apc, afd, aconn, rpc, rfd, rconn,
                    stops, wrongTear, dblClose, rejGood>>
 
 ReadDead ==     \* :549-558 / :472-479 recv says EOF or an error on the fd read from s_fd; the lock is released
@@ -139,7 +159,7 @@ ReadDead ==     \* :549-558 / :472-479 recv says EOF or an error on the fd read 
        \/ sfd # 0 /\ open[sfd] = 0 /\ rconn' = 0           \* socket gone: EBADF
        \/ sfd = 0 /\ rconn' = 0                            \* s_fd = -1: recv fails
     /\ rfd' = sfd /\ rpc' = "held"
-    /\ UNCHANGED <<started, open, kind, nconn, peerClosed, authed, sfd, sAuth, hs, apc, afd, aconn, stops,
+    /\ UNCHANGED <<sent, kickAct, started, open, kind, nconn, peerClosed, authed, sfd, sAuth, hs, apc, afd, aconn, stops,
                    cmdBad, wrongTear, dblClose, rejGood>>
 
 TeardownClient ==   \* :118-127 body, mutex held by the caller; rc = the conn the caller meant (0 = any)
@@ -159,22 +179,22 @@ TeardownIfCurrent ==    \* :131-137: take the mutex, close only if s_fd == fd
     /\ IF sfd = rfd \/ BugNoFdCheck
        THEN TeardownClient
        ELSE UNCHANGED <<open, sfd, sAuth, dblClose, wrongTear>>
-    /\ UNCHANGED <<started, kind, nconn, peerClosed, authed, hs, apc, afd, aconn, rfd, rconn, stops, cmdBad, rejGood>>
+    /\ UNCHANGED <<sent, kickAct, started, kind, nconn, peerClosed, authed, hs, apc, afd, aconn, rfd, rconn, stops, cmdBad, rejGood>>
 
 \* ---- stopNetConsole :392-410 / startNetConsole :383-390, both on the loop task ---------------------------
 Stop ==
     /\ started /\ rpc = "idle" /\ stops < MaxStops
     /\ started' = FALSE /\ stops' = stops + 1
     /\ TeardownClient       \* rpc = "idle": no wrongTear judgement
-    /\ UNCHANGED <<kind, nconn, peerClosed, authed, hs, apc, afd, aconn, rpc, rfd, rconn, cmdBad, rejGood>>
+    /\ UNCHANGED <<sent, kickAct, kind, nconn, peerClosed, authed, hs, apc, afd, aconn, rpc, rfd, rconn, cmdBad, rejGood>>
 
 Start ==
     /\ ~started /\ rpc = "idle"
     /\ started' = TRUE
-    /\ UNCHANGED <<open, kind, nconn, peerClosed, authed, sfd, sAuth, hs, apc, afd, aconn, rpc, rfd, rconn, stops,
+    /\ UNCHANGED <<sent, kickAct, open, kind, nconn, peerClosed, authed, sfd, sAuth, hs, apc, afd, aconn, rpc, rfd, rconn, stops,
                    cmdBad, wrongTear, dblClose, rejGood>>
 
-Next == Accept \/ PeerClose \/ Verify \/ AuthFail \/ Install \/ ReadData \/ ReadDead \/ TeardownIfCurrent \/ Stop \/ Start
+Next == Accept \/ Send \/ PeerClose \/ Verify \/ AuthFail \/ Install \/ ReadData \/ ReadDead \/ TeardownIfCurrent \/ Stop \/ Start
 
 Spec == Init /\ [][Next]_vars /\ WF_vars(AuthFail) /\ WF_vars(Install)
 
@@ -188,6 +208,8 @@ NoWrongTear   == ~wrongTear               \* teardownIfCurrent never closes a se
 NoDoubleClose == ~dblClose                \* no close() on an fd that is already closed
 SessFlag      == sAuth => sfd # 0         \* the session flag does not outlive its socket
 NoRejectGood  == ~rejGood                 \* an honest client is never turned away because the slot is busy
+
+NoKickActive  == ~kickAct                 \* a handshake whose peer is sending is never preempted
 
 SlotFree == hs ~> ~hs                     \* the single handshake slot is never held forever
 =============================================================================

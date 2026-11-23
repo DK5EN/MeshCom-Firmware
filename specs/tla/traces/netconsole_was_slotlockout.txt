@@ -32,7 +32,7 @@ State 2: <Accept line 72, col 5 to line 89, col 108 of module netconsole>
 /\ rpc = "idle"
 /\ rconn = 0
 /\ open = <<1, 0>>
-/\ kind = <<"bad", "good">>
+/\ kind = <<"good", "good">>
 /\ wrongTear = FALSE
 /\ rfd = 0
 /\ sAuth = FALSE
@@ -54,7 +54,7 @@ State 3: <Accept line 72, col 5 to line 89, col 108 of module netconsole>
 /\ rpc = "idle"
 /\ rconn = 0
 /\ open = <<1, 0>>
-/\ kind = <<"bad", "good">>
+/\ kind = <<"good", "good">>
 /\ wrongTear = FALSE
 /\ rfd = 0
 /\ sAuth = FALSE
@@ -66,5 +66,5 @@ State 3: <Accept line 72, col 5 to line 89, col 108 of module netconsole>
 /\ dblClose = FALSE
 /\ afd = 1
 
-The depth of the complete state graph search is 3.
-The average outdegree of the complete state graph is 4 (minimum is 4, the maximum 4 and the 95th percentile is 4).
+The depth of the complete state graph search is 5.
+The average outdegree of the complete state graph is 3 (minimum is 1, the maximum 4 and the 95th percentile is 4).

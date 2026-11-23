@@ -5,7 +5,20 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves). Release plan and working checklist: operator's Desktop
 `upstream-releaseplan-20261122.html` (Fassung 10; the separate Desktop checklist is retired).
 
-## Now (2026-11-22)
+## Now (2026-11-23)
+
+- **FORMAL-01 (library patches and formal-check fixes), code phase:** campaign
+  [campaign-formal-01-20261123.md](campaign-formal-01-20261123.md), status per review finding
+  [review/formal01-20261123/README.md](review/formal01-20261123/README.md). Operator 2026-11-23: finish the fixes now
+  (code, review, fix, commit); tests and bench later (BACKLOG `FORMAL01-BENCH`, `FORMAL01-GAPS`); TLA+/BMC another day
+  and only on explicit request (`FORMAL01-RUN`, `tools/regression.sh --formal`). Open next: `FORMAL01-1B`,
+  `FORMAL01-SEAMS`, `FORMAL01-UP`.
+  - In the tree, uncommitted: 3a/3b library patches (NimBLE NB-01..07, W5100S ETH-07, safeboot ESP32Async bump, lwIP
+    MTU guard, arduino-esp32 AE-01..03, TLS date check + TLS 1.2), 3c (patched mDNS and DHCP server objects, NimBLE
+    max length 300 + prep entries 2, TLS allocation cap, DNS via tcpip thread), 3d (UDP drain F2-5, queueExtern
+    F2-14, net console slot F2-10, APRS F3-8, NUL in asset URL), the `--update dlverify` switch.
+  - Next: advisor verdict on 3b+3c, then the gate (board builds sequential, link proof for the overrides, host stage
+    1,2 without `--formal`), then commit on fork-dev.
 
 - **OTA-LOWHEAP-01 running (fork issue DK5EN/MeshCom-Firmware#3):** ESP32-S3 Auto Update refuses with "Not enough
   free memory" after long uptime (field, 11.22 rollout). Campaign

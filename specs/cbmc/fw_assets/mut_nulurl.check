@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DFW_ASSETS_MUT_RAWCTRL -DDEFNUL -DSTRICT_URL"
+FLAGS="--unwind 90"
+EXPECT=fail
+CHECKS="mutation: raw control check removed -> NUL in browser_download_url gives found with an empty url"
+EXPECT_PROP='assertion out.url'

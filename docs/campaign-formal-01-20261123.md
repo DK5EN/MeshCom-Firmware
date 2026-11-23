@@ -37,7 +37,53 @@ Langzeitstabilität und non exploitability."
 | 2    | gate: `--all` both runners, README tables, regression.sh stage 2 hook                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | open    |
 | 1b   | libraries (operator 2026-11-23: suspects BLE lib, ETH stack, TCP/UDP, web server): (1) pinned versions vs upstream fixes/CVEs (running), (2) ESBMC boundary proofs with the library as adversary: NimBLE/Bluefruit onWrite, AsyncWebServer onBody/onUpload (index/len/total), UDP read, W5100S recv, (3) library-internal BMC: ESPAsyncWebServer request + multipart parser, W5100S driver incl. our patches, NimBLE ATT (prepare) write path; lwIP and the full NimBLE host out of scope (size; lwIP is fuzzed upstream), (4) TLA+: AsyncTCP task vs loop, NimBLE host task vs loop (F2-8), W5100S/LoRa SPI bus (F2-19) | open    |
 | 3a   | library fixes: NimBLE backports (`tools/nimble_patch.py`), W5100S upstream fixes (`tools/w5100s_patch.py`), safeboot ESP32Async bump (safeboot envs + `src/safeboot/`), IDF 4.4 review (read-only)                                                                                                                                                                                                                                                                                                                                                                                                                       | running |
+| 3b   | library patches from the review verifications (ownership below), rework done, gate with 3c/3d                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | running |
 | 3    | seams (handleACK, readPhoneCommand length, UDP RX, url decode core) and fixes for confirmed defects, operator decides which                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | open    |
+
+### Wave 3b ownership (library patches, dispatched 2026-11-23)
+
+| agent | owns                                                                      | targets                                                                        |
+| ----- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| L1    | `tools/nimble_patch.py`, `tools/tests/test_nimble_patch.py`               | NB-04 deinit after failed stop, NB-05 init unwind + bounded sync, NB-06, NB-07 |
+| L2    | `src/esp32/lwip_mtu_guard.*`, `test/test_lwip_mtu_guard/`                 | lwIP #2 DHCP MTU floor via `-Wl,--wrap` (link-time, prebuilt lib)              |
+| L3    | `tools/arduino_esp32_patch.py`, `tools/tests/test_arduino_esp32_patch.py` | IDF #4 HTTPClient header cap, #5 alloc failure without abort, #8 hostByName    |
+| L4    | `src/fw_tls_time.h`, `test/test_fw_tls_time/`, `src/esp32/mc_tls/*`       | mbedTLS #1 own certificate validity check, IDF #7 minimum TLS 1.2              |
+
+Orchestrator: `platformio.ini` (two native envs added before dispatch; `--wrap` flags and the AE pre-script at the gate).
+Not in 3b: NimBLE #1 (src, characteristic max length), lwIP #4/#5 dhcpserver override, mbedTLS #2 calloc cap,
+IDF #3 DNS thread safety.
+
+### Wave 3c+3d ownership (dispatched 2026-11-23, 3b gate aborted by operator, one gate for 3b+3c+3d)
+
+| agent | owns                                                                                           | target                               | build env                              |
+| ----- | ---------------------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------- |
+| M1    | `src/esp32/idf_override/mdns.c`, `README.md`                                                   | IDF #1, lwIP #3/#6/#7/#9 (MD-0x)     | ttgo_tbeam                             |
+| M2    | `src/esp32/idf_override/dhcpserver.c`, `README-dhcpserver.md`                                  | lwIP #4/#5, IDF #2 (DS-0x)           | E22_1262-DevKitC                       |
+| M3    | `src/esp32/esp32_main.cpp` (BLE), `src/esp32/fw_update_net.*`                                  | NimBLE #1/#7, mbedTLS #2             | heltec_wifi_lora_32_V3                 |
+| M4    | `src/esp32/mc_dns.*`, DNS calls in `aprs_is_client.cpp`, `udp_functions.cpp`                   | IDF #3                               | ttgo-lora32-v21, t_echo                |
+| D1    | `udp_drain_esp32.cpp`, `udp_drain_nrf52.cpp`, `byte_fifo.*`, `test_byte_fifo`, bytefifo*       | F2-5 dup/loss                        | heltec_wireless_stick, wiscore_rak4631 |
+| D2    | `src/extudp_functions.*` (not the DNS line), optional `ext_queue_core.h`                       | F2-14                                | ttgo_tbeam_SX1262, heltec_t114         |
+| D3    | `src/net_console.*`, `test_net_console_gate`, netconsole*                                      | F2-10 slot takeover of a silent peer | E22_1262_S3-DevKitC-1-N16R8            |
+| D4    | `aprs_functions.cpp` (encodeStartAPRS), `fw_update_assets.h`, their tests, cbmc aprs/fw_assets | F3-8, NUL in url                     | native only                            |
+
+Orchestrator at the gate: NimBLE `-D` flags in `[esp32]`, new native env blocks, the extudp DNS line, golden baseline.
+
+### Wave 3c plan (remaining reachable review findings, after 3b is committed)
+
+Status table per finding: `review/formal01-20261123/README.md`. Feasibility (scout, 2026-11-23):
+
+- DHCP server (lwIP #4/#5, IDF #2): `dhcpserver.c.obj` is a member of `liblwip.a`; a patched copy of the IDF 4.4.7
+  source that defines all 9 externally referenced symbols replaces it at link time (member never pulled).
+- mDNS (IDF #1 recursion, lwIP #6/#9): `mdns.c.obj` lives in `libmdns.a`; a patched `mdns.c` with the public API that
+  ESPmDNS uses (12 functions) replaces it; it must not define the 6 `mdns_networking_lwip` symbols. Sources:
+  `~/WebDev/formal01-review/review-lwip/code/idf/` (branch `review`) and `.../src/esp-idf/components/mdns/`.
+- NimBLE #7: `-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=<n>` and `-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=<ms>`
+  override the `#ifndef` defaults (64, 30000 ms; `esp_nimble_cfg.h:319-332`).
+- NimBLE #1: src, characteristic max length and a static onWrite item.
+- mbedTLS #2: `mbedtls_platform_set_calloc_free` exists in `libmbedcrypto.a`; already used at `fw_update_net.cpp:325`
+  (PSRAM boards only).
+- IDF #3: loop-task DNS callers use `dns_gethostbyname` directly (`extudp_functions.cpp:184`,
+  `aprs_is_client.cpp:321`, `udp_functions.cpp:602`); blocking `hostByName` only in the AU task and instrument_probe.
 
 ### Wave 1 ownership
 
@@ -96,6 +142,34 @@ Deferred: NBR matrix lock model (G), dedup and deferred save (single writer, low
     prebuilt libs: fix route there is mitigation in our code; the Arduino layer is source and can be patched by a
     pre-script like `tools/nimble_patch.py` (wave 3a, review running).
 - Tracks 2-4 (boundary proofs, library-internal BMC, task models) still open.
+
+## Wave 3c+3d results (2026-11-23, written, NOT built at the end, gate pending)
+
+Operator 2026-11-23: no TLC/ESBMC runs unless explicitly requested; no board builds inside agents (builds only at
+the gate). Models and BMC jobs below are written, not run.
+
+- M1 mDNS: `src/esp32/idf_override/mdns.c` (IDF 4.4.7, byte-identical to the libmdns.a source), MD-01 depth cap 8
+  (IDF #1), MD-02 (lwIP #9), MD-03 (#3), MD-04 (#7), MD-05 (#6). Gate: `nm -l` must place mdns_init in our file.
+- M2 DHCP server: `src/esp32/idf_override/dhcpserver.c`, DS-01 malloc checks (#4), DS-02 bounded option walk (IDF #2),
+  DS-03 unconfirmed leases 30 s + eviction at 8 stations (#5), DS-04 datagram length 240..1500 + full pbuf copy.
+  Open: under a full DISCOVER+REQUEST flood the oldest confirmed lease is evicted (client re-asks) instead of
+  refusing new MACs. Gate: map/nm must show our dhcps_start.
+- M3 NimBLE #1: TX/RX max length 300, static onWrite item. #7: `MAX_PREP_ENTRIES=2`, `QUEUED_WRITE_TMO=5000`
+  (long writes need MTU >= 155). mbedTLS #2: capped calloc during AU jobs on every ESP32 (24 KiB per allocation,
+  128 KiB live), `src/fw_tls_alloc_cap.h`, native_fw_tls_alloc_cap 8/8 (before the build stop).
+- M4 IDF #3: `src/esp32/mc_dns.*` runs dns_gethostbyname in the tcpip thread (tcpip_callback + semaphore); callers in
+  aprs_is_client.cpp, udp_functions.cpp, extudp_functions.cpp (orchestrator).
+- D1 F2-5: both drains use bf_peek_gen / bf_pop_if (one lock section each); cfgs bytefifo_fix_udp_{dup,loss},
+  bytefifo_was_udp_{dup,loss}. native_byte_fifo 27/27.
+- D2 F2-14: `src/ext_queue_core.h`, writer checks `used` before the copy, drops counted (`externQueueDrops()`);
+  native_ext_queue (old writer: 3/4 fail, new: 4/4, run by hand before the stop). Open for the advisor: nRF52 has no
+  lock around the ring, ordering only (as in the model).
+- D3 F2-10: a new connection takes the handshake slot from a holder silent for 3 s (shutdown, generation counter);
+  `src/net_console_slot.h`, 5 tests in test_net_console_gate (not run); cfgs netconsole_fix_slot,
+  netconsole_mut_preemptactive, netconsole_was_slotlockout (not run, spec not parsed).
+- D4 F3-8: copy capped at 249 B; NUL/control byte in a JSON string fails the asset scan. native_aprs_fuzz 13/13,
+  native_fw_update_assets 24/24, native_aprs 222/222; BMC jobs enc_pass_widepath, enc_mut_widepath, pass_nulurl,
+  mut_nulurl written, not run.
 
 ## Wave 3a results (2026-11-23, built, not on the bench, not committed)
 
