@@ -4,3 +4,5 @@ CFLAGS="-I$ROOT/src "
 FLAGS="--unwind 12"
 EXPECT=pass
 CHECKS="any byte stream <=10 B, arbitrary chunking (3 feeds): bounds, msg_len/ctl_len limits, progress, sticky error"
+# peak 3.4 to 3.8 GB on 2026-11-23
+MEM=5120

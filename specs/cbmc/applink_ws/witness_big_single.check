@@ -6,3 +6,5 @@ EXPECT=fail
 CHECKS="witness: a message filling msg[300] exactly is decoded"
 TIMEOUT=1800
 EXPECT_PROP='assertion g_d.msg_len != APPLINK_MAX_IN$'
+# memout at the 6 GB cap on 2026-11-23: unrolls a 300-byte payload loop. Small-scope twin: pass_cap_small.check
+TIER=heavy

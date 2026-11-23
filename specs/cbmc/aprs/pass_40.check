@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-Istubs -I$ROOT/test/support -I$ROOT/src -DNATIVE_BUILD=1 -DUNIT_TEST=1 -DMAXLEN=40"
+FLAGS="--unwind 46"
+EXPECT=pass
+CHECKS="decodeAPRS memory safety + NUL-terminated fields, rsize 0..40 (complete up to 40 B; full frame is pass.check, heavy)"

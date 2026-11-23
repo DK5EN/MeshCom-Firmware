@@ -5,3 +5,5 @@ FLAGS="--unwind 310"
 EXPECT=pass
 CHECKS="one BIN frame, 16-bit length 297..302 vs APPLINK_MAX_IN=300, chunks header|payload: msg[300] filled but never overrun, 1009 beyond"
 TIMEOUT=1800
+# memout at the 6 GB cap on 2026-11-23: unrolls a 300-byte payload loop. Small-scope twin: pass_cap_small.check
+TIER=heavy

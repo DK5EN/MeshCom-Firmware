@@ -5,3 +5,5 @@ FLAGS="--unwind 12"
 EXPECT=fail
 CHECKS="mutation: input one byte short"
 EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'
+# peak 3.4 to 3.8 GB on 2026-11-23
+MEM=5120

@@ -7,6 +7,13 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
 
 ## Now (2026-11-23)
 
+- **Formal checks reworked, unrun (2026-11-23):** review [formal-review-20261123.md](formal-review-20261123.md), how to
+  run [`specs/README.md`](../specs/README.md). Runners repaired, tautologies removed, `netconsole.tla` rewritten, heap
+  models archived, tiers and budgets for the bounded jobs, self-test and drift check in stage 2 of the host gate. Runs stay
+  local on the Mac (operator: no GitHub run). Models were edited without a parser and nothing ran: BACKLOG
+  `FORMAL01-RUN` is the next step and starts with `specs/tla/run_tlc.sh --sany-all`. Predicted, unconfirmed defect in
+  the net console slot takeover: BACKLOG `FORMAL-NETCON-MARK`. Not committed.
+
 - **FORMAL-01 (library patches and formal-check fixes), code phase:** campaign
   [campaign-formal-01-20261123.md](campaign-formal-01-20261123.md), status per review finding
   [review/formal01-20261123/README.md](review/formal01-20261123/README.md). Operator 2026-11-23: finish the fixes now

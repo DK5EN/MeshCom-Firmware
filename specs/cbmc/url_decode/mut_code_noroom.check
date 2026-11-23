@@ -1,0 +1,10 @@
+TOOL=esbmc
+# code mutation: escape_at() no longer checks that two hex digits fit before the end
+mkdir -p gen && sed 's/if (i + 2 >= len || buf\[i\] != /if (buf[i] != /' "$ROOT/src/url_decode.cpp" > gen/url_decode.cpp
+cmp -s "$ROOT/src/url_decode.cpp" gen/url_decode.cpp && { echo "  mutation did not apply to url_decode.cpp (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp gen/url_decode.cpp"
+CFLAGS="-I$ROOT/src"
+FLAGS="--unwind 26"
+EXPECT=fail
+CHECKS="code mutation: room check removed from escape_at -> read past the buffer on a trailing %"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

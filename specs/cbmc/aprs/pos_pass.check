@@ -4,3 +4,5 @@ CFLAGS="-Istubs -I$ROOT/test/support -I$ROOT/src -DNATIVE_BUILD=1 -DUNIT_TEST=1 
 FLAGS="--unwind 30"
 EXPECT=pass
 CHECKS="decodeAPRSPOS memory safety"
+# memout at the 6 GB cap after 76 s on 2026-11-23
+TIER=heavy

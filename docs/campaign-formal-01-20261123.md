@@ -8,6 +8,11 @@ test.
 Operator 2026-11-23: "TLA+ jetzt ausbauen und dann noch CBMC/ESBMC für unseren C code mit einbauen. Ziel ist
 Langzeitstabilität und non exploitability."
 
+> [!IMPORTANT]
+> **Superseded for the verification part (2026-11-23):** review `formal-review-20261123.md`, current setup and rules
+> `../specs/README.md`. The heap models and several configurations named below were archived, renamed or removed.
+> The library patch waves below are unaffected.
+
 ## Rules
 
 - Verification only in waves 1-2: no edits in `src/`, `test/`, `platformio.ini`. A harness that needs a seam files a

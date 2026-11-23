@@ -1,0 +1,8 @@
+# Pinned tool versions for the formal checks. Both runners read this file.
+# A different version is a tool error unless TOOL_DRIFT_OK=1 is set for that run.
+# Change a pin only together with a full run of both runners (results files show the versions).
+TLA_TOOLS_VERSION=1.7.4
+TLA_JAR_URL=https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar
+TLA_JAR_SHA256=936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88
+ESBMC_VERSION=8.7
+CBMC_VERSION=6.11.0

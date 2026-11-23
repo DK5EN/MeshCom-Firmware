@@ -9,6 +9,7 @@
 //   - rmParse output: cmd/args/tag NUL-terminated within their arrays, tag exactly 16 lower-case hex, ctr==0 only for "sync"
 //   - AUTH: dispatch  =>  hmacSha256 was called in this check, over exactly rmCanonical(cmd,dst,src), and its first 8 output bytes in
 //     lower-case hex equal cmd.tag (i.e. the verify returned true); RM_OK additionally => ctr > hwm
+//   - REPLAY (ROUNDS=2): the same frame checked again after RM_OK + rmAccept is never RM_OK a second time
 //   - EMPTY SECRET (passwd NULL / "" / spaces only): verdict RM_REJ_DISABLED, no hmac/sha call, never dispatched (audit M1)
 // Modes (-D): default AUTH; EMPTY_SECRET; mutations/witnesses (EXPECT=fail):
 //   -DDIRECT            skip text+rmParse, hand rmCheck a fully nondet RmCmd (superset of any parser output; cheap)
@@ -18,6 +19,7 @@
 //   -DWITNESS_PARSED    assert rmParse never accepts -> must fail (accept path reachable)
 //   -DWITNESS_DISPATCH  assert no frame is ever dispatched -> must fail (RM_OK/REFUSED/SYNC/CACHED reachable)
 //   -DWITNESS_OK        assert verdict != RM_OK -> must fail
+//   -DWITNESS_CACHED    (ROUNDS=2) assert verdict != RM_CACHED -> must fail (the reply cache path is reachable)
 //   -DMUT_NOAUTH        assert dispatch happens only when the hmac model was NOT called (opposite of the auth property) -> must fail
 //   -DMUT_TAGFLIP       assert at dispatch that the tag does NOT equal hexLower(mac) (opposite) -> must fail
 //   -DMUT_SHORT_TEXT    text buffer one byte shorter than it is read (no terminator) -> read past it must be found
@@ -130,6 +132,7 @@ int main()
     rmStateInit(s, hwm);
     s.strict = nondet_int() != 0;
 
+    bool executed = false; // an earlier round returned RM_OK for this very frame
     for(int round = 0; round < ROUNDS; round++) {
         uint32_t now = nondet_uint();
         g_m.sha_calls = g_m.hmac_calls = 0; g_m.msg_len = 0;
@@ -158,10 +161,16 @@ int main()
 #endif
             assert(memcmp(hex, cmd.tag, 16) == 0);
         }
+#ifdef WITNESS_CACHED
+        assert(v != RM_CACHED);
+#endif
+        // REPLAY: a frame that was executed once is never executed again (ctr <= hwm after rmAccept)
+        assert(!(executed && v == RM_OK));
         if(v == RM_OK) {
 #ifdef WITNESS_OK
             assert(0);
 #endif
+            executed = true;
             assert(cmd.ctr > hwm_before);
             // runtime contract: rmAccept for every RM_OK; second round can then hit the cache
             char res[RM_MAX_RESULT + 1]; strcpy(res, "ok");

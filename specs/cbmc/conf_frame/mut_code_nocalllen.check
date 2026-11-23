@@ -1,0 +1,10 @@
+TOOL=esbmc
+# code mutation: the check "declared call length runs past the payload" is removed from a copy of the source
+mkdir -p gen && sed 's/if(pos + call_len > len)/if(0)/' "$ROOT/src/conf_frame.cpp" > gen/conf_frame.cpp
+cmp -s "$ROOT/src/conf_frame.cpp" gen/conf_frame.cpp && { echo "  mutation did not apply to conf_frame.cpp (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp gen/conf_frame.cpp"
+CFLAGS="-I$ROOT/src"
+FLAGS="--unwind 257"
+EXPECT=fail
+CHECKS="code mutation: call length check removed from parseConfFrame -> read past the payload"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

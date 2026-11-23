@@ -5,3 +5,5 @@ FLAGS="--unwind 12"
 EXPECT=fail
 CHECKS="witness: 1009 too-big error reachable"
 EXPECT_PROP='assertion g_d.error_code != 1009$'
+# peak 3.4 to 3.8 GB on 2026-11-23
+MEM=5120

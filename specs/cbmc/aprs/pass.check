@@ -1,6 +1,9 @@
 TOOL=esbmc
 SOURCES="harness.cpp"
 CFLAGS="-Istubs -I$ROOT/test/support -I$ROOT/src -DNATIVE_BUILD=1 -DUNIT_TEST=1"
-FLAGS="--no-unwinding-assertions --unwind 270"
+FLAGS="--unwind 270"
 EXPECT=pass
 CHECKS="decodeAPRS memory safety + NUL-terminated fields, rsize 0..255 (full UDP frame), charset filter modelled"
+# memout at the 6 GB cap after 114 s on 2026-11-23 (then still with --no-unwinding-assertions, removed: a pass
+# without them is unsound). Bounded twin that fits the quick tier: pass_40.check
+TIER=heavy

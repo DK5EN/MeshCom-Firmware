@@ -1,0 +1,12 @@
+TOOL=esbmc
+# small scope: a copy of the decoder with APPLINK_MAX_IN reduced to 6, so the message cap and the 1009 path are
+# reached by a 18-byte stream with the real code (the cap logic does not depend on the value of the constant)
+mkdir -p gen && sed 's/^#define APPLINK_MAX_IN .*/#define APPLINK_MAX_IN 6/' "$ROOT/src/applink_ws.h" > gen/applink_ws.h
+cp "$ROOT/src/applink_ws.cpp" gen/applink_ws.cpp
+cmp -s "$ROOT/src/applink_ws.h" gen/applink_ws.h && { echo "  APPLINK_MAX_IN was not reduced (header changed?)"; TOOL=none; }
+SOURCES="harness.cpp gen/applink_ws.cpp"
+CFLAGS="-Igen -I$ROOT/src -DSTREAM=18"
+FLAGS="--unwind 20"
+EXPECT=pass
+CHECKS="reassembly limit with APPLINK_MAX_IN=6: any 18-byte stream (two masked frames fit), 3 feeds: no overrun"
+TIER=heavy

@@ -1,0 +1,9 @@
+TOOL=esbmc
+SOURCES="harness.cpp hmac_model.cpp $ROOT/src/remote_cmd.cpp"
+CFLAGS="-I$ROOT/src -Ishim -DNATIVE_BUILD=1 -DDIRECT -DROUNDS=2 -DWITNESS_CACHED"
+FLAGS="--unwind 110"
+EXPECT=fail
+TIMEOUT=2400
+CHECKS="witness: the reply cache (RM_CACHED) is reachable in round 2"
+EXPECT_PROP='assertion v != RM_CACHED$'
+TIER=heavy

@@ -5,3 +5,5 @@ FLAGS="--unwind 12"
 EXPECT=fail
 CHECKS="witness: complete message decoded"
 EXPECT_PROP='assertion 0$'
+# peak 3.4 to 3.8 GB on 2026-11-23
+MEM=5120

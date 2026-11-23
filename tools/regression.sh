@@ -25,6 +25,8 @@
 #                  tools not covered by selftest.sh. Only with --formal: the TLA+
 #                  models (specs/tla/run_tlc.sh --all) and the ESBMC/CBMC jobs
 #                  (specs/cbmc/run_cbmc.sh --all), SKIP when the tools are missing.
+#                  --formal runs the quick tier; the heavy jobs: specs/cbmc/run_cbmc.sh --all --heavy.
+#                  Always: specs/selftest.sh (model lint, model drift against src/, runner verdict logic).
 # Stage 3  bench:  tools/bench/bench_suite.py -- identity guard, per-board
 #                  harness, OTA regression, optional flash/EXTUDP/deep-sleep
 #                  on every fleet.json node that is attached over USB.
@@ -246,6 +248,9 @@ stage2() {
         run_step "self-test $(basename "$f")" "stage2-selftest-$(basename "$f" .py)" \
             uv run --quiet "$f" --self-test
     done
+    # Formal instruments, always: static lint of the TLA+ models, drift check of the models against src/
+    # (specs/manifest.json), verdict logic of both runners on canned tool output. No solver, no Java.
+    run_step "formal instruments self-test (specs/selftest.sh)" stage2-formal-selftest specs/selftest.sh
     # FORMAL-01: TLA+ models (every cfg incl. expect-fail mutations) and bounded model checking
     # (ESBMC/CBMC jobs incl. mutations). Opt-in with --formal (operator 2026-11-23: too heavy for every
     # run; run_cbmc.sh --all took > 13 min, up to 6 GB per job). Missing tools are a SKIP, not a pass.

@@ -1,5 +1,15 @@
 # TLA+ models of the ESP32-S3 internal heap around Auto Update (OTA-LOWHEAP-01)
 
+> [!IMPORTANT]
+> **Archived 2026-11-23, not part of `run_tlc.sh --all`.** Review: `docs/formal-review-20261123.md`.
+>
+> - `heap.tla` is retired. Its properties H1 to H8 hold by construction. The eight rules stay valid as
+>   requirements and become checks on real allocation traces (BACKLOG `FORMAL-LINK`).
+> - `heap_frag.tla` is frozen. It models the Auto Update gate with two TLS record buffers from the heap. The code
+>   now serves the records from the reserved 32 KB buffer. The findings below explain why the old gate failed.
+> - Line anchors below are those of 2026-11-22 and no longer match `src/esp32/fw_update_net.cpp`.
+> - Run one by hand: `specs/tla/run_tlc.sh archive/heap/heap_frag_f2.cfg`. The results table below is the last run.
+
 Goal: find bugs, not prove tautologies. Every property that holds has a mutation cfg (a deliberately broken
 design or constant) that makes TLC report a violation; both runs are in the table below.
 

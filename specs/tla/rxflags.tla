@@ -35,7 +35,8 @@ CONSTANTS
     NoStall,   \* BOOLEAN: no stall between the IRQ check and the gate close
     ParkGate,  \* BOOLEAN: ringFull leaves the packet on the chip (FALSE = mutation: park service reads regardless)
     RingMax,   \* park ring slots (abstract, RX_PARK_SLOTS = 4)
-    Timeout    \* BOOLEAN: model the periodic RX timeout restart
+    Timeout,   \* BOOLEAN: model the periodic RX timeout restart
+    ReEnable   \* BOOLEAN: E=true after every RX restart (FALSE = mutation: the gate stays shut)
 
 VARIABLES E, R, ET, T, att, mode, air, pkt, txdone, pc, kind, ring, arr, txq,
           processed, silent, blind, rxInTx
@@ -108,7 +109,7 @@ RB == /\ pc = "rB" /\ mode' = "rx" /\ pkt' = FALSE /\ txdone' = FALSE /\ air' = 
       /\ UNCHANGED <<E, R, ET, T, att, kind, ring, arr, txq, processed, silent, rxInTx>>
 RC == /\ pc = "rC" /\ att' = "rx" /\ pc' = "rD"
       /\ UNCHANGED <<E, R, ET, T, mode, air, pkt, txdone, kind, ring, arr, txq, processed, silent, blind, rxInTx>>
-RD == /\ pc = "rD" /\ E' = TRUE /\ pc' = "rE"
+RD == /\ pc = "rD" /\ E' = (IF ReEnable THEN TRUE ELSE E) /\ pc' = "rE"
       /\ UNCHANGED <<R, ET, T, att, mode, air, pkt, txdone, kind, ring, arr, txq, processed, silent, blind, rxInTx>>
 \* digitalRead(LORA_DIO1) == HIGH -> receiveFlag = true  :5794-5799
 RE == /\ pc = "rE"
@@ -126,7 +127,10 @@ TT == /\ pc = "tT" /\ T' = FALSE /\ pc' = "rA"
       /\ UNCHANGED <<E, R, ET, att, mode, air, pkt, txdone, kind, ring, arr, txq, processed, silent, blind, rxInTx>>
 
 \* ---- RX timeout restart :3883 ----
-Tmo == /\ pc = "tmo" /\ ~R /\ E' = FALSE /\ pc' = "rA"
+\* The code does not look at receiveFlag here (esp32_main.cpp, "FIX BUG #1" block): a flag the ISR set after the
+\* dispatch is left standing and the restart clears the chip IRQ under it (counted in blind).  An earlier version
+\* of this model guarded the step with ~R, which left pc stuck at "tmo" and cut every behaviour behind it.
+Tmo == /\ pc = "tmo" /\ E' = FALSE /\ pc' = "rA"
        /\ UNCHANGED <<R, ET, T, att, mode, air, pkt, txdone, kind, ring, arr, txq, processed, silent, blind, rxInTx>>
 
 \* ---- TX prepare :4076-4204 ----
@@ -163,6 +167,12 @@ TypeOK == /\ {E, R, ET, T, pkt, txdone, rxInTx} \subseteq BOOLEAN
 NoDeaf == pc = "idle" => ( (mode = "rx" /\ pkt => R) /\ (mode = "tx" /\ txdone => T) )
 \* P2: the receive path never reads the chip while it transmits.
 NoRxInTx == ~rxInTx
-\* P3: the park service never reads a packet it cannot store.
+\* P3 (probe only): the park service never reads a packet it cannot store.  Holds by construction, the gate in
+\* ParkSvc is the property; no cfg checks it any more (review 2026-11-23).
 NoSilentLoss == silent = 0
+\* P4: no stuck state.  Whenever the loop is back at idle with the chip in RX, the receive gate is open and the
+\* ISR is attached; with the chip in TX the transmit gate is open and the ISR is attached.  Without this a node
+\* is deaf (or never sees TxDone) with no packet latched, which NoDeaf does not notice.
+Listening == (pc = "idle" /\ mode = "rx") => (E /\ att = "rx")
+TxArmed   == (pc = "idle" /\ mode = "tx") => (ET /\ att = "tx")
 =============================================================================

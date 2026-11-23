@@ -7,3 +7,5 @@ FLAGS="--unwind 170 --unwindset 18:16"
 EXPECT=pass
 CHECKS="BIN(FIN=0,150)+CONT(150..151 = 300 / 301), one chunk per frame (2 calls), unwind 170: reassembly limit at 300, no overrun"
 TIMEOUT=1800
+# memout at the 6 GB cap on 2026-11-23: unrolls a 300-byte payload loop. Small-scope twin: pass_cap_small.check
+TIER=heavy

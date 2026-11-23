@@ -286,8 +286,11 @@ InflightOwned == \A s \in SlotSet : st[s] = "INFLIGHT" /\ ln[s] > 0 =>
 \* a frame counted as queued sits in a slot
 QueuedInSlot == \A i \in AllIds : fate[i] = "queued" => \E s \in SlotSet : ln[s] = i
 
+\* Probes, not design properties: evInf / expInf are set by the very guard a mutation removes, so with the guard
+\* in place they hold by construction. They are checked only where the guard is REMOVED and the probe still holds
+\* (txring_sweepinflight_dead.cfg: the sweep cannot meet an INFLIGHT slot, both run in the loop task). The
+\* mutations of the evictor and the ACK scan are judged by their consequence instead: NoSplice.
 NoEvictInflight == ~evInf
-\* neither the sweep nor an ACK scan frees a slot while doTX holds it INFLIGHT
 NoExpireInflight == ~expInf
 EvictBounded == evictCnt <= enqDone
 

@@ -1,0 +1,189 @@
+{
+  "note": "TLA+ models and the firmware functions they describe. Maintained by specs/drift.py (--check in the host gate, --accept after a review). Bounded-model-checking jobs compile the real source and are not listed.",
+  "models": [
+    {
+      "id": "txring",
+      "spec": "specs/tla/txring.tla",
+      "status": "active",
+      "not_hashed": "getNextTxSlot (the unlocked pick); the retry of parked SENT frames is not modelled",
+      "sources": [
+        {
+          "file": "src/txring_functions.cpp",
+          "functions": [
+            "addTxRingEntryCore",
+            "txRingBeginTx",
+            "txRingFinishTx",
+            "txRingSweep"
+          ]
+        },
+        {
+          "file": "src/lora_functions.cpp",
+          "functions": [
+            "findAndStopRingSlotImpl",
+            "doTX"
+          ]
+        }
+      ],
+      "hashes": {
+        "src/txring_functions.cpp::addTxRingEntryCore": "e1c197160e0f0e9b",
+        "src/txring_functions.cpp::txRingBeginTx": "5763d221825a9032",
+        "src/txring_functions.cpp::txRingFinishTx": "9a01e156b335cc77",
+        "src/txring_functions.cpp::txRingSweep": "56059e77700d2980",
+        "src/lora_functions.cpp::findAndStopRingSlotImpl": "828027d68d0e2647",
+        "src/lora_functions.cpp::doTX": "0a5e9094ae5ef301"
+      },
+      "reviewed": "2026-11-23",
+      "review_depth": "baseline only: anchors checked, model not re-derived from the code"
+    },
+    {
+      "id": "extqueue",
+      "spec": "specs/tla/extqueue.tla",
+      "status": "active",
+      "not_hashed": "the callers that decide in which task queueExtern runs (OnRxDone contexts on nRF52)",
+      "sources": [
+        {
+          "file": "src/ext_queue_core.h",
+          "functions": [
+            "extQueueWrite"
+          ]
+        },
+        {
+          "file": "src/extudp_functions.cpp",
+          "functions": [
+            "queueExtern",
+            "flushExternQueue"
+          ]
+        }
+      ],
+      "hashes": {
+        "src/ext_queue_core.h::extQueueWrite": "bf9db3f0e4af12e4",
+        "src/extudp_functions.cpp::queueExtern": "ead6c975f6416d9b",
+        "src/extudp_functions.cpp::flushExternQueue": "c0c4d645a831f735"
+      },
+      "reviewed": "2026-11-23",
+      "review_depth": "writer and the single-producer claim read; reader anchored only"
+    },
+    {
+      "id": "rxflags",
+      "spec": "specs/tla/rxflags.tla",
+      "status": "active",
+      "not_hashed": "the radio section of loop() in esp32_main.cpp (dispatch, TX-done branch, timeout restart, TX prepare): too large to hash as one function, review by hand when it changes",
+      "sources": [
+        {
+          "file": "src/esp32/esp32_main.cpp",
+          "functions": [
+            "setFlagReceive",
+            "setFlagSent",
+            "loraRxParkService",
+            "loraRxParkDrain"
+          ]
+        }
+      ],
+      "hashes": {
+        "src/esp32/esp32_main.cpp::setFlagReceive": "3d85f5fbf361ab7f",
+        "src/esp32/esp32_main.cpp::setFlagSent": "66359f1580102746",
+        "src/esp32/esp32_main.cpp::loraRxParkService": "8f3a6f1bd7d4d474",
+        "src/esp32/esp32_main.cpp::loraRxParkDrain": "e6af2880619e3fae"
+      },
+      "reviewed": "2026-11-23",
+      "review_depth": "timeout restart re-read and corrected in the model; the rest is baseline only"
+    },
+    {
+      "id": "bytefifo",
+      "spec": "specs/tla/bytefifo.tla",
+      "status": "active",
+      "not_hashed": "bf_reset, bf_detach, bf_attach (not modelled)",
+      "sources": [
+        {
+          "file": "src/byte_fifo.cpp",
+          "functions": [
+            "bf_push2",
+            "bf_peek_gen",
+            "bf_pop_if",
+            "bf_pop",
+            "bf_iter_begin",
+            "bf_iter_next"
+          ]
+        },
+        {
+          "file": "src/esp32/udp_drain_esp32.cpp",
+          "functions": [
+            "*"
+          ]
+        },
+        {
+          "file": "src/nrf52/udp_drain_nrf52.cpp",
+          "functions": [
+            "*"
+          ]
+        }
+      ],
+      "hashes": {
+        "src/byte_fifo.cpp::bf_push2": "96b0b7614d5496b3",
+        "src/byte_fifo.cpp::bf_peek_gen": "bf75e5afc34c0a39",
+        "src/byte_fifo.cpp::bf_pop_if": "96fb063470920f39",
+        "src/byte_fifo.cpp::bf_pop": "3a0f86ca77a8f290",
+        "src/byte_fifo.cpp::bf_iter_begin": "4ce18cc757b29ebf",
+        "src/byte_fifo.cpp::bf_iter_next": "74d07f70f7940895",
+        "src/esp32/udp_drain_esp32.cpp::*": "6ae19daded6cb749",
+        "src/nrf52/udp_drain_nrf52.cpp::*": "7781ee034b54a8c1"
+      },
+      "reviewed": "2026-11-23",
+      "review_depth": "baseline only: anchors checked, model not re-derived from the code"
+    },
+    {
+      "id": "netconsole",
+      "spec": "specs/tla/netconsole.tla",
+      "status": "active",
+      "not_hashed": "netConsoleAvailable",
+      "sources": [
+        {
+          "file": "src/net_console.cpp",
+          "functions": [
+            "authTask",
+            "teardownClient",
+            "teardownIfCurrent",
+            "loopNetConsole",
+            "stopNetConsole",
+            "startNetConsole",
+            "netConsoleRead"
+          ]
+        },
+        {
+          "file": "src/net_console_slot.h",
+          "functions": [
+            "netConsoleSlotMayPreempt",
+            "netConsoleSlotRxSeen"
+          ]
+        }
+      ],
+      "hashes": {
+        "src/net_console.cpp::authTask": "7e53494683b9f6df",
+        "src/net_console.cpp::teardownClient": "849a42f558508b15",
+        "src/net_console.cpp::teardownIfCurrent": "ed40165d85667378",
+        "src/net_console.cpp::loopNetConsole": "b98eeb77fd564b8a",
+        "src/net_console.cpp::stopNetConsole": "5cb78c2703a07a98",
+        "src/net_console.cpp::startNetConsole": "01dc8277936fd5c0",
+        "src/net_console.cpp::netConsoleRead": "a0b477b5eb3772d0",
+        "src/net_console_slot.h::netConsoleSlotMayPreempt": "5ed444047d5c1088",
+        "src/net_console_slot.h::netConsoleSlotRxSeen": "27fcc38d9a87231d"
+      },
+      "reviewed": "2026-11-23",
+      "review_depth": "model rewritten from a full read of the listed functions"
+    },
+    {
+      "id": "heap",
+      "spec": "specs/tla/archive/heap/heap.tla",
+      "status": "retired",
+      "reason": "holds by construction; its rules H1 to H8 become checks on real allocation traces (BACKLOG FORMAL-MONITOR)",
+      "sources": []
+    },
+    {
+      "id": "heap_frag",
+      "spec": "specs/tla/archive/heap/heap_frag.tla",
+      "status": "frozen",
+      "reason": "models the Auto Update gate before the reserved 32 KB buffer; kept as the record of why the old gate failed",
+      "sources": []
+    }
+  ]
+}
