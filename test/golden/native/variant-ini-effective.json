@@ -15,6 +15,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -62,7 +64,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -141,6 +145,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -188,7 +194,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -269,6 +277,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -318,7 +328,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -401,6 +413,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -450,7 +464,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -531,6 +547,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -581,7 +599,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -661,6 +681,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -709,7 +731,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -787,6 +811,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -836,7 +862,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -919,6 +947,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -992,7 +1022,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -1074,6 +1106,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -1124,7 +1158,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -1300,7 +1336,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -1362,6 +1400,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -1409,7 +1449,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -1488,6 +1530,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -1535,7 +1579,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -1776,7 +1822,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -1841,6 +1889,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -1888,7 +1938,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -1964,6 +2016,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -2012,7 +2066,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -2088,6 +2144,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -2141,7 +2199,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -2217,6 +2277,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -2264,7 +2326,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -2339,6 +2403,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -2411,7 +2477,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -2507,7 +2575,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -2610,7 +2680,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2643,7 +2715,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2674,7 +2748,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2707,7 +2783,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2751,7 +2829,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2774,7 +2854,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2796,7 +2878,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -2821,7 +2905,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2853,7 +2939,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2874,7 +2962,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2899,7 +2989,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2920,7 +3012,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -2950,7 +3044,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -2971,7 +3067,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3024,7 +3122,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3045,7 +3145,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3071,7 +3173,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3101,7 +3205,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3122,7 +3228,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3143,7 +3251,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3164,7 +3274,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3185,7 +3297,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3207,7 +3321,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3228,7 +3344,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3254,7 +3372,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3283,7 +3403,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -3312,7 +3434,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3339,7 +3463,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3360,7 +3486,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3390,12 +3518,37 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
    "test_dedup_replay"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_dhcps_opt": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_dhcps_opt"
   ],
   "test_framework": "unity"
  },
@@ -3411,7 +3564,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3452,7 +3607,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3489,7 +3646,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3510,7 +3669,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3535,12 +3696,37 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
    "test_eth_recovery"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_ext_queue": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_ext_queue"
   ],
   "test_framework": "unity"
  },
@@ -3556,7 +3742,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -3586,7 +3774,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -3606,7 +3796,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -3614,6 +3806,53 @@
    "test_external_radio_tcp",
    "test_external_radio_txq",
    "test_kiss_ax25"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_fw_tls_alloc_cap": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-D MC_AU_DEV_CHANNEL",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_fw_tls_alloc_cap"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_fw_tls_time": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_fw_tls_time"
   ],
   "test_framework": "unity"
  },
@@ -3630,7 +3869,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3651,7 +3892,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3672,7 +3915,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3693,7 +3938,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3714,7 +3961,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3742,7 +3991,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3766,7 +4017,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3787,7 +4040,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -3807,7 +4062,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3832,7 +4089,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3853,7 +4112,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -3879,7 +4140,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3904,7 +4167,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3925,11 +4190,15 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
-  "test_filter": "test_ina226_cal",
+  "test_filter": [
+   "test_ina226_cal"
+  ],
   "test_framework": "unity"
  },
  "env:native_kiss_frame": {
@@ -3949,7 +4218,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -3976,7 +4247,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4001,7 +4274,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4027,12 +4302,37 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
   "test_filter": [
    "test_ltr390_calc"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_lwip_mtu_guard": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_lwip_mtu_guard"
   ],
   "test_framework": "unity"
  },
@@ -4053,7 +4353,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4074,7 +4376,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4100,7 +4404,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -4127,7 +4433,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4148,7 +4456,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4170,7 +4480,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4196,7 +4508,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4220,7 +4534,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4244,7 +4560,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4266,7 +4584,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4291,7 +4611,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4318,7 +4640,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4339,7 +4663,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4360,7 +4686,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4381,7 +4709,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4436,7 +4766,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -4456,7 +4788,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4487,7 +4821,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -4519,7 +4855,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4540,7 +4878,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -4560,7 +4900,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -4580,7 +4922,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4601,7 +4945,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4622,7 +4968,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4648,7 +4996,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4675,7 +5025,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4696,7 +5048,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4722,7 +5076,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4743,7 +5099,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4764,7 +5122,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4790,7 +5150,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4811,7 +5173,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4832,7 +5196,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4853,7 +5219,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4874,7 +5242,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -4895,7 +5265,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "lib_ldf_mode": "chain+",
   "platform": "native",
@@ -4919,7 +5291,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -4945,7 +5319,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -4973,7 +5349,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5006,7 +5384,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5038,7 +5418,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5063,7 +5445,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5090,7 +5474,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5111,7 +5497,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5132,7 +5520,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5153,7 +5543,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5177,7 +5569,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5198,7 +5592,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5219,7 +5615,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5253,7 +5651,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5277,7 +5677,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5315,7 +5717,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "lib_deps": [
    "bblanchon/ArduinoJson@^7.4.3"
@@ -5344,7 +5748,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5369,7 +5775,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5415,7 +5823,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5436,7 +5846,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_filter": [
@@ -5468,7 +5880,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5495,7 +5909,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "True",
@@ -5516,7 +5932,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5537,7 +5955,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5558,7 +5978,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5584,7 +6006,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5610,7 +6034,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5636,7 +6062,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
   "test_build_src": "False",
@@ -5664,7 +6092,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "lib_deps": [
    "https://github.com/leethomason/tinyxml2"
@@ -5720,7 +6150,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -5777,6 +6209,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -5846,7 +6280,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -5921,6 +6357,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -5990,7 +6428,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -6105,7 +6545,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -6254,7 +6696,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -6319,6 +6763,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -6366,7 +6812,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -6442,6 +6890,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -6491,7 +6941,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -6567,6 +7019,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -6616,7 +7070,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -6692,6 +7148,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -6741,7 +7199,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -6818,6 +7278,8 @@
    "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER_DISABLED",
    "-DCONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=3072",
    "-DCONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=4",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_MAX_PREP_ENTRIES=2",
+   "-DMYNEWT_VAL_BLE_ATT_SVR_QUEUED_WRITE_TMO=5000",
    "-std=c++17",
    "-std=gnu++17",
    "-D ENABLE_LTR390",
@@ -6867,7 +7329,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -6994,7 +7458,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -7113,7 +7579,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -7228,7 +7696,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -7342,7 +7812,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -7455,7 +7927,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"
@@ -7580,7 +8054,9 @@
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
-   "pre:tools/w5100s_patch.py"
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
   ],
   "framework": [
    "arduino"

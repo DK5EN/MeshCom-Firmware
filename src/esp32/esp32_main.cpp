@@ -489,7 +489,11 @@ class CharacteristicCallbacks : public NimBLECharacteristicCallbacks {
     }*/
 
     void onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) override {
-        BleQueueItem item = {};
+        // FORMAL-01 NimBLE #1: off the 3072 B host stack. onWrite runs only in the single NimBLE
+        // host task (never re-entered, one connection) and xQueueSend copies the item before
+        // returning, so one static item is race free.
+        static BleQueueItem item;
+        item = {};
         item.length = pCharacteristic->getLength();
         if (item.length <= 0 || item.length > MAX_MSG_LEN_PHONE)
             return;
@@ -563,6 +567,11 @@ static inline void bleLifeUnlock(void)
 // Brings the whole NimBLE stack up: stack, security, server, service, both characteristics,
 // callbacks, advertising data. startAdv false = leave advertising off (BENCH_BLE_ADV_LATE boot).
 // False if NimBLEDevice::init() failed (the objects are then not created, the pointers stay NULL).
+// FORMAL-01 NimBLE #1: explicit attribute max length. The library default is 512 and its GATT
+// write handler puts a buffer of that size on the 3072 B host task stack. The longest legal
+// phone frame is MAX_MSG_LEN_PHONE (onWrite already dropped anything longer).
+#define BLE_CHR_MAX_LEN MAX_MSG_LEN_PHONE
+
 static bool bleStackStart(bool startAdv)
 {
     const std::string strBLEName = cBLEName;
@@ -593,11 +602,19 @@ static bool bleStackStart(bool startAdv)
     pServer->setCallbacks(&serverCallbacks, false);
     pServer->advertiseOnDisconnect(bleAdvWanted());   // TD-30
 
-    // Create the BLE Service
-    pService = pServer->createService(SERVICE_UUID);
+    // Create the BLE Service and both characteristics. After a failed NimBLEDevice::deinit(true)
+    // (NB-04: the host stop failed, the library keeps the server and its GATT objects) the stack
+    // is still up and createServer() above returned that old server: reuse its service and
+    // characteristics, a second 6E400001 service would leave pTxCharacteristic on a copy the phone
+    // has not subscribed to. On the normal path (fresh server) all three are created as before.
+    pService = pServer->getServiceByUUID(SERVICE_UUID);
+    if(pService == NULL)
+        pService = pServer->createService(SERVICE_UUID);
 
     // Create a BLE Characteristic
-    pTxCharacteristic = pService->createCharacteristic(
+    pTxCharacteristic = pService->getCharacteristic(CHARACTERISTIC_UUID_TX);
+    if(pTxCharacteristic == NULL)
+        pTxCharacteristic = pService->createCharacteristic(
                         CHARACTERISTIC_UUID_TX,
                         NIMBLE_PROPERTY::WRITE  |
                         // Require a secure connection for read and write access
@@ -606,9 +623,12 @@ static bool bleStackStart(bool startAdv)
                         NIMBLE_PROPERTY::READ   |
                         //NIMBLE_PROPERTY::READ_ENC |  // only allow reading if paired / encrypted
                         //NIMBLE_PROPERTY::READ_AUTHEN |
-                        NIMBLE_PROPERTY::NOTIFY );
+                        NIMBLE_PROPERTY::NOTIFY,
+                        BLE_CHR_MAX_LEN );
 
-    NimBLECharacteristic* pRxCharacteristic = pService->createCharacteristic(
+    NimBLECharacteristic* pRxCharacteristic = pService->getCharacteristic(CHARACTERISTIC_UUID_RX);
+    if(pRxCharacteristic == NULL)
+        pRxCharacteristic = pService->createCharacteristic(
                         CHARACTERISTIC_UUID_RX,
                         NIMBLE_PROPERTY::WRITE  |
                         // Require a secure connection for read and write access
@@ -617,7 +637,8 @@ static bool bleStackStart(bool startAdv)
                         NIMBLE_PROPERTY::READ   |
                         //NIMBLE_PROPERTY::READ_ENC |  // only allow reading if paired / encrypted
                         //NIMBLE_PROPERTY::READ_AUTHEN |
-                        NIMBLE_PROPERTY::NOTIFY );
+                        NIMBLE_PROPERTY::NOTIFY,
+                        BLE_CHR_MAX_LEN );
 
     pRxCharacteristic->setCallbacks(&chrCallbacks);
 
@@ -711,7 +732,7 @@ bool esp32BlePause(void)
     xSemaphoreGive(s_bleLife);
 
     if(!stopped)
-        Serial.print("[AU];ble;pause;deinit;fail\n");   // the resume rebuilds the objects on the running stack
+        Serial.print("[AU];ble;pause;deinit;fail\n");   // stack still up, the library kept the server (NB-04): the resume reuses it (bleStackStart())
     Serial.printf("[AU];ble;pause;heap;%u;blk;%u\n", (unsigned)esp_get_free_heap_size(),
                   (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
     return true;

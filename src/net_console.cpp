@@ -43,6 +43,7 @@ static auto& s_hwSerial = Serial;
 
 #include "net_console.h"
 #include "net_console_gate.h"
+#include "net_console_slot.h"
 #include "instrument.h"
 #include "configuration_global.h"
 #include <configuration.h>        // board defines (HAS_ETHERNET)
@@ -64,6 +65,13 @@ static bool              s_started        = false;
 static volatile bool     s_server_pending = false;
 static bool              s_authenticated  = false;
 static volatile bool     s_hs_running     = false;
+// Handshake-slot takeover (F2-10-SLOT): a silent peer must not hold the single slot.
+// Per generation, not a bool: a preempted task wakes later (EOF after shutdown) and must not mark the
+// NEW holder as "sending". Each task stores its own generation; rxSeen = (s_hs_rx_gen == s_hs_gen).
+static volatile uint32_t s_hs_rx_gen      = 0;       // generation of the holder that last sent a byte / left the receive phase
+static volatile int      s_hs_fd          = -1;      // socket of the slot holder
+static volatile uint32_t s_hs_startMs     = 0;       // when the slot was taken
+static volatile uint32_t s_hs_gen         = 0;       // slot generation; a preempted task must not free the new holder's slot
 static uint32_t          s_acceptErrLogMs = 0;   // rate limit for the accept() error log
 
 // 1-byte lookahead for netConsoleAvailable()
@@ -138,14 +146,19 @@ static void teardownIfCurrent(int fd, TickType_t wait)
 }
 
 // ── Auth task — HMAC-SHA256 challenge-response ────────────────────────────────
-struct AuthArgs { int fd; };
+struct AuthArgs { int fd; uint32_t gen; };
 
 static void authTask(void* arg)
 {
     AuthArgs* a = static_cast<AuthArgs*>(arg);
     int fd      = a->fd;
+    const uint32_t myGen = a->gen;
     delete a;
-    if (fd < 0) { s_hs_running = false; vTaskDelete(nullptr); return; }
+    // A preempted task must not free the slot of the connection that took it over.
+    auto freeSlot = [myGen]() { if (s_hs_gen == myGen) s_hs_running = false; };
+    // Single word store of OUR generation: harmless if we were preempted (s_hs_gen != myGen then).
+    auto markRx = [myGen]() { s_hs_rx_gen = myGen; };
+    if (fd < 0) { freeSlot(); vTaskDelete(nullptr); return; }
 
     // Blocking mode for the auth exchange
     { int fl = fcntl(fd, F_GETFL, 0); fcntl(fd, F_SETFL, fl & ~O_NONBLOCK); }
@@ -154,6 +167,7 @@ static void authTask(void* arg)
 
     if (s_password[0] == '\0')
     {
+        markRx();  // nothing to wait for: not preemptable
         authOk = true;  // no password configured — grant immediately
     }
     else
@@ -188,11 +202,13 @@ static void authTask(void* arg)
             char c;
             int r = ::recv(fd, &c, 1, 0);
             if (r <= 0) break;
+            markRx();           // peer is sending: the slot is no longer preemptable
             if (c == '\r') { readOk = true; break; } //continue;
             if (c == '\n') { readOk = true; break; }
             respBuf[idx++] = c;
         }
 
+        markRx();           // receive phase over (verify/deadline): never preempt from here
         if (readOk)
         {
             Serial.printf("[CON ]...s_password:<***> lng:%i resoBuf:<***>\n", strlen(s_password));
@@ -221,7 +237,7 @@ static void authTask(void* arg)
         ::send(fd, "FAIL\r\n", 6, 0);
         ::close(fd);
         s_hwSerial.println("[CON ]...Authentication failed.");
-        s_hs_running = false;
+        freeSlot();
         vTaskDelete(nullptr);
         return;
     }
@@ -252,13 +268,13 @@ static void authTask(void* arg)
     {
         ::close(fd);
         s_hwSerial.println("[CON ]...Console stopped, session dropped.");
-        s_hs_running = false;
+        freeSlot();
         vTaskDelete(nullptr);
         return;
     }
     s_hwSerial.printf("[CON ]...Client authenticated on port %d. free heap=%u\n",
                       NET_CONSOLE_PORT, (unsigned)esp_get_free_heap_size());
-    s_hs_running = false;
+    freeSlot();
     vTaskDelete(nullptr);
 }
 
@@ -506,9 +522,28 @@ void loopNetConsole()
 
     if (s_hs_running)
     {
-        s_hwSerial.println("[CON ]...Rejected: auth already in progress");
-        ::close(client_fd);
-        return;
+        // F2-10-SLOT: take the slot over from a holder that has sent nothing for NET_CONSOLE_HS_SILENT_MS.
+        // shutdown() (not close()) wakes the old task's recv() with EOF; the task closes its own fd on the
+        // FAIL path, so the fd number cannot be reused under it. A holder that is sending is never preempted.
+        const uint32_t gen0 = s_hs_gen;
+        const int      fd0  = s_hs_fd;
+        if (netConsoleSlotMayPreempt(s_hs_running, netConsoleSlotRxSeen(s_hs_rx_gen, gen0), millis(), s_hs_startMs))
+        {
+            s_hwSerial.println("[CON ]...Silent handshake peer dropped, slot taken over");
+            // Check-then-act: the holder may have got EOF and freed the slot (closing fd0) since the check
+            // above. Re-check the generation right before shutdown() so we do not hit a reused fd number.
+            // Residual window (a few instructions between this re-check and the syscall, same core, task
+            // switch only at a tick): a close+reuse inside it would shut down a foreign socket; the
+            // consequence is one dropped connection, never a wrong grant. Only the task closes its own fd.
+            if (s_hs_running && s_hs_gen == gen0 && fd0 >= 0)
+                ::shutdown(fd0, SHUT_RDWR);
+        }
+        else
+        {
+            s_hwSerial.println("[CON ]...Rejected: auth already in progress");
+            ::close(client_fd);
+            return;
+        }
     }
 
     // Detect a peer that vanished without FIN within ~90 s (P-0168).
@@ -518,13 +553,16 @@ void loopNetConsole()
     setsockopt(client_fd, IPPROTO_TCP, TCP_KEEPINTVL, &intvl, sizeof(intvl));
     setsockopt(client_fd, IPPROTO_TCP, TCP_KEEPCNT,   &cnt,   sizeof(cnt));
 
+    s_hs_gen++;   // new generation: the previous holder's rx mark no longer counts (s_hs_rx_gen != s_hs_gen)
+    s_hs_fd      = client_fd;
+    s_hs_startMs = millis();
     s_hs_running = true;
-    AuthArgs* args = new AuthArgs{ client_fd };
+    AuthArgs* args = new AuthArgs{ client_fd, s_hs_gen };
     BaseType_t rc = xTaskCreatePinnedToCore(authTask, "con_auth", 3072, args, 1, nullptr, 1);
     if (rc != pdPASS)
     {
         s_hwSerial.printf("[CON ]...xTaskCreate failed: %d\n", rc);
-        delete args; ::close(client_fd); s_hs_running = false;
+        delete args; ::close(client_fd); s_hs_running = false; s_hs_gen++;
     }
 }
 

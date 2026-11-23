@@ -42,6 +42,7 @@
 #if defined(ESP32)
 #include "esp_task_wdt.h"
 #include "esp32/fw_update_net.h"   // fwNetSessionActive(): no WiFi scan during an AU session (OTA-LOWHEAP-01)
+#include "esp32/mc_dns.h"       // FORMAL-01 lwIP #3: DNS lookup in the tcpip thread
 #endif
 
 #if defined(BOARD_T_ETH_ELITE) || defined(BOARD_T_CONNECT_PRO)
@@ -599,7 +600,7 @@ static void wifiDnsStart(WifiDns *d, const char *host)
   ip_addr_t addr;
   d->t0 = millis();
   err_t err;
-  { WifiStall st("dns"); err = dns_gethostbyname(host, &addr, wifiDnsCb, d); }
+  { WifiStall st("dns"); err = mcDnsGethostbyname(host, &addr, wifiDnsCb, d); }
   if(err == ERR_OK)
   {
     d->result = IPAddress(addr.u_addr.ip4.addr);

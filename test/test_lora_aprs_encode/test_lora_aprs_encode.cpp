@@ -139,6 +139,30 @@ void test_track_beacon_worst_case_length_is_bounded(void)
     TEST_ASSERT_TRUE(ilng < 245);
 }
 
+// F3-8: encodeStartAPRS() clamped its copy to 254 bytes but writes it at msg_buffer+6, so path fields wider than
+// today's MC_PATH_LEN (121) wrote 5 bytes past the 255-byte target. The live width cannot reach it, so the test
+// makes both strlen() results huge by laying the message into an oversized arena filled with non-NUL bytes.
+static void test_encode_start_never_writes_past_target_for_any_path_width()
+{
+    const size_t arena_len = sizeof(struct aprsMessage) + 600;
+    char *arena = new char[arena_len];
+    memset(arena, 'A', arena_len);
+    arena[arena_len - 1] = '\0';
+    struct aprsMessage *m = reinterpret_cast<struct aprsMessage *>(arena);
+    m->payload_type = ':';
+    m->msg_id = 0x11223344u;
+    m->max_hop = 5;
+    m->msg_server = false;
+    m->msg_track = false;
+    m->msg_app_offline = false;
+
+    uint8_t *buf = new uint8_t[UDP_TX_BUF_SIZE];   // exactly the declared target; ASan flags any byte past it
+    uint16_t r = encodeStartAPRS(buf, *m);
+    TEST_ASSERT_TRUE(r <= UDP_TX_BUF_SIZE);
+    delete[] buf;
+    delete[] arena;
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -151,5 +175,6 @@ int main(int argc, char **argv)
     RUN_TEST(test_track_beacon_keeps_25_bytes_of_comment);
     RUN_TEST(test_track_beacon_cut_never_splits_utf8);
     RUN_TEST(test_track_beacon_worst_case_length_is_bounded);
+    RUN_TEST(test_encode_start_never_writes_past_target_for_any_path_width);
     return UNITY_END();
 }

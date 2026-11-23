@@ -24,6 +24,10 @@
 #include "McTlsClient.h"
 #include <esp_heap_caps.h>
 #include "fw_update_roots.h"
+#include "fw_tls_time.h"
+#include "esp32/mc_dns.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include <lwip/sockets.h>
 #include <lwip/netdb.h>
 #include <errno.h>
@@ -86,7 +90,7 @@ int McTlsClient::connect(const char *host, uint16_t port)
     // -9984 also comes from an allocation failure inside the signature check: retry only when the heap could
     // carry a second session at all (records 2 x 16.7 KB), else it doubles time and heap at the worst moment.
     if (r == 0 && _lastError == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED && _CA_cert == NULL && ca != FW_UPDATE_ROOTS_PEM
-        && !_use_insecure && heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) >= MC_TLS_RETRY_MIN_BLK) {
+        && !_use_insecure && !fwTlsFlagsAreDate(_lastTimeFlags) && heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) >= MC_TLS_RETRY_MIN_BLK) {
         log_w("single trust anchor did not verify %s, retrying with the full bundle", host);
         r = connectTo(host, address, port, FW_UPDATE_ROOTS_PEM);
     }
@@ -99,11 +103,94 @@ int McTlsClient::connect(const char *host, uint16_t port, int32_t timeout)
     return connect(host, port);
 }
 
+// FORMAL-01 IDF #3: WiFi.hostByName() ran dns_gethostbyname() in the calling (AU) task, but with core
+// locking off the lwIP DNS table may only be touched from the tcpip thread. mcDnsGethostbyname() makes
+// that call in the tcpip thread. For ERR_INPROGRESS the result arrives later from the found-callback
+// (also tcpip thread); the caller waits on a binary semaphore for the 15 s hostByName() waited.
+// The callback never touches the caller's stack: it writes a static slot guarded by a request id (same
+// idea as AE-03 / DNS_CB_PATCHED in tools/arduino_esp32_patch.py). After a timeout the id is bumped, so
+// a late callback of that request carries an old id and does nothing (no write, no semaphore give).
+// Callers are serialised by a mutex, so the slot has one owner at a time. Residual window (as in AE-03):
+// a callback already past its id check while the caller times out may still store its word; the next
+// request clears the slot after bumping the id before it reads it.
+namespace {
+constexpr uint32_t MC_TLS_DNS_WAIT_MS = 15000; // WiFi.hostByName(): waitStatusBits(DNS_DONE, 15000)
+constexpr uint32_t MC_TLS_DNS_LOCK_MS = 16000; // WiFi.hostByName(): waitStatusBits(DNS_IDLE, 16000)
+volatile uint32_t s_tlsDnsId = 0;              // request the caller currently waits for
+volatile uint32_t s_tlsDnsAddr = 0;            // its IPv4 result (0 = none)
+SemaphoreHandle_t s_tlsDnsLock = nullptr;      // created once, never deleted (a late callback may still see s_tlsDnsDone)
+SemaphoreHandle_t s_tlsDnsDone = nullptr;
+
+void tlsDnsFound(const char *, const ip_addr_t *ipaddr, void *arg)
+{
+    if ((uint32_t)(uintptr_t)arg != s_tlsDnsId) {
+        return; // stale callback of a timed-out request
+    }
+    s_tlsDnsAddr = (ipaddr != nullptr) ? (uint32_t)ipaddr->u_addr.ip4.addr : 0;
+    xSemaphoreGive(s_tlsDnsDone);
+}
+
+// true and ip set on success; false on error or timeout (same contract as WiFi.hostByName()).
+bool tlsResolve(const char *host, IPAddress &ip)
+{
+    if (ip.fromString(host)) {
+        return true; // literal address, as hostByName() does
+    }
+    static portMUX_TYPE initMux = portMUX_INITIALIZER_UNLOCKED;
+    if (s_tlsDnsLock == nullptr || s_tlsDnsDone == nullptr) {
+        SemaphoreHandle_t lock = xSemaphoreCreateMutex();
+        SemaphoreHandle_t done = xSemaphoreCreateBinary();
+        if (lock == nullptr || done == nullptr) {
+            if (lock != nullptr) vSemaphoreDelete(lock);
+            if (done != nullptr) vSemaphoreDelete(done);
+            return false;
+        }
+        bool installed = false;
+        portENTER_CRITICAL(&initMux);
+        if (s_tlsDnsLock == nullptr && s_tlsDnsDone == nullptr) {
+            s_tlsDnsLock = lock;
+            s_tlsDnsDone = done;
+            installed = true;
+        }
+        portEXIT_CRITICAL(&initMux);
+        if (!installed) { // another task won the race
+            vSemaphoreDelete(lock);
+            vSemaphoreDelete(done);
+        }
+    }
+    if (xSemaphoreTake(s_tlsDnsLock, pdMS_TO_TICKS(MC_TLS_DNS_LOCK_MS)) != pdTRUE) {
+        return false;
+    }
+    s_tlsDnsAddr = 0;
+    const uint32_t id = ++s_tlsDnsId;
+    xSemaphoreTake(s_tlsDnsDone, 0); // drop a give left over from an earlier request
+    ip_addr_t addr;
+    ip_addr_set_zero(&addr);
+    err_t err = mcDnsGethostbyname(host, &addr, tlsDnsFound, (void *)(uintptr_t)id);
+    uint32_t result = 0;
+    if (err == ERR_OK) {
+        result = (uint32_t)addr.u_addr.ip4.addr;
+    } else if (err == ERR_INPROGRESS) {
+        if (xSemaphoreTake(s_tlsDnsDone, pdMS_TO_TICKS(MC_TLS_DNS_WAIT_MS)) == pdTRUE) {
+            result = s_tlsDnsAddr;
+        }
+        ++s_tlsDnsId; // timeout or done: a later callback of this request is stale now
+    }
+    xSemaphoreGive(s_tlsDnsLock);
+    if (result == 0) {
+        return false;
+    }
+    ip = IPAddress(result);
+    return true;
+}
+} // namespace
+
 // host != NULL and ip unset (0.0.0.0): resolve after the buffers are allocated. ip set: use it.
 int McTlsClient::connectTo(const char *host, IPAddress ip, uint16_t port, const char *ca_pem)
 {
     const bool resolve = (ip == IPAddress((uint32_t)0));
     stop(); // a reused client starts from a clean context
+    _lastTimeFlags = 0;
 
     int ret = mc_ssl_prepare(sslclient, host, _use_insecure); // B1
     if (ret == 0 && !_use_insecure) {
@@ -115,13 +202,14 @@ int McTlsClient::connectTo(const char *host, IPAddress ip, uint16_t port, const 
         stop();
         return 0;
     }
-    if (resolve && !WiFi.hostByName(host, ip)) {
+    if (resolve && !tlsResolve(host, ip)) {
         _lastError = -1;
         stop();
         return 0;
     }
     ret = mc_ssl_connect(sslclient, ip, port, _timeout);
     _lastError = ret;
+    _lastTimeFlags = sslclient->time_flags; // before stop() re-initialises the context
     if (ret < 0) {
         log_e("mc_ssl_connect: %d", ret);
         stop();

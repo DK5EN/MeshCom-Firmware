@@ -52,8 +52,9 @@ void sendMeshComUDP()
             // unten liest ab Offset 1+36; der Rest ist damit deterministisch.
             static uint8_t udpSnapshot[UDP_TX_BUF_SIZE+64];
             memset(udpSnapshot, 0, sizeof(udpSnapshot));
-            uint16_t myGen = bf_tail_gen(&udpOutRing);
-            uint16_t msg_len = bf_peek(&udpOutRing, udpSnapshot + 1, sizeof(udpSnapshot) - 1);
+            uint16_t myGen;
+            // F2-5: Generation und Frame in EINER Sperre (bf_peek_gen).
+            uint16_t msg_len = bf_peek_gen(&udpOutRing, udpSnapshot + 1, sizeof(udpSnapshot) - 1, &myGen);
             udpSnapshot[0] = (uint8_t)msg_len;
 
             // Bench outage (--udphold outage on, INSTRUMENT builds): behave as if the
@@ -61,8 +62,7 @@ void sendMeshComUDP()
             // never set outside such a build (udp_hold.h).
             if(udpHoldBenchOutage())
             {
-                if (bf_tail_gen(&udpOutRing) == myGen)
-                    bf_pop(&udpOutRing);
+                bf_pop_if(&udpOutRing, myGen); // F2-5: Vergleich und Entnahme in EINER Sperre
                 return;
             }
 
@@ -184,8 +184,7 @@ void sendMeshComUDP()
             // Nur entnehmen, wenn es noch derselbe Frame ist: hat ein Schreiber
             // ihn waehrend des Sendens verdraengt, steht die Generation anders
             // und pop() traefe den naechsten Frame (byte_fifo.h, tail_gen).
-            if (bf_tail_gen(&udpOutRing) == myGen)
-                bf_pop(&udpOutRing);
+            bf_pop_if(&udpOutRing, myGen); // F2-5: Vergleich und Entnahme in EINER Sperre
 
         }
         else

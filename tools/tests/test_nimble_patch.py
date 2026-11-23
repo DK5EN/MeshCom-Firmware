@@ -274,7 +274,7 @@ def test_nb01_and_nb02_compose_on_one_file():
 def test_nb_file_ops_and_table(tmp_path):
     np = _load()
     ids = [i for i, _, _ in np.PATCHES]
-    assert ids == ["AU-19", "AU-20", "NB-01", "NB-02", "NB-03"]
+    assert ids[:5] == ["AU-19", "AU-20", "NB-01", "NB-02", "NB-03"]
     f = tmp_path / "NimBLEAttValue.cpp"
     assert np.patch_set_file(tmp_path / "missing.cpp") is False
     f.write_text(ATT_ORIGINAL)
@@ -328,3 +328,260 @@ def test_nb01_upgrades_first_form():
     out = np.patch_set_text(v1)
     assert out == np.patch_set_text(ATT_ORIGINAL)
     assert out.count(np.SET_MARKER) == 1
+
+
+# --- NB-04..NB-07: NimBLE lifecycle fixes (FORMAL-01 NimBLE review #2/#4/#3/#8, exact 2.2.3 snippets) ---
+
+DEINIT_TEXT = """bool NimBLEDevice::deinit(bool clearAll) {
+    int rc = 0;
+    if (m_initialized) {
+        rc = nimble_port_stop();
+        if (rc == 0) {
+            nimble_port_deinit();
+            rc = esp_nimble_hci_and_controller_deinit();
+            m_initialized = false;
+            m_synced      = false;
+        }
+    }
+
+    if (clearAll) {
+# if defined(CONFIG_BT_NIMBLE_ROLE_PERIPHERAL)
+        if (NimBLEDevice::m_pServer != nullptr) {
+            delete NimBLEDevice::m_pServer;
+            NimBLEDevice::m_pServer = nullptr;
+        }
+# endif
+    }
+
+    return rc == 0;
+} // deinit
+"""
+
+INIT_TEXT = """bool NimBLEDevice::init(const std::string& deviceName) {
+    if (!m_initialized) {
+        err = esp_bt_controller_enable(ESP_BT_MODE_BLE);
+        if (err != ESP_OK) {
+            NIMBLE_LOGE(LOG_TAG, "esp_bt_controller_enable() failed; err=%d", err);
+            return false;
+        }
+
+        err = esp_nimble_hci_init();
+        if (err != ESP_OK) {
+            NIMBLE_LOGE(LOG_TAG, "esp_nimble_hci_init() failed; err=%d", err);
+            return false;
+        }
+#  endif
+# endif
+        nimble_port_init();
+        nimble_port_freertos_init(NimBLEDevice::host_task);
+    }
+
+    // Wait for host and controller to sync before returning and accepting new tasks
+    while (!m_synced) {
+        ble_npl_time_delay(1);
+    }
+
+    m_initialized = true; // Set the initialization flag to ensure we are only initialized once.
+    return true;
+} // init
+"""
+
+HOST_TASK_TEXT = """void NimBLEDevice::host_task(void* param) {
+    NIMBLE_LOGI(LOG_TAG, "BLE Host Task Started");
+    nimble_port_run(); // This function will return only when nimble_port_stop() is executed
+    nimble_port_freertos_deinit();
+} // host_task
+"""
+
+STOP_TEXT = """static void
+ble_hs_stop_terminate_timeout_cb(struct ble_npl_event *ev)
+{
+    BLE_HS_LOG(ERROR, "ble_hs_stop_terminate_timeout_cb,"
+                      "%d connection(s) still up \\n", ble_hs_stop_conn_cnt);
+
+    /* TODO: Shall we send error here? */
+    ble_hs_stop_done(0);
+}
+"""
+
+NB2_CASES = [
+    ("NB-04", DEINIT_TEXT, "patch_deinit_text", "DEINIT_MARKER", "if (clearAll && stopRc == 0)"),
+    ("NB-05", INIT_TEXT, "patch_init_text", "INIT_MARKER", "NIMBLE_SYNC_TIMEOUT_MS"),
+    ("NB-06", HOST_TASK_TEXT, "patch_host_task_text", "HOST_TASK_MARKER", "vTaskDelete(NULL);"),
+    ("NB-07", STOP_TEXT, "patch_stop_text", "STOP_MARKER", "ble_hs_stop_conn_cnt = 0;"),
+]
+
+
+@pytest.mark.parametrize(("pid", "text", "fn", "marker", "added"), NB2_CASES)
+def test_nb2_applies_once(pid, text, fn, marker, added):
+    np = _load()
+    m = getattr(np, marker)
+    assert m == f"/* MESHCOM-PATCH {pid} */"
+    out = getattr(np, fn)(text)
+    assert out.count(m) == 1
+    assert added in out
+    assert out != text
+
+
+@pytest.mark.parametrize(("pid", "text", "fn", "marker", "added"), NB2_CASES)
+def test_nb2_idempotent(pid, text, fn, marker, added):
+    np = _load()
+    once = getattr(np, fn)(text)
+    assert getattr(np, fn)(once) == once
+
+
+@pytest.mark.parametrize(("pid", "text", "fn", "marker", "added"), NB2_CASES)
+def test_nb2_changed_text_raises(pid, text, fn, marker, added):
+    np = _load()
+    with pytest.raises(RuntimeError, match=pid):
+        getattr(np, fn)("int unrelated(void) { return 0; }\n")
+    with pytest.raises(RuntimeError, match=pid):
+        getattr(np, fn)(text + text)  # anchor twice: ambiguous, refuse
+
+
+def check_nb04(out: str) -> None:
+    """Behavioral assertions on NB-04 patched deinit() text (also run against the first form)."""
+    assert "    if (clearAll) {" not in out
+    # the stop result is captured in its own variable right after nimble_port_stop(), before
+    # the controller deinit overwrites rc
+    assert "int stopRc = 0;" in out
+    assert out.index("rc = nimble_port_stop();") < out.index("stopRc = rc;")
+    assert out.index("stopRc = rc;") < out.index("rc = esp_nimble_hci_and_controller_deinit();")
+    # clearAll is gated on the stop result only, never on rc
+    assert "if (clearAll && stopRc == 0)" in out
+    assert "clearAll && rc == 0" not in out
+    assert out.index("if (clearAll && stopRc == 0)") < out.index("delete NimBLEDevice::m_pServer;")
+    # the return value is unchanged
+    assert "return rc == 0;" in out
+
+
+def test_nb04_free_only_after_successful_stop():
+    np = _load()
+    check_nb04(np.patch_deinit_text(DEINIT_TEXT))
+
+
+def test_nb04_upgrades_first_form():
+    np = _load()
+    v1 = DEINIT_TEXT.replace(np.DEINIT_ORIGINAL, np.DEINIT_PATCHED_V1)
+    assert v1 != DEINIT_TEXT
+    out = np.patch_deinit_text(v1)
+    check_nb04(out)
+    assert out.count(np.DEINIT_MARKER) == 1
+    assert np.patch_deinit_text(out) == out
+    assert out == np.patch_deinit_text(DEINIT_TEXT)
+
+
+def check_nb05(out: str) -> None:
+    """Behavioral assertions on NB-05 patched init() text (also run against the first form)."""
+    # controller enable / hci init failures release what was already taken
+    en = out[out.index("esp_bt_controller_enable() failed") :]
+    assert en.index("esp_bt_controller_deinit();") < en.index("return false;")
+    hci = out[out.index("esp_nimble_hci_init() failed") :]
+    assert hci.index("esp_bt_controller_disable();") < hci.index("return false;")
+    # a local flag is set inside the bring-up block, nowhere else
+    head = out[: out.index("esp_bt_controller_enable()")]
+    assert "bool bringUp = false;" in head
+    assert head.index("if (!m_initialized) {") < head.index("bringUp = true;")
+    assert out.count("bringUp = true;") == 1
+    # the sync wait is bounded
+    wait = out[
+        out.index("// Wait for host and controller to sync") : out.index("m_initialized = true;")
+    ]
+    assert "NIMBLE_SYNC_TIMEOUT_MS" in wait
+    assert out.index("while (!m_synced)") < out.index("m_initialized = true;")
+    # on timeout: without the flag just return false, before any unwind call
+    assert "if (!bringUp)" in wait
+    guard = wait.index("if (!bringUp)")
+    assert guard < wait.index("nimble_port_stop();")
+    assert wait.index("return false;") < wait.index("nimble_port_stop();")
+    # the stop result is checked; the port is freed only for 0 / BLE_HS_EALREADY, else logged
+    assert "= nimble_port_stop();" in wait
+    assert "stopRc == 0 || stopRc == BLE_HS_EALREADY" in wait
+    assert wait.index("stopRc == 0 || stopRc == BLE_HS_EALREADY") < wait.index(
+        "nimble_port_deinit();"
+    )
+    assert wait.index("nimble_port_deinit();") < wait.index(
+        "esp_nimble_hci_and_controller_deinit();"
+    )
+    assert "nimble_port_stop() failed" in wait
+    assert wait.index("} else {") < wait.index("nimble_port_stop() failed")
+    assert wait.index("nimble_port_stop() failed") < wait.index("m_synced      = false;")
+    # the late-sync flags are cleared after the unwind, before the final return false
+    assert wait.index("m_synced      = false;") < wait.index("m_initialized = false;")
+    assert wait.index("m_initialized = false;") < wait.rindex("return false;")
+    assert wait.rindex("return false;") < wait.index("ble_npl_time_delay(1);")
+
+
+def test_nb05_unwind_and_bounded_sync_wait():
+    np = _load()
+    check_nb05(np.patch_init_text(INIT_TEXT))
+
+
+def test_nb05_upgrades_first_form():
+    np = _load()
+    first = np.patch_init_text(INIT_TEXT)
+    v1 = first.replace(np.INIT_WAIT_PATCHED, np.INIT_WAIT_PATCHED_V1)
+    v1 = v1.replace(np.INIT_UP_PATCHED, np.INIT_UP_ORIGINAL)
+    assert v1 != first
+    out = np.patch_init_text(v1)
+    check_nb05(out)
+    assert out == first
+    assert np.patch_init_text(out) == out
+
+
+def test_nb06_host_task_ends_itself():
+    np = _load()
+    out = np.patch_host_task_text(HOST_TASK_TEXT)
+    assert "nimble_port_freertos_deinit();" not in out
+    assert out.index("nimble_port_run();") < out.index("vTaskDelete(NULL);")
+
+
+def test_nb07_counter_reset_before_done():
+    np = _load()
+    out = np.patch_stop_text(STOP_TEXT)
+    assert out.index("ble_hs_stop_conn_cnt = 0;") < out.index("ble_hs_stop_done(0);")
+
+
+def test_nb04_to_nb07_share_one_file_and_compose():
+    np = _load()
+    both = INIT_TEXT + DEINIT_TEXT + HOST_TASK_TEXT
+    a = np.patch_host_task_text(np.patch_deinit_text(np.patch_init_text(both)))
+    b = np.patch_init_text(np.patch_host_task_text(np.patch_deinit_text(both)))
+    assert a == b
+    assert np.DEVICE_REL == "NimBLE-Arduino/src/NimBLEDevice.cpp"
+    assert np.STOP_REL.endswith("nimble/host/src/ble_hs_stop.c")
+
+
+def test_nb2_file_ops_and_table(tmp_path):
+    np = _load()
+    ids = [i for i, _, _ in np.PATCHES]
+    assert ids[-4:] == ["NB-04", "NB-05", "NB-06", "NB-07"]
+    f = tmp_path / "NimBLEDevice.cpp"
+    assert np.patch_deinit_file(tmp_path / "missing.cpp") is False
+    f.write_text(INIT_TEXT + DEINIT_TEXT + HOST_TASK_TEXT)
+    for fn in (np.patch_deinit_file, np.patch_init_file, np.patch_host_task_file):
+        assert fn(f) is True
+        assert fn(f) is False
+    s = tmp_path / "ble_hs_stop.c"
+    s.write_text(STOP_TEXT)
+    assert np.patch_stop_file(s) is True
+    assert np.patch_stop_file(s) is False
+
+
+def test_nb2_real_library_files():
+    root = TOOLS.parent
+    np = _load()
+    seen = 0
+    for rel, fns in (
+        (np.DEVICE_REL, (np.patch_deinit_text, np.patch_init_text, np.patch_host_task_text)),
+        (np.STOP_REL, (np.patch_stop_text,)),
+    ):
+        for f in sorted(root.glob(f".pio/libdeps/*/{rel}")):
+            text = f.read_text()
+            out = text
+            for fn in fns:
+                out = fn(out)
+                assert fn(out) == out, f
+            seen += 1
+    if not seen:
+        pytest.skip("NimBLE-Arduino not installed")

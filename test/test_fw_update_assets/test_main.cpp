@@ -535,6 +535,28 @@ static void test_long_url_is_not_found_not_a_crash()
     TEST_ASSERT_EQUAL_STRING("https://ok", r.url);
 }
 
+static void test_raw_control_byte_in_string_fails_closed()
+{
+    // RFC 8259: raw bytes < 0x20 (incl. NUL) are invalid inside a string. A NUL in browser_download_url used to
+    // give found=true with an empty url (the T_URL branch appended any byte).
+    for (int cb : {0x00, 0x01, 0x0a, 0x1f})
+    {
+        const std::string url = std::string("http://x/") + std::string(1, (char)cb) + "y";
+        const std::string a = "{\"name\":\"a.bin\",\"size\":5,\"browser_download_url\":\"" + url + "\"}";
+        for (size_t c : kChunks)
+        {
+            FwReleaseInfo r;
+            const bool ok = scan(doc(a), "a.bin", c, r);
+            TEST_ASSERT_FALSE(ok);
+            TEST_ASSERT_FALSE(r.found);
+        }
+    }
+    // the escaped form stays valid
+    FwReleaseInfo r;
+    TEST_ASSERT_TRUE(scan(doc("{\"name\":\"a.bin\",\"size\":5,\"browser_download_url\":\"http://x/\\ny\"}"), "a.bin", 0, r));
+    TEST_ASSERT_TRUE(r.found);
+}
+
 static void test_overlong_tag_and_keys()
 {
     FwReleaseInfo r;
@@ -684,6 +706,7 @@ int main(int, char **)
     RUN_TEST(test_string_escapes_whitespace_numbers_nesting);
     RUN_TEST(test_size_saturates_instead_of_wrapping);
     RUN_TEST(test_long_url_is_not_found_not_a_crash);
+    RUN_TEST(test_raw_control_byte_in_string_fails_closed);
     RUN_TEST(test_overlong_tag_and_keys);
     RUN_TEST(test_missing_tag_or_wrong_root_is_false);
     RUN_TEST(test_malformed_documents_do_not_crash);

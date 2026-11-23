@@ -44,6 +44,7 @@
 #include "../configuration_global.h"
 #include <loop_functions_extern.h> // schedule: node settings + clock source (after configuration_global.h)
 #include <meshcom_settings.h>
+#include "../fw_tls_alloc_cap.h"
 #include "../fw_update.h"
 #include "../fw_update_assets.h"
 #include "../fw_update_http.h"
@@ -302,33 +303,93 @@ inline void auHeapSample(uint32_t) {}
 // NOTE: the hook is global, every mbedTLS user (net_console, ...) allocates from PSRAM afterwards.
 // The AU task stack and the FWNET_BLK staging block stay internal (flash writes disable the cache).
 bool s_tlsPsram = false;
+bool s_tlsHookInstalled = false;
+
+// FORMAL-01 mbedTLS #2: the chain is parsed before it is verified, so the peer chooses allocation sizes.
+// The hook below is installed once (every ESP32 board) and caps allocations ONLY while armed: from the start
+// of a CHECK/DOWNLOAD job to its end (fwNetTask, tlsCapArm()/tlsCapDisarm()). Disarmed it is the plain
+// allocator the library used before (caps 0x804 internal, or PSRAM first with internal fallback). The hook is
+// global, so another mbedTLS user (net_console) running during the job is capped too; that is acceptable: the
+// caps (fw_tls_alloc_cap.h) are 1.4x / 1.35x the observed need of a whole AU session, no legitimate TLS
+// session needs more, and a refused calloc is an ordinary mbedTLS allocation failure (-0x7F00) that
+// the caller already handles. The live byte count is atomic; blocks allocated before arming and freed while
+// armed only make the count smaller (clamped at 0), i.e. the cap errs permissive, never refuses wrongly.
+volatile bool s_tlsCapArmed = false;
+volatile uint32_t s_tlsCapLive = 0;
+volatile uint32_t s_tlsCapRefused = 0;
 
 void *tlsCalloc(size_t n, size_t size)
 {
     size_t total;
     if (!fwCallocSizeOk(n, size, &total))
         return nullptr;
-    void *p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    const bool armed = s_tlsCapArmed;
+    if (armed)
+    {
+        if (!fwTlsCapAllow(__atomic_load_n(&s_tlsCapLive, __ATOMIC_RELAXED), n, size, FW_TLS_CAP_PER_ALLOC,
+                           FW_TLS_CAP_SESSION, &total))
+        {
+            __atomic_fetch_add(&s_tlsCapRefused, 1u, __ATOMIC_RELAXED);
+            return nullptr;
+        }
+    }
+    void *p = nullptr;
+    if (s_tlsPsram)
+        p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (p == nullptr)
         p = heap_caps_calloc(n, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (p != nullptr && armed)
+        __atomic_fetch_add(&s_tlsCapLive, (uint32_t)heap_caps_get_allocated_size(p), __ATOMIC_RELAXED);
     return p;
 }
 
-void tlsFree(void *p) { heap_caps_free(p); }
+void tlsFree(void *p)
+{
+    if (p != nullptr && s_tlsCapArmed)
+    {
+        const uint32_t sz = (uint32_t)heap_caps_get_allocated_size(p);
+        uint32_t cur = __atomic_load_n(&s_tlsCapLive, __ATOMIC_RELAXED);
+        uint32_t nxt;
+        do
+            nxt = cur > sz ? cur - sz : 0u;
+        while (!__atomic_compare_exchange_n(&s_tlsCapLive, &cur, nxt, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+    }
+    heap_caps_free(p);
+}
 
 // Install once, before the first TLS session of a job; true = mbedTLS runs on PSRAM.
 bool tlsAllocInstall()
 {
+    if (!s_tlsHookInstalled && mbedtls_platform_set_calloc_free(tlsCalloc, tlsFree) == 0)
+        s_tlsHookInstalled = true;
 // Only BOARD_HAS_PSRAM builds have PSRAM in the heap: without it esp32-hal-psram.h undefines
 // CONFIG_SPIRAM and Arduino never runs psramInit() (T-Beam Supreme, every ttgo_tbeam env).
 #if defined(BOARD_HAS_PSRAM)
-    if (!s_tlsPsram && psramFound() && mbedtls_platform_set_calloc_free(tlsCalloc, tlsFree) == 0)
+    if (!s_tlsPsram && s_tlsHookInstalled && psramFound())
     {
         s_tlsPsram = true;
         auLog("[AU];tlsalloc;psram\n");
     }
 #endif
     return s_tlsPsram;
+}
+
+// Armed for the whole TLS job; every exit of the job body reaches the single tlsCapDisarm() in fwNetTask
+// (the restart path re-arms in the new task, which resets the count).
+void tlsCapArm()
+{
+    tlsAllocInstall();
+    __atomic_store_n(&s_tlsCapLive, 0u, __ATOMIC_RELAXED);
+    __atomic_store_n(&s_tlsCapRefused, 0u, __ATOMIC_RELAXED);
+    s_tlsCapArmed = s_tlsHookInstalled;
+}
+
+void tlsCapDisarm()
+{
+    s_tlsCapArmed = false;
+    const uint32_t r = __atomic_load_n(&s_tlsCapRefused, __ATOMIC_RELAXED);
+    if (r != 0u)
+        auLog("[AU];tlscap;refused;%lu\n", (unsigned long)r);
 }
 
 // Failed heap allocations while a job runs (heap_caps failed-alloc hook). mbedtls maps an
@@ -1500,9 +1561,11 @@ void fwNetTask(void *)
     auHeapLine("start", "", false);
     heapMark("start");
     allocFailArm();
+    const bool tlsJob = (s_argJob == FWJ_CHECK || s_argJob == FWJ_DOWNLOAD);
+    if (tlsJob)
+        tlsCapArm();
     // Spec 7 / 8.1: under the BLE guard the pause is forced (a phone may be linked), on every board; without it the
     // classic ESP32 pauses BLE only when no phone is connected.
-    const bool tlsJob = (s_argJob == FWJ_CHECK || s_argJob == FWJ_DOWNLOAD);
     const bool guarded = tlsJob && auBleGuardActive();
     bool blePaused = false;
     bool phoneHeld = false;
@@ -1547,6 +1610,7 @@ void fwNetTask(void *)
                       : (s_argJob == FWJ_STAGELAN) ? runStageLan()
 #endif
                                                    : runDownload();
+    tlsCapDisarm(); // every return of the job body (the restart below re-arms in the new task)
 #if AU_BLE_PAUSE
     // Enough free heap, but split: the record buffers do not fit (DK5EN-92, 2026-11-06: 80 KB free, largest block 26.6 KB
     // with this task's stack inside the big region, 38.9 KB with the stack elsewhere; a wait or a BLE cycle on this stack

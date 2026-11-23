@@ -11,6 +11,7 @@
 #include "lwip/sockets.h"
 #include "lwip/netdb.h"
 #include "lwip/dns.h"
+#include "esp32/mc_dns.h"
 #include "lwip/err.h"
 #include "lwip/ip_addr.h"
 
@@ -318,7 +319,7 @@ static AprsStart aprsIsStartCycle(void)
     }
     else
     {
-        err_t err = dns_gethostbyname(host, &addr, aprsDnsCb, (void *)s_dns_gen);
+        err_t err = mcDnsGethostbyname(host, &addr, aprsDnsCb, (void *)s_dns_gen);
         if(err == ERR_OK)
         {
             s_dns.ip = (uint32_t)ip_2_ip4(&addr)->addr;
