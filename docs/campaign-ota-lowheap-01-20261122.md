@@ -409,3 +409,21 @@ images built before today's commits. Both need an operator decision; measurement
   `[AU];buf32;ok|none`, `[AU];dry;dict;buf32`. Docs: "reserved 32 KB buffer".
 - Still open: the download failure (stop 2); with it, the image check after the download.
 - Breakdown per board: Desktop `ota-lowheap-heapmap-20261123.html`, section 1b. Evidence: `ota-lowheap-arena-20261123/tbeam-plain/`.
+
+## 2026-11-23 night: serial allocation trace, complete heap maps (V3 and T-Beam)
+
+- **Instrument** (`799aa238`, `6ebf78ad`): every internal-heap alloc/free with 3 callers over UART at 921600
+  (`-DINSTR_HEAPTRACE=1` + wraps), 2 KB ring, the waiting task feeds its watchdog; `serial_capture.py
+--heaptrace-baud 921600` follows the switch (block-based garble detection); `tools/bench/heaptrace.py` replays.
+- **V3 idle** (DK5EN-1, 22:43-22:55): 130.9 KB in 379 blocks with caller; BLE 43.1, system 35.9, WiFi 32.0,
+  MeshCom app 7.5, lwIP 5.3, mDNS 5.0 KB; free 89.7 KB; not in the trace 26.2 KB (block headers, WiFi ISR buffers,
+  58 dropped events, drain task). Was 53 KB unassigned with the table image.
+- **V3 during the check**: +77.9 KB for the update job (32 KB buffer, 12.6 KB task stack, 12.3 KB job block,
+  4.9 KB task, ~10 KB TLS).
+- **T-Beam idle** (DK5EN-92, 23:11-23:23): heap 193.2 KB (V3 246.7), 105.9 KB with caller; WiFi 44.5, system
+  31.6, BLE 11.3 KB; free 48.7; not in the trace 38.6 KB (12.4 KB more than the V3, open). The AU gate refuses
+  on the trace image (73.9 < 76 KB; the trace costs ~5.4 KB).
+- Side effect: producers wait for the serial line (V3 AU jobs 115 s); timing distorted, memory figures not.
+- Maps: Desktop `ota-lowheap-heapmap-20261123.html` section 2; chains JSON in
+  `ota-lowheap-arena-20261123/heaptrace-v3d/` and `heaptrace-tbeam2/`.
+- Next: break down the T-Beam's extra 12 KB not in the trace; the download failure (GitHub side, open).

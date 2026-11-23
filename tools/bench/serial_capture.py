@@ -64,6 +64,14 @@ def main() -> int:
                     chunk = s.read(4096)
                     if not chunk:
                         continue
+                    if args.heaptrace_baud and len(chunk) >= 64:
+                        # garbled bytes carry no clean line breaks: judge the raw block, not the line
+                        bad = sum(1 for b in chunk if b >= 0x80 or (b < 0x20 and b not in (9, 10, 13)))
+                        if bad * 4 > len(chunk):
+                            s.baudrate = 115200 if s.baudrate != 115200 else args.heaptrace_baud
+                            f.write(f"{stamp()}  [CAPTURE] garbled block, baud {s.baudrate}\n")
+                            buf = b""
+                            continue
                     buf += chunk
                     while b"\n" in buf:
                         line, buf = buf.split(b"\n", 1)
