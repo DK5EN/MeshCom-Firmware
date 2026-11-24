@@ -893,10 +893,11 @@ static inline uint32_t fwEraseWorstIdleGapMs(uint32_t blockMs, uint32_t gapMs, u
 #ifndef FWNET_TLS_REC_BUF
 #define FWNET_TLS_REC_BUF 16717u
 #endif
-// OTA-LOWHEAP-01: the OUTPUT record buffer on ESP32 IDF-4 builds (src/esp32/idf_override/mbedtls, content 4096 B
-// + 13 header + 320 payload overhead). The input buffer stays FWNET_TLS_REC_BUF.
+// The OUTPUT record buffer: stock mbedTLS 2.28 of arduino-esp32 2.0.17 allocates it with the same length as the
+// input buffer (MBEDTLS_SSL_OUT_CONTENT_LEN = 16384). A smaller value needs a rebuilt mbedTLS, which this firmware
+// does not carry.
 #ifndef FWNET_TLS_OUT_BUF
-#define FWNET_TLS_OUT_BUF 4429u
+#define FWNET_TLS_OUT_BUF FWNET_TLS_REC_BUF
 #endif
 // twoBufOk: result of the caller's probe (FWNET_TLS_REC_BUF + FWNET_TLS_OUT_BUF internal allocations held at once);
 // only consulted on the classic (non-PSRAM) path.

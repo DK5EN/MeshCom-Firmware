@@ -3,12 +3,17 @@
 #include <stdint.h>
 #include <string.h>
 #include "fw_au_buf.h"
+#include "fw_update.h"
 
-#define REC 16717u       // input record buffer (FWNET_TLS_REC_BUF)
-#define OUT 4429u        // output record buffer after the 4 KB patch (FWNET_TLS_OUT_BUF)
-#define BUF_LEN 32768u // max(16720 + 4432, TINFL_LZ_DICT_SIZE): the size fw_update_net.cpp uses
+#define REC FWNET_TLS_REC_BUF // input record buffer, 16717 B
+#define SMALL 4429u           // a smaller record, for the slot mechanics (gap fill, spare slot)
+#define DICT 32768u           // TINFL_LZ_DICT_SIZE
+#define BUF_LEN fwAuBufLenFor(FWNET_TLS_REC_BUF, FWNET_TLS_OUT_BUF, DICT) // the size fw_update_net.cpp uses
+// Stock mbedTLS 2.28.7 of arduino-esp32 2.0.17: in and out record buffer are both 16384 + 13 + 320 B.
+#define STOCK_MBEDTLS_REC 16717u
 
-static uint8_t g_buf[BUF_LEN + 64];
+static uint8_t g_buf[40000 + 64];
+static_assert(BUF_LEN <= 40000, "test buffer");
 static FwAuBuf g_a;
 
 void setUp(void)
@@ -27,29 +32,29 @@ static bool overlap(const void *p, size_t n, const void *q, size_t m)
 void test_two_records_fit_without_overlap(void)
 {
     void *r1 = fwAuBufAllocRecord(&g_a, REC);
-    void *r2 = fwAuBufAllocRecord(&g_a, OUT);
+    void *r2 = fwAuBufAllocRecord(&g_a, SMALL);
     TEST_ASSERT_NOT_NULL(r1);
     TEST_ASSERT_NOT_NULL(r2);
-    TEST_ASSERT_FALSE(overlap(r1, REC, r2, OUT));
+    TEST_ASSERT_FALSE(overlap(r1, REC, r2, SMALL));
     TEST_ASSERT_TRUE(fwAuBufOwns(&g_a, r1));
     TEST_ASSERT_TRUE(fwAuBufOwns(&g_a, r2));
     // the full compiled length is writable (mbedtls_ssl_free zeroizes it)
     memset(r1, 0xAA, REC);
-    memset(r2, 0xBB, OUT);
+    memset(r2, 0xBB, SMALL);
     TEST_ASSERT_EQUAL_UINT8(0xAA, ((uint8_t *)r1)[REC - 1]);
     TEST_ASSERT_EQUAL_UINT8(0xBB, ((uint8_t *)r2)[0]);
-    TEST_ASSERT_EQUAL_UINT8(0xBB, ((uint8_t *)r2)[OUT - 1]);
+    TEST_ASSERT_EQUAL_UINT8(0xBB, ((uint8_t *)r2)[SMALL - 1]);
     TEST_ASSERT_EQUAL_UINT(2, fwAuBufLive(&g_a));
 }
 
 void test_third_that_does_not_fit_is_null(void)
 {
     TEST_ASSERT_NOT_NULL(fwAuBufAllocRecord(&g_a, REC));
-    TEST_ASSERT_NOT_NULL(fwAuBufAllocRecord(&g_a, OUT));
-    TEST_ASSERT_NULL(fwAuBufAllocRecord(&g_a, REC)); // 11616 B left: a second input record does not fit
+    TEST_ASSERT_NOT_NULL(fwAuBufAllocRecord(&g_a, SMALL));
+    TEST_ASSERT_NULL(fwAuBufAllocRecord(&g_a, REC)); // 12288 B left (33440 - 16720 - 4432): a second input record does not fit
     TEST_ASSERT_EQUAL_UINT(2, fwAuBufLive(&g_a));
-    TEST_ASSERT_NOT_NULL(fwAuBufAllocRecord(&g_a, OUT)); // the spare slot takes a small one
-    TEST_ASSERT_NULL(fwAuBufAllocRecord(&g_a, OUT));     // slots exhausted
+    TEST_ASSERT_NOT_NULL(fwAuBufAllocRecord(&g_a, SMALL)); // the spare slot takes a small one
+    TEST_ASSERT_NULL(fwAuBufAllocRecord(&g_a, SMALL));     // slots exhausted
     TEST_ASSERT_EQUAL_UINT(3, fwAuBufLive(&g_a));
 }
 
@@ -58,7 +63,7 @@ void test_third_that_does_not_fit_is_null(void)
 void test_slots_aligned_and_rounded(void)
 {
     void *in = fwAuBufAllocRecord(&g_a, REC);
-    void *out = fwAuBufAllocRecord(&g_a, OUT);
+    void *out = fwAuBufAllocRecord(&g_a, SMALL);
     TEST_ASSERT_EQUAL_PTR(g_buf, in);
     TEST_ASSERT_EQUAL_UINT(0, ((size_t)((uint8_t *)out - g_buf)) % FW_AUBUF_ALIGN);
     TEST_ASSERT_EQUAL_PTR(g_buf + 16720u, out);
@@ -70,14 +75,14 @@ void test_slots_aligned_and_rounded(void)
 void test_small_request_fills_gap_below_live_slot(void)
 {
     void *in = fwAuBufAllocRecord(&g_a, REC);
-    void *out = fwAuBufAllocRecord(&g_a, OUT);
+    void *out = fwAuBufAllocRecord(&g_a, SMALL);
     fwAuBufFree(&g_a, in); // gap [0, 16720) below the live out record
-    void *p = fwAuBufAllocRecord(&g_a, OUT);
+    void *p = fwAuBufAllocRecord(&g_a, SMALL);
     TEST_ASSERT_EQUAL_PTR(g_buf, p);
-    TEST_ASSERT_FALSE(overlap(p, OUT, out, OUT));
-    void *q = fwAuBufAllocRecord(&g_a, OUT); // next gap start: right after p, still below out
+    TEST_ASSERT_FALSE(overlap(p, SMALL, out, SMALL));
+    void *q = fwAuBufAllocRecord(&g_a, SMALL); // next gap start: right after p, still below out
     TEST_ASSERT_EQUAL_PTR(g_buf + 4432u, q);
-    TEST_ASSERT_FALSE(overlap(q, OUT, out, OUT));
+    TEST_ASSERT_FALSE(overlap(q, SMALL, out, SMALL));
 }
 
 void test_oversize_is_null(void)
@@ -89,14 +94,14 @@ void test_oversize_is_null(void)
 void test_free_then_realloc_reuses(void)
 {
     void *r1 = fwAuBufAllocRecord(&g_a, REC);
-    void *r2 = fwAuBufAllocRecord(&g_a, OUT);
+    void *r2 = fwAuBufAllocRecord(&g_a, SMALL);
     TEST_ASSERT_GREATER_OR_EQUAL_UINT(REC, fwAuBufFree(&g_a, r1));
     void *r3 = fwAuBufAllocRecord(&g_a, REC);
     TEST_ASSERT_EQUAL_PTR(r1, r3);
-    TEST_ASSERT_FALSE(overlap(r3, REC, r2, OUT));
+    TEST_ASSERT_FALSE(overlap(r3, REC, r2, SMALL));
     // the second slot freed: reused as well
-    TEST_ASSERT_GREATER_OR_EQUAL_UINT(OUT, fwAuBufFree(&g_a, r2));
-    TEST_ASSERT_EQUAL_PTR(r2, fwAuBufAllocRecord(&g_a, OUT));
+    TEST_ASSERT_GREATER_OR_EQUAL_UINT(SMALL, fwAuBufFree(&g_a, r2));
+    TEST_ASSERT_EQUAL_PTR(r2, fwAuBufAllocRecord(&g_a, SMALL));
 }
 
 void test_mixed_sizes_first_fit(void)
@@ -152,7 +157,7 @@ void test_take_whole_refused_while_record_live(void)
 void test_take_whole_granted_when_all_free(void)
 {
     void *r1 = fwAuBufAllocRecord(&g_a, REC);
-    void *r2 = fwAuBufAllocRecord(&g_a, OUT);
+    void *r2 = fwAuBufAllocRecord(&g_a, SMALL);
     fwAuBufFree(&g_a, r1);
     TEST_ASSERT_NULL(fwAuBufTakeWhole(&g_a, 32768u)); // one still live
     fwAuBufFree(&g_a, r2);
@@ -213,10 +218,29 @@ void test_uninitialised_buffer_serves_nothing(void)
     TEST_ASSERT_NULL(fwAuBufTakeWhole(&e, 1));
 }
 
+// Without the vendored mbedTLS copy the output record is as large as the input record. The AU buffer must hold both
+// records of one session, or the second one goes to the heap and fragments it (the reason the AU buffer exists).
+void test_au_buffer_holds_both_stock_records(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(STOCK_MBEDTLS_REC, FWNET_TLS_REC_BUF);
+    TEST_ASSERT_EQUAL_UINT32(STOCK_MBEDTLS_REC, FWNET_TLS_OUT_BUF);
+    TEST_ASSERT_EQUAL_UINT(33440u, BUF_LEN);
+    void *in = fwAuBufAllocRecord(&g_a, STOCK_MBEDTLS_REC);
+    void *out = fwAuBufAllocRecord(&g_a, STOCK_MBEDTLS_REC);
+    TEST_ASSERT_NOT_NULL(in);
+    TEST_ASSERT_NOT_NULL(out);
+    TEST_ASSERT_FALSE(overlap(in, STOCK_MBEDTLS_REC, out, STOCK_MBEDTLS_REC));
+    // the dictionary still fits once both records are released
+    fwAuBufFree(&g_a, in);
+    fwAuBufFree(&g_a, out);
+    TEST_ASSERT_NOT_NULL(fwAuBufTakeWhole(&g_a, DICT));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
     RUN_TEST(test_two_records_fit_without_overlap);
+    RUN_TEST(test_au_buffer_holds_both_stock_records);
     RUN_TEST(test_third_that_does_not_fit_is_null);
     RUN_TEST(test_slots_aligned_and_rounded);
     RUN_TEST(test_small_request_fills_gap_below_live_slot);

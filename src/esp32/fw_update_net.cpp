@@ -335,15 +335,12 @@ volatile uint32_t s_tlsCapRefused = 0;
 // OTA-LOWHEAP-01 (a'): one AU buffer per CHECK/DOWNLOAD job, allocated at the job start while the big free block still
 // exists (buf32Acquire). While TLS sessions run it hosts their record buffers (the hook below serves every request of
 // the job task >= FW_AUBUF_MIN_RECORD from it first); after the last session is closed the dry-run inflate lends the
-// whole block as its 32 KB dictionary (stageDryRun). Size = max(in + out record as compiled (16720 + 4432 B in
-// 16-byte slots = 21152 B), TINFL_LZ_DICT_SIZE) = 32768 B; the DryMem state (~11 KB) stays on the heap, dict + DryMem
-// (~44 KB) does not fit the ~40.9 KB block of a job start. Cost: while the AU buffer exists the 4 KB output record saves
-// no peak (the AU buffer holds the dictionary's 32 KB from the job start); the saving applies when there is no AU buffer and
-// to TLS outside the AU job. Never created when PSRAM is present (the PSRAM path stays as is). All AU buffer state is
-// touched under s_buf32Mux only.
-#define FWNET_BUF32_RND(n) (((n) + (FW_AUBUF_ALIGN - 1u)) & ~(FW_AUBUF_ALIGN - 1u))
-#define FWNET_BUF32_RECS (FWNET_BUF32_RND(FWNET_TLS_REC_BUF) + FWNET_BUF32_RND(FWNET_TLS_OUT_BUF))
-#define FWNET_BUF32_LEN (FWNET_BUF32_RECS > TINFL_LZ_DICT_SIZE ? FWNET_BUF32_RECS : TINFL_LZ_DICT_SIZE)
+// whole block as its 32 KB dictionary (stageDryRun). Size = max(in + out record of stock mbedTLS (2 x 16720 B in
+// 16-byte slots = 33440 B), TINFL_LZ_DICT_SIZE) = 33440 B (fwAuBufLenFor); the DryMem state (~11 KB) stays on the heap,
+// dict + DryMem (~44 KB) does not fit the ~40.9 KB block of a job start. Never created when PSRAM is present (the PSRAM
+// path stays as is). All AU buffer state is touched under s_buf32Mux only.
+#define FWNET_BUF32_RECS (fwAuBufRound(FWNET_TLS_REC_BUF) + fwAuBufRound(FWNET_TLS_OUT_BUF))
+#define FWNET_BUF32_LEN fwAuBufLenFor(FWNET_TLS_REC_BUF, FWNET_TLS_OUT_BUF, TINFL_LZ_DICT_SIZE)
 static_assert(FWNET_BUF32_LEN >= TINFL_LZ_DICT_SIZE, "AU buffer must hold the inflate dictionary");
 static_assert(FWNET_BUF32_LEN >= FWNET_BUF32_RECS, "AU buffer must hold the in + out record of one session");
 FwAuBuf s_buf32;                         // zero = no AU buffer (buf == nullptr)

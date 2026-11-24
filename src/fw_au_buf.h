@@ -3,8 +3,7 @@
 // The AU buffer is one block the job allocates while the big free block still exists. While TLS sessions run it
 // hosts their record buffers (slot allocator below); once the last record is released the whole block is lent
 // to the dry-run inflate check as the 32 KB dictionary. Records and dictionary never need memory at the same
-// time, so the records no longer fragment the heap. Cost: the AU buffer is dictionary-sized (32 KB) from the job start,
-// so while it exists the smaller output record (4 KB patch) does not lower the job's peak.
+// time, so the records no longer fragment the heap. Size: fwAuBufLenFor() below (33440 B with stock mbedTLS).
 //
 // Not thread-safe by itself: the caller (fw_update_net.cpp) serialises every call with one lock.
 #pragma once
@@ -31,9 +30,16 @@ struct FwAuBuf
     FwAuBufSlot slot[FW_AUBUF_SLOTS];
 };
 
-inline size_t fwAuBufRound(size_t n)
+constexpr size_t fwAuBufRound(size_t n)
 {
     return (n + (FW_AUBUF_ALIGN - 1u)) & ~(size_t)(FW_AUBUF_ALIGN - 1u);
+}
+
+// Length of the AU buffer: the in + out record of one TLS session in rounded slots, or the inflate dictionary,
+// whichever is larger. With stock mbedTLS 2.28 both records are 16717 B: 2 x 16720 = 33440 B.
+constexpr size_t fwAuBufLenFor(size_t inRec, size_t outRec, size_t dict)
+{
+    return fwAuBufRound(inRec) + fwAuBufRound(outRec) > dict ? fwAuBufRound(inRec) + fwAuBufRound(outRec) : dict;
 }
 
 inline void fwAuBufInit(FwAuBuf *a, uint8_t *buf, size_t len)
