@@ -20,9 +20,9 @@ test, `hmac_connect.py` fix, wave-5 bench, one night, release and PR documents. 
 | 1    | mbedTLS copy removed, host gate, AU re-measured -1, -92 | code done (`5488f0bc`), bench in step 3 |
 | 2    | full host gate, every board env                         | done: 35/36 envs, external-radio its own `#error` |
 | 3    | flash all bench nodes + DK5EN-98 (OTA), AU on T-Deck    | done 2026-11-24 15:38 |
-| 4    | sync-word A/B on DK5EN-90                               | running |
+| 4    | sync-word A/B on DK5EN-90                               | done: no side effect on the bench; gaps stated |
 | 5    | `tools/hmac_connect.py` fixes (HMAC-WIN-01)             | done (`732238bd`) |
-| 6    | wave 5 bench (#1307, #1308, #1303)                      | open    |
+| 6    | wave 5 bench (#1307, #1308, #1303)                      | running: #1307 pass, #1308 pass |
 | 7    | one night: AU check + download x3 per ESP32 node        | open    |
 | 8    | documents (release notes, journal, PR text, issues)     | open    |
 
@@ -176,3 +176,98 @@ only, compared with DK5EN-98's log). Raw logs: `tools/bench/runs/harness/rc-benc
   step-2 builds are older than that session.
 - From now on every RC image is built in a clean worktree at the campaign commit (`../MeshCom-RC-732238bd`), and the
   foreign edit stays untouched and uncommitted in this tree; the desk session was asked to use its own worktree.
+- 2026-11-24 about 16:25: the desk session commits its WEB-WX-01 change (P-0394, `web_functions.cpp` WX table, a
+  pytest, `test-suite-map.md`) on fork-dev with the operator's approval. It is newer than the bench images
+  (`732238bd`) and not in this campaign's bench evidence; the release commit must either be benched with it or the
+  notes must say the WX table change is host-tested only. Operator decides at the tag.
+
+## Operator decisions (2026-11-24 evening)
+
+- The FORMAL-01 TLS allocation cap (`fw_tls_alloc_cap.h`, about 95 lines) travels with Auto Update in the combined PR.
+- Desk commit `35ae3418` (WEB-WX-01, WX table) goes into the release as a low-risk web page change, host-tested.
+- Margin near the sensitivity limit: not testable on the bench table; stated as a gap, no attenuator test.
+
+#### Run A, image A `0x242B`, 2 dBm (17:02-17:14)
+
+| Sender | Receiver | Sent | Decoded direct | Relay only | Errors in window | RSSI med/min | SNR med/min |
+| ------ | -------- | ---- | -------------- | ---------- | ---------------- | ------------ | ----------- |
+| DK5EN-90 | DK5EN-1 | 13 | 13 | 0 | 1 | -39 / -41 | 6 / 5 |
+| DK5EN-90 | DK5EN-92 | 13 | 13 | 0 | 0 | -56 / -56 | 13 / 10 |
+| DK5EN-90 | DK5EN-14 | 13 | 13 | 0 | 0 | -64 / -65 | 6 / 5 |
+| DK5EN-1 | DK5EN-92 | 12 | 11 | 1 | 0 | -46 / -48 | 13 / 11 |
+| DK5EN-1 | DK5EN-90 | 12 | 9 | 3 | 0 | -34 / -34 | 6 / 6 |
+| DK5EN-1 | DK5EN-14 | 12 | 12 | 0 | 0 | -38 / -41 | 6 / 5 |
+| DK5EN-14 | DK5EN-1 | 12 | 9 | 0 | 0 | -48 / -48 | 6 / 5 |
+| DK5EN-14 | DK5EN-92 | 12 | 10 | 0 | 0 | -58.5 / -59 | 10 / 9 |
+| DK5EN-14 | DK5EN-90 | 12 | 7 | 0 | 0 | -65 / -66 | 7 / 7 |
+| DK5EN-92 | DK5EN-1 | 12 | 11 | 0 | 0 | -36 / -37 | 6 / 6 |
+| DK5EN-92 | DK5EN-90 | 12 | 7 | 0 | 0 | -42 / -43 | 6 / 6 |
+| DK5EN-92 | DK5EN-14 | 12 | 11 | 0 | 0 | -46 / -46 | 6 / 6 |
+
+#### Run A-low, -9 dBm as in B-low (17:15-17:27)
+
+| Sender | Receiver | Sent | Decoded direct | Relay only | Errors in window | RSSI med/min | SNR med/min |
+| ------ | -------- | ---- | -------------- | ---------- | ---------------- | ------------ | ----------- |
+| DK5EN-90 | DK5EN-1 | 12 | 10 | 2 | 0 | -39 / -40 | 6 / 6 |
+| DK5EN-90 | DK5EN-92 | 12 | 11 | 1 | 0 | -55 / -56 | 10 / 10 |
+| DK5EN-90 | DK5EN-14 | 12 | 11 | 1 | 0 | -65 / -66 | 6 / 5 |
+| DK5EN-1 | DK5EN-92 | 12 | 12 | 0 | 0 | -52 / -53 | 12 / 11 |
+| DK5EN-1 | DK5EN-90 | 12 | 9 | 3 | 0 | -43 / -44 | 6 / 6 |
+| DK5EN-1 | DK5EN-14 | 12 | 12 | 0 | 0 | -50 / -51 | 6 / 5 |
+| DK5EN-14 | DK5EN-1 | 12 | 10 | 0 | 0 | -61 / -61 | 6 / 5 |
+| DK5EN-14 | DK5EN-92 | 12 | 11 | 0 | 0 | -70 / -71 | 12 / 10 |
+| DK5EN-14 | DK5EN-90 | 12 | 7 | 0 | 2 | -77 / -78 | 6 / 6 |
+| DK5EN-92 | DK5EN-1 | 12 | 8 | 0 | 0 | -37 / -38 | 6 / 6 |
+| DK5EN-92 | DK5EN-90 | 12 | 9 | 0 | 0 | -42 / -44 | 7 / 6 |
+| DK5EN-92 | DK5EN-14 | 12 | 12 | 0 | 0 | -47 / -48 | 6 / 5 |
+
+#### Every missed frame, classified (what the receiver was doing at the time)
+
+| Run   | RAK as receiver: missed / sent | of these: own CAD busy | own TX | other | ESP32 as receivers: missed RAK frames                          |
+| ----- | ------------------------------ | ---------------------- | ------ | ----- | -------------------------------------------------------------- |
+| B     | 7 / 40                         | 7                      | 0      | 0     | 0                                                              |
+| B-low | 10 / 40                        | 7                      | 2      | 1     | 1 (DK5EN-1, CAD busy)                                          |
+| A     | 12 / 37                        | 11                     | 1      | 0     | 0                                                              |
+| A-low | 10 / 39                        | 10                     | 0      | 0     | 4: one frame lost at all three (DK5EN-1 sent at the same time), one CAD busy |
+
+- **Verdict, active part: no sync-word side effect at the bench's signal levels**, neither RAK old (`0x242B`) nor
+  RAK new (`0x24B4`) against Heltec V3 (SX1262), T-Deck Plus (SX1262) and T-Beam v1.2, in both directions. Every
+  loss is explained by channel access (the receiver was in its own CAD or TX) or by a collision. Error lines in the
+  windows: 0-2 per pair, same under A and B.
+- Differences between A and B in the "decoded" counts follow how often the RAK had gateway ACKs queued, not the
+  image. All SNR values +5 to +13 dB, so nothing here speaks to the margin near the sensitivity limit.
+
+## Step 6: wave 5 bench
+
+### #1308 EXTUDP register query: PASS (2026-11-24 17:31, DK5EN-92, T-Beam, RC image)
+
+- Set for the test: `--extudpip 192.168.68.58` (the Mac), `--extudp on`; restored to `--extudp off`, no peer
+  (`--info` after: `EXTUDP off ...EXT IP` empty), as before.
+- `{"type":"reg","q":"SN"}`: one reply `TYP SN`, 21 keys, none matching the secret rule; `q:"I"`: one reply, no
+  `BPIN`; `q:"XX"`: `{"type":"reg","err":"unknown"}`; two queries 200 ms apart: one reply (limiter); `q:"all"`: 16
+  registers (TM, W, IO, I, IS1, IS2, G, SE, S1, SW, S2, SN, SN1, AN, SA, CONFFIN) and `done`, no secret key in any.
+- Not testable with one host: replies only to the configured peer (host test only).
+- Logs: `wave5/1308-result.json`, `1308-udp.log`, `1308-dk5en92-console.log`.
+
+### #1307 hold during server outage: PASS (2026-11-24 17:35-17:39, DK5EN-1, Heltec V3 gateway, INSTRUMENT image)
+
+- Image: `rc-732238bd-heltec_v3-INSTRUMENT.bin` (md5 `606f373d`, clean worktree); `--udphold` exists only there.
+  Never on DK5EN-98.
+- `--udphold outage on` -> `[GW];hold;outage;start`; a group-9999 text from DK5EN-92 over LoRa (`x4106E045`,
+  RSSI -37) -> `held;1;bytes;85;cap;6144;pushed;1`.
+- `--udphold outage off` after 149 s -> `outage;end;dur_s;149;held;1`, `replay;start;n;1`, `replay;done;replayed;1`,
+  `TX-UDP ... x4106E045` (same id), ring empty, `drop_full 0`, `drop_age 0`.
+- DK5EN-98 gated the same frame to the server at once (it heard it too); the server-side dedup of the replay is not
+  checked here.
+- Operational finding: a node with a staged Auto Update image installs it when it enters Safeboot, so the first
+  `webflash.py` pass fails with `Broken pipe` and the second flashes (DK5EN-1, twice today). Before re-flashing a
+  bench node after an AU run, expect two passes.
+
+### Step 4 completed (2026-11-24 18:40)
+
+- Passive A (17:32-18:32): as B, only DL2JA-2 (SX126x, 92 copies at DK5EN-98, SNR below -10 dB), none at the RAK, no
+  nRF52 field transmitter in either window.
+- TRACK under image B (18:34): `--track on`, one `--sendtrack` (APRS 433.775 MHz, then back to 433.175 MHz after
+  `OnTXDone`), `--track off`; check run `B-after-track`: RAK decodes 10/12 of the ESP32 nodes, they decode 12/12 of
+  the RAK. `--loradebug` on the RAK was switched off by the test sequence and restored.
+- RAK back on image B (`52723f33`, DFU 18:33). Result doc: [syncword-ab-bench-20261124.md](syncword-ab-bench-20261124.md).

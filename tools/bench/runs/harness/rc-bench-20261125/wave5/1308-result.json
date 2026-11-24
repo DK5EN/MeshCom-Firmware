@@ -1,0 +1,56 @@
+{
+ "SN": {
+  "replies": 1,
+  "typ": [
+   "SN"
+  ],
+  "keys": 21,
+  "secret_keys": [
+   []
+  ]
+ },
+ "I": {
+  "replies": 1,
+  "typ": [
+   "I"
+  ],
+  "secret_keys": [
+   []
+  ]
+ },
+ "XX": [
+  {
+   "type": "reg",
+   "err": "unknown"
+  }
+ ],
+ "two_in_200ms": {
+  "replies": 1,
+  "typ": [
+   "SN"
+  ]
+ },
+ "all": {
+  "replies": 17,
+  "typ": [
+   "TM",
+   "W",
+   "IO",
+   "I",
+   "IS1",
+   "IS2",
+   "G",
+   "SE",
+   "S1",
+   "SW",
+   "S2",
+   "SN",
+   "SN1",
+   "AN",
+   "SA",
+   "CONFFIN",
+   "done"
+  ],
+  "secret_keys": []
+ }
+}

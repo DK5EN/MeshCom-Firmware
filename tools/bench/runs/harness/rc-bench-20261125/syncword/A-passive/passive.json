@@ -1,0 +1,18 @@
+[
+ {
+  "class": "SX126x ESP32",
+  "snr_at_98": "-99..-10",
+  "ref": 92,
+  "rak": 0,
+  "stations": 1,
+  "ratio": 0.0
+ },
+ {
+  "class": "SX126x ESP32",
+  "snr_at_98": "all",
+  "ref": 92,
+  "rak": 0,
+  "stations": 1,
+  "ratio": 0.0
+ }
+]

@@ -7,9 +7,9 @@ transmitted on purpose. DK5EN-98 is read from its meshlogger file (``--no-debug-
     syncword_passive.py capture --rak-port /dev/cu.usbmodem2101 --minutes 60 --out DIR/A-passive
     syncword_passive.py compare --rak DIR/A-passive/rak.log --ref 98.log --label A [--start EPOCH --end EPOCH]
 
-Compare: every DIRECT frame (no relay in the path, so the HW code is the board that transmitted) that DK5EN-98
-decoded from a station outside the bench (not DK5EN-*) inside the RAK window is looked up by message id in the
-RAK's decoded frames. Rows per transmitter class (nRF52 = old 0x242B on air, SX126x ESP32, SX127x) and per SNR
+Compare: every copy on air that DK5EN-98 decoded inside the RAK window, sent by a station outside the bench (the
+last call of the path is not DK5EN-*), is looked up by message id and last-hop call in the RAK's decoded frames.
+The transmitter's board comes from LH (last-hop hardware). Rows per transmitter class (nRF52 = old 0x242B on air, SX126x ESP32, SX127x) and per SNR
 band at DK5EN-98. The two receivers sit a few metres apart with different antennas, so only the A/B difference
 of the ratio carries meaning, not the ratio itself.
 """
@@ -31,7 +31,7 @@ NRF52 = {7, 9, 54}                       # T-Echo, RAK4631, T114 (configuration_
 SX127X = {1, 2, 3, 4, 6, 10, 11}         # T-LoRa, T-Beam SX1276/8, Heltec V1/V2
 BENCH = re.compile(r"^DK5EN-")
 _RX = re.compile(r"\[LOG\]\s+\d+\s+\S\s+x([0-9A-F]{8})\s.*?\s([A-Z0-9]+-\d+(?:,[A-Z0-9-]+)*)>"
-                 r".*?\sHW:(\d+)\s.*?RSSI:(-?\d+)\s+SNR:(-?\d+)")
+                 r".*?\sHW:(\d+)\s.*?LH:([0-9A-F]{2})\s.*?RSSI:(-?\d+)\s+SNR:(-?\d+)")
 BANDS = [(-99, -10), (-10, -5), (-5, 0), (0, 5), (5, 99)]
 
 
@@ -44,12 +44,17 @@ def chip_class(hw: int) -> str:
 
 
 def parse(line: str) -> Optional[Tuple[str, str, bool, int, int, int]]:
-    """(id, originator, direct, hw, rssi, snr) of a decoded frame line."""
+    """(id, last-hop call, direct, transmitter hw, rssi, snr) of a decoded frame line.
+
+    The copy on air was sent by the LAST call of the path; its board is LH & 0x7F when bit 0x80 is set
+    (msg_last_hw = BOARD_HARDWARE | 0x80, lora_functions.cpp), else -1 (unknown, not classified)."""
     m = _RX.search(line)
     if not m:
         return None
     path = m.group(2).split(",")
-    return m.group(1), path[0], len(path) == 1, int(m.group(3)), int(m.group(4)), int(m.group(5))
+    lh = int(m.group(4), 16)
+    hw = lh & 0x7F if lh & 0x80 else (int(m.group(3)) if len(path) == 1 else -1)
+    return m.group(1), path[-1], len(path) == 1, hw, int(m.group(5)), int(m.group(6))
 
 
 def epoch_of(line: str) -> Optional[float]:
@@ -67,28 +72,29 @@ def epoch_of(line: str) -> Optional[float]:
 
 
 def frames(lines: Iterable[str], t0: float, t1: float) -> Dict[str, Tuple[str, bool, int, int, int]]:
+    """One entry per copy on air: key "id/last-hop call" (the same id relayed by two nodes is two copies)."""
     out: Dict[str, Tuple[str, bool, int, int, int]] = {}
     for ln in lines:
         t = epoch_of(ln)
         if t is None or not (t0 <= t <= t1):
             continue
         p = parse(ln)
-        if p and p[0] not in out:
-            out[p[0]] = p[1:]
+        if p:
+            out.setdefault(f"{p[0]}/{p[1]}", p[1:])
     return out
 
 
 def compare(rak: Dict[str, tuple], ref: Dict[str, tuple]) -> List[dict]:
     rows: Dict[Tuple[str, str], dict] = {}
-    for mid, (orig, direct, hw, _rssi, snr) in ref.items():
-        if not direct or BENCH.match(orig):
+    for mid, (last, _direct, hw, _rssi, snr) in ref.items():
+        if hw < 0 or BENCH.match(last):
             continue
         band = next(f"{lo}..{hi}" for lo, hi in BANDS if lo <= snr < hi)
         for key in ((chip_class(hw), "all"), (chip_class(hw), band)):
             r = rows.setdefault(key, {"class": key[0], "snr_at_98": key[1], "ref": 0, "rak": 0, "stations": set()})
             r["ref"] += 1
             r["rak"] += 1 if mid in rak else 0
-            r["stations"].add(orig)
+            r["stations"].add(last)
     out = []
     for key in sorted(rows):
         r = rows[key]
@@ -160,14 +166,14 @@ def self_test() -> int:
             "MOD:8/8 FCS:0 FW:40:a LH:89 RSSI:-90 SNR:2 DUP:n OWN:- t=1")
     lrak = "1795532401.000 16:00:01 [LOG] 049 : x00000001 H04 S0 T0 M00 OE1ABC-3>9999:x HW:09 RSSI:-118 SNR:-11 DUP:n"
     assert parse(l98)[:4] == ("00000001", "OE1ABC-3", True, 9)
-    assert parse(lrly)[2] is False
+    assert parse(lrly)[1:4] == ("OE1XYZ-1", False, 9)
     assert chip_class(9).startswith("nRF52") and chip_class(43) == "SX126x ESP32" and chip_class(4) == "SX127x"
     t = epoch_of(l98)
     ref = frames([l98, lrly], t - 1, t + 5)
-    rak = {"00000001": parse(lrak)[1:]}
+    rak = {"00000001/OE1ABC-3": parse(lrak.replace("HW:09", "HW:09 LH:89"))[1:]}
     rows = {(r["class"], r["snr_at_98"]): r for r in compare(rak, ref)}
     r = rows[("nRF52 (0x242B)", "all")]
-    assert (r["ref"], r["rak"], r["ratio"]) == (1, 1, 1.0), r  # the relayed copy is not counted
+    assert (r["ref"], r["rak"], r["ratio"]) == (2, 1, 0.5), r  # the relayed copy (OE1XYZ-1) was not at the RAK
     assert rows[("nRF52 (0x242B)", "-99..-10")]["ref"] == 1
     print("syncword_passive self-test ok")
     return 0
