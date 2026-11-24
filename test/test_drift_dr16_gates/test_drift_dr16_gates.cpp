@@ -17,6 +17,7 @@
 //
 //   pio test -e native -f test_drift_dr16_gates
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -29,25 +30,12 @@ void tearDown(void) {}
 // test_aprs_corpus.cpp openRel()).
 static char *read_rel(const char *rel)
 {
-    static const char *prefixes[] = { "", "../", "../../", "../../../", "../../../../" };
-    char path[512];
-    for (const char *p : prefixes)
-    {
-        snprintf(path, sizeof(path), "%s%s", p, rel);
-        FILE *f = fopen(path, "rb");
-        if (!f)
-            continue;
-        fseek(f, 0, SEEK_END);
-        long n = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        char *buf = (char *)malloc((size_t)n + 1);
-        TEST_ASSERT_NOT_NULL(buf);
-        size_t got = fread(buf, 1, (size_t)n, f);
-        fclose(f);
-        buf[got] = '\0';
-        return buf;
-    }
-    return nullptr;
+    const std::string s = repo_slurp(rel);
+    char *buf = (char *)malloc(s.size() + 1);
+    TEST_ASSERT_NOT_NULL(buf);
+    memcpy(buf, s.data(), s.size());
+    buf[s.size()] = '\0';
+    return buf;
 }
 
 // Returns the first line (as a NUL-terminated copy in `line`) that contains

@@ -7,6 +7,7 @@
 // the hand-checked vector from test/test_aprs_epilogue (type 0x3A, "Hi").
 
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -658,7 +659,7 @@ static void test_glue_synthetic_write_masks_the_replay_start(void)
 // followed by udpHoldNoteSynthetic() on the next code line.
 static int scan_unmasked_timer_writes(const char *path, int *writes)
 {
-    FILE *fp = fopen(path, "r");
+    FILE *fp = repo_fopen(path, "r");
     if (!fp) return -1;
     char line[512];
     int bad = 0;

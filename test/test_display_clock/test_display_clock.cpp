@@ -2,6 +2,7 @@
 // W2 contract: every second draws on pages with a clock line; no display / off / message page (type 0,
 // F1) / draw in progress skip.
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <string.h>
 #include <string>
 #include <fstream>
@@ -171,24 +172,7 @@ void test_fix_F2_every_second_draws(void)
 // Source pins on src/loop_functions.cpp.
 static std::string read_repo_file(const char *rel)
 {
-    const std::string self = "test/test_display_clock/test_display_clock.cpp";
-    char cwd_buf[4096];
-    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
-    std::string dir(cwd_buf);
-    for (int hops = 0; hops < 16; hops++)
-    {
-        std::ifstream a((dir + "/" + self).c_str()), b((dir + "/platformio.ini").c_str());
-        if (a.good() && b.good())
-            break;
-        const size_t pos = dir.find_last_of('/');
-        if (pos == std::string::npos || pos == 0)
-            TEST_FAIL_MESSAGE("could not derive repo root");
-        dir = dir.substr(0, pos);
-    }
-    std::ifstream f((dir + "/" + rel).c_str());
-    std::stringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 static std::string func_body(const std::string &src, const char *sig)

@@ -35,6 +35,7 @@
 #include "../../src/mc_text.h"
 #include "../../src/udp_frame.h"   // F4: buildExternAckJson() direkt pruefen
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -47,7 +48,6 @@
 #include <climits>
 #include <dirent.h>   // corpus directory listing (POSIX; native env is host-only, no Windows target)
 #if defined(__APPLE__)
-#include <mach-o/dyld.h>   // _NSGetExecutablePath(), see repo_root_from_file()
 #endif
 
 #include <Arduino.h>
@@ -2851,95 +2851,6 @@ static void test_agreement_max_zeros_returns_1_without_resetting_on_both(void)
 // why): raw Serial output and checkOwnTx() reads.
 // ===========================================================================
 
-// This source lives at <repo_root>/test/test_udp_frame_twin/test_udp_frame_
-// twin.cpp. A PlatformIO native test binary's CWD is not guaranteed (it can
-// be the project root, the build dir, or wherever the runner happened to
-// start), so a path relative to CWD can silently resolve to nothing.
-//
-// __FILE__, measured on this build (`strings` on the .o -- see the wave
-// report), comes back RELATIVE ("test/test_udp_frame_twin/test_udp_frame_
-// twin.cpp"): SCons runs with the project root as its own CWD, so the
-// relative form is correct at COMPILE time -- but useless standing alone at
-// RUN time, since this binary's run-time CWD is exactly the thing not
-// guaranteed to still be the project root (the trap this function exists
-// to dodge). An absolute __FILE__ (a different toolchain/build system)
-// is handled directly, by stripping the known suffix. For the relative
-// case, the fallback is this executable's own resolved path: PlatformIO
-// always builds a native test to <repo_root>/.pio/build/<env>/program, a
-// fixed 4-component depth, and resolving argv[0]/the running image through
-// the OS (not through textual path arithmetic on the current CWD) is safe
-// regardless of where the binary is invoked from.
-static std::string g_argv0;   // captured in main() before anything else runs
-
-static std::string resolve_absolute_path(const std::string &path)
-{
-    char buf[PATH_MAX];
-    if (path.empty())
-        return std::string();
-    if (realpath(path.c_str(), buf) != nullptr)
-        return std::string(buf);
-    return std::string();
-}
-
-static std::string running_executable_path()
-{
-#if defined(__APPLE__)
-    char raw[PATH_MAX];
-    uint32_t size = sizeof(raw);
-    if (_NSGetExecutablePath(raw, &size) == 0)
-    {
-        std::string resolved = resolve_absolute_path(raw);
-        if (!resolved.empty())
-            return resolved;
-    }
-#endif
-    // Linux: /proc/self/exe is a symlink the OS resolves to the running
-    // image regardless of how the process was invoked.
-    std::string resolved = resolve_absolute_path("/proc/self/exe");
-    if (!resolved.empty())
-        return resolved;
-    // Last resort: argv[0] realpath()'d against the CURRENT cwd. Valid even
-    // then, because if argv[0] was relative, the OS resolved it against
-    // this same cwd at exec() time and the process has not chdir'd since.
-    return resolve_absolute_path(g_argv0);
-}
-
-static std::string strip_trailing_path_components(std::string p, int n)
-{
-    for (int i = 0; i < n; i++)
-    {
-        size_t pos = p.find_last_of("/\\");
-        if (pos == std::string::npos)
-            return std::string();
-        p.erase(pos);
-    }
-    return p;
-}
-
-static std::string repo_root_from_file()
-{
-    std::string f = __FILE__;
-    for (char &c : f)
-        if (c == '\\') c = '/';
-
-    static const char *anchor = "test/test_udp_frame_twin/test_udp_frame_twin.cpp";
-    size_t pos = f.rfind(anchor);
-    if (pos != std::string::npos && pos > 0 &&
-        pos + strlen(anchor) == f.size() && f[pos - 1] == '/')
-    {
-        // Absolute __FILE__: strip the anchor and its leading separator.
-        return f.substr(0, pos - 1);
-    }
-
-    // Relative __FILE__ (the measured case): fall back to the executable's
-    // own OS-resolved location, four components below the repo root
-    // (.pio/build/<env>/program).
-    std::string exe = running_executable_path();
-    if (exe.empty())
-        return std::string();
-    return strip_trailing_path_components(exe, 4);
-}
-
 // Corpus format (test/golden/corpus_lint.py, test/golden/mc_frame.py): lines
 // starting with '#' are comments, the remaining hex digits (whitespace
 // tolerated) are one datagram.
@@ -3073,10 +2984,9 @@ static int dump_corpus_for_platform(const std::string &corpus_dir,
 
 static void test_u1_corpus_ordered_sink_dump_both_platforms(void)
 {
-    std::string root = repo_root_from_file();
+    const std::string root = repo_root();
     TEST_ASSERT_TRUE_MESSAGE(!root.empty(),
-        "U1: could not derive the repo root from __FILE__ -- this source moved, "
-        "update repo_root_from_file()'s component count");
+        "U1: could not derive the repo root (test/support/repo_file.h)");
 
     std::string corpus_dir = root + "/test/golden/corpus/udp1990";
     std::string out_esp32 = root + "/test/golden/native/u1-esp32.txt";
@@ -3635,9 +3545,8 @@ static void test_agreement_gw_foreign_group_is_still_acked_and_relayed_on_both(v
     memset(meshcom_settings.node_gcb, 0, sizeof(meshcom_settings.node_gcb));
 }
 
-int main(int, char **argv)
+int main(int, char **)
 {
-    g_argv0 = argv[0] ? argv[0] : "";
 
     UNITY_BEGIN();
 

@@ -8,6 +8,7 @@
 //   pio test -e native -f test_settings_sanitize
 
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <string.h>
 #include <math.h>
@@ -422,15 +423,7 @@ static void test_au_schedule_corrupt_values_go_to_defaults(void)
 // reboot: P0.01 is the 32 kHz crystal. Console and web were dead, a reflash kept it.
 static std::string read_src(const char *path)
 {
-    FILE *f = fopen(path, "rb");
-    TEST_ASSERT_NOT_NULL_MESSAGE(f, path);
-    static char buf[64 * 1024];
-    size_t r;
-    std::string src;
-    while ((r = fread(buf, 1, sizeof(buf), f)) > 0)
-        src.append(buf, r);
-    fclose(f);
-    return src;
+    return repo_slurp(path);
 }
 
 static void test_nrf52_reserved_pins(void)
@@ -468,7 +461,7 @@ static void test_console_refuses_reserved_pins(void)
 
 static void test_au_schedule_esp32_load_path_calls_the_repair(void)
 {
-    FILE *f = fopen("src/esp32/esp32_flash.cpp", "rb");
+    FILE *f = repo_fopen("src/esp32/esp32_flash.cpp", "rb");
     TEST_ASSERT_NOT_NULL_MESSAGE(f, "src/esp32/esp32_flash.cpp not readable (run from the repo root)");
     static char buf[64 * 1024];
     size_t n = 0, r;

@@ -5,7 +5,6 @@
 // Before the fix the boot read `bCHARGE_LED = node_sset3 & 0x0001` and called setChargeLedOn(bCHARGE_LED):
 // a fresh node (sset3 = 0) came up with the AXP192 LED dark, and a stale node whose bit 0x0001 was left
 // over from the old bMHONLY flag came up with the LED "on" without anyone configuring it.
-// oldBoot() is that rule, kept here as the comparison.
 //
 // The "configured" marker is node_sset2 bit 0x8000: inside the 0..65535 settings range of config_json.h, so
 // it survives the load clamp and a downgrade (a marker above bit 15 of sset3 would clamp to 65535 = all flags on).
@@ -17,9 +16,6 @@
 void setUp(void) {}
 void tearDown(void) {}
 
-// the pre-fix rule: true = PMU auto mode, false = dark
-static bool oldBoot(int sset3) { return (sset3 & 0x0001) != 0; }
-
 // sset2 bits in use in src/ (command_functions.cpp toggle rows and setters), documented here instead of grepped:
 //   0x0001 0x0002 0x0004 0x0008 0x0020 0x0040 0x0080 0x0100 0x0200 0x0400 0x0800 0x1000 0x4000
 // plus AppLink (src/applink.h): 0x0010 value bit and 0x2000 CONFIGURED marker. 0x8000 is the charge LED marker.
@@ -30,7 +26,6 @@ static void test_fresh_node_follows_charging(void)
 {
     TEST_ASSERT_EQUAL_INT(CHGLED_AUTO, chargeLedModeFromSettings(0, 0));
     TEST_ASSERT_TRUE(chargeLedAutoFromSettings(0, 0));
-    TEST_ASSERT_FALSE_MESSAGE(oldBoot(0), "the old rule left a fresh AXP192 node dark");
 }
 
 static void test_stale_sset3_bit_without_marker_is_ignored(void)
@@ -39,7 +34,6 @@ static void test_stale_sset3_bit_without_marker_is_ignored(void)
     TEST_ASSERT_EQUAL_INT(CHGLED_AUTO, chargeLedModeFromSettings(0, 0x0001));
     TEST_ASSERT_EQUAL_INT(CHGLED_AUTO, chargeLedModeFromSettings(0x7FFF, 0xFFFF));
     TEST_ASSERT_EQUAL_INT(CHGLED_AUTO, chargeLedModeFromSettings(SSET2_BITS_IN_USE, 0x8080));
-    TEST_ASSERT_TRUE_MESSAGE(oldBoot(0x0001), "the old rule read the stale bit as 'on'");
 }
 
 static void test_marker_with_sset3_bit_is_on_meaning_follows_charging(void)

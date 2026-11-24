@@ -1,5 +1,6 @@
 // TBEAM1W-PWR-01 (#1301): boot and runtime path must configure the SX126x PA the same way.
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <cstdint>
 #include <fstream>
 #include <sstream>
@@ -55,14 +56,7 @@ static void test_helper_tdeckpro_keeps_table(void)
 
 static std::string slurp(const char *rel)
 {
-    std::string file(__FILE__);
-    const std::string suffix = "test/test_rf_pa/test_rf_pa.cpp";
-    std::string root = file.substr(0, file.size() - suffix.size());
-    std::ifstream f((root + rel).c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 static void test_tdeckpro_dispatch_uses_the_one_arg_overload(void)

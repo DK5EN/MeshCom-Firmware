@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -345,14 +346,8 @@ void test_lock_wraps_table_access(void)
 // Only screen 3 (entry3/exit3) may start and stop that task.
 void test_tdeck_pro_loop_does_not_suspend_gps_task(void)
 {
-    std::string file(__FILE__);
-    const std::string suffix = "test/test_gps_skyplot/test_main.cpp";
-    std::string path = file.substr(0, file.size() - suffix.size()) + "src/esp32/esp32_main.cpp";
-    std::ifstream f(path.c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE(f.good());
-    std::stringstream ss;
-    ss << f.rdbuf();
-    TEST_ASSERT_TRUE(ss.str().find("tdeck_set_gps(false);") == std::string::npos);
+    const std::string src = repo_slurp("src/esp32/esp32_main.cpp");
+    TEST_ASSERT_TRUE(src.find("tdeck_set_gps(false);") == std::string::npos);
 }
 
 int main(int, char **)

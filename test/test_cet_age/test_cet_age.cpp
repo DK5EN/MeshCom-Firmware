@@ -1,5 +1,6 @@
 // Native-Tests fuer src/cet_age.h (Kampagne TXP, W0).
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <string.h>
 #include <stdio.h>
 #include "cet_age.h"
@@ -129,7 +130,7 @@ static void test_frame_stale_truth_table(void)
 
 static bool fileContains(const char *path, const char *needle, long *pos)
 {
-    FILE *f = fopen(path, "rb");
+    FILE *f = repo_fopen(path, "rb");
     if(!f) return false;
     static char buf[1 << 20];
     size_t n = fread(buf, 1, sizeof(buf) - 1, f);

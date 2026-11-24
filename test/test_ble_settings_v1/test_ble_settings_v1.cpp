@@ -21,6 +21,7 @@
 // truncated member shows up as a byte diff here exactly as it would on the
 // real target), just not a byte-identical copy of what ships to a phone.
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -40,16 +41,7 @@ void tearDown(void) {}
 
 static FILE *openRel(const char *rel, const char *mode)
 {
-    static const char *prefixes[] = {"", "../", "../../", "../../../", "../../../../"};
-    char path[512];
-    for (const char *p : prefixes)
-    {
-        snprintf(path, sizeof(path), "%s%s", p, rel);
-        FILE *f = fopen(path, mode);
-        if (f)
-            return f;
-    }
-    return nullptr;
+    return repo_fopen(rel, mode);
 }
 
 static size_t hex2bin(const char *hex, uint8_t *out, size_t maxlen)

@@ -1,6 +1,7 @@
 // CLK-01: tick arithmetic of Clock::CheckEvent() (src/clock_tick.h).
 // F3 fix (W2): real elapsed seconds counted, remainder carried (clockTickAdvance).
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <stdint.h>
 #include <string>
 #include <fstream>
@@ -153,23 +154,7 @@ void test_step_3600_late_ticks_over_wrap_count_real_seconds(void)
 // so the tests above exercise the code that runs on the device and not a copy of it.
 static std::string read_repo_file(const char *rel)
 {
-    char cwd_buf[4096];
-    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
-    std::string dir(cwd_buf);
-    for (int hops = 0; hops < 16; hops++)
-    {
-        std::ifstream a((dir + "/test/test_clock_tick/test_clock_tick.cpp").c_str()), b((dir + "/platformio.ini").c_str());
-        if (a.good() && b.good())
-            break;
-        const size_t pos = dir.find_last_of('/');
-        if (pos == std::string::npos || pos == 0)
-            TEST_FAIL_MESSAGE("could not derive repo root");
-        dir = dir.substr(0, pos);
-    }
-    std::ifstream f((dir + "/" + rel).c_str());
-    std::stringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 void test_checkevent_uses_clockTickStep(void)

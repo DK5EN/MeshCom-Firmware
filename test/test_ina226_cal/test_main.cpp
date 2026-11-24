@@ -25,14 +25,8 @@ static bool libAccepts(float maxCurrent, float shunt)
     return true;
 }
 
-// pre-fix setupINA226: stored pair used as is when 0.001 < shunt < 0.5, else (20, 0.002)
-static float oldSetupImax(float imax, float shunt) { return (shunt > 0.001f && shunt < 0.5f) ? imax : 20.0f; }
-
-static void test_field_case_old_rule_was_rejected(void)
-{
-    // documents the bug: the old setup handed (20 A, 0.1 Ohm) to the library, which refused it
-    TEST_ASSERT_FALSE(libAccepts(oldSetupImax(20.0f, 0.1f), 0.1f));
-}
+// The bug: the pre-fix setupINA226 handed the stored pair (20 A, 0.1 Ohm) to the library as is,
+// and the library refused it.
 
 static void test_field_case_new_rule_is_accepted(void)
 {
@@ -88,7 +82,6 @@ static void test_out_of_range_values(void)
 int main(int, char **)
 {
     UNITY_BEGIN();
-    RUN_TEST(test_field_case_old_rule_was_rejected);
     RUN_TEST(test_field_case_new_rule_is_accepted);
     RUN_TEST(test_default_pair_unchanged);
     RUN_TEST(test_fitting_imax_is_kept);

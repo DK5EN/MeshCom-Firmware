@@ -5,6 +5,7 @@
 //   pio test -e native_safeboot -f test_safeboot_ver
 
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -132,15 +133,7 @@ static void test_min_not_above_current(void) {
 // Repo files. pio test starts the binary with differing cwd, so try a few prefixes.
 // ---------------------------------------------------------------------
 static FILE *openRel(const char *rel) {
-    static const char *prefixes[] = {"", "../", "../../", "../../../", "../../../../"};
-    char path[512];
-    for (const char *p : prefixes) {
-        snprintf(path, sizeof(path), "%s%s", p, rel);
-        FILE *f = fopen(path, "rb");
-        if (f)
-            return f;
-    }
-    return nullptr;
+    return repo_fopen(rel, "rb");
 }
 
 static void scanRepoImage(const char *rel, int *outVersion) {

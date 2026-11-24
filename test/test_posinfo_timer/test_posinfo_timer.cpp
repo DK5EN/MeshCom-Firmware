@@ -8,6 +8,7 @@
 // Source scan of the mains: POSINFO_SCAN_ROOT=<dir with src/esp32/esp32_main.cpp, src/nrf52/nrf52_main.cpp>
 // points it at a copy (default: the real tree).
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <fstream>
@@ -210,23 +211,21 @@ static void test_auto_spacing_helper(void)
 
 static std::string slurpNoWs(const char *rel)
 {
-    std::string root;
+    std::string raw;
     const char *env = getenv("POSINFO_SCAN_ROOT");
     if (env && *env)
     {
-        root = std::string(env) + "/";
+        std::ifstream f((std::string(env) + "/" + rel).c_str(), std::ios::binary);
+        TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
+        std::stringstream ss;
+        ss << f.rdbuf();
+        raw = ss.str();
     }
     else
     {
-        std::string file(__FILE__);
-        const std::string suffix = "test/test_posinfo_timer/test_posinfo_timer.cpp";
-        root = file.substr(0, file.size() - suffix.size());
+        raw = repo_slurp(rel);
     }
-    std::ifstream f((root + rel).c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    std::string raw = ss.str(), out;
+    std::string out;
     for (char c : raw)
         if (c != ' ' && c != '\t' && c != '\r' && c != '\n')
             out += c;

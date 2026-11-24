@@ -2,6 +2,7 @@
 // Host only (env native_au_schedule). The module is pure; the tests also pin by source text that it cannot start
 // an install and that the AU_AUTO_INSTALL guard of fw_update.h (decision D14) is intact.
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -711,25 +712,7 @@ void test_parse_time(void)
 
 static std::string readRepoFile(const char *rel)
 {
-    const std::string self = "test/test_au_schedule/test_main.cpp";
-    char cwdBuf[4096];
-    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwdBuf, sizeof(cwdBuf)), "getcwd() failed");
-    std::string dir(cwdBuf);
-    for (int hops = 0; hops < 16; hops++)
-    {
-        std::ifstream a((dir + "/" + self).c_str()), b((dir + "/platformio.ini").c_str());
-        if (a.good() && b.good())
-            break;
-        const size_t pos = dir.find_last_of('/');
-        if (pos == std::string::npos || pos == 0)
-            TEST_FAIL_MESSAGE("could not derive repo root");
-        dir = dir.substr(0, pos);
-    }
-    std::ifstream f((dir + "/" + rel).c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), (std::string("could not open ") + rel).c_str());
-    std::ostringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 void test_auto_install_guard_still_in_place(void)

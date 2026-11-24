@@ -13,6 +13,7 @@
 //   pio test -e native_aprs -f test_txring
 
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <fstream>   // CET-AGE-LOG-01: source-shape check
 #include <sstream>
 #include <string>
@@ -2706,25 +2707,7 @@ static void test_csma05_relay_backoff_meldet_jitter(void)
 // native shim swallows printfdeb, so the guard is on the call itself.
 static std::string read_txring_source(void)
 {
-    char cwd_buf[4096];
-    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
-    std::string dir(cwd_buf);
-    for (int hops = 0; hops < 16; hops++)
-    {
-        std::ifstream a((dir + "/src/txring_functions.cpp").c_str()), b((dir + "/platformio.ini").c_str());
-        if (a.good() && b.good())
-        {
-            std::stringstream ss;
-            ss << a.rdbuf();
-            return ss.str();
-        }
-        const size_t pos = dir.find_last_of('/');
-        if (pos == std::string::npos || pos == 0)
-            break;
-        dir = dir.substr(0, pos);
-    }
-    TEST_FAIL_MESSAGE("could not find src/txring_functions.cpp");
-    return std::string();
+    return repo_slurp("src/txring_functions.cpp");
 }
 
 static void test_cet_age_log01_cet_sweep_uses_real_time(void)

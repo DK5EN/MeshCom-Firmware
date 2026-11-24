@@ -1,6 +1,7 @@
 // POSINFO-NEXT-01: clamped NEXT countdown (src/posinfo_next.h), six display sites.
 //   pio test -e native -f test_posinfo_next
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <stdint.h>
 #include <fstream>
 #include <sstream>
@@ -10,12 +11,6 @@
 
 void setUp(void) {}
 void tearDown(void) {}
-
-// old unsigned expression, uint32_t to model the boards (host unsigned long is 64 bit)
-static int legacyNextExpr(uint32_t now, uint32_t timer, uint32_t interval)
-{
-    return (int)(((timer + (interval * 1000u)) - now) / 1000);
-}
 
 static void test_overdue_by_one_ms_is_zero(void)
 {
@@ -40,21 +35,9 @@ static void test_millis_rollover(void)
     TEST_ASSERT_EQUAL_INT(0, posinfoNextSeconds(20000, 0xFFFFFF00u, 20));
 }
 
-static void test_legacy_expression_wraps(void)
-{
-    TEST_ASSERT_EQUAL_INT(4294967, legacyNextExpr(120001, 100000, 20));
-}
-
 static std::string slurp(const char *rel)
 {
-    std::string file(__FILE__);
-    const std::string suffix = "test/test_posinfo_next/test_posinfo_next.cpp";
-    std::string root = file.substr(0, file.size() - suffix.size());
-    std::ifstream f((root + rel).c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 static void test_all_six_sites_use_the_helper(void)
@@ -82,7 +65,6 @@ int main(int, char **)
     RUN_TEST(test_overdue_30s_window_is_zero);
     RUN_TEST(test_normal_countdown);
     RUN_TEST(test_millis_rollover);
-    RUN_TEST(test_legacy_expression_wraps);
     RUN_TEST(test_all_six_sites_use_the_helper);
     return UNITY_END();
 }

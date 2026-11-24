@@ -3,14 +3,6 @@
 #include <stdio.h>
 #include "pong_format.h"
 
-// OLD behaviour (before the fix), kept to show the regression.
-static void oldPayload(char *o, size_t n, uint32_t id) { snprintf(o, n, "{pong}{%03i}", (int)id); }
-static void oldDisplay(const char *p, char *o, size_t n)
-{
-    const char *c = (strlen(p) > 14) ? p + 14 : "";
-    snprintf(o, n, "%.3s", c);
-}
-
 void setUp(void) {}
 void tearDown(void) {}
 

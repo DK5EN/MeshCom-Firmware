@@ -9,6 +9,7 @@
 //   pio test -e native_safeboot -f test_safeboot_state
 
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <string.h>
 
@@ -1305,14 +1306,7 @@ void test_app_check_head_segment_count_bounds(void)
 // and the RebootToApp / SwitchPartition path must not point the boot pointer at ota_0 without the same check.
 static std::string sbSlurp(const char *rel)
 {
-    std::string file(__FILE__);
-    const std::string suffix = "test/test_safeboot_state/test_safeboot_state.cpp";
-    std::string root = file.substr(0, file.size() - suffix.size());
-    std::ifstream f((root + rel).c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 void test_src_upload_completion_checks_image_before_onverified(void)

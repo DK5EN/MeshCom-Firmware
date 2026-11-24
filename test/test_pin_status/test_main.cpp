@@ -1,6 +1,7 @@
 // Unity tests of src/pin_status_json.h: GET /pinstatus document. Host only; there is no MCP23017 on the bench, the
 // expander side is proven here with a plain struct, not with a chip.
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -651,22 +652,7 @@ void test_gpio_status_worst_case_fits_max(void)
 // kHard[] in src/pin_board.cpp lists the macro under the Pro guard.
 static std::string gpio06_read(const char *rel)
 {
-    char cwd[4096];
-    TEST_ASSERT_NOT_NULL(getcwd(cwd, sizeof(cwd)));
-    std::string dir(cwd);
-    for (int hops = 0; hops < 16; hops++)
-    {
-        std::ifstream probe(dir + "/platformio.ini");
-        if (probe.good()) break;
-        const size_t pos = dir.find_last_of('/');
-        if (pos == std::string::npos || pos == 0) TEST_FAIL_MESSAGE("could not derive repo root");
-        dir = dir.substr(0, pos);
-    }
-    std::ifstream f((dir + "/" + rel).c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
-    std::ostringstream o;
-    o << f.rdbuf();
-    return o.str();
+    return repo_slurp(rel);
 }
 
 static int gpio06_define(const std::string &cfg, const char *name)

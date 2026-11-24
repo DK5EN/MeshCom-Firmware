@@ -1,5 +1,6 @@
 // T114-DARK-01 (#1314): palette values, contrast, and source pins.
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <math.h>
 #include <string>
 #include <fstream>
@@ -24,11 +25,7 @@ static double contrast(uint16_t a, uint16_t b)
 
 static std::string slurp(const char *p)
 {
-    std::ifstream f(p);
-    // An unreadable file must not pass as "string absent" (TESTGATE-01).
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), p);
-    std::stringstream s; s << f.rdbuf();
-    return s.str();
+    return repo_slurp(p);
 }
 
 void test_light_is_todays_colours()

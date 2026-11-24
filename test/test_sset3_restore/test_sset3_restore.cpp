@@ -1,6 +1,7 @@
 // GPS-AUTOSYM-01: both mains must restore bGPSAutosymbol (node_sset3 0x1000) at boot.
 //   pio test -e native -f test_sset3_restore
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -10,14 +11,7 @@ void tearDown(void) {}
 
 static std::string slurp(const char *rel)
 {
-    std::string file(__FILE__);
-    const std::string suffix = "test/test_sset3_restore/test_sset3_restore.cpp";
-    std::string root = file.substr(0, file.size() - suffix.size());
-    std::ifstream f((root + rel).c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 static void test_both_mains_restore_autosymbol_bit(void)

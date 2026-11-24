@@ -7,6 +7,7 @@
 // never reached the air. The source pins below fail on that code.
 
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <fstream>
 #include <sstream>
@@ -18,32 +19,9 @@
 void setUp(void) {}
 void tearDown(void) {}
 
-static bool file_exists(const std::string &p)
-{
-    std::ifstream f(p.c_str());
-    return f.good();
-}
-
 static std::string read_repo_file(const char *rel)
 {
-    const std::string self = "test/test_telemetry_app/test_main.cpp";
-    char cwd_buf[4096];
-    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
-    std::string dir(cwd_buf);
-    for (int hops = 0; hops < 16; hops++)
-    {
-        if (file_exists(dir + "/" + self) && file_exists(dir + "/platformio.ini"))
-            break;
-        const size_t pos = dir.find_last_of('/');
-        if (pos == std::string::npos || pos == 0)
-            TEST_FAIL_MESSAGE("could not derive repo root");
-        dir = dir.substr(0, pos);
-    }
-    std::ifstream f((dir + "/" + rel).c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
-    std::ostringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 static int count(const std::string &hay, const std::string &needle)

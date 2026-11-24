@@ -15,6 +15,7 @@
 //   pio test -e native_aprs -f test_gwflood_frames
 
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -72,15 +73,7 @@ static int hexToBytes(const char *hex, uint8_t *out, int max)
 // pio test startet das Binary je nach Plattform mit unterschiedlicher cwd.
 static FILE *openRel(const char *rel)
 {
-    static const char *prefixes[] = { "", "../", "../../", "../../../", "../../../../" };
-    char path[512];
-    for (const char *p : prefixes)
-    {
-        snprintf(path, sizeof(path), "%s%s", p, rel);
-        FILE *f = fopen(path, "r");
-        if (f) return f;
-    }
-    return nullptr;
+    return repo_fopen(rel, "r");
 }
 
 static void loadFixture(void)

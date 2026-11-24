@@ -8,6 +8,7 @@
 // predicates, and three regression tests named after the verified attacks.
 
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -837,11 +838,7 @@ void test_updcheck_ble_needs_xmc_and_source_pins(void)
     TEST_ASSERT_TRUE(webGuardCallAllowed("updcheck", with.c_str(), with.size()));
     TEST_ASSERT_FALSE(webGuardCallAllowed("updcheck", without.c_str(), without.size()));
 
-    std::ifstream f("src/web_functions/web_nodefunctioncalls.cpp");
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), "run from the project root");
-    std::stringstream ss;
-    ss << f.rdbuf();
-    const std::string src = ss.str();
+    const std::string src = repo_slurp("src/web_functions/web_nodefunctioncalls.cpp");
     TEST_ASSERT_TRUE_MESSAGE(src.find("#define AU_BLE_COOLDOWN_MS 300000u") != std::string::npos, "5 min cooldown constant");
     TEST_ASSERT_TRUE_MESSAGE(src.find("< AU_BLE_COOLDOWN_MS") != std::string::npos, "cooldown used");
     TEST_ASSERT_TRUE_MESSAGE(src.find("auBleGuardRequest(chain)") != std::string::npos, "guard request");

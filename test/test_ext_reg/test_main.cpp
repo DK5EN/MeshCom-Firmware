@@ -1,6 +1,7 @@
 // EXTUDP register query: name table, secret filter, framing, limiter (src/ext_reg.h)
 //   piolock.sh pio test -e native_ext_reg
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -210,35 +211,11 @@ static void test_max_payload_fits_reply(void)
 }
 
 // ---- reading the firmware source (as test_command_setters does) ----
-static bool file_exists(const std::string &p)
-{
-    std::ifstream f(p.c_str());
-    return f.good();
-}
-
 // __FILE__ is relative under PlatformIO's native runner: walk up from the working directory until the
 // test file and platformio.ini sit side by side.
 static std::string read_repo_file(const char *rel)
 {
-    const std::string self = "test/test_ext_reg/test_main.cpp";
-    char cwd_buf[4096];
-    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
-    std::string dir(cwd_buf);
-    for (int hops = 0; hops < 16; hops++)
-    {
-        if (file_exists(dir + "/" + self) && file_exists(dir + "/platformio.ini"))
-            break;
-        const size_t pos = dir.find_last_of('/');
-        if (pos == std::string::npos || pos == 0)
-            TEST_FAIL_MESSAGE("could not derive repo root");
-        dir = dir.substr(0, pos);
-    }
-    const std::string path = dir + "/" + rel;
-    std::ifstream f(path.c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), ("could not open " + path).c_str());
-    std::ostringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 // Keys of the register frames: every  <var>["KEY"] = ...  assignment of src/command_functions.cpp (the

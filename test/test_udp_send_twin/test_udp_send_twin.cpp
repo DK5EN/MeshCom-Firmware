@@ -37,6 +37,7 @@
 
 #include "../../src/mc_text.h"
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -968,64 +969,7 @@ static void test_short_slot_is_not_decoded_on_either_side(void)
 // was expected to.
 // ---------------------------------------------------------------------------
 
-// Repo root, derived from __FILE__ rather than the working directory: a
-// PlatformIO native test binary's CWD is not guaranteed, so a relative path
-// to test/golden/corpus/udp1990/ could silently resolve to nothing (or to
-// something else entirely) instead of failing loudly.
-static bool path_exists(const std::string &p)
-{
-    std::ifstream f(p.c_str());
-    return f.good();
-}
-
-static std::string repo_root()
-{
-    std::string file(__FILE__);
-    const std::string suffix = "test/test_udp_send_twin/test_udp_send_twin.cpp";
-
-    if (!file.empty() && file[0] == '/')
-    {
-        // __FILE__ came out absolute: strip the known relative suffix.
-        TEST_ASSERT_TRUE_MESSAGE(
-            file.size() > suffix.size() &&
-                file.compare(file.size() - suffix.size(), suffix.size(), suffix) == 0,
-            ("unexpected absolute __FILE__ shape: " + file).c_str());
-        std::string root = file.substr(0, file.size() - suffix.size());
-        while (!root.empty() && root.back() == '/')
-            root.pop_back();
-        TEST_ASSERT_TRUE_MESSAGE(path_exists(root + "/platformio.ini"),
-                                 ("derived repo root does not look like one "
-                                  "(no platformio.ini): " + root).c_str());
-        return root;
-    }
-
-    // __FILE__ came out relative (PlatformIO's normal case, compiled with
-    // CWD == project root) -- but the test BINARY's own CWD when it runs is
-    // NOT guaranteed, so a relative path formed from it could silently
-    // resolve to nothing (or to an unrelated file). Re-derive the root
-    // instead: walk upward from the actual runtime CWD until
-    // "<candidate>/<file>" exists next to a platformio.ini, which is true at
-    // exactly one place regardless of where the binary happens to be run
-    // from, as long as that place is an ancestor of the CWD.
-    char cwd_buf[4096];
-    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
-    std::string dir(cwd_buf);
-
-    for (int hops = 0; hops < 16; hops++)
-    {
-        if (path_exists(dir + "/" + file) && path_exists(dir + "/platformio.ini"))
-            return dir;
-        if (dir.empty() || dir == "/")
-            break;
-        size_t pos = dir.find_last_of('/');
-        dir = (pos == std::string::npos || pos == 0) ? "/" : dir.substr(0, pos);
-    }
-
-    TEST_FAIL_MESSAGE(("could not derive repo root: walked up from the runtime "
-                       "cwd looking for '" + file + "' next to platformio.ini "
-                       "and found neither").c_str());
-    return "";
-}
+// Repo root: repo_root() from test/support/repo_file.h.
 
 struct CorpusItem
 {

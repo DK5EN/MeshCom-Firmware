@@ -246,6 +246,7 @@
 //   stage-2 line type (EVICT-H/EVICT-X/ECHO) appears on the compat replay.
 
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -341,49 +342,15 @@ namespace edge_norules
 #pragma pop_macro("NBR_SHARE_PCT")
 #endif
 
-// --- fixture location, same pattern as test_command_toggles.cpp ------------
+// --- fixture location (repo_root() from test/support/repo_file.h) ----------
 
 static bool path_exists(const std::string &p)
 {
-    std::ifstream f(p.c_str());
-    return f.good();
-}
-
-static std::string repo_root()
-{
-    std::string file(__FILE__);
-    const std::string suffix = "test/test_nbr_replay/test_nbr_replay.cpp";
-
-    if (!file.empty() && file[0] == '/')
-    {
-        TEST_ASSERT_TRUE_MESSAGE(
-            file.size() > suffix.size() &&
-                file.compare(file.size() - suffix.size(), suffix.size(), suffix) == 0,
-            ("unexpected absolute __FILE__ shape: " + file).c_str());
-        std::string root = file.substr(0, file.size() - suffix.size());
-        while (!root.empty() && root.back() == '/')
-            root.pop_back();
-        TEST_ASSERT_TRUE_MESSAGE(path_exists(root + "/platformio.ini"),
-                                 ("derived repo root does not look like one "
-                                  "(no platformio.ini): " + root).c_str());
-        return root;
-    }
-
-    char cwd_buf[4096];
-    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
-    std::string dir(cwd_buf);
-
-    for (int hops = 0; hops < 16; hops++)
-    {
-        if (path_exists(dir + "/" + file) && path_exists(dir + "/platformio.ini"))
-            return dir;
-        if (dir.empty() || dir == "/")
-            break;
-        size_t pos = dir.find_last_of('/');
-        dir = (pos == std::string::npos || pos == 0) ? "/" : dir.substr(0, pos);
-    }
-    TEST_FAIL_MESSAGE("could not locate repo root from __FILE__ or cwd");
-    return std::string();
+    FILE *f = fopen(p.c_str(), "rb");
+    if (f == NULL)
+        return false;
+    fclose(f);
+    return true;
 }
 
 static std::string fixture_path()

@@ -18,6 +18,7 @@
 //   command): compiled and run directly with cc/c++.
 
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -1033,15 +1034,7 @@ static void test_net_mode_existing_keyed_store_keeps_its_value(void)
 // this source scrape keeps it from coming back unnoticed.
 static std::string read_repo_source(const char *rel)
 {
-    std::string file(__FILE__);
-    // __FILE__ may be relative to the repo root (pio runs the compiler from there).
-    const size_t cut = file.find("test/test_nrf52_settings_paths/");
-    TEST_ASSERT_TRUE_MESSAGE(cut != std::string::npos, "cannot derive the repo root from __FILE__");
-    std::ifstream in(file.substr(0, cut) + rel, std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(in.good(), rel);
-    std::ostringstream ss;
-    ss << in.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 static void test_ble_set_01_dead_settings_characteristic_is_gone(void)

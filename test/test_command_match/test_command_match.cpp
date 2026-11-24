@@ -5,6 +5,7 @@
 // compiled by no env:native*. The only thing standing between a wrong rule
 // and the fleet was the ordering lint plus a hardware capture.
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include "command_match.h"
 #include "command_dash.h"
@@ -14,21 +15,8 @@
 #include <sstream>
 #include <unistd.h>
 
-// ---------------------------------------------------------------------------
-// The old rule, kept verbatim so every case below can state what CHANGED.
-// This is what shipped before D2-10: truncate the input to the candidate's
-// length and compare. It is here as a reference implementation only.
-// ---------------------------------------------------------------------------
-static bool oldPrefixMatch(const char *msg, const char *command)
-{
-    char vmsg[100];
-    strncpy(vmsg, msg, sizeof(vmsg) - 1);
-    vmsg[sizeof(vmsg) - 1] = '\0';
-    if (strlen(vmsg) < strlen(command))
-        return false; // the old code read uninitialised stack here
-    vmsg[strlen(command)] = 0x00;
-    return casecmp(vmsg, command) == 0;
-}
+// The old rule (before D2-10) truncated the input to the candidate's length
+// and compared, so "msgid" ran "msg" and "posx" ran "pos".
 
 // --- exact token -----------------------------------------------------------
 
@@ -46,12 +34,6 @@ static void test_a_longer_name_no_longer_matches_a_shorter_command(void)
     TEST_ASSERT_FALSE(commandMatches("posshot", "pos"));
     TEST_ASSERT_FALSE(commandMatches("instreset", "instr"));
     TEST_ASSERT_FALSE(commandMatches("mheard", "mh"));
-
-    // ... and that this is a CHANGE, not something that already held.
-    TEST_ASSERT_TRUE(oldPrefixMatch("msgid", "msg"));
-    TEST_ASSERT_TRUE(oldPrefixMatch("posshot", "pos"));
-    TEST_ASSERT_TRUE(oldPrefixMatch("instreset", "instr"));
-    TEST_ASSERT_TRUE(oldPrefixMatch("mheard", "mh"));
 }
 
 // Bench-checked on DK5EN-93: --posx / --infox / --msgidx are rejected.
@@ -59,7 +41,6 @@ static void test_garbage_suffix_is_rejected(void)
 {
     TEST_ASSERT_FALSE(commandMatches("posx", "pos"));
     TEST_ASSERT_FALSE(commandMatches("infox", "info"));
-    TEST_ASSERT_TRUE(oldPrefixMatch("posx", "pos")); // used to run --pos
 }
 
 // A space still terminates, so setters that take an argument keep working.
@@ -101,7 +82,6 @@ static void test_two_word_commands(void)
     // `softser app0` must NOT be swallowed by `softser app` -- the exact
     // defect command_ladder_lint.py was written for.
     TEST_ASSERT_FALSE(commandMatches("softser app0", "softser app"));
-    TEST_ASSERT_TRUE(oldPrefixMatch("softser app0", "softser app"));
 }
 
 // --- boundaries ------------------------------------------------------------
@@ -204,31 +184,9 @@ static void test_dash_folded_line_reaches_the_ladder(void)
     TEST_ASSERT_TRUE(commandMatches(folded.c_str() + 2, "loradebug off"));
 }
 
-static bool dash_file_exists(const std::string &p)
-{
-    std::ifstream f(p.c_str());
-    return f.good();
-}
-
 static std::string dash_read_repo_file(const char *rel)
 {
-    char cwd_buf[4096];
-    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
-    std::string dir(cwd_buf);
-    for (int hops = 0; hops < 16; hops++)
-    {
-        if (dash_file_exists(dir + "/test/test_command_match/test_command_match.cpp") && dash_file_exists(dir + "/platformio.ini"))
-            break;
-        const size_t pos = dir.find_last_of('/');
-        if (pos == std::string::npos || pos == 0)
-            TEST_FAIL_MESSAGE("could not derive repo root");
-        dir = dir.substr(0, pos);
-    }
-    std::ifstream f((dir + "/" + rel).c_str());
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 // Source pin: both commandAction() entry points fold before they look at "--".

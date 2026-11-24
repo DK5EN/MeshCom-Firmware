@@ -21,6 +21,7 @@
 //   pio test -e native -f test_ack_replay
 
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -36,15 +37,7 @@ void tearDown(void) {}
 
 static FILE *openRel(const char *rel, const char *mode)
 {
-    static const char *prefixes[] = { "", "../", "../../", "../../../", "../../../../" };
-    char path[512];
-    for (const char *p : prefixes)
-    {
-        snprintf(path, sizeof(path), "%s%s", p, rel);
-        FILE *f = fopen(path, mode);
-        if (f) return f;
-    }
-    return nullptr;
+    return repo_fopen(rel, mode);
 }
 
 static uint16_t hex2bin(const char *hex, uint8_t *out, uint16_t maxlen)

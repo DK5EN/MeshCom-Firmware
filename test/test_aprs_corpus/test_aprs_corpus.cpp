@@ -20,6 +20,7 @@
 //   pio test -e native_aprs
 
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,30 +73,18 @@ static uint16_t hex2bin(const char *hex, uint8_t *out, uint16_t maxlen)
 // unveraendert wiederverwendet -- corpus.txt und golden.txt koennen so nie
 // aus unterschiedlichen Wurzeln stammen (vorher loeste jeder Aufruf den
 // Praefix unabhaengig neu auf).
-static char g_pathPrefix[16] = "";
 static bool g_prefixResolved = false;
 
 // Datei relativ zum Projekt finden — pio test startet das Binary je nach
 // Plattform mit unterschiedlicher cwd.
 static FILE *openRel(const char *rel, const char *mode)
 {
-    static const char *prefixes[] = { "", "../", "../../", "../../../", "../../../../" };
-    char path[512];
-    for (const char *p : prefixes)
+    FILE *f = repo_fopen(rel, mode);
+    if (f)
     {
-        snprintf(path, sizeof(path), "%s%s", p, rel);
-        FILE *f = fopen(path, mode);
-        if (f)
-        {
-            if (!g_prefixResolved)
-            {
-                snprintf(g_pathPrefix, sizeof(g_pathPrefix), "%s", p);
-                g_prefixResolved = true;
-            }
-            return f;
-        }
+        g_prefixResolved = true;
     }
-    return nullptr;
+    return f;
 }
 
 // Oeffnet eine Datei relativ zum BEREITS aufgeloesten Praefix -- kein eigener
@@ -105,9 +94,7 @@ static FILE *openResolved(const char *rel, const char *mode)
 {
     TEST_ASSERT_TRUE_MESSAGE(g_prefixResolved,
                               "Pfad-Praefix noch nicht aufgeloest -- corpus.txt zuerst laden");
-    char path[512];
-    snprintf(path, sizeof(path), "%s%s", g_pathPrefix, rel);
-    return fopen(path, mode);
+    return repo_fopen(rel, mode);
 }
 
 // Kanonische Decode-Zeile: jede verhaltensrelevante Ausgabe des Decoders.

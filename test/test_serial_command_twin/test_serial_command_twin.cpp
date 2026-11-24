@@ -21,6 +21,7 @@
 // test output, not a hand edit.
 
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <cstdio>
 #include <cstdarg>
@@ -338,7 +339,7 @@ static void test_table_matches_the_committed_baseline(void)
     }
     printf("--- end, baseline: " EXPECTED_PATH " ---\n\n");
 
-    FILE *f = fopen(EXPECTED_PATH, "r");
+    FILE *f = repo_fopen(EXPECTED_PATH, "r");
     TEST_ASSERT_NOT_NULL_MESSAGE(
         f, "no committed baseline at " EXPECTED_PATH
            " -- copy the table printed above into it");

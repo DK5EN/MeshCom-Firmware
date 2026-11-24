@@ -5,6 +5,7 @@
 //   pio test -e native_remote_cmd
 
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -36,37 +37,9 @@ static void strictInit(RmState &s, uint32_t hwm)
 
 // ---- vector file ----------------------------------------------------------
 
-// __FILE__ is relative under PlatformIO's native runner, so walk up from the
-// working directory until the test file and platformio.ini sit side by side.
-static bool file_exists(const std::string &p)
-{
-    std::ifstream f(p.c_str());
-    return f.good();
-}
-
 static bool read_repo_file(const char *rel, std::string &out)
 {
-    const std::string self = "test/test_remote_cmd/test_main.cpp";
-    char cwd[4096];
-    if (getcwd(cwd, sizeof(cwd)) == nullptr)
-        return false;
-    std::string dir(cwd);
-    for (int hops = 0; hops < 16; hops++)
-    {
-        if (file_exists(dir + "/" + self) && file_exists(dir + "/platformio.ini"))
-            break;
-        const size_t pos = dir.find_last_of('/');
-        if (pos == std::string::npos || pos == 0)
-            return false;
-        dir = dir.substr(0, pos);
-    }
-    std::ifstream f((dir + "/" + rel).c_str(), std::ios::binary);
-    if (!f.good())
-        return false;
-    std::ostringstream ss;
-    ss << f.rdbuf();
-    out = ss.str();
-    return true;
+    return repo_try_slurp(rel, out);
 }
 
 // Minimal reader for the flat objects of the vector file: no nesting inside an

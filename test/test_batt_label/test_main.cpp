@@ -1,5 +1,6 @@
 // TDECK-VOLT-01 (#1312) -- src/batt_label.h: OLED equivalence, T-Deck labels, source pins.
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <stdio.h>
 #include <string.h>
 #include <fstream>
@@ -76,14 +77,7 @@ static void test_tdeck_buffer_8_no_truncation(void)
 
 static std::string slurp(const char *rel)
 {
-    std::string file(__FILE__);
-    const std::string suffix = "test/test_batt_label/test_main.cpp";
-    std::string root = file.substr(0, file.size() - suffix.size());
-    std::ifstream f((root + rel).c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 static std::string func_body(const std::string &src, const char *sig)

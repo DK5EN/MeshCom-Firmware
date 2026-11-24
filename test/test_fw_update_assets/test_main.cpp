@@ -4,6 +4,7 @@
 // icssw-org v4.40a) plus a synthetic fork release with .autoupdate assets inserted
 // (dk5en-autoupdate-synthetic.json; the T-Beam-1W.autoupdate asset has its "name" key LAST).
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -17,32 +18,9 @@
 
 // __FILE__ is relative under PlatformIO's native runner, so walk up from the working
 // directory until the test directory and platformio.ini sit side by side.
-static bool file_exists(const std::string &p)
-{
-    std::ifstream f(p.c_str());
-    return f.good();
-}
-
 static std::string read_fixture(const char *name)
 {
-    const std::string rel = std::string("test/test_fw_update_assets/fixtures/") + name;
-    char cwd_buf[4096];
-    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
-    std::string dir(cwd_buf);
-    for (int hops = 0; hops < 16; hops++)
-    {
-        if (file_exists(dir + "/" + rel) && file_exists(dir + "/platformio.ini"))
-            break;
-        const size_t pos = dir.find_last_of('/');
-        if (pos == std::string::npos || pos == 0)
-            TEST_FAIL_MESSAGE("could not derive repo root");
-        dir = dir.substr(0, pos);
-    }
-    std::ifstream f((dir + "/" + rel).c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), "could not open fixture");
-    std::ostringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp((std::string("test/test_fw_update_assets/fixtures/") + name).c_str());
 }
 
 // chunk 0 = the whole document in one call.

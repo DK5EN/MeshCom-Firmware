@@ -6,6 +6,7 @@
 #include <string>
 #include <unistd.h>
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <t-deck/tdeck_pattern.h>
 
 void setUp(void) {}
@@ -94,26 +95,7 @@ static void test_parse_rejects(void)
 // TD-NAV-01: source pins on src/t-deck/lv_obj_functions.cpp (LVGL is not linked on the host).
 static std::string read_repo_file(const char *rel)
 {
-    const std::string self = "test/test_tdeck_pattern/test_main.cpp";
-    char cwd_buf[4096];
-    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
-    std::string dir(cwd_buf);
-    for(int hops = 0; hops < 16; hops++)
-    {
-        std::ifstream a((dir + "/" + self).c_str()), b((dir + "/platformio.ini").c_str());
-        if(a.good() && b.good())
-            break;
-        const size_t pos = dir.find_last_of('/');
-        if(pos == std::string::npos || pos == 0)
-            TEST_FAIL_MESSAGE("could not derive repo root");
-        dir = dir.substr(0, pos);
-    }
-    std::ifstream f((dir + "/" + rel).c_str());
-    // An unreadable file must not pass as "string absent" (TESTGATE-01).
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 static void test_nav01_sat_icon_opens_gps_tab(void)

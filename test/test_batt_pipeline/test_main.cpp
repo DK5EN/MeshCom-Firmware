@@ -657,46 +657,22 @@ static void test_percent_scale_invariant(void)
     }
 }
 
-// The comparison table documented in batt_pipeline.h. "old" and "lin" are
-// re-computed here from the two current implementations' formulas.
-static int oldCurve(float mv, float mx)   // batt_function_old.cpp mv_to_percent(), uint8_t
-{
-    if (mv < mx * 0.785F) return 0;
-    if (mv < mx * 0.857F) { mv -= mx * 0.785F; return (uint8_t)(mv / 30); }
-    if (mv > mx) return 100;
-    mv -= mx * 0.857F;
-    return (uint8_t)(10 + (mv * 0.15F));
-}
-
-static int linCurve(float mv, float mx_mv, float min_v)   // batt_functions.cpp mv_to_percent()
-{
-    float r = (mv / 1000.0f - min_v) / (mx_mv / 1000.0f - min_v) * 100.0f;
-    if (r > 100.0f) r = 100.0f;
-    if (r < 0.0f) r = 0.0f;
-    return (int)roundf(r);
-}
-
+// The comparison table documented in batt_pipeline.h: the row of the current
+// curve. The rows of the two earlier curves were asserted here against copies
+// of those curves and tested nothing in src/ (TESTGATE-01 step 3.7).
 static void test_percent_comparison_table(void)
 {
     static const int mv1[] = {4200, 4100, 4000, 3900, 3800, 3700, 3600, 3500, 3400, 3300};
-    static const int old1[] = {100, 85, 70, 55, 40, 25, 10, 6, 3, 0};
     static const int new1[] = {100, 90, 75, 60, 40, 20, 10, 5, 3, 0};
-    static const int lin1[] = {100, 89, 78, 67, 56, 44, 33, 22, 11, 0};
     for (int i = 0; i < 10; i++)
     {
-        TEST_ASSERT_EQUAL_INT(old1[i], oldCurve((float)mv1[i], 4200.0f));
         TEST_ASSERT_EQUAL_INT(new1[i], battPercent((float)mv1[i], 4200.0f));
-        TEST_ASSERT_EQUAL_INT(lin1[i], linCurve((float)mv1[i], 4200.0f, 3.3f));
     }
     static const int mv2[] = {8400, 8200, 8000, 7800, 7600, 7400, 7200, 7000, 6800, 6600};
-    static const int old2[] = {190, 160, 130, 100, 70, 40, 10, 13, 6, 0};
     static const int new2[] = {100, 90, 75, 60, 40, 20, 10, 5, 3, 0};
-    static const int lin2[] = {100, 89, 79, 68, 58, 47, 37, 26, 16, 5};
     for (int i = 0; i < 10; i++)
     {
-        TEST_ASSERT_EQUAL_INT(old2[i], oldCurve((float)mv2[i], 8400.0f));
         TEST_ASSERT_EQUAL_INT(new2[i], battPercent((float)mv2[i], 8400.0f));
-        TEST_ASSERT_EQUAL_INT(lin2[i], linCurve((float)mv2[i], 8400.0f, 6.5f));
     }
 }
 

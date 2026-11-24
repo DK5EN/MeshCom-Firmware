@@ -1,6 +1,7 @@
 // GPS-AUTOSYM-02/03: automatic symbol hysteresis (src/autosymbol.h) and its call order in setSMartBeaconing().
 //   pio test -e native -f test_autosymbol
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <stdint.h>
 #include <fstream>
 #include <sstream>
@@ -92,14 +93,7 @@ static void test_hold_expires_from_the_sample_not_from_boot(void)
 
 static std::string slurp(const char *rel)
 {
-    std::string file(__FILE__);
-    const std::string suffix = "test/test_autosymbol/test_autosymbol.cpp";
-    std::string root = file.substr(0, file.size() - suffix.size());
-    std::ifstream f((root + rel).c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 static void test_setsmartbeaconing_calls_pick_before_both_returns(void)

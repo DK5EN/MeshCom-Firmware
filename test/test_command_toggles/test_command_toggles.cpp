@@ -16,6 +16,7 @@
  *     (the rung used a bare `return;`) -- the caller depends on the difference.
  */
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -338,7 +339,6 @@ static void test_nbrsym_on_mask_leaves_upper_bits_alone()
 // dem INVERTIERTEN Bit lesen, sonst startet ein frischer Knoten (node_sset4
 // == 0, keine Migration) mit sym aus. Die Dateien lassen sich hier nicht
 // linken (Arduino-Framework), deshalb prueft der Test den Quelltext.
-static std::string repo_root();
 static std::string read_whole_file(const std::string &path);
 
 static void test_nbrsym_boot_restore_reads_inverted_bit()
@@ -390,55 +390,6 @@ static void test_nbr_boot_restore_reads_moved_bits()
 // post column reverts to nullptr/a different function, or that function
 // stops calling resetExternUDP().
 // ---------------------------------------------------------------------------
-
-static bool path_exists(const std::string &p)
-{
-    std::ifstream f(p.c_str());
-    return f.good();
-}
-
-// Repo root, derived from __FILE__ rather than the working directory: a
-// PlatformIO native test binary's CWD is not guaranteed (same reasoning as
-// test/test_udp_send_twin/test_udp_send_twin.cpp's repo_root()).
-static std::string repo_root()
-{
-    std::string file(__FILE__);
-    const std::string suffix = "test/test_command_toggles/test_command_toggles.cpp";
-
-    if (!file.empty() && file[0] == '/')
-    {
-        TEST_ASSERT_TRUE_MESSAGE(
-            file.size() > suffix.size() &&
-                file.compare(file.size() - suffix.size(), suffix.size(), suffix) == 0,
-            ("unexpected absolute __FILE__ shape: " + file).c_str());
-        std::string root = file.substr(0, file.size() - suffix.size());
-        while (!root.empty() && root.back() == '/')
-            root.pop_back();
-        TEST_ASSERT_TRUE_MESSAGE(path_exists(root + "/platformio.ini"),
-                                 ("derived repo root does not look like one "
-                                  "(no platformio.ini): " + root).c_str());
-        return root;
-    }
-
-    char cwd_buf[4096];
-    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
-    std::string dir(cwd_buf);
-
-    for (int hops = 0; hops < 16; hops++)
-    {
-        if (path_exists(dir + "/" + file) && path_exists(dir + "/platformio.ini"))
-            return dir;
-        if (dir.empty() || dir == "/")
-            break;
-        size_t pos = dir.find_last_of('/');
-        dir = (pos == std::string::npos || pos == 0) ? "/" : dir.substr(0, pos);
-    }
-
-    TEST_FAIL_MESSAGE(("could not derive repo root: walked up from the runtime "
-                       "cwd looking for '" + file + "' next to platformio.ini "
-                       "and found neither").c_str());
-    return "";
-}
 
 static std::string read_whole_file(const std::string &path)
 {

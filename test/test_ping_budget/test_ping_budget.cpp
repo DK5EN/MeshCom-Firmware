@@ -1,6 +1,7 @@
 // PING-NRF-01: ping budget helpers (src/ping_budget.h) shared by esp32_main.cpp and nrf52_main.cpp.
 //   pio test -e native -f test_ping_budget
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -47,14 +48,7 @@ static void test_track_and_invalid_do_not_decrement(void)
 
 static std::string slurp(const char *rel)
 {
-    std::string file(__FILE__);
-    const std::string suffix = "test/test_ping_budget/test_ping_budget.cpp";
-    std::string root = file.substr(0, file.size() - suffix.size());
-    std::ifstream f((root + rel).c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 static void test_both_loops_use_the_helpers(void)

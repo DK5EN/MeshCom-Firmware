@@ -5,6 +5,7 @@
 //   pio test -e native_netif_mtu
 
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <unistd.h>
 #include <fstream>
 #include <sstream>
@@ -38,24 +39,7 @@ static void test_clamp_out_of_range_falls_back_to_1280(void)
 // Repo root = first parent of cwd that holds platformio.ini (pio test runs from it).
 static std::string read_repo_file(const char *rel)
 {
-    char cwd_buf[1024];
-    TEST_ASSERT_NOT_NULL_MESSAGE(getcwd(cwd_buf, sizeof(cwd_buf)), "getcwd() failed");
-    std::string dir(cwd_buf);
-    for (int hops = 0; hops < 16; hops++)
-    {
-        std::ifstream probe((dir + "/platformio.ini").c_str());
-        if (probe.good())
-            break;
-        const size_t pos = dir.find_last_of('/');
-        if (pos == std::string::npos || pos == 0)
-            TEST_FAIL_MESSAGE("could not derive repo root");
-        dir = dir.substr(0, pos);
-    }
-    std::ifstream f((dir + "/" + rel).c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
-    std::ostringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
+    return repo_slurp(rel);
 }
 
 // The body of `case <ev>:` up to the next case/default.

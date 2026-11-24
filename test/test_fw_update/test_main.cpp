@@ -1036,13 +1036,11 @@ static void test_wrap_attempt_spacing(void)
     TEST_ASSERT_TRUE(now + H6 < now);                           // really wrapped
 }
 
-// #1187: pre-TLS heap gate. The old rule looked at the largest block only.
-static bool oldBlockOnlyRule(uint32_t largestBlk) { return largestBlk >= 17000u; }
+// #1187: pre-TLS heap gate. The old rule looked at the largest block only (>= 17000).
 
 void test_heap_gate_total_free_classic(void)
 {
-    // failing T-Beam run (phone on BLE): block rule passes, TLS then failed with -10368
-    TEST_ASSERT_TRUE(oldBlockOnlyRule(57332));
+    // failing T-Beam run (phone on BLE): the old block rule passed, TLS then failed with -10368
     TEST_ASSERT_FALSE(fwNetHeapOk(59832, 57332, 76000u, 17000u));
     // good run (BLE paused)
     TEST_ASSERT_TRUE(fwNetHeapOk(88180, 57332, 76000u, 17000u));
@@ -1054,7 +1052,6 @@ void test_heap_gate_total_free_classic(void)
 void test_heap_gate_internal_tdeck_refuses(void)
 {
     // AU-13 field case: 8BIT block 4456436 (PSRAM) passed the old rule, internal numbers must refuse
-    TEST_ASSERT_TRUE(oldBlockOnlyRule(4456436));
     TEST_ASSERT_FALSE(fwNetHeapGate(false, 20000, 15000, 0, 0u, 17000u, 24000u));
     // without the allocator a large PSRAM block must not count
     TEST_ASSERT_FALSE(fwNetHeapGate(false, 20000, 15000, 4456436, 0u, 17000u, 24000u));

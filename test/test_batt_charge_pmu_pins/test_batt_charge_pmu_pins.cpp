@@ -9,6 +9,7 @@
 //
 //   pio test -e native_batt_charge -f test_batt_charge_pmu_pins
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -20,24 +21,7 @@ void tearDown(void) {}
 
 static std::string read_rel(const char *rel)
 {
-    static const char *prefixes[] = { "", "../", "../../", "../../../", "../../../../" };
-    char path[512];
-    for (const char *p : prefixes)
-    {
-        snprintf(path, sizeof(path), "%s%s", p, rel);
-        FILE *f = fopen(path, "rb");
-        if (!f)
-            continue;
-        std::string s;
-        char b[4096];
-        size_t n;
-        while ((n = fread(b, 1, sizeof(b), f)) > 0)
-            s.append(b, n);
-        fclose(f);
-        return s;
-    }
-    TEST_FAIL_MESSAGE("source file not found");
-    return std::string();
+    return repo_slurp(rel);
 }
 
 // The MODUL_FW_TBEAM branch of loopAction_battCheck(): from its #elif to the next #else.

@@ -23,6 +23,7 @@
 
 #include "../../src/mc_text.h"
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,15 +59,7 @@ void tearDown(void) {}
 
 static FILE *openRel(const char *rel, const char *mode)
 {
-    static const char *prefixes[] = { "", "../", "../../", "../../../", "../../../../" };
-    char path[512];
-    for (const char *p : prefixes)
-    {
-        snprintf(path, sizeof(path), "%s%s", p, rel);
-        FILE *f = fopen(path, mode);
-        if (f) return f;
-    }
-    return nullptr;
+    return repo_fopen(rel, mode);
 }
 
 static String unhex(const char *hex)

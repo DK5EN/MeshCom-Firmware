@@ -15,6 +15,7 @@
 //   pio test -e native_config
 
 #include <unity.h>
+#include "../support/repo_file.h"
 
 #include <string>
 #include <cstring>
@@ -879,19 +880,7 @@ static void test_import_without_autoupd_updchan_keeps_current_values(void)
 /* Source text of a repo file; pio runs native tests from the project root, a few "../" are tolerated. */
 static std::string read_file(const char *rel)
 {
-    std::string prefix;
-    for (int up = 0; up < 5; up++, prefix += "../")
-    {
-        std::ifstream in(prefix + rel, std::ios::binary);
-        if (in)
-        {
-            std::ostringstream ss;
-            ss << in.rdbuf();
-            return ss.str();
-        }
-    }
-    TEST_FAIL_MESSAGE("repo file not found");
-    return std::string();
+    return repo_slurp(rel);
 }
 
 /* Production lock: node_ptime / node_pingtime / node_pingmax keep their OLD wide import ranges

@@ -11,6 +11,7 @@
 //   pio test -e native -f test_csma_timing
 
 #include <unity.h>
+#include "../support/repo_file.h"
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -298,14 +299,7 @@ static void test_ack_age01_ack_stufe1_frueher(void)
 // 6-20 s range never reaches the floor (csma_compute_timeout_slot, lora_functions.cpp).
 static void test_ack_age01_aufrufstelle_nutzt_ack_stufe(void)
 {
-    std::string file(__FILE__);
-    const std::string suffix = "test/test_csma_timing/test_csma_timing.cpp";
-    std::string path = file.substr(0, file.size() - suffix.size()) + "src/lora_functions.cpp";
-    std::ifstream f(path.c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE(f.good());
-    std::stringstream ss;
-    ss << f.rdbuf();
-    std::string s = ss.str();
+    std::string s = repo_slurp("src/lora_functions.cpp");
     const size_t a = s.find("unsigned long csma_compute_timeout_slot(int attempt, int slot) {");
     TEST_ASSERT_TRUE(a != std::string::npos);
     const std::string body = s.substr(a, 1500);
@@ -317,14 +311,7 @@ static void test_ack_age01_aufrufstelle_nutzt_ack_stufe(void)
 
 static void test_csma03_nrf52loop_delay_nutzt_helper(void)
 {
-    std::string file(__FILE__);
-    const std::string suffix = "test/test_csma_timing/test_csma_timing.cpp";
-    std::string path = file.substr(0, file.size() - suffix.size()) + "src/nrf52/nrf52_main.cpp";
-    std::ifstream f(path.c_str(), std::ios::binary);
-    TEST_ASSERT_TRUE(f.good());
-    std::stringstream ss;
-    ss << f.rdbuf();
-    std::string s = ss.str();
+    std::string s = repo_slurp("src/nrf52/nrf52_main.cpp");
     // The loop period comes from the helper. Non-T114 sleeps it in one piece; T114 splits it into
     // <= 10 ms steps for button and GPS UART polling (merge of upstream #1265/#1266).
     TEST_ASSERT_TRUE(s.find("unsigned long _dl_ms = csmaLoopDelayMs(_dl_ip, _dl_df);") != std::string::npos);
