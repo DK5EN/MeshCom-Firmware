@@ -352,6 +352,40 @@ void test_sbwhy_key(void)
     TEST_ASSERT_NOT_NULL(strstr(out, ",\"sbwhy\":\"ok\"}"));
 }
 
+// AU-30: "vpend" rides outside auStatusJson (goldens unchanged), 0 or 1, last key; no room or no object -> unchanged
+void test_vpend_key(void)
+{
+    char out[512];
+    AuUiIn in = inE();
+    size_t n = auStatusJson(in, out, sizeof(out));
+    TEST_ASSERT_EQUAL_STRING(AU_GOLDEN_E_JSON, out);
+    size_t m = auAppendVpend(out, sizeof(out), n, 1);
+    TEST_ASSERT_EQUAL_UINT32(n + strlen(",\"vpend\":1"), m);
+    TEST_ASSERT_EQUAL_STRING(",\"vpend\":1}", out + m - strlen(",\"vpend\":1}"));
+    TEST_ASSERT_EQUAL_UINT32(strlen(out), m);
+    n = auStatusJson(in, out, sizeof(out));
+    m = auAppendVpend(out, sizeof(out), n, 0);
+    TEST_ASSERT_EQUAL_STRING(",\"vpend\":0}", out + m - strlen(",\"vpend\":0}"));
+    n = auStatusJson(in, out, sizeof(out));
+    m = auAppendVpend(out, sizeof(out), n, 7); // any non-zero is 1
+    TEST_ASSERT_EQUAL_STRING(",\"vpend\":1}", out + m - strlen(",\"vpend\":1}"));
+    // exact fit works, one byte less leaves the body as it was
+    n = auStatusJson(in, out, sizeof(out));
+    const size_t need = n + strlen(",\"vpend\":1") + 1;
+    TEST_ASSERT_EQUAL_UINT32(need - 1, auAppendVpend(out, need, n, 1));
+    n = auStatusJson(in, out, sizeof(out));
+    TEST_ASSERT_EQUAL_UINT32(n, auAppendVpend(out, need - 1, n, 1));
+    TEST_ASSERT_EQUAL_STRING(AU_GOLDEN_E_JSON, out);
+    // not an object / null / too short: unchanged
+    char bad[16] = "abc";
+    TEST_ASSERT_EQUAL_UINT32(3, auAppendVpend(bad, sizeof(bad), 3, 1));
+    TEST_ASSERT_EQUAL_STRING("abc", bad);
+    TEST_ASSERT_EQUAL_UINT32(5, auAppendVpend(nullptr, 10, 5, 1));
+    char empty[16] = "{}";
+    TEST_ASSERT_EQUAL_UINT32(strlen("{\"vpend\":1}"), auAppendVpend(empty, sizeof(empty), 2, 1));
+    TEST_ASSERT_EQUAL_STRING("{\"vpend\":1}", empty);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -365,5 +399,6 @@ int main(int, char **)
     RUN_TEST(test_escaping);
     RUN_TEST(test_overflow_and_truncation);
     RUN_TEST(test_sbwhy_key);
+    RUN_TEST(test_vpend_key);
     return UNITY_END();
 }

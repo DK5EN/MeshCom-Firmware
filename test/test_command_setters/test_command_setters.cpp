@@ -926,10 +926,14 @@ static void test_au_tick_and_wifi_gate_are_wired_in_esp32_main()
                                  "handover must validate the record, print [AU];handover;<tag> and call auRebootToSafeboot()");
         TEST_ASSERT_TRUE_MESSAGE(once < set && set < mark && mark < print && print < reboot,
                                  "handover order must be: once per tag, hand marker, [AU];handover;<tag>, reboot");
-        // R1/R5: a handover that returns (no Safeboot / boot partition not settable) drops the record
+        // R1/R5, AU-30: a handover that returns (no Safeboot / boot partition not settable) keeps the record and withdraws
+        // the hand marker (same as the verify boot and the web install path); it never deletes the record
         const size_t fail = hr.find("[AU];fail;nosafeboot");
-        const size_t clr = hr.find("fwNetClearRecord()");
-        TEST_ASSERT_TRUE_MESSAGE(reboot < fail && fail < clr, "a failed handover must print nosafeboot and then fwNetClearRecord()");
+        const size_t unmark = hr.find("fwNetUnmarkHandover()");
+        TEST_ASSERT_TRUE_MESSAGE(fail != std::string::npos && unmark != std::string::npos && reboot < fail && fail < unmark,
+                                 "a failed handover must print nosafeboot and then fwNetUnmarkHandover()");
+        TEST_ASSERT_TRUE_MESSAGE(hr.find("fwNetClearRecord()") == std::string::npos,
+                                 "a failed handover must not delete the staged record");
         // the tick: the FW_HANDOVER branch re-reads and re-validates the record and hands it to the helper
         const size_t ho = body.find("if(act == FW_HANDOVER)");
         TEST_ASSERT_TRUE_MESSAGE(ho != std::string::npos, "FW_HANDOVER branch missing in auTick");

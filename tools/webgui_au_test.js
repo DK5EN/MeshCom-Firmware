@@ -736,6 +736,27 @@ async function mkPage(node, opts) {
     check('getter handlers exist for the three names', ['audelay', 'auday', 'autime'].every((n) => (setup.match(new RegExp('paramName\\.equals\\("' + n + '"\\)', 'g')) || []).length === 2));
   }
 
+  // ---- AU-30: a record whose dry run was deferred to the install ("vpend":1) is not called verified ---------------
+  {
+    const withVpend = (k, v) => J(k).replace(/\}$/, ',"vpend":' + v + '}');
+    const V1 = await mkPage(mkNode(withVpend('E', 1)));
+    await V1.init();
+    check('AU-30: E with vpend 1 says "downloaded, checked at install", Install now stays', /Firmware v4\.40a\.10\.18 downloaded, checked at install/.test(V1.view().msg) && !/verified/.test(V1.view().msg) &&
+      V1.view().btn === 'Install now' && V1.view().red && V1.view().act === 'apply' && V1.w.auState(JSON.parse(withVpend('E', 1)), false) === 'E', JSON.stringify(V1.view()));
+    V1.w.auPageLeave();
+    const V0 = await mkPage(mkNode(withVpend('E', 0)));
+    await V0.init();
+    check('AU-30: E with vpend 0 says "downloaded and verified"', /Firmware v4\.40a\.10\.18 downloaded and verified/.test(V0.view().msg), JSON.stringify(V0.view()));
+    V0.w.auPageLeave();
+    const VN = await mkPage(mkNode(J('E')));
+    await VN.init();
+    check('AU-30: an answer without "vpend" (older firmware) says "downloaded and verified"', /downloaded and verified/.test(VN.view().msg), JSON.stringify(VN.view()));
+    VN.w.auPageLeave();
+    check('AU-30: /austatus appends "vpend" outside auStatusJson from fwNetVerifyPending of the staged tag (goldens unchanged)',
+      /auAppendVpend\(body, sizeof\(body\), n, \(au\.staged && fwNetVerifyPending\(au\.stagedTag\)\) \? 1 : 0\)/.test(cpp) &&
+      !/w\.key\("vpend"\)/.test(fs.readFileSync(path.join(ROOT, 'src', 'web_functions', 'au_ui_state.h'), 'utf8').split('auAppendVpend')[0]));
+  }
+
   // ---- error table mirror (spec 4.3) --------------------------------------------------------------------------------
   {
     const P = await mkPage(mkNode(J('A')));

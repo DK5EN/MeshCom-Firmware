@@ -1709,6 +1709,118 @@ static void test_job_restart_once_only_for_a_split_heap(void)
     TEST_ASSERT_FALSE(fwJobRestartDue(true, false, true, false)); // the job ended for another reason
 }
 
+// OTA-LOWHEAP-01 / AU-30: the job task's 10 KB stack was created before the BLE pause and sits in the biggest block, so
+// the 32 KB AU buffer finds only 25-27 KB (T-Beam, "[AU];buf32;none"). One early restart on a stack allocated with BLE down.
+static void test_job_early_restart_only_for_a_missing_au_buffer(void)
+{
+    TEST_ASSERT_TRUE(fwJobEarlyRestartDue(true, false, false, false));
+    TEST_ASSERT_FALSE(fwJobEarlyRestartDue(false, false, false, false)); // BLE up: the stack is not what blocks the buffer
+    TEST_ASSERT_FALSE(fwJobEarlyRestartDue(true, true, false, false));   // only once per job (also no second end-of-job restart)
+    TEST_ASSERT_FALSE(fwJobEarlyRestartDue(true, false, true, false));   // PSRAM board: records live in PSRAM, no AU buffer
+    TEST_ASSERT_FALSE(fwJobEarlyRestartDue(true, false, false, true));   // the AU buffer is there
+}
+
+// OTA-LOWHEAP-01 / AU-30: T-Beam, the dry run's 32 KB + 11.4 KB never exist after WiFi start. Only a memory failure on a
+// classic ESP32 without PSRAM, with the bytes proven against the release digest, is deferred to a verify boot.
+static void test_dry_defer_only_for_nomem_on_classic_with_a_verified_digest(void)
+{
+    TEST_ASSERT_TRUE(fwDryDeferOk(true, true, true));
+    TEST_ASSERT_FALSE(fwDryDeferOk(false, true, true)); // S3 / PSRAM: unchanged, the refusal stays
+    TEST_ASSERT_FALSE(fwDryDeferOk(true, false, true)); // inflate_chk / image / env: a real verdict, never deferred
+    TEST_ASSERT_FALSE(fwDryDeferOk(true, true, false)); // STAGELAN: no release digest to lean on
+}
+
+// AU-30: the apply goes through the verify boot only when the mark names exactly the staged tag; no mark (records from
+// before AU-30, verified records) hands over as before.
+static void test_apply_needs_verify_boot_only_for_the_marked_tag(void)
+{
+    TEST_ASSERT_TRUE(fwApplyNeedsVerifyBoot("v4.40a.11.24", "v4.40a.11.24"));
+    TEST_ASSERT_FALSE(fwApplyNeedsVerifyBoot("v4.40a.11.24", ""));             // no mark: verified
+    TEST_ASSERT_FALSE(fwApplyNeedsVerifyBoot("v4.40a.11.24", "v4.40a.11.23")); // a mark of another record
+    TEST_ASSERT_FALSE(fwApplyNeedsVerifyBoot("", ""));
+    TEST_ASSERT_FALSE(fwApplyNeedsVerifyBoot(nullptr, "v4.40a.11.24"));
+    TEST_ASSERT_FALSE(fwApplyNeedsVerifyBoot("v4.40a.11.24", nullptr));
+}
+
+// AU-30 (advisor rework): stage commit order and rollback, on a fake NVS. The order is the invariant: no deferred
+// record without its mark at any cut, and a failed write leaves none of the three keys (the old code left "last").
+struct FakeNvs
+{
+    bool have[3];
+    int failKey; // -1 = no failure
+    int puts;
+    FwStageKey order[3];
+};
+static bool fakePut(void *c, FwStageKey k)
+{
+    FakeNvs &n = *(FakeNvs *)c;
+    if ((int)k == n.failKey)
+        return false;
+    n.have[k] = true;
+    n.order[n.puts++] = k;
+    return true;
+}
+static void fakeDrop(void *c, FwStageKey k) { ((FakeNvs *)c)->have[k] = false; }
+static FakeNvs fakeNvs(int failKey)
+{
+    FakeNvs n;
+    memset(&n, 0, sizeof(n));
+    n.failKey = failKey;
+    return n;
+}
+
+static void test_stage_commit_mark_first_then_record_then_guard(void)
+{
+    FakeNvs n = fakeNvs(-1);
+    TEST_ASSERT_TRUE(fwStageCommit(true, fakePut, fakeDrop, &n));
+    TEST_ASSERT_EQUAL_INT(3, n.puts);
+    TEST_ASSERT_EQUAL_UINT8(FW_SK_VPEND, n.order[0]); // the mark before the record: a cut never leaves an unmarked record
+    TEST_ASSERT_EQUAL_UINT8(FW_SK_REC, n.order[1]);
+    TEST_ASSERT_EQUAL_UINT8(FW_SK_LAST, n.order[2]);
+    TEST_ASSERT_TRUE(n.have[FW_SK_VPEND] && n.have[FW_SK_REC] && n.have[FW_SK_LAST]);
+    // verified dry run: no mark written, record then guard
+    n = fakeNvs(-1);
+    TEST_ASSERT_TRUE(fwStageCommit(false, fakePut, fakeDrop, &n));
+    TEST_ASSERT_EQUAL_INT(2, n.puts);
+    TEST_ASSERT_EQUAL_UINT8(FW_SK_REC, n.order[0]);
+    TEST_ASSERT_EQUAL_UINT8(FW_SK_LAST, n.order[1]);
+    TEST_ASSERT_FALSE(n.have[FW_SK_VPEND]);
+}
+
+static void test_stage_commit_failure_leaves_no_key(void)
+{
+    for (int pend = 0; pend < 2; pend++)
+        for (int fail = (int)FW_SK_VPEND; fail <= (int)FW_SK_LAST; fail++)
+        {
+            if (!pend && fail == (int)FW_SK_VPEND)
+                continue; // no mark is written for a verified dry run
+            FakeNvs n = fakeNvs(fail);
+            TEST_ASSERT_FALSE(fwStageCommit(pend != 0, fakePut, fakeDrop, &n));
+            // the "last" guard of a failed commit is gone too: it would block the re-download of this tag
+            TEST_ASSERT_FALSE(n.have[FW_SK_VPEND]);
+            TEST_ASSERT_FALSE(n.have[FW_SK_REC]);
+            TEST_ASSERT_FALSE(n.have[FW_SK_LAST]);
+            // nothing is written after the failed key
+            for (int i = 0; i < n.puts; i++)
+                TEST_ASSERT_TRUE((int)n.order[i] < fail);
+        }
+}
+
+// AU-30 (advisor rework): a verify boot that finds the right record without a mark hands it over (it is verified);
+// only a real tag mismatch is a failure that drops the record.
+static void test_verify_boot_plan_keeps_a_verified_record(void)
+{
+    TEST_ASSERT_EQUAL_UINT8(FWVBP_DRYRUN, fwVerifyBootPlan("v4.40a.11.24", "v4.40a.11.24", "v4.40a.11.24"));
+    TEST_ASSERT_EQUAL_UINT8(FWVBP_ALREADY, fwVerifyBootPlan("v4.40a.11.24", "v4.40a.11.24", ""));
+    TEST_ASSERT_EQUAL_UINT8(FWVBP_ALREADY, fwVerifyBootPlan("v4.40a.11.24", "v4.40a.11.24", "v4.40a.11.23")); // a stale mark of another tag
+    TEST_ASSERT_EQUAL_UINT8(FWVBP_MISMATCH, fwVerifyBootPlan("v4.40a.11.24", "v4.40a.11.23", "v4.40a.11.24"));
+    TEST_ASSERT_EQUAL_UINT8(FWVBP_MISMATCH, fwVerifyBootPlan("v4.40a.11.24", "v4.40a.11.23", ""));
+    TEST_ASSERT_EQUAL_UINT8(FWVBP_MISMATCH, fwVerifyBootPlan("", "", ""));
+    TEST_ASSERT_EQUAL_UINT8(FWVBP_MISMATCH, fwVerifyBootPlan(nullptr, "v4.40a.11.24", "v4.40a.11.24"));
+    TEST_ASSERT_EQUAL_UINT8(FWVBP_MISMATCH, fwVerifyBootPlan("v4.40a.11.24", nullptr, "v4.40a.11.24"));
+    TEST_ASSERT_EQUAL_UINT8(FWVBP_ALREADY, fwVerifyBootPlan("v4.40a.11.24", "v4.40a.11.24", nullptr));
+}
+
 static void test_shed_skipped_while_a_restart_can_fix_the_split(void)
 {
     TEST_ASSERT_TRUE(fwShedSkipForRestart(true, 80000u, 76000u));
@@ -2013,6 +2125,12 @@ int main(int, char **)
     RUN_TEST(test_bleguard_release_words_and_phone_rule);
     RUN_TEST(test_shed_allowed_not_while_a_phone_holds_ble);
     RUN_TEST(test_job_restart_once_only_for_a_split_heap);
+    RUN_TEST(test_job_early_restart_only_for_a_missing_au_buffer);
+    RUN_TEST(test_dry_defer_only_for_nomem_on_classic_with_a_verified_digest);
+    RUN_TEST(test_apply_needs_verify_boot_only_for_the_marked_tag);
+    RUN_TEST(test_stage_commit_mark_first_then_record_then_guard);
+    RUN_TEST(test_stage_commit_failure_leaves_no_key);
+    RUN_TEST(test_verify_boot_plan_keeps_a_verified_record);
     RUN_TEST(test_shed_skipped_while_a_restart_can_fix_the_split);
     RUN_TEST(test_shed_first_stage_is_kiss_only);
     RUN_TEST(test_shed_second_stage_console_only_when_the_estimate_closes_the_gap);

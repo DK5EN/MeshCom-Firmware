@@ -27,10 +27,10 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
   - Next: advisor verdict on 3b+3c, then the gate (board builds sequential, link proof for the overrides, host stage
     1,2 without `--formal`), then commit on fork-dev.
 
-- **AU-28 / AU-29 fixed (2026-11-24):** Auto Update download failed `conn -7` on every ESP32 image built since
-  2026-11-23 17:03 (FORMAL-01 AE-01 capped HTTP header lines at 2 KB; github.com sends a 4.2 KB CSP line); AE-01v2 drains
-  long unused lines, the store upgrades itself. T-Beam TASK_WDT in the staging erase fixed with a real gap + IDLE0 wait.
-  Bench green on DK5EN-1 and DK5EN-92 (fix images flashed). Open: T-Beam `nomem` right after the download. Campaign doc
+- **AU-28 / AU-29 / AU-30 fixed (2026-11-24):** download `conn -7` (AE-01v2), T-Beam TASK_WDT in the staging erase,
+  and the T-Beam heap at the web Install: early stack restart, dry run deferred to a verify boot before WiFi when memory
+  is short, one BLE pause per click. Bench: T-Beam 10/10 web installs, Install now -> verify boot -> Safeboot -> 11.22
+  PASS; V3 unchanged. DK5EN-92 now runs CI 11.22, DK5EN-1 the AU-30 bench build with 11.22 staged. Campaign doc
   section "2026-11-24".
 
 - **OTA-LOWHEAP-01 running (fork issue DK5EN/MeshCom-Firmware#3):** ESP32-S3 Auto Update refuses with "Not enough

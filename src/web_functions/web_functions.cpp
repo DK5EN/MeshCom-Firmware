@@ -4973,6 +4973,9 @@ static void sub_au_status()
         fwNetSchedGet(sv);
         n = auAppendSched(body, sizeof(body), n, sv.text);
     }
+    // AU-30 "vpend": the staged record's dry run was deferred to the install (the page says "checked at install").
+    // One NVS read, only while a record is staged.
+    n = auAppendVpend(body, sizeof(body), n, (au.staged && fwNetVerifyPending(au.stagedTag)) ? 1 : 0);
     // "up": seconds since boot, appended outside auStatusJson. The page compares it across the install restart
     // when the build tag cannot be compared (an image built without MC_BUILD_TAG reports run "local").
     n = fwJsonAppendUp(body, sizeof(body), n, (uint32_t)(esp_timer_get_time() / 1000000));

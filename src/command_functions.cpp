@@ -313,6 +313,15 @@ bool auRebootToSafeboot(void)
     esp_restart();
     return true;   // not reached
 }
+
+// OTA-LOWHEAP-01 / AU-30: restart into the app for the verify boot (NVS "vfy" armed by the caller). Declared in
+// esp32/fw_update_net.h. The log line leaves before the restart.
+[[noreturn]] void auRestartForVerify(void)
+{
+    Serial.flush();
+    loopCrumbClear();   // INS-05: deliberate restart
+    esp_restart();
+}
 #endif
 
 int commandCheck(char *msg, char *command)
@@ -1703,6 +1712,15 @@ void commandAction(char *umsg_text, bool ble)
         {
             Serial.printf("[AU];ota-update;note;safeboot_too_old;ver;%d;need;%d;nocap;%d;proceeding\n", fwNetSafebootVersion(), AU_SAFEBOOT_MIN, fwNetSafebootOld() ? 1 : 0);
             Serial.printf("[AU];note;flash once with the web flasher to install the new Safeboot\n");
+        }
+        // AU-30: Safeboot applies any record it finds; one whose dry run is still pending must not reach it unproven
+        {
+            FwStageRecord _vrec;
+            if(fwNetLoadRecord(_vrec) && fwNetVerifyPending(_vrec.tag))
+            {
+                fwNetClearRecord();
+                Serial.printf("[AU];ota-update;dropped_unverified;%s\n", _vrec.tag);
+            }
         }
         auRebootToSafeboot();   // returns only without a safeboot partition (or AU-16: DIO bootloader, already reported)
 
@@ -6141,8 +6159,20 @@ void commandAction(char *umsg_text, bool ble)
                 Serial.printf("[AU];bleguard;cycle;start;%lu%s\n", _bn, _bctl ? ";ctl" : "");
             #endif
         }
-        // bench only: --update forget clears fwstage/last, so the tag can be offered again
+        // bench only: --update checknow makes the automatic check path due now
         else
+        if(casecmp(_owner_c, (char*)"checknow") == 0)
+        {
+            auInstrCheckNow();
+            Serial.printf("[AU];checknow;armed\n");
+        }
+        else
+#endif
+        // OTA-LOWHEAP-01 / AU-30: forget and unstage also exist in MC_AU_TEST bench builds (tools/mc_build_defines.py),
+        // so repeated download runs need no INSTRUMENT image and no reflash between runs. Bench only: MC_AU_TEST is
+        // never set in CI or release builds.
+#if INSTRUMENT_ENABLED || defined(MC_AU_TEST)
+        // bench only: --update forget clears fwstage/last, so the tag can be offered again
         if(casecmp(_owner_c, (char*)"forget") == 0)
             Serial.printf("[AU];forget;%s\n", fwNetForgetLast() ? "ok" : "failed");
         // bench only: --update unstage drops the staged record (NVS) so a download can be measured again
@@ -6151,13 +6181,6 @@ void commandAction(char *umsg_text, bool ble)
         {
             fwNetClearRecord();
             Serial.printf("[AU];unstage;ok\n");
-        }
-        // bench only: --update checknow makes the automatic check path due now
-        else
-        if(casecmp(_owner_c, (char*)"checknow") == 0)
-        {
-            auInstrCheckNow();
-            Serial.printf("[AU];checknow;armed\n");
         }
         else
 #endif
@@ -6199,6 +6222,15 @@ void commandAction(char *umsg_text, bool ble)
             }
             else
             {
+#if AU_BLE_PAUSE
+                // OTA-LOWHEAP-01 / AU-30: one user action, one BLE pause. With no phone on BLE the CHECK runs under the
+                // guard with the DOWNLOAD chained (auGuardTick starts it only for an installable newer release), so the
+                // heap freed by the pause and the AU buffer carry over instead of a second pause and a second click.
+                // Loop task (console and the web "updinstall" button both run here), as auBleGuardRequest requires.
+                if(!fwNetPhoneHeld() && !auBleGuardActive() && auBleGuardRequest(true))
+                    Serial.printf("[AU];install;check_first;chain\n");
+                else
+#endif
                 // nothing known to be newer yet: check first, the user retries when it is done
                 if(fwNetStart(FWJ_CHECK, (uint8_t)meshcom_settings.node_updchan))
                     Serial.printf("[AU];install;check_first;retry_when_done\n");
@@ -6239,6 +6271,19 @@ void commandAction(char *umsg_text, bool ble)
                     Serial.printf("[AU];apply;note;old_safeboot_flag_set_trying_anyway\n");
                 else if(!fwNetSafebootCapable())
                     Serial.printf("[AU];apply;note;safeboot_too_old;ver;%d;trying_anyway\n", fwNetSafebootVersion());
+                if(fwNetVerifyPending(_rec.tag))
+                {
+                    // AU-30: the dry run was deferred (no memory after the download): run it on a verify boot first,
+                    // which hands over itself when it passes
+                    if(!fwNetArmVerifyBoot(_rec.tag))
+                        Serial.printf("[ERR];update;nvs\n");
+                    else
+                    {
+                        Serial.printf("[AU];apply;verify_boot;%s\n", _rec.tag);
+                        auRestartForVerify();
+                    }
+                }
+                else
                 if(!fwNetMarkHandover(_rec.tag))   // before the reboot, as in the auto path
                 {
                     Serial.printf("[ERR];update;nvs\n");

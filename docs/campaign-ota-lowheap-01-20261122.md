@@ -506,3 +506,35 @@ images built before today's commits. Both need an operator decision; measurement
   margin.
 - Note: a local build without a date in its version honours the "last installed tag" lock (AU-27), so after a staged
   11.22 it reports `newer;0`; bench builds that must download need `MC_BUILD_TAG`.
+
+### AU-30: T-Beam install reliable from the web GUI (2026-11-24)
+
+- **Field-like test first:** the web Install button (`/callfunction/?updinstall=`, page load and `/austatus` polling as
+  the browser does) on a normal build staged only 2 of 5 on DK5EN-92. Two causes: the job task's 10 KB stack is created
+  before the BLE pause and lands in the biggest block (buf32 missed, 25-30 KB left), and after the download the dry run's
+  11,412 B decompressor state finds no block even with buf32 held. At boot before WiFi the big region is whole (110 KB).
+- **Fix (`fw_update_net.cpp`, `esp32_main.cpp`, `command_functions.cpp`):**
+  - Early restart: buf32 missed with BLE down -> the job restarts once on a new stack while the largest block is held
+    (`[AU];shed;restart;buf32` then `placed` or `noblk`), then takes buf32.
+  - Check at install: on classic ESP32 without PSRAM a dry run that lacks only memory stages the image with NVS `vpend`
+    (written before the record; `[AU];stage;ok;...;vfy;pending`). Every apply path then restarts into the app (`vfy`),
+    which runs the dry run before BLE and WiFi start and only then hands over to Safeboot; a failed check drops the
+    record and shows the reason. `--ota-update` drops an unchecked record. Web text: "downloaded, checked at install"
+    (`/austatus` `vpend`).
+  - One click, one BLE pause: `--update install` / web Install with nothing known yet runs check + download under the
+    BLE guard (no phone connected); the CHECK keeps buf32 for the chained DOWNLOAD; a refused chain start is retried
+    (`[AU];bleguard;chain;retry`), `startJob` logs `[AU];task;nostack`.
+  - A failed handover keeps the staged record (same in all paths).
+  - Bench build flag `MC_AU_TEST=1` (never in CI/release): `--update forget` / `unstage` in normal builds.
+- **Reviews:** two advisor rounds (Opus): round 1 rejected the stack restart without a held block and a DryMem reserve
+  that never fired (removed); round 2 asked for the NVS write order, counter restore, internal read buffer, keeping a
+  verified record, one failed-handover behaviour, the web text (all done); re-check APPROVED.
+- **Bench (normal build with `MC_AU_TEST`, `au30c-web-series/`, `au30c-v3-series/`):**
+  - DK5EN-92: 10/10 web installs staged (5 cold, 5 warm), 0 TASK_WDT; 5 checked in place, 5 `vfy;pending`; early restart
+    8x (6 placed, 1 noblk). Install now on a pending image: `[AU];apply;verify_boot` -> `verify_boot;ok;free;146948;blk;110580`
+    -> handover -> `[SAFEBOOT];apply;ok;bytes;1861584;ms;15879` -> 11.22 runs, identity intact.
+  - DK5EN-1 (V3): 4/5 staged; the 5th was a direct install call with nothing known (S3 keeps "check first", the web UI
+    offers Check now in that state).
+- Gate: `tools/regression.sh --stage 1,2`: 4236 Unity cases ok; suite inventory regenerated; `webgui_au_test.js` ALL PASSED.
+- Follow-ups (BACKLOG): crash marker for the verify boot before automatic install is enabled; `stagePrepare` staging
+  block caps (8BIT vs INTERNAL on PSRAM boards); an error token when the chain retry gives up.

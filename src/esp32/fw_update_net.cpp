@@ -96,8 +96,11 @@ void fwNetHeapNow(uint32_t *ifree, uint32_t *iblk)
 }
 #if INSTRUMENT_ENABLED
 void fwNetSetHeapGateOverride(uint32_t) {}
+#endif
+#if INSTRUMENT_ENABLED || defined(MC_AU_TEST)
 bool fwNetForgetLast(void) { return false; }
 #endif
+void fwNetDropIdleBuf32(void) {}
 bool fwNetSchedGet(FwSchedView &v)
 {
     memset(&v, 0, sizeof(v));
@@ -112,6 +115,14 @@ bool fwNetLoadRecord(FwStageRecord &) { return false; }
 void fwNetClearRecord(void) {}
 bool fwNetMarkHandover(const char *) { return false; }
 void fwNetUnmarkHandover(void) {}
+bool fwNetVerifyPending(const char *) { return false; }
+bool fwNetArmVerifyBoot(const char *) { return false; }
+FwVerifyBoot fwNetVerifyBoot(char *tag, size_t n)
+{
+    if (tag != nullptr && n > 0)
+        tag[0] = '\0';
+    return FWVB_NONE;
+}
 bool fwNetSafebootOld(void) { return false; }
 int fwNetSafebootVersion(void) { return -1; }
 bool fwNetSafebootCapable(void) { return false; }
@@ -464,9 +475,10 @@ void tlsCapDisarm()
 
 // Job start (fwNetTask, TLS jobs, after BLE pause / TFT shed and before the gate and the first TLS session): the
 // AU buffer is taken from the biggest block there is. No AU buffer (PSRAM board, no block) = exactly the old behaviour.
+// True = this task holds the AU buffer now (AU-30: false lets fwNetTask decide on the early restart).
 void buf32Release(); // below
 
-void buf32Acquire()
+bool buf32Acquire()
 {
     // Restart path: the old task detached its idle AU buffer (buf32Detach) instead of freeing it, so the new task's stack
     // cannot land in the freed block before this task allocates again. Adopt it.
@@ -481,24 +493,25 @@ void buf32Acquire()
     if (adopted)
     {
         auLog("[AU];buf32;ok;%u;adopt\n", (unsigned)FWNET_BUF32_LEN);
-        return;
+        return true;
     }
     buf32Release(); // a previous job's AU buffer that could not be freed then (live record) is retried here
     if (!s_tlsHookInstalled || psramFound() || s_buf32.buf != nullptr)
-        return; // PSRAM boards: records are in PSRAM already; leftover AU buffer: keep it unused
+        return false; // PSRAM boards: records are in PSRAM already; leftover AU buffer: keep it unused
     const uint32_t blk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     uint8_t *b = blk >= FWNET_BUF32_LEN ? (uint8_t *)heap_caps_malloc(FWNET_BUF32_LEN, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)
                                         : nullptr;
     if (b == nullptr)
     {
         auLog("[AU];buf32;none;iblk;%u\n", (unsigned)blk);
-        return;
+        return false;
     }
     portENTER_CRITICAL(&s_buf32Mux);
     fwAuBufInit(&s_buf32, b, FWNET_BUF32_LEN);
     s_buf32Task = xTaskGetCurrentTaskHandle();
     portEXIT_CRITICAL(&s_buf32Mux);
     auLog("[AU];buf32;ok;%u\n", (unsigned)FWNET_BUF32_LEN);
+    return true;
 }
 
 // Job end (after tlsCapDisarm and the restart branch; a restart hands the idle AU buffer to the new task via buf32Detach
@@ -640,6 +653,12 @@ const char *runningVersion()
 // fwNetSafebootCapable() combines both verdicts.
 #define FWNET_KEY_HAND "hand"
 #define FWNET_KEY_NOCAP "nocap"
+// OTA-LOWHEAP-01 / AU-30 (classic ESP32 without PSRAM): "vpend" = tag of a record whose dry-run inflate was deferred
+// because its memory was not there after the download (everything else was proven: SHA-256 against the release digest,
+// read-back CRC, length). No "vpend" = verified (records written before AU-30 included). "vfy" = tag: an apply asked
+// for a verify boot; the next boot runs the dry run before WiFi and BLE take the big heap block, then hands over.
+#define FWNET_KEY_VPEND "vpend"
+#define FWNET_KEY_VFY "vfy"
 
 // Removes the record AND Safeboot's attempt counter: a new tag must not inherit the failed
 // attempts of an old one (AU-08 R4), and the handover marker. Neither key present is success.
@@ -655,6 +674,10 @@ bool nvsClearRecord()
         ok = p.remove(FWNET_KEY_TRIES) && ok;
     if (p.isKey(FWNET_KEY_HAND))
         ok = p.remove(FWNET_KEY_HAND) && ok;
+    if (p.isKey(FWNET_KEY_VPEND)) // AU-30: the verify mark belongs to the record
+        ok = p.remove(FWNET_KEY_VPEND) && ok;
+    if (p.isKey(FWNET_KEY_VFY))
+        ok = p.remove(FWNET_KEY_VFY) && ok;
     p.end();
     return ok;
 }
@@ -1360,6 +1383,12 @@ struct DryWr
     }
 };
 
+struct DryMem
+{
+    DryDec dec;
+    DryWr wr;
+};
+
 // nullptr = the staged bytes inflate to exactly ilen bytes of an ESP image for this env.
 // Needs the private chip still armed. A NO_MARKER image (built before the board marker) passes.
 // Dict (32 KB) and state (~11 KB) are two allocations, so no single 44 KB block is needed. With
@@ -1367,11 +1396,6 @@ struct DryWr
 // ROM tinfl is not covered by the PSRAM cache workaround, a spurious failure only refuses.
 const char *stageDryRun(const Stage &sg, uint8_t *in, uint32_t ilen)
 {
-    struct DryMem
-    {
-        DryDec dec;
-        DryWr wr;
-    };
     const uint32_t caps[2] = {MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT};
     DryMem *m = nullptr;
     uint8_t *dict = nullptr;
@@ -1407,8 +1431,13 @@ const char *stageDryRun(const Stage &sg, uint8_t *in, uint32_t ilen)
             dict = (uint8_t *)heap_caps_malloc(TINFL_LZ_DICT_SIZE, caps[i]);
     }
     const char *why = nullptr;
+    // AU-30: no refuse() line here: on a classic ESP32 stageFinish may defer the dry run to a verify boot
+    // (fwDryDeferOk) instead of refusing; it logs the outcome.
     if (m == nullptr || dict == nullptr)
-        why = refuse("nomem");
+    {
+        auLog("[AU];dry;nomem;dict;%u;mem;%u\n", dict != nullptr ? 1u : 0u, m != nullptr ? 1u : 0u);
+        why = "nomem";
+    }
     else
     {
         m->wr.have = 0;
@@ -1615,8 +1644,22 @@ const char *stageFinish(Stage &sg, const char *err, const char *tag, uint32_t il
             err = "crc";
     }
     // dry-run inflate while the chip is armed, before anything is committed (QA-AU-01)
+    bool vfyPending = false;
     if (err == nullptr)
+    {
         err = stageDryRun(sg, sg.blk, ilen);
+        const bool nomem = err != nullptr && strcmp(err, "nomem") == 0;
+        // AU-30: on a classic ESP32 the dry run's 44 KB never exist after WiFi start (T-Beam). The bytes are proven
+        // (digest, CRC, length): stage them with the verify mark; the apply runs the dry run on a verify boot.
+        if (fwDryDeferOk(AU_BLE_PAUSE && !psramFound(), nomem, expectSha != nullptr))
+        {
+            auLog("[AU];dry;defer;nomem\n");
+            err = nullptr;
+            vfyPending = true;
+        }
+        else if (nomem)
+            refuse("nomem");
+    }
     heap_caps_free(sg.blk);
     sg.blk = nullptr;
     stageFlashDisarm(); // the private chip is not used past this point
@@ -1644,13 +1687,33 @@ const char *stageFinish(Stage &sg, const char *err, const char *tag, uint32_t il
             err = "nvs";
         else
         {
-            if (p.putBytes(FWNET_KEY_REC, enc, el) != el)
-                err = "nvs";
-            else if (p.putString(FWNET_KEY_LAST, tag) == 0)
+            // AU-30: verify mark FIRST, then the record, then the reinstall guard; any failed write drops all three
+            // (fwStageCommit, host-tested). A mark left without a record is harmless (stagePrepare/nvsClearRecord
+            // remove it, the apply check fires only on a tag match).
+            struct CommitCtx
             {
-                p.remove(FWNET_KEY_REC);
+                Preferences *p;
+                const char *tag;
+                const uint8_t *enc;
+                size_t el;
+            } cx = {&p, tag, enc, el};
+            const bool wrote = fwStageCommit(
+                vfyPending,
+                [](void *c, FwStageKey k) -> bool {
+                    CommitCtx &x = *(CommitCtx *)c;
+                    if (k == FW_SK_REC)
+                        return x.p->putBytes(FWNET_KEY_REC, x.enc, x.el) == x.el;
+                    return x.p->putString(k == FW_SK_VPEND ? FWNET_KEY_VPEND : FWNET_KEY_LAST, x.tag) != 0;
+                },
+                [](void *c, FwStageKey k) {
+                    Preferences &q = *((CommitCtx *)c)->p;
+                    const char *key = k == FW_SK_VPEND ? FWNET_KEY_VPEND : (k == FW_SK_REC ? FWNET_KEY_REC : FWNET_KEY_LAST);
+                    if (q.isKey(key))
+                        q.remove(key);
+                },
+                &cx);
+            if (!wrote)
                 err = "nvs";
-            }
             p.end();
         }
     }
@@ -1667,7 +1730,7 @@ const char *stageFinish(Stage &sg, const char *err, const char *tag, uint32_t il
     s_st.stagedIlen = ilen;
     s_stagedKnown = true;
     portEXIT_CRITICAL(&s_mux);
-    auLog("[AU];stage;ok;tag;%s;zlen;%u\n", tag, (unsigned)zlen);
+    auLog("[AU];stage;ok;tag;%s;zlen;%u%s\n", tag, (unsigned)zlen, vfyPending ? ";vfy;pending" : "");
     return nullptr;
 }
 
@@ -1844,8 +1907,70 @@ void fwNetTask(void *)
     }
     // OTA-LOWHEAP-01 (a'): after the BLE pause / TFT release (they only add free memory, so the block is the biggest
     // it gets) and before the gate and the first TLS session. The restart path runs this again in the new task.
+    bool haveBuf32 = false;
+#if AU_BLE_PAUSE
+    // AU-30: a restarted task first lets the idle task free the old task's stack (vTaskDelete(self) defers that), so the
+    // block it split is whole again before the AU buffer is taken.
+    if (restarted && tlsJob)
+        vTaskDelay(pdMS_TO_TICKS(FWNET_GATE_SETTLE_MS));
+#endif
     if (tlsJob)
-        buf32Acquire();
+        haveBuf32 = buf32Acquire();
+#if AU_BLE_PAUSE
+    // AU-30: no AU buffer because this task's own stack (created by startJob() before the BLE pause) splits the biggest
+    // block: run the job on a new stack now, allocated with BLE down, before any TLS work. Missed for lack of a block
+    // only (hook installed, no leftover buffer); the new task has restarted = true, so neither restart fires again.
+    // Nothing to hand over: no buffer; shed state, BUSY and the guard carry over as in the
+    // end-of-job restart below (the TFT hold is not taken twice: the sprite is already gone, auShedAvail drops the bit).
+    if (tlsJob && fwJobEarlyRestartDue(blePaused || (guarded && esp32BleDown()), restarted, psramFound(),
+                                       haveBuf32 || !s_tlsHookInstalled || s_buf32.buf != nullptr))
+    {
+        auLog("[AU];shed;restart;buf32;iblk;%u\n",
+              (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+        // AU-30 (advisor rework): hold the current biggest internal block while the new task is created, so its stack
+        // lands in some other heap and cannot split the block the AU buffer needs (the old stack, freed behind us, joins
+        // it again). The hold lives only around the create call. Poisoning may make the exact size unobtainable: one
+        // retry 256 B smaller still leaves no room for a stack in that block.
+        // The hold attempts and a failed task create must not count as the job's alloc failures (allocFailArm() ran at
+        // task start; the "noheld" and "noblk" paths below go on with the job): the counters are put back after the
+        // create, as twoRecBufProbe() does.
+        const uint32_t afN = s_afN, afSize = s_afFirstSize, afCaps = s_afFirstCaps, afMax = s_afMaxSize;
+        const char *afFn = s_afFirstFn;
+        const uint32_t hblk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        void *hold = heap_caps_malloc(hblk, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        if (hold == nullptr && hblk > 256u)
+            hold = heap_caps_malloc(hblk - 256u, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        bool made = false;
+        if (hold != nullptr)
+        {
+            tlsCapDisarm(); // the new task arms again
+            s_jobRestart = true;
+            made = xTaskCreatePinnedToCore(fwNetTask, "fwnet", FWNET_TASK_STACK, nullptr, 1, nullptr, FWNET_CORE) == pdPASS;
+            heap_caps_free(hold);
+        }
+        if (!made) // the new task (if any) arms its own counters: put this task's back only when it goes on
+        {
+            s_afN = afN;
+            s_afFirstSize = afSize;
+            s_afFirstCaps = afCaps;
+            s_afMaxSize = afMax;
+            s_afFirstFn = afFn;
+        }
+        if (hold == nullptr)
+            auLog("[AU];shed;restart;noheld\n"); // go on here without the AU buffer, as before AU-30
+        else
+        {
+            if (made)
+            {
+                auLog("[AU];shed;restart;placed\n");
+                vTaskDelete(nullptr);
+            }
+            s_jobRestart = false;
+            tlsCapArm(); // no stack outside the big block: go on here without the AU buffer, as before AU-30
+            auLog("[AU];shed;restart;noblk\n");
+        }
+    }
+#endif
     s_shedAllowed = fwShedAllowed(blePaused, guarded, phoneHeld);
     s_gateFragmented = false;
 #if AU_BLE_PAUSE
@@ -1875,7 +2000,15 @@ void fwNetTask(void *)
         s_jobRestart = false;
     }
 #endif
-    buf32Release(); // all TLS sessions of the job body are closed (every exit; a failed restart lands here too)
+#if AU_BLE_PAUSE
+    // AU-30: a guarded CHECK with a chained DOWNLOAD keeps its idle AU buffer for it (the DOWNLOAD adopts it in
+    // buf32Acquire), so the DOWNLOAD task's stack, created by the loop before that, cannot land in the freed block. When
+    // no DOWNLOAD follows, the loop frees it on releasing the guard (fwNetDropIdleBuf32).
+    if (s_argJob == FWJ_CHECK && guarded && err == nullptr && auBleGuardChainPending() && buf32Detach())
+        auLog("[AU];buf32;keep;chain\n");
+    else
+#endif
+        buf32Release(); // all TLS sessions of the job body are closed (every exit; a failed restart lands here too)
     auHeapLine("peak", "", true);
     heapMark("end"); // after every client object is gone
     allocFailMark("end");
@@ -2072,6 +2205,10 @@ bool startJob(FwNetJob job, uint8_t channel)
         s_st = prev;
         s_busy = false;
         portEXIT_CRITICAL(&s_mux);
+        // AU-30: no block for the task stack (e.g. right after a CHECK whose stack the idle task has not freed yet while
+        // the AU buffer is kept for the chained DOWNLOAD): say so, the caller retries or gives up
+        auLog("[AU];task;nostack;iblk;%u\n",
+              (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
         return false;
     }
     return true;
@@ -2129,7 +2266,11 @@ void fwNetSetHeapGateOverride(uint32_t bytes)
 {
     s_gateOver = bytes; // plain word store, read by the job task; bench use only
 }
+#endif
 
+// AU-30: also in MC_AU_TEST bench builds (tools/mc_build_defines.py), so repeated downloads can be run on a normal
+// (non-INSTRUMENT) image. Never set in CI or release builds.
+#if INSTRUMENT_ENABLED || defined(MC_AU_TEST)
 bool fwNetForgetLast(void)
 {
     Preferences p;
@@ -2143,6 +2284,26 @@ bool fwNetForgetLast(void)
 #endif
 
 bool fwNetPhoneHeld(void) { return deviceConnected || isPhoneReady != 0; }
+
+// OTA-LOWHEAP-01 / AU-30: a CHECK under the guard kept its idle AU buffer for a chained DOWNLOAD (buf32Detach); the
+// guard ended without one adopting it. Same idle test as buf32Detach/buf32Acquire under the mux, so an owned, lent or
+// live buffer is never touched (the guard never ends while a job is BUSY).
+void fwNetDropIdleBuf32(void)
+{
+    uint8_t *b = nullptr;
+    portENTER_CRITICAL(&s_buf32Mux);
+    if (s_buf32.buf != nullptr && s_buf32Task == nullptr && !s_buf32.lent && fwAuBufLive(&s_buf32) == 0)
+    {
+        b = s_buf32.buf;
+        fwAuBufInit(&s_buf32, nullptr, 0);
+    }
+    portEXIT_CRITICAL(&s_buf32Mux);
+    if (b != nullptr)
+    {
+        heap_caps_free(b);
+        auLog("[AU];buf32;drop\n");
+    }
+}
 
 // OTA-LOWHEAP-01 A3: s_busy is set in startJob() before the task exists and cleared at the one exit of fwNetTask
 // (success, refusal, failure, abort) and when the task cannot be created; the restart keeps it set.
@@ -2471,6 +2632,7 @@ bool fwNetLoadRecord(FwStageRecord &out)
     {
         p.remove(FWNET_KEY_REC);
         p.remove(FWNET_KEY_TRIES);
+        p.remove(FWNET_KEY_VPEND); // AU-30
         auLog("[AU];refuse;stalerec\n");
         // the cached "staged" flag must follow, or fwTick would hand over every second
         portENTER_CRITICAL(&s_mux);
@@ -2508,7 +2670,133 @@ void fwNetUnmarkHandover(void)
         return;
     if (p.isKey(FWNET_KEY_HAND))
         p.remove(FWNET_KEY_HAND);
+    if (p.isKey(FWNET_KEY_VFY)) // AU-30: an armed verify boot is withdrawn with the handover
+        p.remove(FWNET_KEY_VFY);
     p.end();
+}
+
+bool fwNetVerifyPending(const char *tag)
+{
+    char pend[24] = "";
+    Preferences p;
+    if (!p.begin(FWNET_NS, true))
+        return false;
+    if (p.isKey(FWNET_KEY_VPEND))
+        p.getString(FWNET_KEY_VPEND, pend, sizeof(pend));
+    p.end();
+    pend[sizeof(pend) - 1] = '\0';
+    return fwApplyNeedsVerifyBoot(tag, pend);
+}
+
+bool fwNetArmVerifyBoot(const char *tag)
+{
+    if (tag == nullptr || tag[0] == '\0')
+        return false;
+    Preferences p;
+    if (!p.begin(FWNET_NS, false))
+        return false;
+    const bool ok = p.putString(FWNET_KEY_VFY, tag) != 0;
+    p.end();
+    return ok;
+}
+
+// AU-30: early boot, before WiFi and BLE (the big D/IRAM block is still whole: 110,580 B on the T-Beam).
+FwVerifyBoot fwNetVerifyBoot(char *tagOut, size_t n)
+{
+    if (tagOut != nullptr && n > 0)
+        tagOut[0] = '\0';
+    char vfy[24] = "";
+    char pend[24] = "";
+    {
+        Preferences p;
+        if (!p.begin(FWNET_NS, false))
+            return FWVB_NONE;
+        if (!p.isKey(FWNET_KEY_VFY))
+        {
+            p.end();
+            return FWVB_NONE;
+        }
+        p.getString(FWNET_KEY_VFY, vfy, sizeof(vfy));
+        p.remove(FWNET_KEY_VFY); // consumed before the dry run: a crash in it cannot loop the boot
+        if (p.isKey(FWNET_KEY_VPEND))
+            p.getString(FWNET_KEY_VPEND, pend, sizeof(pend));
+        p.end();
+    }
+    vfy[sizeof(vfy) - 1] = '\0';
+    pend[sizeof(pend) - 1] = '\0';
+    if (tagOut != nullptr)
+        copyStr(tagOut, n, vfy);
+    const uint32_t fr = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    const uint32_t bk = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    const char *why = nullptr;
+    FwStageRecord rec;
+    memset(&rec, 0, sizeof(rec));
+    const bool haveRec = fwNetLoadRecord(rec);
+    const FwVerifyBootPlan plan = haveRec ? fwVerifyBootPlan(rec.tag, vfy, pend) : FWVBP_MISMATCH;
+    if (!haveRec)
+        why = "norecord";
+    else if (plan == FWVBP_MISMATCH)
+        why = "tag";
+    else if (plan == FWVBP_ALREADY)
+    {
+        // the record asked for is there but carries no verify mark: it is already verified (a verify boot that
+        // removed the mark and then could not hand over). Never drop a verified record: hand it over.
+        auLog("[AU];verify_boot;ok;%s;already\n", vfy);
+        return FWVB_OK;
+    }
+    else
+    {
+        // the same dry run as stageFinish, on the same private chip (armed for the record's stage area only)
+        Stage sg;
+        memset(&sg, 0, sizeof(sg));
+        sg.ota0 = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, nullptr);
+        sg.off = rec.off;
+        sg.dl.part = sg.ota0;
+        sg.dl.base = rec.off;
+        sg.dl.zlen = rec.zlen;
+        // internal RAM: the dry run reads flash with the cache off (see the TLS hook note: FWNET_BLK stays internal)
+        uint8_t *in = (uint8_t *)heap_caps_malloc(FWNET_BLK, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        if (in == nullptr)
+            why = "nomem";
+        else if (!stageFlashArm(sg.ota0, rec.off))
+            why = "noflash";
+        else
+        {
+            why = stageDryRun(sg, in, rec.ilen);
+            stageFlashDisarm();
+        }
+        heap_caps_free(in);
+    }
+    if (why == nullptr)
+    {
+        Preferences p;
+        if (p.begin(FWNET_NS, false))
+        {
+            p.remove(FWNET_KEY_VPEND);
+            p.end();
+        }
+        auLog("[AU];verify_boot;ok;%s;free;%u;blk;%u\n", vfy, (unsigned)fr, (unsigned)bk);
+        return FWVB_OK;
+    }
+    auLog("[AU];verify_boot;fail;%s;free;%u;blk;%u\n", why, (unsigned)fr, (unsigned)bk);
+    // as a dry run that failed inside the DOWNLOAD: no record and no reinstall guard for the tag (stageFinish writes
+    // "last" only with a proven record), and the reason in the status for the web page after this boot
+    fwNetClearRecord();
+    {
+        Preferences p;
+        if (p.begin(FWNET_NS, false))
+        {
+            if (p.isKey(FWNET_KEY_LAST))
+                p.remove(FWNET_KEY_LAST);
+            p.end();
+        }
+    }
+    portENTER_CRITICAL(&s_mux);
+    s_st.state = FWS_DONE_FAIL;
+    s_st.job = FWJ_DOWNLOAD;
+    copyStr(s_st.lastErr, sizeof(s_st.lastErr), why);
+    portEXIT_CRITICAL(&s_mux);
+    return FWVB_FAIL;
 }
 
 bool fwNetSafebootOld(void)

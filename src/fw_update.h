@@ -23,6 +23,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h> // AU-30: strcmp in fwApplyNeedsVerifyBoot
 
 #include "fw_schedule.h" // planned install time + countdown notice (pure; never starts an install)
 
@@ -1167,6 +1168,77 @@ inline bool fwJobRestartDue(bool bleDown, bool restarted, bool fragmented, bool 
     return bleDown && !restarted && fragmented && lowheap;
 }
 
+// OTA-LOWHEAP-01 / AU-30: startJob() creates the job task (10 KB stack) before the BLE pause, so the stack lands in the
+// biggest block and the 32 KB AU buffer (FWNET_BUF32_LEN) then finds only 25-27 KB (T-Beam, the block shrinks by exactly
+// the stack size). One restart right after the missed buffer, on a stack allocated with BLE down, before any TLS work.
+// Only when BLE is down (otherwise BLE, not the stack, holds the heap), once per job (restarted also blocks the
+// end-of-job restart), never with PSRAM (no AU buffer there).
+inline bool fwJobEarlyRestartDue(bool bleDown, bool restarted, bool psram, bool haveBuf32)
+{
+    return bleDown && !restarted && !psram && !haveBuf32;
+}
+
+// OTA-LOWHEAP-01 / AU-30: the dry-run inflate needs 32 KB + 11.4 KB at once, which a classic ESP32 without PSRAM
+// (T-Beam) never has after WiFi start. When that is the only failure and the staged bytes are proven against the
+// release digest (shaVerified: a DOWNLOAD, not the bench STAGELAN), the image is staged with a verify mark and the
+// dry run runs on a verify boot before WiFi and BLE. Every other dry-run failure still refuses.
+inline bool fwDryDeferOk(bool classicNoPsram, bool dryErrIsNomem, bool shaVerified)
+{
+    return classicNoPsram && dryErrIsNomem && shaVerified;
+}
+
+// AU-30: an apply of the record recTag goes through the verify boot when the verify mark names exactly that tag.
+// No mark (every record staged before AU-30, and every verified one) = hand over as before.
+inline bool fwApplyNeedsVerifyBoot(const char *recTag, const char *pendTag)
+{
+    return recTag != nullptr && pendTag != nullptr && recTag[0] != '\0' && strcmp(recTag, pendTag) == 0;
+}
+
+// AU-30: the NVS keys stageFinish commits a staged image with, in commit order.
+enum FwStageKey : uint8_t
+{
+    FW_SK_VPEND, // verify mark: the dry-run inflate was deferred to the install
+    FW_SK_REC,   // the stage record
+    FW_SK_LAST   // the reinstall guard
+};
+
+// AU-30: commits a stage record. The verify mark goes in first (only for a deferred dry run), then the record, then
+// the reinstall guard, so a deferred record without its mark can never exist; a cut between two writes leaves at most
+// a mark without a record, which is harmless (the apply check fires only on a tag match, the next stage clears it).
+// put() returns false on a failed write; then all three keys are dropped (drop() of an absent key is a no-op) and
+// the result is false.
+inline bool fwStageCommit(bool vfyPending, bool (*put)(void *ctx, FwStageKey k), void (*drop)(void *ctx, FwStageKey k),
+                          void *ctx)
+{
+    bool ok = !vfyPending || put(ctx, FW_SK_VPEND);
+    ok = ok && put(ctx, FW_SK_REC);
+    ok = ok && put(ctx, FW_SK_LAST);
+    if (!ok)
+    {
+        drop(ctx, FW_SK_VPEND);
+        drop(ctx, FW_SK_REC);
+        drop(ctx, FW_SK_LAST);
+    }
+    return ok;
+}
+
+// AU-30: what the verify boot does with the record it finds. vfyTag = the tag the apply armed, pendTag = the verify
+// mark ("" when absent). Tag mismatch (or no tag) = a real failure; the right tag without a mark = already verified
+// (a verify boot that removed the mark and then could not hand over): hand over, never drop it; with the mark = dry run.
+enum FwVerifyBootPlan : uint8_t
+{
+    FWVBP_MISMATCH,
+    FWVBP_ALREADY,
+    FWVBP_DRYRUN
+};
+
+inline FwVerifyBootPlan fwVerifyBootPlan(const char *recTag, const char *vfyTag, const char *pendTag)
+{
+    if (recTag == nullptr || vfyTag == nullptr || recTag[0] == '\0' || strcmp(recTag, vfyTag) != 0)
+        return FWVBP_MISMATCH;
+    return fwApplyNeedsVerifyBoot(recTag, pendTag) ? FWVBP_DRYRUN : FWVBP_ALREADY;
+}
+
 // Shedding frees small pieces and cannot join a split heap: leave the services up while a restart can still fix it.
 inline bool fwShedSkipForRestart(bool restartAvail, uint32_t freeNow, uint32_t need)
 {
@@ -1235,11 +1307,22 @@ inline bool fwNotifyDue(bool checkDoneOk, bool availNewer, int effMode, bool alr
 // While the guard is set the job task force-pauses BLE (also with a phone linked) and esp32BleResume() refuses.
 bool auBleGuardRequest(bool chainDownload);
 bool auBleGuardActive(void);
+// OTA-LOWHEAP-01 / AU-30: the guard is set and its CHECK was requested with a chained DOWNLOAD that has not started yet.
+// Read by the job task at the CHECK's end: it then keeps the idle AU buffer for the DOWNLOAD (buf32Detach) instead of
+// freeing it, so the DOWNLOAD task's stack cannot land in the freed block. Read only.
+bool auBleGuardChainPending(void);
+// OTA-LOWHEAP-01 / AU-30 (fw_update_net.cpp): frees an AU buffer that a finished job kept for a chained DOWNLOAD
+// (detached: no task owns it, no record live, not lent); no-op otherwise. Called by the loop when the guard ends
+// without the DOWNLOAD adopting the buffer. Loop task.
+void fwNetDropIdleBuf32(void);
 // True from auRequestApplyReboot() until the loop has acted on it. fwNetStart() refuses new jobs meanwhile.
 bool auApplyRebootPending(void);
 // Web "Install now": asks the main loop (esp32_main.cpp auTick) to call auRebootToSafeboot() >= 500 ms
 // later (fwApplyRebootDue), so the HTTP answer leaves first. Sets a flag only; returns at once.
 void auRequestApplyReboot(void);
+// AU-30: web "Install now" for a record with the verify mark: the same 500 ms answer-first timing, but auTick restarts
+// into the app (verify boot, auRestartForVerify) instead of Safeboot. The caller armed NVS "vfy" before.
+void auRequestVerifyReboot(void);
 #if INSTRUMENT_ENABLED
 void auInstrCheckNow(void); // bench: --update checknow
 bool auInstrBleGuardCycle(uint16_t n); // bench: --update bleguardcycle <n>; false while a guard or a cycle run is active

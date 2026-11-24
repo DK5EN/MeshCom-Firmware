@@ -20,3 +20,9 @@ env.Append(  # noqa: F821
 # Auto Update dev channel (DK5EN releases, src/fw_update.h). Unset = prod only.
 if os.environ.get("MC_AU_DEV_CHANNEL") == "1":
     env.Append(CPPDEFINES=["MC_AU_DEV_CHANNEL"])  # noqa: F821
+
+# Bench only (OTA-LOWHEAP-01 / AU-30): MC_AU_TEST=1 compiles `--update forget` and
+# `--update unstage` into a normal (non-INSTRUMENT) build, so repeated Auto Update
+# download runs need no reflash between runs. Never set in CI or release builds.
+if os.environ.get("MC_AU_TEST") == "1":
+    env.Append(CPPDEFINES=["MC_AU_TEST"])  # noqa: F821
