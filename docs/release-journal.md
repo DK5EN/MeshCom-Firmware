@@ -1,6 +1,6 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261122`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261125`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
@@ -8,6 +8,45 @@ Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `releas
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
 
 ---
+
+## Release v4.40a.11.25 (Mittwoch, 2026-11-25, vorbereitet am 2026-11-24)
+
+Noch nicht getaggt: Tag und Veröffentlichung warten auf das Go des Betreibers. Gebaut wird von GitHub CI (`MeshCom CI`, Tag `v4.40a.11.25`, `MC_BUILD_TAG` und `MC_AU_DEV_CHANNEL=1` gesetzt), 69 Assets wie `v4.40a.11.22`. Der Tagname ist auf beiden Remotes frei (geprüft 2026-11-24).
+`FLASH_VERSION` 20261125, `FLASH_STRUCT_VERSION` 20260724 unverändert, die Einstellungen bleiben erhalten. Safeboot unverändert seit `v4.40a.11.20`.
+Basis ist `upstream/dev` `68286e07` (#1320, 2026-11-23) mit unserem gemergten Welle-3-PR #1316; upstream hat beides noch nicht released. Das offizielle `v4.40a.11.22` von upstream trägt nur denselben Namen wie unser `v4.40a.11.22`.
+
+Handlungsbedarf: RAK4631, T114 und T-Echo senden das Sync-Word `0x24B4` statt `0x242B` (SYNC-NRF-01, upstream #1320). Auf dem Bench ohne Nebenwirkung gegen ESP32-Boards; nRF52 alt gegen nRF52 neu ist nicht gemessen. Knoten einer reinen nRF52-Strecke zusammen aktualisieren.
+
+Inhalt, neu gegenüber `v4.40a.11.22`:
+
+- Auto Update ohne Speicherfehler auf ESP32 ohne PSRAM (OTA-LOWHEAP-01, Fork-Issue #3): Zulassungsregeln vor dem Download, Webserver bedient während eines Laufs nur die Update-Seite, eigener TLS-Client mit einer Vertrauenswurzel je Host, ein Puffer von 33.440 Byte je Lauf für beide TLS-Puffer und danach als Wörterbuch der Image-Prüfung (`878ebef4`, `469bb942`, `f6c6acd7`, `5488f0bc`). Die kopierte mbedTLS-Bibliothek (rund 23.000 Zeilen) vom 23.11. ist vor dem Release wieder entfernt; TLS kommt aus dem Framework.
+- T-Beam: kein Watchdog-Neustart beim Löschen des Ablagebereichs (AU-29), zuverlässige Installation aus der Web-Oberfläche mit Image-Prüfung in einem eigenen Start vor dem WLAN (AU-30) (`03a30cac`, `616850e2`).
+- nRF52-Sync-Word aus einer Quelle, `0x24B4` (upstream #1320, `154014dc`).
+- Welle-3-Fixes aus #1316, im Fork bisher in keinem Release: SEC-DUMP-01 (#1291), RAK-ETH-DNS-01 und RAK-NETMODE-01 (#1289), GW-GROUP-01, GW-DM-01, GW-CALL-01 (#1290), WEB-TEMPOFF-01 (#1296), TBEAM1W-PWR-01 (#1301), GPS-AUTOSYM-01..03 und POSINFO-NEXT-01 (#1295), OTA-SAFEBOOT-01 (#1300), DHT-PROBE-01 (#1302), APRS-TXT-01..03 (#1293), TDECK-VOLT-01 (#1312), DISP-PAGE-01..03 und BTN-OFF-01 (#1294), T114-DARK-01 (#1314), POSINFO-LAG-01 (#1315), der echte Fix für `--aprswx` (#1288) (`c22cb3d2`, `1830d8ed`, `45732840`, `57acc7c3`, `40c1c47d`).
+- INA226: Kalibrierung wird auch für übliche Shunt-Werte geschrieben (INA226-CAL-01, `55fe0174`); Web-Etikett vBUS ohne `<` (WEB-INA-01, `2de6142f`); WX-Tabelle zeigt AHT20, SHT21, BMP390 und INA226 (WEB-WX-01, `35ae3418`).
+- Bibliotheks-Patches FORMAL-01 (nur Fork): NimBLE, W5100S, HTTP-Client, mDNS, DHCP-Server, lwIP-MTU, Zertifikatsdatum und TLS 1.2 für Auto Update, DNS über den Netzwerk-Thread, Fixes in UDP-Drain, Extern-UDP-Warteschlange, Netzkonsole und APRS (`9696a3ba`, `6bbca7a2`).
+- Werkzeug: `tools/hmac_connect.py` endet sauber, wenn der Knoten die Verbindung schließt, auch ohne `pthread_kill` (HMAC-WIN-01, `732238bd`).
+- Nur Bench-Builds (nicht in Release-Images): `--heapwatch`, `--heapgap`, Heap-Trace (`307591a6`, `799aa238`, `6ebf78ad`).
+
+### Was für dieses Release auf Hardware geprüft wurde
+
+- 2026-11-24, Auto Update mit den Release-Kandidaten (Commit `732238bd`), Prüfung und Download mit Ablage, nie installiert: DK5EN-1 (Heltec V3) 1.180.497 Byte in 11,2 s, niedrigster freier Heap im Lauf 19.564 Byte; DK5EN-92 (T-Beam) 1.240.686 Byte in 13,4 s, 11.332 Byte; DK5EN-14 (T-Deck Plus, PSRAM-Weg) 1.617.579 Byte in 20,7 s. Alle TLS-Puffer im Lauf-Puffer.
+- Nacht 2026-11-24/25, je drei Läufe auf DK5EN-1, -92 und -14: [morgens eintragen].
+- 2026-11-24, Sync-Word: RAK4631 mit `0x242B` und mit `0x24B4` gegen Heltec V3, T-Deck Plus und T-Beam, beide Richtungen, 2 und -9 dBm; jeder Verlust durch Kanalzugriff oder Kollision erklärt. TRACK ein und aus in Ordnung. Passiv 2 x 60 min gegen DK5EN-98: kein nRF52 aus dem Feld gesendet.
+- 2026-11-24, Halten bei Serverausfall auf DK5EN-1 (Messbuild desselben Commits): eine Nachricht gehalten, nach 149 s einmal mit derselben ID nachgesendet.
+- 2026-11-24, EXTUDP-Registerabfrage auf DK5EN-92: 16 Register ohne Geheimnis, Begrenzer und Fehlerantwort wirken.
+- 2026-11-24, Fernverwaltung über LoRa von DK5EN-92 an DK5EN-1: `pins`, `gpio`, `txq`, `mbox`, `maxhop` beantwortet, Button-Pin und GPIO ohne Hauptschalter abgelehnt.
+- Produktions-Gateway DK5EN-98: Release-Kandidat per OTA seit 2026-11-24 15:38 (Betreiber-OK für genau diesen einen Flash), Einstellungen unverändert, Server verbunden.
+- Host-Gate `tools/regression.sh --stage 1,2` auf dem getaggten Stand: [morgens eintragen]. Alle 36 Board-Envs gebaut, 35 grün, `esp32-external-radio` scheitert wie upstream an seinem eigenen `#error`.
+
+### Was ausdrücklich NICHT geprüft wurde
+
+- Die Bibliotheks-Patches einzeln auf Hardware; einer davon hatte am 2026-11-23 den Download gebrochen (AU-28, behoben).
+- nRF52 alt gegen nRF52 neu (ein RAK am Bench) und die Reserve nahe der Empfindlichkeitsgrenze (am Tisch nicht testbar, Betreiber 2026-11-24).
+- Auto Update auf T-Beam Supreme, Wireless Tracker, E22 und Heltec V4.
+- INA226-Kalibrierung und WX-Tabelle (kein Sensor), der Klick auf den Lesen-Knopf der Queues-Karte im Browser, ein echter Pinwechsel per Jumper.
+- Von den Welle-3-Fixes: GW-DM-01 am Telefon, GW-CALL-01, OTA-SAFEBOOT-01, BTN-OFF-01, DISP-PAGE-03, APRS-Frames auf Funk, DHT-PROBE-01, GPS-AUTOSYM-02/03 in Bewegung, TBEAM1W-PWR-01.
+- Die WX-Tabelle (`35ae3418`) ist jünger als die Bench-Images; Host-Test, Betreiber-Entscheidung: geringes Risiko.
 
 ## Release v4.40a.11.22 (Sonntag, 2026-11-22, geschnitten am 2026-11-21)
 

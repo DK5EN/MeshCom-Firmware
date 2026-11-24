@@ -3,40 +3,89 @@
 
 ## What this release is
 
-**`v4.40a.11.22` stops a RAK4631 Ethernet gateway from going silent after a network outage, and adds AppLink: the phone app over the LAN instead of Bluetooth, off by default.** Your configuration survives the update. Nobody needs to act; T-Beam owners coming from before `v4.40a.11.20` should read the first box.
+**`v4.40a.11.25` makes Auto Update work on ESP32 boards without PSRAM after long uptime and stops the T-Beam from rebooting during the download. RAK4631, T114 and T-Echo owners should read the first box: these boards now send the same LoRa sync word as every ESP32 SX1262 board.** Your configuration survives the update.
 
 ### Action needed
 
 > [!WARNING]
-> **Coming from before `v4.40a.11.20`, T-Beam: holding the user button for 3 s puts the node into deep sleep** (TBEAM-SLEEP-01).
+> **RAK4631, T114 and T-Echo: the LoRa sync word changes from `0x242B` to `0x24B4`** (SYNC-NRF-01, upstream #1320).
 >
-> - A press of 0.8 s still toggles the display. At 3 s the node goes to deep sleep; press the button to wake it.
-> - All five T-Beam environments. The T-Beam 1W needs `--button on`. Only the T-Beam v1.2 was tried on our bench.
+> - Why: the old value put the second sync symbol where no other board sends it; a LoRa chip of the newest generation (LR2012) drops such frames. With `0x24B4` an nRF52 board sends exactly like a Heltec V3.
+> - Bench 2026-11-24: a RAK4631 with the old and with the new value against Heltec V3, T-Deck Plus and T-Beam, both directions: no difference.
+> - **Not measured:** an nRF52 node with the old value against one with the new value (we have one RAK). Update all nRF52 nodes of a route that runs only over nRF52 boards together, and report it if such a route loses frames after the update.
 
 > [!WARNING]
-> **Coming from before `v4.40a.11.08`:** RAK4631, T114 and T-Echo ping only after `--ping start` and the budget is not stored (PING-NRF-01). On the Heltec V4 the I2C bus moved from GPIO 41/42 to SDA 4 and SCL 3 (GPSV4-01); a sensor wired to 41/42 must be moved.
+> **Coming from before `v4.40a.11.20`, T-Beam: holding the user button for 3 s puts the node into deep sleep** (TBEAM-SLEEP-01). A short press still toggles the display.
 
 > [!WARNING]
 > **T-Beam 1W and T-Deck Pro:** run the [web flasher](https://dk5en.github.io/MeshCom-Firmware/flash/) once if you skipped it with `v4.40a.10.20` (1W) or `v4.40a.10.21` (Pro). Details: "Known gaps" below.
 
-**Everyone else:** update as usual (web flasher, `.bin` over USB, `tools/webflash.py`, or Auto Update on the `dev` channel). Scripts that call `?otaupdate` or `?reboot` already needed the header `X-MC: 1` since `v4.40a.11.06`.
+**Everyone else:** update as usual (web flasher, `.bin` over USB, `tools/webflash.py`, or Auto Update on the `dev` channel).
 
 ### Key facts
 
-- **Base:** the official `v4.40a.11.14` (2026-11-14) plus everything upstream `dev` has merged since, up to our PR [#1285](https://github.com/icssw-org/MeshCom-Firmware/pull/1285) (`REVIEW.md` only, merged 2026-11-21, `5698913a`). Upstream has released none of it yet.
-- **Merged upstream, not yet released there:** ping display and budget (#1280), web GUI with Pins page (#1281), APRS-IS weather over Wi-Fi (#1269) and the W/S hemisphere fixes (#1284).
-- **Fork-only firmware:** everything under "New in" below, the fork-only items of `v4.40a.11.21` and older, and the `dev` Auto Update channel. The release is **not** byte-identical to any official release.
-- **How to tell builds apart:** the version on the air still reads `4.40a`. The flash stamp in `--info` is the distinguishing mark.
-  - `--info` prints `...AU env=<board> tag=v4.40a.11.22` and `FLASH_VERSION 20261122`.
-  - `--id` prints `MCBOARD:v1:<hwid>:<hwid>:<board>:v4.40a.11.22`.
-- **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings are kept. AppLink uses two bits of an existing settings word and starts off; see "Known gaps" for the one exception.
-- **Safeboot** stays at capability v3 and unchanged since `v4.40a.11.20`.
-- **Auto Update channels:** `prod` reads the latest icssw-org release, `dev` (`--updchan dev`) the **Latest** release of this fork, which is this one. The mode is always `notify`.
-- **Release line:** cut from `fork-dev` once more by operator decision (2026-11-21). The stable branch `fork-nightly` (NIGHTLY-01) is still planned.
-- **Bench status:** the Ethernet fix and AppLink ran on our bench on 2026-11-21 (RAK4631 and Heltec V3), AppLink again on the release candidate. The three small fixes did not. "Verification" says what was checked.
+- **Base:** the official `v4.40a.11.22` plus upstream `dev` up to #1320 (2026-11-23, `68286e07`), which includes our wave-3 PR [#1316](https://github.com/icssw-org/MeshCom-Firmware/pull/1316) (merged 2026-11-22). Upstream has released #1316 and #1320 in no official release yet.
+- **Fork-only firmware:** Auto Update memory work (OTA-LOWHEAP-01, AU-29, AU-30), library patches (FORMAL-01), INA226 calibration, everything listed under "New in", the fork-only items of `v4.40a.11.22` and older, and the `dev` Auto Update channel. Not byte-identical to any official release.
+- **How to tell builds apart:** `--info` prints `...AU env=<board> tag=v4.40a.11.25` and `FLASH_VERSION 20261125`; `--id` ends in `:v4.40a.11.25`.
+- **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings are kept.
+- **Safeboot** stays at capability v3.
+- **Auto Update channels:** `prod` reads the latest icssw-org release, `dev` (`--updchan dev`) the Latest release of this fork. Mode always `notify`.
+- **Bench status:** Auto Update on Heltec V3, T-Beam and T-Deck Plus, the sync word, the gateway hold, the register query and remote management ran on our bench on 2026-11-24, plus one night of Auto Update runs. "Verification" says what was checked.
 - **Assets (69):** 28 ESP32 application `.bin` plus 28 `.autoupdate` files, the three nRF52 boards as `.uf2` and DFU `.zip`, and seven support files.
 
-## New in `v4.40a.11.22`
+## New in `v4.40a.11.25`
+
+**Auto Update**
+
+- **Auto Update no longer fails with "Not enough free memory" after long uptime** on ESP32 boards without PSRAM (OTA-LOWHEAP-01, fork issue #3).
+  - Cause: the download needs 66-69 KB of internal memory at its peak; half of it are two TLS buffers of 16,717 bytes that must exist at the same time. After hours of uptime the memory is split into pieces and the update failed, sometimes after the check had let it pass.
+  - Now: the check before the download measures what the run needs; while a run is active the web server only serves the update page; a lean TLS client of its own; one buffer of 33,440 bytes taken at the start of each run holds both TLS buffers and then serves the image check.
+  - No vendored library code: the TLS library is the framework's own (an earlier fork build carried a copy of 23,000 lines, removed before this release).
+- **The T-Beam no longer reboots while the update is written** (AU-29). Erasing the staging area held one CPU core for up to 900 ms per block and tripped the watchdog. Also in the official 11.21 and 11.22.
+- **The T-Beam installs reliably from the web page** (AU-30): the image check runs in a separate start before WiFi when memory is short.
+- **Bench 2026-11-24:** check and download with staging on DK5EN-1 (Heltec V3, 1,180,497 bytes in 11.2 s), DK5EN-92 (T-Beam, 1,240,686 bytes in 13.4 s, lowest free memory 11,332 bytes) and DK5EN-14 (T-Deck Plus, 1,617,579 bytes in 20.7 s). Night: [morning].
+  - Background: [`docs/campaign-ota-lowheap-01-20261122.md`](docs/campaign-ota-lowheap-01-20261122.md).
+
+**Radio**
+
+- **nRF52 sync word `0x24B4`** (SYNC-NRF-01, upstream #1320): see "Action needed". Background: [`docs/syncword-ab-bench-20261124.md`](docs/syncword-ab-bench-20261124.md).
+- **Position beacons go out on time** (POSINFO-LAG-01, #1315). Cause: a beacon was sent about 30 s late. Now: on time, with a 60 s floor between automatic beacons; manual beacons keep 30 s.
+
+**Fixes from the official wave-3 PR #1316** (merged upstream, released here first)
+
+- **nRF52 `--dumpsettings` no longer prints passwords and the BLE PIN** (SEC-DUMP-01, #1291).
+- **RAK4631 Ethernet uses the configured DNS server, and `--info` shows the real network mode** (RAK-ETH-DNS-01, RAK-NETMODE-01, #1289).
+- **A gateway no longer hands server texts for foreign groups, third-party DMs, or `*` texts under `--nomsgall on` to its display and phone** (GW-GROUP-01, GW-DM-01, #1290); relay, dedup and the gateway ACK are unchanged. `--setcall`, `--setudpcall` and `--setlog` explain why a call with `/` is refused (GW-CALL-01).
+- **Web setup reads `tempoffsetoutdoor`** (WEB-TEMPOFF-01, #1296).
+- **T-Beam 1W sets the PA the same way at boot and at runtime** (TBEAM1W-PWR-01, #1301).
+- **GPS autosymbol and the NEXT position counter** (#1295): nRF52 restores the autosymbol setting at boot (GPS-AUTOSYM-01), a stationary node still updates its symbol (GPS-AUTOSYM-02), the first two minutes after boot no longer count as car speed (GPS-AUTOSYM-03), and the NEXT countdown no longer wraps to a huge number (POSINFO-NEXT-01).
+- **Manual OTA onto an old Safeboot warns and proceeds** (OTA-SAFEBOOT-01, #1300).
+- **DHT is reported "found" only after the sensor answered a probe** (DHT-PROBE-01, #1302).
+- **APRS text** (#1293): the track frame keeps 25 bytes of comment instead of 16; text is cut once and never inside a UTF-8 character; `--atxt` tells you when the text is longer than what goes on air (APRS-TXT-01..03).
+- **T-Deck header battery label follows `--volt`** (TDECK-VOLT-01, #1312).
+- **Display paging and the user button** (#1294): OLED and web show the same messages (DISP-PAGE-01), a browse click is no longer lost when the display turns off right after it (DISP-PAGE-02), the Wireless Paper's first press no longer redraws the newest message (DISP-PAGE-03), and a user button switched off in the web UI stops working at once, not after a reboot (BTN-OFF-01).
+- **Heltec T114 dark theme; `--msgwake` keeps a switched-off display dark** (T114-DARK-01, #1314).
+- **`--aprswx on|off` real fix** for the settings reply to the phone (#1288; replaces the temporary fork fix).
+
+**Sensors and web**
+
+- **INA226: the calibration is written for common shunt values** (INA226-CAL-01).
+  - Cause: the library refuses a shunt and maximum current pair above 81.9 mV full scale and then writes no calibration; with 0.1 Ohm and the default 20 A the sensor read 0 mA.
+  - Now: `--shunt` lowers the maximum current to fit, `--imax` refuses a pair that does not fit, a stored pair is clamped at boot.
+- **The INA226 bus-voltage label lost its stray `<`** (WEB-INA-01).
+- **The WX table lists AHT20, SHT21, BMP390 and INA226** (WEB-WX-01, ticket P-0394).
+
+**Library patches** (FORMAL-01, fork-only)
+
+- **Patched copies of library code fix findings of a code review:** NimBLE (NB-01..07), W5100S Ethernet (ETH-07), the arduino-esp32 HTTP client (AE-01..03), mDNS and the DHCP server of the access point, an lwIP MTU guard, a certificate date check and TLS 1.2 as minimum for Auto Update, DNS through the network thread, and fixes in the UDP drain, the Extern-UDP queue, the net console slot and APRS. See "Known gaps": these were not benched one by one.
+  - Background: [`docs/campaign-formal-01-20261123.md`](docs/campaign-formal-01-20261123.md).
+
+## Earlier fork releases
+
+Everything below is already in `v4.40a.11.22` and older, and therefore in this release too. Open a section for details.
+
+<details>
+<summary><strong><code>v4.40a.11.22</code></strong> — RAK4631 Ethernet gateway no longer goes silent after a chip reset, AppLink (phone app over the LAN), dash commands, unsigned pong id</summary>
 
 **Ethernet gateway (RAK4631 with RAK13800)**
 
@@ -68,9 +117,7 @@
   - On air: ids below 2^31 are unchanged.
 - **The web navigation buttons take 75 % of the bar on every system** (WEB-NAV-02). Since `v4.40a.11.20` they filled the whole bar on Linux with a classic scrollbar; the reporter chose the smaller look.
 
-## Earlier fork releases
-
-Everything below is already in `v4.40a.11.21` and older, and therefore in this release too. Open a section for details.
+</details>
 
 <details>
 <summary><strong><code>v4.40a.11.21</code></strong> — Auto Update after a downgrade, W/S hemisphere in TRACK beacons, APRS-IS weather over Wi-Fi</summary>
@@ -723,7 +770,13 @@ Full list of differences from upstream: [`docs/fork-dev-vs-upstream-20261018.md`
 
 ## What changes on the air
 
-With default settings, compared with the official `v4.40a.11.14`:
+With default settings, compared with the official `v4.40a.11.22`:
+
+- **RAK4631, T114 and T-Echo send sync word `0x24B4`** (SYNC-NRF-01, upstream #1320): the second sync symbol now sits where every ESP32 SX1262 board puts it. In TRACK mode the APRS sync word is unchanged.
+- **Track frames carry up to 25 bytes of comment** instead of 16, without a `#name` (APRS-TXT-01, #1293).
+- **Automatic position beacons go out on time**, at least 60 s apart; manual beacons keep 30 s (POSINFO-LAG-01, #1315).
+
+Since the official `v4.40a.11.14`, unchanged from the previous fork release:
 
 - **Pong ids with the top bit set go out unsigned** (PONG-SIGN-01): `{pong}{3867557991}` instead of `{pong}{-427409305}`. Ids below 2^31 are unchanged.
 - **A RAK4631 gateway keeps sending after an Ethernet chip reset** (ETH-06) instead of falling silent until a reboot.
@@ -774,6 +827,19 @@ With default settings, compared with the official `v4.40a.11.14`:
 
 ### Verification for this release
 
+- **Host suite:** `tools/regression.sh --stage 1,2` PASS on the tagged tree: [morning] Unity test cases in [morning] native environments, plus the golden selftest and [morning] host tool tests. The new Auto Update buffer size, the `hmac_connect.py` fixes and the INA226 calibration each have tests that fail on the old code.
+- **Build:** all 36 board environments built from the release candidate on 2026-11-24 (35 green; `esp32-external-radio` needs its own build overlay and is not shipped). CI builds all shipped environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download.
+- **Auto Update, bench 2026-11-24** (release-candidate images, check and download with staging, never installed): DK5EN-1 Heltec V3, DK5EN-92 T-Beam v1.2, DK5EN-14 T-Deck Plus, numbers under "New in". Night 2026-11-24/25, three runs per board: [morning].
+- **Sync word, bench 2026-11-24:** RAK4631 with the old and the new value against Heltec V3, T-Deck Plus and T-Beam, both directions, at 2 and -9 dBm; TRACK on and off. Result: [`docs/syncword-ab-bench-20261124.md`](docs/syncword-ab-bench-20261124.md).
+- **Gateway and remote management, bench 2026-11-24:** message hold in a simulated server outage on DK5EN-1 (held, replayed once with the same id); Extern-UDP register query on DK5EN-92 (16 registers, no secret, rate limit); RM1 `pins`, `gpio`, `txq`, `mbox`, `maxhop` over LoRa from DK5EN-92 to DK5EN-1, refusals for the button pin and without the GPIO master switch.
+- **Production gateway:** `DK5EN-98` runs the release candidate since 2026-11-24 15:38 (OTA), settings unchanged.
+- **Not on a node:** INA226 calibration and the WX table (no sensor on the bench), and most wave-3 fixes listed under "Not on our bench" below.
+
+<details>
+<summary>Bench results of earlier releases (unchanged code since)</summary>
+
+**`v4.40a.11.22`:**
+
 - **Host suite:** `tools/regression.sh --stage 1,2` PASS on the tagged tree: 4012 Unity test cases in 116 native environments, plus the golden selftest and 1632 host tool tests. The Ethernet fix, the AppLink socket rules and the AppLink memory rule each have tests that fail on the old code.
 - **Build:** all 36 board environments built from the AppLink merge on 2026-11-21 (35 green; `esp32-external-radio` needs its own build overlay and is not shipped); after the last code change T-Beam, Heltec V3 and RAK4631. CI builds all shipped environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download.
 - **Review:** the AppLink merge, its socket fix and the memory change each passed an independent review before commit.
@@ -782,9 +848,6 @@ With default settings, compared with the official `v4.40a.11.14`:
 - **Production gateway:** `DK5EN-98` runs `v4.40a.11.20`; it does not run this release yet.
 - **Smoke test after the memory change, 2026-11-21:** release-candidate images on `DK5EN-1` and `DK5EN-90`; AppLink on, login, off, on, login again on both.
 - **Not on a node:** the dash commands, the unsigned pong id and the navigation buttons.
-
-<details>
-<summary>Bench results of earlier releases (unchanged code since)</summary>
 
 **`v4.40a.11.21`:**
 
@@ -940,6 +1003,16 @@ With default settings, compared with the official `v4.40a.11.14`:
 - **A failed image after the flash erase** leaves the node in Safeboot until a web-flasher upload (single app slot).
 - **Locked settings are reset at boot without asking.** INSTRUMENT bench builds keep them changeable. `--stor on` is refused, so store-and-forward (#1188) is effectively off.
 
+**New in `v4.40a.11.25`**
+
+- **Library patches (FORMAL-01) were not benched one by one.** They ran on the bench nodes the whole day (WiFi, web, BLE advertising, Auto Update download over TLS, Ethernet on the RAK), but no patch has a targeted test on hardware. One of them broke the Auto Update download on 2026-11-23 (AU-28, fixed before this release). Report anything new around BLE, mDNS, the access point, Ethernet or downloads.
+- **Sync word:** an nRF52 node with the old value against one with the new value is not measured (one RAK on our bench), and the margin near the sensitivity limit is not testable on our bench table. See "Action needed".
+- **Auto Update not measured on** T-Beam Supreme, Wireless Tracker, the E22 boards and Heltec V4. The T-Beam stays tight: the largest free block at the start of a run was between 34.8 KB and 57.3 KB on our board, for a 33.4 KB buffer.
+- **A node can miss the frame that makes its own channel check busy** (CAD-RXLOSS-01, open, found during the sync-word test): a node with frames queued runs CAD before sending; if a frame starts during that check, the node does not decode it and gets it only as a relay copy. Seen mostly on a RAK4631 gateway with ACKs from the server queued. Not new in this release.
+- **Wave-3 fixes not on our bench:** phone path of the gateway rule (GW-DM-01), the `/` hint (GW-CALL-01), the OTA warning on an old Safeboot (OTA-SAFEBOOT-01), the user-button switch (BTN-OFF-01), Wireless Paper paging (DISP-PAGE-03), APRS frames on air, DHT probe, GPS autosymbol in motion, T-Beam 1W PA. Host tests and builds only.
+- **INA226 calibration and the WX table:** host tests only, no sensor on the bench.
+- **Remote management Queues card:** the three requests of its Read buttons were answered over LoRa; the button click itself was not tried in a browser.
+
 **AppLink (new in `v4.40a.11.22`)**
 
 - **A node can start with AppLink on by accident** if it ever had both `--gpsdebug on` (removed in 2026-04) and `--checkmesh on` (v4.35p, May to June 2026) set, and has a console password. The boot log then says `[APPLINK] on (port 8002)`; `--applink off` ends it. Accepted by the operator; the login still needs the password.
@@ -973,7 +1046,7 @@ With default settings, compared with the official `v4.40a.11.14`:
   - **CET-RESTAMP-01 (concept only):** a gateway with NTP would write its own time into the `{CET}` beacon right before transmit, so receivers lose the server and queue delay. That changes what goes on air; no code exists.
 - **CSMA-01, CSMA-05 and the relay hop clamp (IDEE-04):** CSMA-01 ran against a mock server (14 of 14), CSMA-05 and the clamp are host tests only; the shorter CSMA wait was not repeated on air.
   - **CSMA-03 threshold:** `CSMA_CAD_MAX_AGE_US` stays at 5 ms; CAD age was measured at 1-2 ms on `DK5EN-90`.
-- **RM1 `pins` and `gpio`, RM Queues card (RM-Q-01):** `txq`, `mbox` and `maxhop` answered `ok` over LoRa; the card's own Read button, `pins` and `gpio` are host and web tests only.
+- **RM1 `pins` and `gpio`, RM Queues card (RM-Q-01):** benched over LoRa on 2026-11-24 (see "Verification"); a real pin change with a jumper and the card's button click were not tried.
 - **DHT22 (SENS-04):** no DHT22 on our bench; the pin and type handling is host-tested.
 - **Safeboot (SB-06-DESC):** benched on one T-Beam. Nodes that never took a web-flasher install keep an older Safeboot without these checks.
 - **Clock every second:** measured on Heltec V3 and T-Beam OLEDs. No separate record for the T-Deck, e-paper, T114 and T-Echo displays, which run the same logic.
@@ -993,9 +1066,7 @@ With default settings, compared with the official `v4.40a.11.14`:
 - **Auto Update restart on a split heap with a phone held:** the phone path works, but this run may not have hit a split heap (AU-23).
 - **Message hold:** one simulated outage on the bench, no real server failure. A single lost `BEAT` may replay the few held frames (about 1 per 4 h, measured), by decision.
 - **MCP23017 pins on the Pins page:** host tests only, no expander on our bench.
-- **T-Beam Auto Update download can still fail (AU-24, open):** on `DK5EN-92` after hours of uptime the Download is refused with `lowheap_tls`, and one first Download hit a watchdog reset in the gateway task. Seen at 4.8 h uptime on `v4.40a.11.06` code; the cause is unknown.
-  - **What to do:** reboot the node and try again; the web flasher and `tools/webflash.py` do not use this path.
-- **Auto Update download stops at about 54 % with `nomem` (AU-25, open):** seen twice on `DK5EN-1` (local INSTRUMENT build, 3 h uptime) on 2026-11-08; after a reboot the Download went through. Related to AU-24. Both need an explained cause before the next Auto Update wave.
+- **AU-24 and AU-25 are resolved in `v4.40a.11.25`:** both were the low-memory failure (OTA-LOWHEAP-01) and the T-Beam erase watchdog (AU-29); see "New in".
 - **Mailbox echo fix (SNF-ECHO-01):** benched on one Heltec V3 with injected copies, not with a real second gateway and the server, and not on nRF52 (built only). The counters of the node from the field report were not read, so the link to that report rests on timing and code.
   - **Still open:** two mailbox nodes serving the same call can re-open a slot after it expires, about one run per hold time and node. A node that keeps hearing the recipient without an ack can therefore start over.
   - **Accepted:** after the first pause a message gets one frame per pause instead of nine. This differs from the concept but keeps airtime down (about 30 instead of up to 216 frames in 24 hours).
@@ -1020,7 +1091,7 @@ With default settings, compared with the official `v4.40a.11.14`:
 - **Transmit queue in the field:** the 24 h capture on the gateway `DK5EN-98` (2026-10-24/25) found the own-text bug fixed in `v4.40a.10.25`; a 93 h soak of `v4.40a.10.25` on the same gateway (2026-10-25 to 10-29) then showed 0 queue drops and every frame sent well within its expiry time; the expiry times (300/120/90 s) are not re-tuned yet. In a small older sample (27 relayed frames, 2026-10-18) the slowest 10 % waited longer than 300 s and would now be dropped. The relay-side time-beacon gate was not seen on air (host tests only).
 - **Call blocklist:** taking over the DM3KS build's stored list was not benched on hardware.
 - **Queue work of `v4.40a.10.19`:** host tests (including the golden corpus) and builds only. The locked `--nbrrelay on` rests on one gateway's field data. The age-escalated hold is counted only since boot (`[MC-HWM]`), not per 5-minute window.
-- **Auto Update:** the BLE guard runs on classic ESP32 only (a forced NimBLE restart crashed an ESP32-S3) and was tested with a BLE client script, not the McApp phone app. Stale-click and stuck-in-Safeboot handling in the web row is host-tested only. The T-Beam download after the heap work was not re-run.
+- **Auto Update:** the BLE guard runs on classic ESP32 only (a forced NimBLE restart crashed an ESP32-S3) and was tested with a BLE client script, not the McApp phone app. Stale-click and stuck-in-Safeboot handling in the web row is host-tested only.
 - **RM1 `upd go`:** the download path is host-tested only. `upd go` installs even with `--autoupdate off`; remote management itself stays off by default and needs the password.
 - **RAK4631 static IP:** cable pull and a real UDP error streak not benched; ESP32 Ethernet boards not benched with the new table.
 - **LEDs:** deep-sleep LED, remote `chgled` over the air and the phone app view not benched.
@@ -1085,6 +1156,9 @@ With default settings, compared with the official `v4.40a.11.14`:
 
 ## Upstream
 
+- **In upstream `dev`, not in an official release yet:** our wave-3 PR [#1316](https://github.com/icssw-org/MeshCom-Firmware/pull/1316) (21 issues, merged 2026-11-22, synced here as `dc5ea81c`) and #1320 (nRF52 sync word and `hmac_connect.py`, merged 2026-11-23, synced as `4fe57374`). This release carries all of upstream `dev` as of 2026-11-23.
+- **Official `v4.40a.11.22`** (upstream tag on `5db0a4f5`) shares only its name with our `v4.40a.11.22`; the two are different builds.
+- **Next upstream PR (planned):** one combined PR with the Auto Update memory work, the small fixes (#1305, #1306, INA226), the gateway hold (#1307), the register query (#1308), the remote-management node side (#1303) and the `hmac_connect.py` fix. The library patches, Safeboot, AppLink and the `dev` channel stay fork-only for now.
 - **In the official release `v4.40a.11.14`** (2026-11-14, `upstream/dev` 70ae124d): our PR [#1277](https://github.com/icssw-org/MeshCom-Firmware/pull/1277) with 20 commits. Merged into this tree as `d4384eac`.
   - **Clock and display:** stale `{CET}` beacons, clock line every second, GPS without a fix against NTP, shown time held.
   - **T-Deck:** theme and readable light mode, setup controls, header icons, GPS layout and sky plot, smaller builds.

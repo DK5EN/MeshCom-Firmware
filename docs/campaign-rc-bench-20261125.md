@@ -15,16 +15,16 @@ test, `hmac_connect.py` fix, wave-5 bench, one night, release and PR documents. 
 
 ## Steps and status
 
-| Step | What                                                    | Status  |
-| ---- | ------------------------------------------------------- | ------- |
-| 1    | mbedTLS copy removed, host gate, AU re-measured -1, -92 | code done (`5488f0bc`), bench in step 3 |
-| 2    | full host gate, every board env                         | done: 35/36 envs, external-radio its own `#error` |
-| 3    | flash all bench nodes + DK5EN-98 (OTA), AU on T-Deck    | done 2026-11-24 15:38 |
-| 4    | sync-word A/B on DK5EN-90                               | done: no side effect on the bench; gaps stated |
-| 5    | `tools/hmac_connect.py` fixes (HMAC-WIN-01)             | done (`732238bd`) |
+| Step | What                                                    | Status                                             |
+| ---- | ------------------------------------------------------- | -------------------------------------------------- |
+| 1    | mbedTLS copy removed, host gate, AU re-measured -1, -92 | code done (`5488f0bc`), bench in step 3            |
+| 2    | full host gate, every board env                         | done: 35/36 envs, external-radio its own `#error`  |
+| 3    | flash all bench nodes + DK5EN-98 (OTA), AU on T-Deck    | done 2026-11-24 15:38                              |
+| 4    | sync-word A/B on DK5EN-90                               | done: no side effect on the bench; gaps stated     |
+| 5    | `tools/hmac_connect.py` fixes (HMAC-WIN-01)             | done (`732238bd`)                                  |
 | 6    | wave 5 bench (#1307, #1308, #1303)                      | done: all pass; Read button click not in a browser |
-| 7    | one night: AU check + download x3 per ESP32 node        | running since 19:25 |
-| 8    | documents (release notes, journal, PR text, issues)     | open    |
+| 7    | one night: AU check + download x3 per ESP32 node        | running since 19:25                                |
+| 8    | documents (release notes, journal, PR text, issues)     | open                                               |
 
 ## Step 1: mbedTLS copy removed
 
@@ -91,13 +91,13 @@ with the copy, the state before `469bb942`.
 
 ## Step 3: flash and Auto Update (2026-11-24)
 
-| Node     | Board       | Image (all commit `732238bd`)                     | md5        | Method          | Back with                         |
-| -------- | ----------- | ------------------------------------------------- | ---------- | --------------- | --------------------------------- |
-| DK5EN-1  | Heltec V3   | `heltec_wifi_lora_32_V3`, `MC_BUILD_TAG=v4.40a.11.21` | `60cdd358` | OTA, webflash.py | build 15:25:41, guard ok, gateway on |
-| DK5EN-92 | T-Beam v1.2 | `ttgo_tbeam`, tag 11.21                            | `c782b381` | OTA, webflash.py | build 15:26:40, guard ok          |
-| DK5EN-14 | T-Deck Plus | `t_deck_plus`, tag 11.21                           | `4d2c8378` | OTA, webflash.py | build 15:27:30, guard ok          |
-| DK5EN-90 | RAK4631     | `wiscore_rak4631`, image B (`0x24B4`)              | `52723f33` (hex) | serial DFU (`pio -t upload`) | build 14:56:11, guard ok |
-| DK5EN-98 | Heltec V3   | `heltec_wifi_lora_32_V3`, no tag                   | `c1e9adc9` | OTA, webflash.py, 15:38 | build 15:11:17, all settings as before, server connected |
+| Node     | Board       | Image (all commit `732238bd`)                         | md5              | Method                       | Back with                                                |
+| -------- | ----------- | ----------------------------------------------------- | ---------------- | ---------------------------- | -------------------------------------------------------- |
+| DK5EN-1  | Heltec V3   | `heltec_wifi_lora_32_V3`, `MC_BUILD_TAG=v4.40a.11.21` | `60cdd358`       | OTA, webflash.py             | build 15:25:41, guard ok, gateway on                     |
+| DK5EN-92 | T-Beam v1.2 | `ttgo_tbeam`, tag 11.21                               | `c782b381`       | OTA, webflash.py             | build 15:26:40, guard ok                                 |
+| DK5EN-14 | T-Deck Plus | `t_deck_plus`, tag 11.21                              | `4d2c8378`       | OTA, webflash.py             | build 15:27:30, guard ok                                 |
+| DK5EN-90 | RAK4631     | `wiscore_rak4631`, image B (`0x24B4`)                 | `52723f33` (hex) | serial DFU (`pio -t upload`) | build 14:56:11, guard ok                                 |
+| DK5EN-98 | Heltec V3   | `heltec_wifi_lora_32_V3`, no tag                      | `c1e9adc9`       | OTA, webflash.py, 15:38      | build 15:11:17, all settings as before, server connected |
 
 - DK5EN-1: the first OTA attempt broke off (`Broken pipe` during the upload). Entering Safeboot installed the 11.22
   image staged there by the AU-30 bench on 2026-11-24; the second attempt flashed the RC image. Bench node only.
@@ -107,11 +107,11 @@ with the copy, the state before `469bb942`.
 Auto Update, check + install (stage only, never apply), `tools/bench/ota_lowheap_trigger.py --attempts 1`, plain
 images, logs `tools/bench/runs/harness/rc-bench-20261125/au/`:
 
-| Node     | Free / largest block at start | Lowest free during job | AU buffer        | TLS records in buffer | Download              | Erase, idle0max | Result |
-| -------- | ----------------------------- | ---------------------- | ---------------- | --------------------- | --------------------- | --------------- | ------ |
-| DK5EN-1  | 103,120 / 90,100 B            | 19,564 B               | 33,440 B         | check 2/2, dl 4/4     | 1,180,497 B in 11.2 s | 2.7 s, 164 ms   | staged |
-| DK5EN-92 | 62,300 / 57,332 B             | 11,332 B               | 33,440 B, twice  | check 2/2, dl 4/4     | 1,240,686 B in 13.4 s | 6.0 s, 362 ms   | staged, image check in the job |
-| DK5EN-14 | 61,696 / 51,188 B (internal)  | 40,196 B               | none (PSRAM path)| n/a                   | 1,617,579 B in 20.7 s | 2.4 s, 84 ms    | staged |
+| Node     | Free / largest block at start | Lowest free during job | AU buffer         | TLS records in buffer | Download              | Erase, idle0max | Result                         |
+| -------- | ----------------------------- | ---------------------- | ----------------- | --------------------- | --------------------- | --------------- | ------------------------------ |
+| DK5EN-1  | 103,120 / 90,100 B            | 19,564 B               | 33,440 B          | check 2/2, dl 4/4     | 1,180,497 B in 11.2 s | 2.7 s, 164 ms   | staged                         |
+| DK5EN-92 | 62,300 / 57,332 B             | 11,332 B               | 33,440 B, twice   | check 2/2, dl 4/4     | 1,240,686 B in 13.4 s | 6.0 s, 362 ms   | staged, image check in the job |
+| DK5EN-14 | 61,696 / 51,188 B (internal)  | 40,196 B               | none (PSRAM path) | n/a                   | 1,617,579 B in 20.7 s | 2.4 s, 84 ms    | staged                         |
 
 - "Lowest free" is `--info` HEAP `min` (minimum since boot) read after the job; the plain image has no
   `--heaplog`. Not the same instrument as the INSTRUMENT figures of 2026-11-23 (`[INSTR-HEAP]`).
@@ -136,37 +136,37 @@ only, compared with DK5EN-98's log). Raw logs: `tools/bench/runs/harness/rc-benc
 
 #### Run B, 2 dBm (2026-11-24 15:42-15:53)
 
-| Sender | Receiver | Sent | Decoded direct | Relay only | Errors in window | RSSI med/min | SNR med/min |
-| ------ | -------- | ---- | -------------- | ---------- | ---------------- | ------------ | ----------- |
-| DK5EN-90 | DK5EN-1 | 12 | 12 | 0 | 1 | -50 / -51 | 6 / 5 |
-| DK5EN-90 | DK5EN-92 | 12 | 12 | 0 | 0 | -53.5 / -55 | 11 / 10 |
-| DK5EN-90 | DK5EN-14 | 12 | 12 | 0 | 0 | -70 / -71 | 6 / 6 |
-| DK5EN-1 | DK5EN-92 | 12 | 11 | 1 | 0 | -50 / -51 | 10 / 9 |
-| DK5EN-1 | DK5EN-90 | 12 | 11 | 0 | 0 | -44 / -45 | 6 / 6 |
-| DK5EN-1 | DK5EN-14 | 12 | 12 | 0 | 0 | -65 / -66 | 6 / 5 |
-| DK5EN-14 | DK5EN-1 | 12 | 11 | 0 | 0 | -74 / -74 | 6 / 5 |
-| DK5EN-14 | DK5EN-92 | 12 | 11 | 0 | 0 | -75 / -76 | 10 / 9 |
-| DK5EN-14 | DK5EN-90 | 12 | 9 | 0 | 2 | -72 / -72 | 7 / 6 |
-| DK5EN-92 | DK5EN-1 | 14 | 13 | 0 | 0 | -45 / -45 | 6 / 5 |
-| DK5EN-92 | DK5EN-90 | 14 | 10 | 0 | 0 | -42 / -42 | 7 / 6 |
-| DK5EN-92 | DK5EN-14 | 14 | 13 | 0 | 0 | -65 / -65 | 6 / 5 |
+| Sender   | Receiver | Sent | Decoded direct | Relay only | Errors in window | RSSI med/min | SNR med/min |
+| -------- | -------- | ---- | -------------- | ---------- | ---------------- | ------------ | ----------- |
+| DK5EN-90 | DK5EN-1  | 12   | 12             | 0          | 1                | -50 / -51    | 6 / 5       |
+| DK5EN-90 | DK5EN-92 | 12   | 12             | 0          | 0                | -53.5 / -55  | 11 / 10     |
+| DK5EN-90 | DK5EN-14 | 12   | 12             | 0          | 0                | -70 / -71    | 6 / 6       |
+| DK5EN-1  | DK5EN-92 | 12   | 11             | 1          | 0                | -50 / -51    | 10 / 9      |
+| DK5EN-1  | DK5EN-90 | 12   | 11             | 0          | 0                | -44 / -45    | 6 / 6       |
+| DK5EN-1  | DK5EN-14 | 12   | 12             | 0          | 0                | -65 / -66    | 6 / 5       |
+| DK5EN-14 | DK5EN-1  | 12   | 11             | 0          | 0                | -74 / -74    | 6 / 5       |
+| DK5EN-14 | DK5EN-92 | 12   | 11             | 0          | 0                | -75 / -76    | 10 / 9      |
+| DK5EN-14 | DK5EN-90 | 12   | 9              | 0          | 2                | -72 / -72    | 7 / 6       |
+| DK5EN-92 | DK5EN-1  | 14   | 13             | 0          | 0                | -45 / -45    | 6 / 5       |
+| DK5EN-92 | DK5EN-90 | 14   | 10             | 0          | 0                | -42 / -42    | 7 / 6       |
+| DK5EN-92 | DK5EN-14 | 14   | 13             | 0          | 0                | -65 / -65    | 6 / 5       |
 
 #### Run B-low, -9 dBm on DK5EN-1, -14, -90; DK5EN-92 at 2 dBm (refuses below -4) (15:54-16:06)
 
-| Sender | Receiver | Sent | Decoded direct | Relay only | Errors in window | RSSI med/min | SNR med/min |
-| ------ | -------- | ---- | -------------- | ---------- | ---------------- | ------------ | ----------- |
-| DK5EN-90 | DK5EN-1 | 12 | 11 | 1 | 0 | -49 / -51 | 6 / 5 |
-| DK5EN-90 | DK5EN-92 | 12 | 12 | 0 | 0 | -58.5 / -74 | 11 / 10 |
-| DK5EN-90 | DK5EN-14 | 12 | 12 | 0 | 0 | -69 / -77 | 6 / 6 |
-| DK5EN-1 | DK5EN-92 | 12 | 12 | 0 | 0 | -55 / -59 | 11 / 10 |
-| DK5EN-1 | DK5EN-90 | 12 | 12 | 0 | 0 | -49 / -52 | 6 / 6 |
-| DK5EN-1 | DK5EN-14 | 12 | 12 | 0 | 0 | -49 / -68 | 6 / 5 |
-| DK5EN-14 | DK5EN-1 | 12 | 10 | 0 | 0 | -59 / -60 | 6 / 5 |
-| DK5EN-14 | DK5EN-92 | 12 | 11 | 0 | 0 | -64 / -68 | 10 / 9 |
-| DK5EN-14 | DK5EN-90 | 12 | 9 | 1 | 0 | -75 / -76 | 6 / 6 |
-| DK5EN-92 | DK5EN-1 | 13 | 12 | 0 | 0 | -43 / -44 | 6 / 5 |
-| DK5EN-92 | DK5EN-90 | 13 | 8 | 0 | 0 | -47 / -48 | 6 / 6 |
-| DK5EN-92 | DK5EN-14 | 13 | 12 | 0 | 0 | -42 / -44 | 6 / 5 |
+| Sender   | Receiver | Sent | Decoded direct | Relay only | Errors in window | RSSI med/min | SNR med/min |
+| -------- | -------- | ---- | -------------- | ---------- | ---------------- | ------------ | ----------- |
+| DK5EN-90 | DK5EN-1  | 12   | 11             | 1          | 0                | -49 / -51    | 6 / 5       |
+| DK5EN-90 | DK5EN-92 | 12   | 12             | 0          | 0                | -58.5 / -74  | 11 / 10     |
+| DK5EN-90 | DK5EN-14 | 12   | 12             | 0          | 0                | -69 / -77    | 6 / 6       |
+| DK5EN-1  | DK5EN-92 | 12   | 12             | 0          | 0                | -55 / -59    | 11 / 10     |
+| DK5EN-1  | DK5EN-90 | 12   | 12             | 0          | 0                | -49 / -52    | 6 / 6       |
+| DK5EN-1  | DK5EN-14 | 12   | 12             | 0          | 0                | -49 / -68    | 6 / 5       |
+| DK5EN-14 | DK5EN-1  | 12   | 10             | 0          | 0                | -59 / -60    | 6 / 5       |
+| DK5EN-14 | DK5EN-92 | 12   | 11             | 0          | 0                | -64 / -68    | 10 / 9      |
+| DK5EN-14 | DK5EN-90 | 12   | 9              | 1          | 0                | -75 / -76    | 6 / 6       |
+| DK5EN-92 | DK5EN-1  | 13   | 12             | 0          | 0                | -43 / -44    | 6 / 5       |
+| DK5EN-92 | DK5EN-90 | 13   | 8              | 0          | 0                | -47 / -48    | 6 / 6       |
+| DK5EN-92 | DK5EN-14 | 13   | 12             | 0          | 0                | -42 / -44    | 6 / 5       |
 
 ## Shared-tree incident (2026-11-24 16:10)
 
@@ -189,45 +189,45 @@ only, compared with DK5EN-98's log). Raw logs: `tools/bench/runs/harness/rc-benc
 
 #### Run A, image A `0x242B`, 2 dBm (17:02-17:14)
 
-| Sender | Receiver | Sent | Decoded direct | Relay only | Errors in window | RSSI med/min | SNR med/min |
-| ------ | -------- | ---- | -------------- | ---------- | ---------------- | ------------ | ----------- |
-| DK5EN-90 | DK5EN-1 | 13 | 13 | 0 | 1 | -39 / -41 | 6 / 5 |
-| DK5EN-90 | DK5EN-92 | 13 | 13 | 0 | 0 | -56 / -56 | 13 / 10 |
-| DK5EN-90 | DK5EN-14 | 13 | 13 | 0 | 0 | -64 / -65 | 6 / 5 |
-| DK5EN-1 | DK5EN-92 | 12 | 11 | 1 | 0 | -46 / -48 | 13 / 11 |
-| DK5EN-1 | DK5EN-90 | 12 | 9 | 3 | 0 | -34 / -34 | 6 / 6 |
-| DK5EN-1 | DK5EN-14 | 12 | 12 | 0 | 0 | -38 / -41 | 6 / 5 |
-| DK5EN-14 | DK5EN-1 | 12 | 9 | 0 | 0 | -48 / -48 | 6 / 5 |
-| DK5EN-14 | DK5EN-92 | 12 | 10 | 0 | 0 | -58.5 / -59 | 10 / 9 |
-| DK5EN-14 | DK5EN-90 | 12 | 7 | 0 | 0 | -65 / -66 | 7 / 7 |
-| DK5EN-92 | DK5EN-1 | 12 | 11 | 0 | 0 | -36 / -37 | 6 / 6 |
-| DK5EN-92 | DK5EN-90 | 12 | 7 | 0 | 0 | -42 / -43 | 6 / 6 |
-| DK5EN-92 | DK5EN-14 | 12 | 11 | 0 | 0 | -46 / -46 | 6 / 6 |
+| Sender   | Receiver | Sent | Decoded direct | Relay only | Errors in window | RSSI med/min | SNR med/min |
+| -------- | -------- | ---- | -------------- | ---------- | ---------------- | ------------ | ----------- |
+| DK5EN-90 | DK5EN-1  | 13   | 13             | 0          | 1                | -39 / -41    | 6 / 5       |
+| DK5EN-90 | DK5EN-92 | 13   | 13             | 0          | 0                | -56 / -56    | 13 / 10     |
+| DK5EN-90 | DK5EN-14 | 13   | 13             | 0          | 0                | -64 / -65    | 6 / 5       |
+| DK5EN-1  | DK5EN-92 | 12   | 11             | 1          | 0                | -46 / -48    | 13 / 11     |
+| DK5EN-1  | DK5EN-90 | 12   | 9              | 3          | 0                | -34 / -34    | 6 / 6       |
+| DK5EN-1  | DK5EN-14 | 12   | 12             | 0          | 0                | -38 / -41    | 6 / 5       |
+| DK5EN-14 | DK5EN-1  | 12   | 9              | 0          | 0                | -48 / -48    | 6 / 5       |
+| DK5EN-14 | DK5EN-92 | 12   | 10             | 0          | 0                | -58.5 / -59  | 10 / 9      |
+| DK5EN-14 | DK5EN-90 | 12   | 7              | 0          | 0                | -65 / -66    | 7 / 7       |
+| DK5EN-92 | DK5EN-1  | 12   | 11             | 0          | 0                | -36 / -37    | 6 / 6       |
+| DK5EN-92 | DK5EN-90 | 12   | 7              | 0          | 0                | -42 / -43    | 6 / 6       |
+| DK5EN-92 | DK5EN-14 | 12   | 11             | 0          | 0                | -46 / -46    | 6 / 6       |
 
 #### Run A-low, -9 dBm as in B-low (17:15-17:27)
 
-| Sender | Receiver | Sent | Decoded direct | Relay only | Errors in window | RSSI med/min | SNR med/min |
-| ------ | -------- | ---- | -------------- | ---------- | ---------------- | ------------ | ----------- |
-| DK5EN-90 | DK5EN-1 | 12 | 10 | 2 | 0 | -39 / -40 | 6 / 6 |
-| DK5EN-90 | DK5EN-92 | 12 | 11 | 1 | 0 | -55 / -56 | 10 / 10 |
-| DK5EN-90 | DK5EN-14 | 12 | 11 | 1 | 0 | -65 / -66 | 6 / 5 |
-| DK5EN-1 | DK5EN-92 | 12 | 12 | 0 | 0 | -52 / -53 | 12 / 11 |
-| DK5EN-1 | DK5EN-90 | 12 | 9 | 3 | 0 | -43 / -44 | 6 / 6 |
-| DK5EN-1 | DK5EN-14 | 12 | 12 | 0 | 0 | -50 / -51 | 6 / 5 |
-| DK5EN-14 | DK5EN-1 | 12 | 10 | 0 | 0 | -61 / -61 | 6 / 5 |
-| DK5EN-14 | DK5EN-92 | 12 | 11 | 0 | 0 | -70 / -71 | 12 / 10 |
-| DK5EN-14 | DK5EN-90 | 12 | 7 | 0 | 2 | -77 / -78 | 6 / 6 |
-| DK5EN-92 | DK5EN-1 | 12 | 8 | 0 | 0 | -37 / -38 | 6 / 6 |
-| DK5EN-92 | DK5EN-90 | 12 | 9 | 0 | 0 | -42 / -44 | 7 / 6 |
-| DK5EN-92 | DK5EN-14 | 12 | 12 | 0 | 0 | -47 / -48 | 6 / 5 |
+| Sender   | Receiver | Sent | Decoded direct | Relay only | Errors in window | RSSI med/min | SNR med/min |
+| -------- | -------- | ---- | -------------- | ---------- | ---------------- | ------------ | ----------- |
+| DK5EN-90 | DK5EN-1  | 12   | 10             | 2          | 0                | -39 / -40    | 6 / 6       |
+| DK5EN-90 | DK5EN-92 | 12   | 11             | 1          | 0                | -55 / -56    | 10 / 10     |
+| DK5EN-90 | DK5EN-14 | 12   | 11             | 1          | 0                | -65 / -66    | 6 / 5       |
+| DK5EN-1  | DK5EN-92 | 12   | 12             | 0          | 0                | -52 / -53    | 12 / 11     |
+| DK5EN-1  | DK5EN-90 | 12   | 9              | 3          | 0                | -43 / -44    | 6 / 6       |
+| DK5EN-1  | DK5EN-14 | 12   | 12             | 0          | 0                | -50 / -51    | 6 / 5       |
+| DK5EN-14 | DK5EN-1  | 12   | 10             | 0          | 0                | -61 / -61    | 6 / 5       |
+| DK5EN-14 | DK5EN-92 | 12   | 11             | 0          | 0                | -70 / -71    | 12 / 10     |
+| DK5EN-14 | DK5EN-90 | 12   | 7              | 0          | 2                | -77 / -78    | 6 / 6       |
+| DK5EN-92 | DK5EN-1  | 12   | 8              | 0          | 0                | -37 / -38    | 6 / 6       |
+| DK5EN-92 | DK5EN-90 | 12   | 9              | 0          | 0                | -42 / -44    | 7 / 6       |
+| DK5EN-92 | DK5EN-14 | 12   | 12             | 0          | 0                | -47 / -48    | 6 / 5       |
 
 #### Every missed frame, classified (what the receiver was doing at the time)
 
-| Run   | RAK as receiver: missed / sent | of these: own CAD busy | own TX | other | ESP32 as receivers: missed RAK frames                          |
-| ----- | ------------------------------ | ---------------------- | ------ | ----- | -------------------------------------------------------------- |
-| B     | 7 / 40                         | 7                      | 0      | 0     | 0                                                              |
-| B-low | 10 / 40                        | 7                      | 2      | 1     | 1 (DK5EN-1, CAD busy)                                          |
-| A     | 12 / 37                        | 11                     | 1      | 0     | 0                                                              |
+| Run   | RAK as receiver: missed / sent | of these: own CAD busy | own TX | other | ESP32 as receivers: missed RAK frames                                        |
+| ----- | ------------------------------ | ---------------------- | ------ | ----- | ---------------------------------------------------------------------------- |
+| B     | 7 / 40                         | 7                      | 0      | 0     | 0                                                                            |
+| B-low | 10 / 40                        | 7                      | 2      | 1     | 1 (DK5EN-1, CAD busy)                                                        |
+| A     | 12 / 37                        | 11                     | 1      | 0     | 0                                                                            |
 | A-low | 10 / 39                        | 10                     | 0      | 0     | 4: one frame lost at all three (DK5EN-1 sent at the same time), one CAD busy |
 
 - **Verdict, active part: no sync-word side effect at the bench's signal levels**, neither RAK old (`0x242B`) nor
@@ -277,16 +277,16 @@ only, compared with DK5EN-98's log). Raw logs: `tools/bench/runs/harness/rc-benc
 - DK5EN-1 `--remotemgmt on` for the test, `off` afterwards (as before). Sender DK5EN-92, saved slot 0 (DK5EN-1), web API
   `POST /rmsend`, answer read from `/rmstatus`.
 
-| Command        | Answer                                           | Time  | Expected                     |
-| -------------- | ------------------------------------------------ | ----- | ---------------------------- |
-| `pins`         | `ok ow=0 btn=0 an=0 wind=0`                       | 10 s  | read                         |
-| `gpio`         | `ok m=0 o=0000000000000 i=0000000000000 l=0000000000000` | 10 s | read                  |
-| `pins btn 0`   | `err blocked`                                    | 10 s  | button pin is read-only      |
-| `pins ow 0`    | `ok ow=0 btn=0 an=0 wind=0`                       | 10 s  | write of the stored value, read back |
-| `gpio 13 on`   | `err master`                                     | 21 s  | refused, master switch off   |
-| `txq`          | `ok q=0/20 bp=quiet tx=3 rt=0 dr=0 u=0`           | 10 s  | Queues card row              |
-| `mbox`         | `ok m=off u=0/50 b=0 a=0/20 st=0 dl=0 ak=0 dr=0 bl=0 nt=0` | 10 s | Queues card row     |
-| `maxhop`       | `ok t=4 p=2`                                     | 10 s  | Queues card row              |
+| Command      | Answer                                                     | Time | Expected                             |
+| ------------ | ---------------------------------------------------------- | ---- | ------------------------------------ |
+| `pins`       | `ok ow=0 btn=0 an=0 wind=0`                                | 10 s | read                                 |
+| `gpio`       | `ok m=0 o=0000000000000 i=0000000000000 l=0000000000000`   | 10 s | read                                 |
+| `pins btn 0` | `err blocked`                                              | 10 s | button pin is read-only              |
+| `pins ow 0`  | `ok ow=0 btn=0 an=0 wind=0`                                | 10 s | write of the stored value, read back |
+| `gpio 13 on` | `err master`                                               | 21 s | refused, master switch off           |
+| `txq`        | `ok q=0/20 bp=quiet tx=3 rt=0 dr=0 u=0`                    | 10 s | Queues card row                      |
+| `mbox`       | `ok m=off u=0/50 b=0 a=0/20 st=0 dl=0 ak=0 dr=0 bl=0 nt=0` | 10 s | Queues card row                      |
+| `maxhop`     | `ok t=4 p=2`                                               | 10 s | Queues card row                      |
 
 - **Not done: the Read button click itself.** The Chrome extension was not connected, so the three Queues requests
   were sent with the same parameters the card's Read buttons send (`mcrm.js` `data-act=qread`), not by a click.
@@ -306,3 +306,18 @@ only, compared with DK5EN-98's log). Raw logs: `tools/bench/runs/harness/rc-benc
 - Output: `tools/bench/runs/harness/rc-bench-20261125/night/`. DK5EN-98 logger (read-only) runs until 09:00 as the
   reference for reboots and channel.
 - Attempt 1 DK5EN-1 19:26: staged, download 1,180,497 B in 11.4 s, records 4/4 in the AU buffer, after_min 21,736 B.
+
+- Night attempt 1 (19:26-19:47): all three staged. DK5EN-1 after_min 21,736 B; DK5EN-92 iblk at start 42,996 B,
+  after_min 11,700 B; DK5EN-14 after_min 30,728 B (internal). Attempts 2 and 3 at +3 h and +6 h.
+
+## Step 8: documents (drafts 2026-11-24 evening)
+
+- `release-notes.md`: new top section for `v4.40a.11.25` (Action needed: nRF52 sync word), 11.22 folded into the
+  history, verification, known gaps (FORMAL-01 not benched one by one, sync-word gaps, CAD-RXLOSS-01, wave-3 items
+  without bench), upstream status. Placeholders `[morning]`: night result and gate counts.
+- `docs/release-journal.md`: German entry, same placeholders. `FLASH_VERSION` bump to 20261125 goes with the
+  release-doc commit in the morning (stamp only: `--info` and the STAT line).
+- PR text draft: [pr-combined-text-20261125.md](pr-combined-text-20261125.md); scope:
+  [pr-combined-scope-20261125.md](pr-combined-scope-20261125.md). Issue drafts:
+  [upstream-issue-drafts-20261125.md](upstream-issue-drafts-20261125.md).
+- Tag name `v4.40a.11.25` free on origin and upstream (2026-11-24).

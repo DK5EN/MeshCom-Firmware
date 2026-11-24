@@ -28,12 +28,12 @@ Background on air: [syncword-onair-20261121.md](syncword-onair-20261121.md).
 
 ## Missed frames per run
 
-| Run                   | RAK receives: missed / sent | own CAD busy | own TX | other | RAK sends: ESP32 misses                               |
-| --------------------- | --------------------------- | ------------ | ------ | ----- | ----------------------------------------------------- |
-| B (`0x24B4`), 2 dBm   | 7 / 40                      | 7            | 0      | 0     | 0                                                     |
-| B, -9 dBm             | 10 / 40                     | 7            | 2      | 1     | 1 (CAD busy)                                          |
-| A (`0x242B`), 2 dBm   | 12 / 37                     | 11           | 1      | 0     | 0                                                     |
-| A, -9 dBm             | 10 / 39                     | 10           | 0      | 0     | 4: one frame at all three (collision), one CAD busy   |
+| Run                 | RAK receives: missed / sent | own CAD busy | own TX | other | RAK sends: ESP32 misses                             |
+| ------------------- | --------------------------- | ------------ | ------ | ----- | --------------------------------------------------- |
+| B (`0x24B4`), 2 dBm | 7 / 40                      | 7            | 0      | 0     | 0                                                   |
+| B, -9 dBm           | 10 / 40                     | 7            | 2      | 1     | 1 (CAD busy)                                        |
+| A (`0x242B`), 2 dBm | 12 / 37                     | 11           | 1      | 0     | 0                                                   |
+| A, -9 dBm           | 10 / 39                     | 10           | 0      | 0     | 4: one frame at all three (collision), one CAD busy |
 
 - **Why the RAK misses frames at all:** the RAK is an Ethernet gateway and queues ACKs it receives from the server.
   Its channel check before sending (CAD) found the channel busy, and that busy channel was the frame it then did not
