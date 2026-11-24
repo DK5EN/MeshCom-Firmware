@@ -22,8 +22,8 @@ test, `hmac_connect.py` fix, wave-5 bench, one night, release and PR documents. 
 | 3    | flash all bench nodes + DK5EN-98 (OTA), AU on T-Deck    | done 2026-11-24 15:38 |
 | 4    | sync-word A/B on DK5EN-90                               | done: no side effect on the bench; gaps stated |
 | 5    | `tools/hmac_connect.py` fixes (HMAC-WIN-01)             | done (`732238bd`) |
-| 6    | wave 5 bench (#1307, #1308, #1303)                      | running: #1307 pass, #1308 pass |
-| 7    | one night: AU check + download x3 per ESP32 node        | open    |
+| 6    | wave 5 bench (#1307, #1308, #1303)                      | done: all pass; Read button click not in a browser |
+| 7    | one night: AU check + download x3 per ESP32 node        | running since 19:25 |
 | 8    | documents (release notes, journal, PR text, issues)     | open    |
 
 ## Step 1: mbedTLS copy removed
@@ -271,3 +271,38 @@ only, compared with DK5EN-98's log). Raw logs: `tools/bench/runs/harness/rc-benc
   `OnTXDone`), `--track off`; check run `B-after-track`: RAK decodes 10/12 of the ESP32 nodes, they decode 12/12 of
   the RAK. `--loradebug` on the RAK was switched off by the test sequence and restored.
 - RAK back on image B (`52723f33`, DFU 18:33). Result doc: [syncword-ab-bench-20261124.md](syncword-ab-bench-20261124.md).
+
+### #1303 remote management: node side PASS (2026-11-24 19:2x, DK5EN-92 -> DK5EN-1 over LoRa, night images)
+
+- DK5EN-1 `--remotemgmt on` for the test, `off` afterwards (as before). Sender DK5EN-92, saved slot 0 (DK5EN-1), web API
+  `POST /rmsend`, answer read from `/rmstatus`.
+
+| Command        | Answer                                           | Time  | Expected                     |
+| -------------- | ------------------------------------------------ | ----- | ---------------------------- |
+| `pins`         | `ok ow=0 btn=0 an=0 wind=0`                       | 10 s  | read                         |
+| `gpio`         | `ok m=0 o=0000000000000 i=0000000000000 l=0000000000000` | 10 s | read                  |
+| `pins btn 0`   | `err blocked`                                    | 10 s  | button pin is read-only      |
+| `pins ow 0`    | `ok ow=0 btn=0 an=0 wind=0`                       | 10 s  | write of the stored value, read back |
+| `gpio 13 on`   | `err master`                                     | 21 s  | refused, master switch off   |
+| `txq`          | `ok q=0/20 bp=quiet tx=3 rt=0 dr=0 u=0`           | 10 s  | Queues card row              |
+| `mbox`         | `ok m=off u=0/50 b=0 a=0/20 st=0 dl=0 ak=0 dr=0 bl=0 nt=0` | 10 s | Queues card row     |
+| `maxhop`       | `ok t=4 p=2`                                     | 10 s  | Queues card row              |
+
+- **Not done: the Read button click itself.** The Chrome extension was not connected, so the three Queues requests
+  were sent with the same parameters the card's Read buttons send (`mcrm.js` `data-act=qread`), not by a click.
+  The card code is upstream since #1281.
+- A real pin change (`gpio` with the master switch on, a jumper) was not done: no jumper on the bench.
+
+## Step 7: night (started 2026-11-24 19:25)
+
+- Images: night images of `732238bd` with `MC_AU_TEST=1` (adds only `--update forget` and `--update unstage`) and tag
+  11.21, built in the clean worktree: DK5EN-1 `6d80384a`, DK5EN-92 `ea483de2`, DK5EN-14 `8b82e179` (md5 prefixes).
+  Same AU code as the RC image.
+- `tools/bench/ota_lowheap_trigger.py`, one detached run per node, 3 attempts 3 h apart (DK5EN-1 from 19:25, -92
+  from 19:35, -14 from 19:45): check, install (stage only), status, forget, unstage. Heap and uptime from `--info`
+  before and after each attempt (`after_min` = lowest free since boot); a dropped console (reboot) reconnects.
+- Tool change for this: `--update unstage` after every attempt (otherwise attempts 2 and 3 only report "already
+  staged"), `--info` heap fallback, reconnect; `tools/bench/test_ota_lowheap_trigger.py`.
+- Output: `tools/bench/runs/harness/rc-bench-20261125/night/`. DK5EN-98 logger (read-only) runs until 09:00 as the
+  reference for reboots and channel.
+- Attempt 1 DK5EN-1 19:26: staged, download 1,180,497 B in 11.4 s, records 4/4 in the AU buffer, after_min 21,736 B.

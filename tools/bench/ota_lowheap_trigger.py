@@ -34,7 +34,7 @@ DEFAULT_OUT = Path(__file__).resolve().parent / "runs/harness/ota-lowheap-night-
 # Everything the tool may send. No apply, no autoupdate setter, no gateway/config.
 ALLOWED = {
     "--info", "--autoupdate status", "--update status", "--update check",
-    "--update install", "--update forget", "--heaplog 1", "--heaplog 60",
+    "--update install", "--update forget", "--update unstage", "--heaplog 1", "--heaplog 60",
 }
 
 
@@ -100,8 +100,21 @@ class Session:
         self.log.close()
 
 
+def info_heap(lines: list[str]) -> dict:
+    """Heap and uptime from --info (plain images have no --heaplog): '...HEAP : free F min M blk B', '...TIME T ms'."""
+    d = {"up": "?", "free": "?", "blk": "?", "min": "?"}
+    for ln in lines:
+        m = re.search(r"\.\.\.HEAP\s*:\s*free (\d+) min (\d+) blk (\d+)", ln)
+        if m:
+            d["free"], d["min"], d["blk"] = m.group(1), m.group(2), m.group(3)
+        m = re.search(r"\.\.\.TIME (\d+) ms", ln)
+        if m:
+            d["up"] = str(int(m.group(1)) // 1000)
+    return d
+
+
 def heap_sample(s: Session) -> dict:
-    """One [INSTR-HEAP] sample (heaplog 1 for 3 s, then back to 60 s)."""
+    """One [INSTR-HEAP] sample (heaplog 1 for 3 s, then back to 60 s); on a plain image the --info HEAP line."""
     ls = s.cmd("--heaplog 1", 3.5)
     s.cmd("--heaplog 60", 1.5)
     for ln in reversed(ls):
@@ -109,7 +122,7 @@ def heap_sample(s: Session) -> dict:
             kv = ln.split("[INSTR-HEAP]", 1)[1].strip(" ;").replace(";", " ").split()
             d = dict(zip(kv[0::2], kv[1::2]))
             return {"up": d.get("up_s", "?"), "free": d.get("ifree", "?"), "blk": d.get("iblk", "?")}
-    return {"up": "?", "free": "?", "blk": "?"}
+    return info_heap(s.cmd("--info", 5.0))
 
 
 def status_busy(lines: list[str]) -> int | None:
@@ -149,7 +162,7 @@ def verdict(lines: list[str]) -> str:
 def summary(outdir: Path, call: str, n: int, hs: dict, v: str, extra: str = "") -> None:
     with open(outdir / "trigger.summary", "a") as f:
         f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {call} attempt={n} "
-                f"uptime_s={hs['up']} ifree={hs['free']} iblk={hs['blk']} verdict={v}{extra}\n")
+                f"uptime_s={hs['up']} ifree={hs['free']} iblk={hs['blk']} min={hs.get('min', '?')} verdict={v}{extra}\n")
 
 
 def run_node(call: str, host: str, a: argparse.Namespace) -> None:
@@ -172,7 +185,11 @@ def run_node(call: str, host: str, a: argparse.Namespace) -> None:
             return
         for n in range(1, a.attempts + 1):
             if n > 1:
-                s.drain(a.gap)
+                try:
+                    s.drain(a.gap)
+                except OSError:
+                    s.w("[TRIG] console lost during the gap (node reboot?), reconnecting")
+                    s.connect()
             hs = heap_sample(s)
             s.w(f"[TRIG] attempt {n} start, heap {hs}")
             t0 = time.monotonic()
@@ -183,8 +200,10 @@ def run_node(call: str, host: str, a: argparse.Namespace) -> None:
             got += wait_done(s, 600, t1)
             got += s.cmd("--update status", 2.0)
             v = verdict(got)
-            summary(outdir, call, n, hs, v)
+            after = info_heap(s.cmd("--info", 5.0))  # min = lowest free since boot, so the job's low-water mark
+            summary(outdir, call, n, hs, v, f" after_min={after['min']} after_up={after['up']}")
             s.cmd("--update forget", 2.0)
+            s.cmd("--update unstage", 2.0)  # MC_AU_TEST/INSTRUMENT images: the next attempt downloads again
     finally:
         s.close()
         if a.release_logger:
