@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checkliste: Firmware-Update ohne Speicherproblem auf Heltec V3 und T-Beam</title>
+<style>
+:root{--bg:#ffffff;--fg:#1d2329;--mut:#5b6670;--line:#d8dde2;--box:#f4f6f8;--ok:#1f7a4a;--okbg:#e6f4ec;--open:#1d4f91;--openbg:#e7eef8;--warn:#8a1f3a;--warnbg:#f8e8ed}
+@media (prefers-color-scheme:dark){:root{--bg:#14181c;--fg:#e4e8ec;--mut:#9aa5ae;--line:#2c343b;--box:#1c2227;--ok:#5fcf93;--okbg:#17301f;--open:#8fb7ef;--openbg:#18263a;--warn:#ef8fa7;--warnbg:#3a1822}}
+html{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.5;background:var(--bg);color:var(--fg)}
+body{max-width:980px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:26px;line-height:1.25;margin:4px 0 10px}
+h2{font-size:20px;margin:30px 0 10px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.small,.eyebrow,.meta,td.st,th{font-size:13px}
+.eyebrow{color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+.meta{color:var(--mut);list-style:none;padding:0;margin:0 0 14px}
+.bluf{background:var(--box);border-left:4px solid var(--open);padding:12px 16px;margin:14px 0}
+.bluf p{margin:6px 0}
+.warn{background:var(--warnbg);border-left:4px solid var(--warn);padding:10px 16px;margin:14px 0}
+.table-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;margin:8px 0}
+th,td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}
+th{color:var(--mut);font-weight:600}
+td.st{white-space:nowrap;font-weight:600}
+.ok{color:var(--ok)} .op{color:var(--open)} .wa{color:var(--warn)}
+tr.done td{background:var(--okbg)}
+code{font-family:ui-monospace,Menlo,monospace;font-size:13px}
+.foot{color:var(--mut);margin-top:36px;border-top:1px solid var(--line);padding-top:10px}
+</style>
+</head>
+<body>
+<p class="eyebrow">Checkliste · OTA-LOWHEAP-01</p>
+<h1>Ziel: Heltec V3 und alter T-Beam machen das Firmware-Update ohne Speicherproblem</h1>
+<ul class="meta">
+<li>Stand: 23.11.2026, 20:00 Uhr</li>
+<li>Firmware-Stand: fork-dev <code>469bb942</code>: Fix A + B, FORMAL-01-Fixes, mbedTLS-Sendepuffer 4 KB, reservierter 32-KB-Puffer je Update-Job</li>
+<li>Quellen: Kampagne <code>docs/campaign-ota-lowheap-01-20261122.md</code>, Heap-Karte <code>ota-lowheap-heapmap-20261123.html</code> (Desktop), Läufe in <code>tools/bench/runs/harness/ota-lowheap-heapmap-20261123/</code></li>
+</ul>
+
+<div class="bluf">
+<p><strong>Der Speicher reicht jetzt auf beiden Boards bis zum Download: Der T-Beam besteht die Schwelle auch mit Webserver an (77,4 KB bei 76 KB nötig) und bekommt den reservierten 32-KB-Puffer in beiden Jobs. Der Download selbst bricht seit etwa 18:10 Uhr auf allen Images ab, auch auf Ständen vor den heutigen Änderungen; das ist der nächste Schritt.</strong></p>
+<p>Fertig ist das Ziel erst, wenn beide Boards die Abnahme unten bestehen, auf der Bench und in einer Nacht unter Feldlast. Die neue Heap-Rechnung steht in der Heap-Karte, Abschnitt 1b.</p>
+<div class="warn"><p><strong>Neuer Blocker, nicht durch die heutigen Commits:</strong> Der Download scheitert etwa 10 s nach der Schwelle, ohne Speicherfehler, auf V3 und T-Beam, auch mit den Ständen <code>6bbca7a2</code> und <code>38041491</code>. Um 17:39 bis 18:10 lief er noch. Vom Mac aus lädt dieselbe Adresse. Vermutung, nicht belegt: eine Änderung auf der GitHub-Seite. Die Meldung „tls 51“ ist irreführend, 51 ist die Socket-Nummer, kein TLS-Fehlercode.</p></div>
+</div>
+
+<h2>Abnahme: wann das Ziel erreicht ist</h2>
+<div class="table-wrap"><table>
+<tr><th>Nr</th><th>Kriterium</th><th>Heltec V3</th><th>T-Beam</th></tr>
+<tr><td>Z1</td><td>Update-Prüfung und Download mit Bereitlegen gelingen, 0 fehlgeschlagene Speicheranforderungen</td><td class="st ok">erfüllt (Messimage, bis 18:10)</td><td class="st wa">Prüfung ok, Download blockiert</td></tr>
+<tr><td>Z2</td><td>Gelingt mit offenem Browser-Tab, denn das Update wird im Browser gestartet</td><td class="st op">offen</td><td class="st wa">offen</td></tr>
+<tr><td>Z3</td><td>Gelingt mit verbundenem Handy per BLE (Feldfall)</td><td class="st op">offen</td><td class="st wa">offen</td></tr>
+<tr><td>Z4</td><td>Gelingt nach mehr als 24 h Laufzeit</td><td class="st op">offen</td><td class="st wa">offen</td></tr>
+<tr><td>Z5</td><td>Tiefstwert des freien Speichers während des Updates mindestens 8 KB</td><td class="st ok">15,6 KB beim Download</td><td class="st wa">offen</td></tr>
+<tr><td>Z6</td><td>Reicht der Speicher nicht, lehnt die Speicherprüfung sauber ab, nie ein Abbruch mitten in der TLS-Verbindung</td><td class="st ok">erfüllt</td><td class="st ok">erfüllt</td></tr>
+<tr><td>Z7</td><td>10 Läufe hintereinander ohne Fehler</td><td class="st op">offen</td><td class="st wa">offen</td></tr>
+<tr><td>Z8</td><td>TLA+ mit gemessenen Größen: F2 und F8p halten für den neuen Stand</td><td class="st op">offen</td><td class="st op">offen</td></tr>
+</table></div>
+
+<h2>Erledigt</h2>
+<div class="table-wrap"><table>
+<tr><th>Schritt</th><th>Ergebnis</th><th>Beleg</th></tr>
+<tr class="done"><td>Messwerkzeuge in der Firmware</td><td>Heap-Mitschrift ab dem ersten Byte, 5-KB-Stufen, Heap-Karte, Aufrufstellen, Eigentümer-Tabelle, Funktions-Trigger</td><td><code>src/instrument_heap.cpp</code>, <code>src/instrument_probe.cpp</code>, drei Berater-Durchgänge</td></tr>
+<tr class="done"><td>Werkzeuge auf dem Mac</td><td>Zeitleiste mit Code-Zuordnung, Logger pausiert statt Abbruch bei voller Platte</td><td>Commit <code>cac8c024</code></td></tr>
+<tr class="done"><td>Fehler auf der Bench reproduziert</td><td>V3: Prüfung „ok“, dann TLS gescheitert. T-Beam: Ablehnung <code>lowheap_ble_off</code></td><td>Kampagne, Abschnitt 23.11.</td></tr>
+<tr class="done"><td>TLA+-Modelle</td><td>heap.tla und heap_frag.tla, 57 Konfigurationen, Feldbild F8p als Gegenbeispiel</td><td><code>specs/tla/</code>, Commit <code>cac8c024</code></td></tr>
+<tr class="done"><td>Fix A: Regeln während des Updates</td><td>Mindestgrenze S3 78 KB, Wartende Verbindungen vor der Prüfung frei, Web 503 außer Status, kein WLAN-Scan</td><td>125 Tests grün, Berater frei</td></tr>
+<tr class="done"><td>Fix B: eigener TLS-Client</td><td>Puffer zuerst, ein Stammzertifikat pro Host, Zertifikat nach dem Handshake frei</td><td>7 Tests grün, Berater frei</td></tr>
+<tr class="done"><td>A/B: Kettenprüfung auf dem Download-Host aus</td><td>Keine messbare Ersparnis: mit Prüfung 67,0 KB, ohne 66,6 KB Verbrauch beim Download (je 3 Läufe, Streuung 5 KB). Annahme widerlegt. Schalter wieder ausgebaut, volle Prüfung bleibt.</td><td><code>abtest3.summary</code>, 23.11.2026</td></tr>
+<tr class="done"><td>Wirkung A + B auf dem V3 gemessen</td><td>Prüfung 61,4 statt 85 KB, Download 69,5 statt 94 KB</td><td><code>aucheck-DK5EN-1.log</code></td></tr>
+<tr class="done"><td>mbedTLS-Sendepuffer 4 KB und reservierter 32-KB-Puffer</td><td>Berater zweimal, 7 Board-Builds, Host-Gate 4.243 Tests grün, Link-Nachweis auf esp32 und esp32s3. Prüfung: T-Beam 53,9 KB, V3 58,7 KB Bedarf. T-Beam besteht die Schwelle auch mit Webserver an</td><td>Commit <code>469bb942</code>, Läufe <code>ota-lowheap-arena-20261123/</code></td></tr>
+<tr class="done"><td>Abschaltläufe R0 bis R7 (DK5EN-1 und T-Beam, je zwei Runden)</td><td>Der Download braucht immer 66 bis 69 KB, egal welche Funktion an ist. Einziger Hebel per Schalter: Webserver aus, plus 6 KB. AppLink kostet 4,3 KB, KISS 0,4 KB, Gateway, Mailbox und Display nichts. T-Beam mit Webserver aus: Schwelle bestanden, Download komplett, dann scheitert die Prüfung nach dem Download an 32 KB am Stück (größter Block 22,5 KB).</td><td><code>tools/bench/ota_lowheap_knockout.py</code>, Läufe <code>ota-lowheap-knockout-20261123*</code></td></tr>
+</table></div>
+
+<h2>Offen, in dieser Reihenfolge</h2>
+<div class="table-wrap"><table>
+<tr><th>Nr</th><th>Schritt</th><th>Board</th><th>Fertig wenn</th></tr>
+
+<tr><td>1</td><td>mbedTLS-Ausgangspuffer von 16 KB auf 4 KB (eigene Objekte statt der vorgebauten Bibliothek, Eingang bleibt 16 KB)</td><td>alle</td><td>Erledigt: committet <code>469bb942</code>, Gate grün, im Binary nachgewiesen (4.429 B Senden, 16.717 B Empfang). Spart 12 KB nur ohne reservierten Puffer und außerhalb des Updates; im Update-Job bleibt der Bedarf fast gleich (58,7 statt 59,4 KB bei der Prüfung auf der V3)</td></tr>
+<tr><td>1b</td><td>T-Beam: 32-KB-Wörterbuch der Prüfung nach dem Download. Betreiber 23.11.: erst (a) Wörterbuch vor dem Download reservieren, (b) Prüfung im Datenstrom nur wenn (a) scheitert. Nachrechnung mit den Messwerten: (a) scheitert zweimal. Zu Beginn der Installation ist der größte Block nur noch 22,5 KB (nach der Prüfung zerstückelt, davor 40,9 KB), und Download plus 32 KB bräuchte 88 bis 100 KB bei 76 KB frei. (b) hat dasselbe Budgetproblem. Vorschlag (a'): eine Arena von 34 KB zu Beginn der AU-Sitzung, in der die TLS-Puffer liegen; nach dem Download wird genau dieser Block das Wörterbuch. Kein Mehrbedarf, keine Zerstückelung.</td><td>T-Beam</td><td>Committet <code>469bb942</code> als reservierter 32-KB-Puffer (32.768 B). Gemessen: T-Beam bekommt den Puffer in Prüfung und Installation (größter Block 43,0 bzw. 49,1 KB). Offen: Image-Prüfung nach dem Download, wartet auf den Download-Blocker</td></tr>
+<tr><td>1c</td><td>T-Beam: PSRAM meldet 0 Byte</td><td>T-Beam</td><td>Erledigt: absichtlich aus (variants/ttgo_tbeam/platformio.ini, R3-02), spart 4.427 B IRAM; Chip mit 4 MB vorhanden</td></tr>
+<tr><td>1d</td><td>Download-Abbruch seit 18:10 finden (V3 mit Debug-Ausgabe von HTTP und TLS), Logzeile „tls &lt;Socket-Nummer&gt;“ korrigieren</td><td>beide</td><td>Download und Bereitlegen laufen wieder durch</td></tr>
+<tr><td>1e</td><td>Interne Namen im Code klarer: „arena“ wird „buf32“ (Datei, Logzeilen)</td><td>alle</td><td>Gate grün, Logzeilen <code>[AU];buf32;ok|none</code></td></tr>
+<tr><td>2</td><td>T-Beam: Heap-Karte und Budget wie beim V3, mit Eigentümer-Tabelle</td><td>T-Beam</td><td>jeder Eigentümer mit Rechnung a × b = c, Fehlbetrag in KB bekannt</td></tr>
+<tr><td>3</td><td>T-Beam: A + B messen, mit und ohne BLE-Pause</td><td>T-Beam</td><td>Verbrauch von Prüfung und Download in KB, Vergleich mit der Schwelle 76 KB</td></tr>
+<tr><td>4</td><td>T-Beam: Hebel für die fehlenden KB entscheiden</td><td>T-Beam</td><td>Entscheidung des Betreibers, z. B. BLE-Speicher, Task-Stacks, statische Tabellen (D7 bis D10)</td></tr>
+<tr><td>5</td><td>V3: Handy per BLE messen, Feldfall Tab plus Handy nachstellen</td><td>V3</td><td>Z2 und Z3 grün</td></tr>
+<tr><td>6</td><td>Heap-Karte vervollständigen: keine Belegung mehr ohne Eigentümer</td><td>beide</td><td>Block „ohne Eigentümer“ unter 5 KB</td></tr>
+<tr><td>7</td><td>TLA+ mit den gemessenen Größen neu eichen</td><td>beide</td><td>Z8 grün oder ein belegter Gegenbeweis</td></tr>
+<tr><td>8</td><td>Nachtlauf mit A + B auf V3, T-Beam und T-Deck, Browser-Tab offen, Update-Versuche alle 30 min</td><td>alle</td><td>Z4 und Z7 grün</td></tr>
+<tr><td>9</td><td>Fork-Release mit A + B (Betreiber), Feldrückmeldung</td><td>alle</td><td>kein „Not enough free memory“ mehr im Feld</td></tr>
+<tr><td>10</td><td>Upstream-PR Fix A + B nach der Feldbestätigung</td><td>alle</td><td>PR gegen <code>dev</code>, deutsche Beschreibung</td></tr>
+<tr><td>11</td><td>Dokumente nachziehen: RESUME, Kampagne, Backlog-Zeile OTA-LOWHEAP-01</td><td>alle</td><td>nach jedem Schritt aktuell</td></tr>
+</table></div>
+
+<div class="warn">
+<p><strong>Messimages ohne Allokations-Tabelle.</strong> Die Tabelle (Heapwatch) kostet auf dem T-Beam 4,5 KB und zerstückelt den Speicher: mit ihr fehlte der 32-KB-Puffer beim Installationsstart, ohne sie war er da. Messungen ab jetzt nur noch mit dem einfachen INSTRUMENT-Image.</p>
+</div>
+
+<h2>Grenzen</h2>
+<ul>
+<li><strong>Nur Messimage:</strong> Alle Werte stammen aus INSTRUMENT-Builds, das Release hat etwa 6,7 KB mehr frei. Das ist hochgerechnet, nicht gemessen.</li>
+<li><strong>Handy nicht gemessen:</strong> Die 6 KB für ein Handy per BLE sind eine Schätzung.</li>
+<li><strong>Ein Knoten je Board:</strong> Jedes Board ist mit einem Exemplar gemessen, T-Beam Supreme und andere S3-Boards nicht.</li>
+</ul>
+
+<p class="foot">Stand 23.11.2026 · Quellen siehe oben · Nicht die offizielle MeshCom-Firmware, Fork von DK5EN</p>
+</body>
+</html>

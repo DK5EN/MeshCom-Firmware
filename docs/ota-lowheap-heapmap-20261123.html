@@ -1,0 +1,1151 @@
+<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heap-Karte Heltec V3: wer belegt wie viel und warum</title>
+<style>
+:root{--bg:#ffffff;--fg:#1b1f24;--mut:#52606d;--line:#d3dae2;--card:#f3f6fa;--acc:#1d5fd0;
+--warnbg:#fdecee;--warn:#b3261e;--okbg:#e8f3ec;--ok:#1e7a3c;
+--c-ble:#2f6fdb;--c-nimble:#12868a;--c-tasks:#7b52c9;--c-drv:#3a9a4a;--c-nvs:#c2478b;--c-unowned:#c93c3c;
+--c-untr:#7d8794;--c-free:#dfe5ec;--c-ovh:#404a58;--tagm:#dbe9ff;--tage:#e9e1fb;--taga:#e1f0e4;--tagu:#fbdfe2}
+@media (prefers-color-scheme:dark){:root{--bg:#12161c;--fg:#e6ebf1;--mut:#9aa8b8;--line:#2f3945;--card:#1b2230;--acc:#7aa7ff;
+--warnbg:#3a1a1f;--warn:#ff8f8f;--okbg:#14301f;--ok:#6fd48f;
+--c-ble:#5b8def;--c-nimble:#3fb8ba;--c-tasks:#a98aea;--c-drv:#6cc77a;--c-nvs:#e382b6;--c-unowned:#ea7a7a;
+--c-untr:#8c97a6;--c-free:#2a3342;--c-ovh:#5a6677;--tagm:#1f3557;--tage:#2e2650;--taga:#1c3a27;--tagu:#4a2128}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;font-size:16px;line-height:1.5}
+.wrap{max-width:1040px;margin:0 auto;padding:24px 16px 48px}
+.eyebrow{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);margin:0 0 6px}
+h1{font-size:28px;line-height:1.2;margin:0 0 12px}
+h2{font-size:20px;margin:36px 0 10px;padding-top:6px;border-top:1px solid var(--line)}
+h3{font-size:16px;margin:20px 0 6px}
+ul.meta{list-style:none;padding:0;margin:0 0 16px;font-size:13px;color:var(--mut)}
+ul.meta li{margin:2px 0}
+.bluf{background:var(--card);border-left:4px solid var(--acc);padding:12px 16px;border-radius:4px;margin:12px 0}
+.bluf p{margin:6px 0}
+.bluf .reco{font-weight:600}
+.callout{border-radius:4px;padding:10px 16px;margin:14px 0}
+.callout.warn{background:var(--warnbg);border-left:4px solid var(--warn)}
+.callout p{margin:6px 0}
+ul{padding-left:22px;margin:8px 0}
+li{margin:5px 0}
+nav.toc{font-size:13px;margin:14px 0;color:var(--mut)}
+nav.toc a{color:var(--acc);margin-right:12px;white-space:nowrap}
+a{color:var(--acc)}
+.table-wrap{overflow-x:auto;margin:12px 0;border:1px solid var(--line);border-radius:4px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--card);position:sticky;top:0;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+td.num{white-space:nowrap}
+table.map{min-width:1060px}
+table.map td:nth-child(2){min-width:130px}
+table.map td:nth-child(3){min-width:300px}
+table.map td:nth-child(4){min-width:260px}
+table.map td:nth-child(5){min-width:200px}
+table.map td:nth-child(6){min-width:120px}
+tr.sub td:first-child{padding-left:24px}
+tr.sub td{background:var(--card)}
+tr.tot td{font-weight:600}
+tr.unowned td:first-child{border-left:4px solid var(--c-unowned)}
+tr.sum td{background:var(--card);font-weight:600}
+.tag{display:inline-block;font-size:13px;padding:0 6px;border-radius:3px;margin-left:2px;white-space:nowrap}
+.tag.m{background:var(--tagm)}.tag.e{background:var(--tage)}.tag.a{background:var(--taga)}.tag.u{background:var(--tagu)}
+figure{margin:16px 0}
+figure svg{width:100%;height:auto;display:block}
+figcaption{font-size:13px;color:var(--mut);margin-top:6px}
+svg text.lab{font-size:13px;fill:var(--fg);font-family:inherit}
+.s-ble{fill:var(--c-ble)}.s-nimble{fill:var(--c-nimble)}.s-tasks{fill:var(--c-tasks)}.s-drv{fill:var(--c-drv)}
+.s-nvs{fill:var(--c-nvs)}.s-unowned{fill:var(--c-unowned)}.s-untr{fill:var(--c-untr)}.s-free{fill:var(--c-free)}.s-ovh{fill:var(--c-ovh)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;margin:8px 0}
+.legend span::before{content:"";display:inline-block;width:12px;height:12px;margin-right:6px;vertical-align:-1px;border:1px solid var(--line)}
+.legend .l-ble::before{background:var(--c-ble)}.legend .l-nimble::before{background:var(--c-nimble)}.legend .l-tasks::before{background:var(--c-tasks)}
+.legend .l-drv::before{background:var(--c-drv)}.legend .l-nvs::before{background:var(--c-nvs)}.legend .l-unowned::before{background:var(--c-unowned)}
+.legend .l-untr::before{background:var(--c-untr)}.legend .l-free::before{background:var(--c-free)}.legend .l-ovh::before{background:var(--c-ovh)}
+details{margin:12px 0}
+summary{cursor:pointer;font-weight:600}
+.foot{margin-top:40px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;color:var(--mut)}
+.foot p{margin:4px 0}
+@media (max-width:600px){h1{font-size:20px}h2{font-size:16px}}
+</style></head><body><div class="wrap">
+<p class="eyebrow">Messbericht · Heap-Karte · OTA-LOWHEAP-01</p>
+<h1>Heltec V3: Mit A und B braucht das Update 69,5 statt 94,1 KB Heap und besteht die 78,0-KB-Schwelle mit Reserve</h1>
+<ul class="meta"><li>Stand: 23.11.2026, 23:15 Uhr</li><li>Neu: Abschnitt 1b, Heap mit dem reservierten 32-KB-Puffer, Bench 23.11.2026 19:20 bis 19:56, einfaches Messimage von 469bb942</li><li>Karte: Bench 23.11.2026 10:07, DK5EN-1, Heltec V3 mit ESP32-S3 ohne PSRAM, INSTRUMENT-Image mit 23 KB Tabellen im statischen RAM, vor A und B</li><li>Messung A und B: Bench 23.11.2026 10:40 bis 11:05, DK5EN-1, Image ohne Heap-Tabellen und Image mit Owner-Tabelle</li><li>Quellen: tools/bench/runs/harness/ota-lowheap-heapmap-20261123/ (dk5en-1-sites-round1.txt, heaprun-DK5EN-1.log, aucheck-DK5EN-1.log, aucheck-DK5EN-1-AB-check.log), ../ota-lowheap-night-20261122/trigger-DK5EN-1.log</li><li>Konvention: 1 KB = 1.000 B</li></ul>
+<div class="bluf" id="s1">
+<p class="lead"><strong>Mit A und B verbraucht ein Update auf der Heltec V3 gemessen 69,5 statt 94,1 KB Heap und besteht die Prüfschwelle von 78,0 KB auch mit Tab und Telefon. Das Telefon am BLE und der Heap des Release-Images sind nicht gemessen und stehen als Schätzung in der Rechnung.</strong></p>
+<p>Rechnung mit A und B: 69,5 + 8,0 + 6,0 = 83,5 KB. Der Tab, der das Update gestartet hat, ist immer offen und zählt deshalb mit.</p>
+<div class="table-wrap"><table class=""><thead><tr><th>Stand</th><th>Rechnung in KB</th><th>Frei in KB</th><th>Fehlbetrag in KB</th></tr></thead><tbody><tr class=""><td>Vor A und B, Nacht 23.11. 06:00 <span class="tag m">gemessen</span></td><td>Download 94,1 + Tab 8,0 + Telefon 6,0 = 108,1</td><td>93,0 bis 100,0</td><td>+8,1 bis +15,1</td></tr><tr class=""><td>Mit A und B <span class="tag m">gemessen</span> Tab und Telefon <span class="tag e">Schätzung</span></td><td>Download 69,5 + Tab 8,0 + Telefon 6,0 = 83,5</td><td>107,0 im Ruhezustand <span class="tag e">Schätzung</span></td><td>−23,5</td></tr><tr class=""><td>Gate beim Start <span class="tag e">Schätzung</span></td><td>Frei 107,0 - 8,0 - 6,0 = 93,0 gegen Schwelle 78,0</td><td>93,0</td><td>−15,0</td></tr></tbody></table></div>
+<p>Tiefstand im Download: 93.000 - 69.512 = 23.488 B. Schwelle: 78.000 - 69.512 = 8.488 B Marge.</p>
+<p class="reco">Empfehlung: A und B beibehalten, das Telefon am BLE noch messen und die Prüfung der Zertifikatskette überall anlassen.</p>
+</div>
+<div class="callout warn"><p><strong>Entscheidung für den Betreiber:</strong> Soll die Kettenprüfung auf dem Download-Host abschaltbar werden?</p><ul><li><strong>Folge:</strong> Die Prüfsumme bleibt wirksam, solange die API-Verbindung geprüft bleibt.</li><li><strong>Empfehlung:</strong> Nein. Mit A und B bleiben im Download 15,6 KB im Tiefstand frei, die mögliche Ersparnis von höchstens 16 KB wird nicht gebraucht. Details in Abschnitt 5.</li></ul></div>
+<h2>Kernfakten</h2><ul>
+<li><strong>Vollständige Heap-Karte (23.11. abends, V3):</strong> 130,9 KB belegt, jeder Block mit Verursacher. BLE 43,1 KB, System 35,9 KB, WLAN 32,0 KB, MeshCom selbst 7,5 KB. Noch 26,2 KB ohne Trace-Eintrag statt 53 KB. Abschnitt 2.</li>
+<li><strong>Neu, reservierter 32-KB-Puffer (23.11. abends):</strong> Prüfung braucht jetzt 53,9 KB auf dem T-Beam und 58,7 KB auf der V3 (vorher 59,4 KB). Beide Boards bekommen den Puffer in beiden Jobs. Der Download ist heute nicht messbar, siehe Abschnitt 1b.</li>
+<li><strong>Gemessen mit A und B:</strong> Prüfung 61.408 B, Download und Stage 69.512 B, jeweils 0 Allokationsfehler (aucheck-DK5EN-1.log, 10:58).</li>
+<li><strong>Vorher:</strong> Prüfung 85.096 B und Download 94.064 B. A und B sparen 23.688 B und 24.552 B, also etwa 24 KB je Vorgang.</li>
+<li><strong>Abschaltläufe (23.11., V3 und T-Beam):</strong> Der Download braucht immer 66 bis 69 KB, keine Funktion ändert das. Hälfte davon sind die zwei TLS-Puffer zu je 16,7 KB; der Ausgangspuffer ist auf 4.429 B verkleinert (Commit 469bb942); mit dem reservierten 32-KB-Puffer bleibt der Gesamtbedarf aber fast gleich, siehe 1b.</li>
+<li><strong>Schwelle S3:</strong> 78.000 B, gleich dem Download-Verbrauch 69.512 B plus 8.488 B Marge (fw_update.h:900).</li>
+<li><strong>TLS:</strong> Zwei Datensätze x 16.717 B = 33.434 B sind fest. Die TLS-Spitze der Update-Task liegt bei 49.384 B.</li>
+<li><strong>Zertifikate:</strong> Fix B ist eingebaut, je Host eine Wurzel statt fünf mit 4.492 B.</li>
+<li><strong>Kettenprüfung:</strong> Der Digest kommt aus der geprüften API-Sitzung. Nur die API-Verbindung muss geprüft bleiben.</li>
+<li><strong>Dauerhaft belegt:</strong> 145.440 B von 225.320 B, frei 69.952 B. In der ersten Karte hatten 66.908 B keinen Eigentümer, das sind 46 Prozent. Die Owner-Tabelle nach Task liegt jetzt vor.</li>
+<li><strong>Messbasis:</strong> Ein Knoten. Telefon am BLE nicht gemessen, Release-Heap von rund 107 KB geschätzt.</li></ul>
+<h2 id="s8">1b Neu am 23.11. abends: Heap mit dem reservierten 32-KB-Puffer</h2>
+<p><strong>Ein Update-Job belegt jetzt zu Beginn einen einzigen Puffer von 32.768 B. Darin liegen während der Verbindung die beiden TLS-Puffer, nach dem Download wird derselbe Puffer das 32-KB-Wörterbuch der Image-Prüfung. Der Gesamtbedarf bleibt damit praktisch gleich (minus 0,7 KB), aber der Speicher zerstückelt nicht mehr und das Wörterbuch ist sicher da.</strong></p>
+<ul>
+<li><strong>Was im Puffer liegt:</strong> Empfang 16.720 B + Senden 4.432 B = 21.152 B, ungenutzt 32.768 - 21.152 = 11.616 B. Der Sendepuffer ist dank mbedTLS-Patch 4.429 statt 16.717 B (Commit <code>469bb942</code>).</li>
+<li><strong>Warum die 12 KB Ersparnis des kleineren Sendepuffers hier nicht ankommen:</strong> Der Puffer muss so groß sein wie das Wörterbuch (32.768 B), auch wenn TLS nur 21.152 B davon braucht. Vorher: 2 x 16.717 = 33.434 B, jetzt 32.768 B.</li>
+<li><strong>Wann die 12 KB doch wirken:</strong> wenn der Puffer nicht zu bekommen ist (dann zwei einzelne Allokationen 16.717 + 4.429 B) und bei jeder TLS-Verbindung außerhalb des Updates.</li>
+</ul>
+<h3>Rechnung je Board, Prüfungs-Job (gemessen 23.11.2026 19:20 bis 19:56)</h3>
+<div class="table-wrap"><table><thead><tr><th>Schritt</th><th>T-Beam, Webserver an</th><th>T-Beam, Webserver aus</th><th>Heltec V3, Webserver an</th><th>Heltec V3, Webserver aus</th></tr></thead><tbody>
+<tr><td>Frei im Leerlauf</td><td>57.328 B</td><td>63.444 B</td><td>100.296 B</td><td>106.408 B</td></tr>
+<tr><td>Frei beim Jobstart (Update-Task mit 8,5 KB Stack angelegt)</td><td>43.512 B</td><td>49.984 B</td><td>nicht geloggt</td><td>nicht geloggt</td></tr>
+<tr><td>Nach der BLE-Pause, größter Block</td><td>72.460 B, Block 40.948 B</td><td>83.436 B, Block 47.092 B</td><td>BLE ohne Pause</td><td>BLE ohne Pause</td></tr>
+<tr><td>minus reservierter Puffer</td><td>- 32.768 B, belegt</td><td>- 32.768 B, belegt</td><td>- 32.768 B, belegt</td><td>- 32.768 B, belegt</td></tr>
+<tr><td>Frei an der Schwelle (ohne Puffer)</td><td>45.556 B</td><td>51.876 B</td><td>53.024 B</td><td>59.140 B</td></tr>
+<tr><td>Schwelle: frei + Puffer</td><td>45.556 + 32.768 = 78.324 B ≥ 76.000</td><td>51.876 + 32.768 = 84.644 B ≥ 76.000</td><td>53.024 + 32.768 = 85.792 B ≥ 78.000</td><td>59.140 + 32.768 = 91.908 B ≥ 78.000</td></tr>
+<tr><td>Tiefstwert während der Prüfung</td><td>24.416 B</td><td>30.056 B</td><td>27.044 B</td><td>30.668 B</td></tr>
+<tr><td>TLS-Sitzung außerhalb des Puffers</td><td>45.556 - 24.416 = 21.140 B</td><td>51.876 - 30.056 = 21.820 B</td><td>53.024 - 27.044 = 25.980 B</td><td>59.140 - 30.668 = 28.472 B</td></tr>
+<tr><td><strong>Bedarf Prüfung gesamt</strong></td><td><strong>32.768 + 21.140 = 53.908 B</strong></td><td><strong>32.768 + 21.820 = 54.588 B</strong></td><td><strong>32.768 + 25.980 = 58.748 B</strong></td><td><strong>32.768 + 28.472 = 61.240 B</strong></td></tr>
+<tr><td>Zum Vergleich ohne Puffer (Stand <code>38041491</code>)</td><td>nicht gemessen</td><td>nicht gemessen</td><td>59.428 B</td><td>nicht gemessen</td></tr>
+</tbody></table></div>
+<h3>Rechnung Installations-Job (Download), teils geschätzt</h3>
+<div class="table-wrap"><table><thead><tr><th>Schritt</th><th>T-Beam, Webserver an</th><th>T-Beam, Webserver aus</th><th>Heltec V3, Webserver an</th></tr></thead><tbody>
+<tr><td>Nach der BLE-Pause, größter Block <span class="tag m">gemessen</span></td><td>76.208 B, Block 42.996 B</td><td>77.852 B, Block 49.140 B</td><td>BLE ohne Pause</td></tr>
+<tr><td>Puffer belegt <span class="tag m">gemessen</span></td><td>ja</td><td>ja</td><td>ja</td></tr>
+<tr><td>Schwelle: frei + Puffer <span class="tag m">gemessen</span></td><td>44.660 + 32.768 = 77.428 B ≥ 76.000</td><td>51.144 + 32.768 = 83.912 B ≥ 76.000</td><td>52.388 + 32.768 = 85.156 B ≥ 78.000</td></tr>
+<tr><td>Bedarf Download <span class="tag e">Schätzung</span></td><td colspan="3">vorher 66 bis 69 KB, davon 33.434 B TLS-Puffer, Rest 33 bis 36 KB. Jetzt 32.768 B + Rest 33 bis 36 KB = 65,8 bis 68,8 KB</td></tr>
+<tr><td>Tiefstwert im Download <span class="tag e">Schätzung</span></td><td>77.428 - 68.800 bis 65.800 = 8,6 bis 11,6 KB</td><td>15,1 bis 18,1 KB</td><td>16,4 bis 19,4 KB</td></tr>
+<tr><td>Image-Prüfung nach dem Download <span class="tag e">Schätzung</span></td><td colspan="3">Wörterbuch 32.768 B im Puffer (kein neuer Block), dazu rund 11 KB Zustand vom Heap. Die TLS-Sitzung (33 bis 36 KB) ist dann schon frei.</td></tr>
+</tbody></table></div>
+<div class="callout warn"><p><strong>Der Download selbst ist heute nicht messbar.</strong> Seit etwa 18:10 Uhr bricht er auf allen Images etwa 10 s nach der Schwelle ab, ohne fehlgeschlagene Allokation, auch auf Ständen vor allen heutigen Änderungen (<code>6bbca7a2</code>, <code>38041491</code>). Vom Mac aus lädt dieselbe Adresse. Die Zeilen „Download“ oben sind deshalb Schätzung.</p></div>
+<ul>
+<li><strong>Messimage zählt:</strong> Mit der Allokations-Tabelle (Heapwatch) fehlten auf dem T-Beam 4,5 KB im Leerlauf und beim Installationsstart war der größte Block nur 27.636 B, der Puffer fehlte. Mit dem einfachen Messimage ist der Block 42.996 B, der Puffer ist da. Künftig werden Messungen nur noch mit dem einfachen Image gemacht.</li>
+<li><strong>T-Beam PSRAM:</strong> Der Chip ist da (4 MB), wird aber absichtlich nicht eingeschaltet, um 4.427 B IRAM zu sparen (variants/ttgo_tbeam/platformio.ini, R3-02). „psram 0“ ist gewollt.</li>
+</ul>
+<p class="small">Quelle: <code>tools/bench/runs/harness/ota-lowheap-arena-20261123/</code> (<code>tbeam-plain/</code>, <code>v3-plain/</code>, <code>v3-bisect-38041491/</code>, <code>tbeam-plain-serial.log</code>), DK5EN-92 und DK5EN-1, einfaches INSTRUMENT-Image von <code>469bb942</code>, 23.11.2026.</p>
+<nav class="toc"><a href="#s8">1b Reservierter 32-KB-Puffer</a><a href="#s9">2 Vollständige Heap-Karte</a><a href="#s4">4 TLS je Phase</a><a href="#s5">5 Zertifikate</a><a href="#s7">5b Abschaltläufe</a><a href="#s6">6 Grenzen</a></nav>
+<h2 id="s9">2 Vollständige Heap-Karte Heltec V3 aus dem Allokations-Trace</h2>
+<p><strong>Jeder belegte Block hat jetzt einen Verursacher mit Aufrufkette. Im Leerlauf sind 130,9 KB in 379 Blöcken belegt: BLE 43,1 KB, System 35,9 KB, WLAN 32,0 KB, die MeshCom-Anwendung selbst nur 7,5 KB. Während der Update-Prüfung kommen 77,9 KB für den Update-Job dazu.</strong></p>
+<ul>
+<li><strong>Messung:</strong> DK5EN-1, Heltec V3, 23.11.2026 22:43 bis 22:55, Image <code>469bb942</code> + Allokations-Trace (<code>6ebf78ad</code>), Webserver, Gateway und BLE an, 10 Minuten Leerlauf, dann eine Web-Seite und Update-Prüfung.</li>
+<li><strong>Wie gemessen:</strong> Die Firmware schreibt jede Belegung und Freigabe mit drei Aufrufern über die serielle Schnittstelle (921.600 Baud). Der Mac spielt das nach und ordnet jeden Block der Funktion zu, die ihn angelegt hat. Kein Speicher für Tabellen im Gerät, nur 2 KB Puffer.</li>
+<li><strong>Rechnung Leerlauf:</strong> gesamt 246.712 B = frei 89.680 + belegt mit Verursacher 130.858 + nicht im Trace 26.174 B.</li>
+</ul>
+<h3>Nach Bereich, Leerlauf und während der Update-Prüfung</h3>
+<div class="table-wrap"><table><thead><tr><th>Bereich</th><th>Leerlauf</th><th>Blöcke</th><th>Während der Prüfung</th><th>Differenz</th></tr></thead><tbody>
+<tr><td>BLE (Controller und NimBLE)</td><td>43.098 B</td><td>75</td><td>43.098 B</td><td>+0 B</td></tr>
+<tr><td>System (FreeRTOS, Timer, NVS, Start)</td><td>35.912 B</td><td>113</td><td>35.912 B</td><td>+0 B</td></tr>
+<tr><td>WLAN-Treiber</td><td>31.992 B</td><td>70</td><td>31.992 B</td><td>+0 B</td></tr>
+<tr><td>MeshCom-Anwendung</td><td>7.464 B</td><td>26</td><td>7.400 B</td><td>-64 B</td></tr>
+<tr><td>TCP/IP (lwIP)</td><td>5.308 B</td><td>44</td><td>3.336 B</td><td>-1.972 B</td></tr>
+<tr><td>mDNS</td><td>5.028 B</td><td>8</td><td>5.028 B</td><td>+0 B</td></tr>
+<tr><td>Sonstiges</td><td>2.056 B</td><td>43</td><td>1.856 B</td><td>-200 B</td></tr>
+<tr><td>Update-Job (Auto Update)</td><td>0 B</td><td>0</td><td>77.942 B</td><td>+77.942 B</td></tr>
+<tr><td><strong>Summe mit Verursacher</strong></td><td><strong>130.858 B</strong></td><td>379</td><td><strong>206.564 B</strong></td><td>+75.706 B</td></tr>
+<tr><td>Frei</td><td>89.680 B</td><td></td><td>22.076 B</td><td></td></tr>
+<tr><td>Nicht im Trace</td><td>26.174 B</td><td></td><td>18.072 B</td><td></td></tr>
+</tbody></table></div>
+<ul>
+<li><strong>Update-Job während der Prüfung (77,9 KB):</strong> reservierter 32-KB-Puffer 32.768 B, Stack und Kontrollblock des Update-Tasks 12.632 B, Arbeitsblock des Jobs 12.288 B, Update-Task 4.944 B, TLS-Sitzung und Zertifikate rund 10 KB, Rest Netzwerkpuffer.</li>
+<li><strong>BLE ist der größte Einzelposten:</strong> Der Controller belegt 17,6 KB bei <code>esp_bt_controller_init</code> und 7,3 KB in seiner eigenen Task, NimBLE dazu Puffer und Tasks. Das ist der Grund, warum die BLE-Pause beim Update so viel bringt.</li>
+<li><strong>System 35,9 KB:</strong> davon allein 12,6 KB Stack des Arduino-<code>loopTask</code> (angelegt in <code>app_main</code>), 5,0 KB esp_timer, je 2,7 KB IPC- und Leerlauf-Tasks, NVS, Ereignisschleifen.</li>
+</ul>
+<h3>Die 30 größten Verursacher im Leerlauf, mit Aufrufkette</h3>
+<div class="table-wrap"><table><thead><tr><th>Belegt</th><th>Blöcke</th><th>Bereich</th><th>Aufrufkette (angelegt in &lt; aufgerufen von &lt; ...)</th><th>Task</th></tr></thead><tbody>
+<tr><td>17.556 B</td><td>16</td><td>BLE</td><td><code>btdm_controller_init &lt; esp_bt_controller_init &lt; NimBLEDevice::init(string const&amp;)</code></td><td>loopTask</td></tr>
+<tr><td>12.632 B</td><td>2</td><td>System</td><td><code>xTaskCreate &lt; app_main &lt; main_task</code></td><td>main</td></tr>
+<tr><td>8.912 B</td><td>5</td><td>WLAN-Treiber</td><td><code>wDev_Rxbuf_Init &lt; ic_init &lt; wifi_lmac_init</code></td><td>wifi</td></tr>
+<tr><td>7.324 B</td><td>17</td><td>BLE</td><td><code>r_emi_em_base_init &lt; r_emi_init &lt; rw_pre_main</code></td><td>btContro</td></tr>
+<tr><td>7.000 B</td><td>2</td><td>WLAN-Treiber</td><td><code>task_create_pinned_to_core_wrapper &lt; pp_create_task &lt; ic_create_wifi_task</code></td><td>loopTask</td></tr>
+<tr><td>4.960 B</td><td>4</td><td>BLE</td><td><code>ble_buf_alloc &lt; esp_nimble_hci_init &lt; NimBLEDevice::init(string const&amp;)</code></td><td>loopTask</td></tr>
+<tr><td>4.952 B</td><td>2</td><td>System</td><td><code>esp_timer_init &lt; __esp_system_init_fn_init_components0 &lt; do_system_init_fn</code></td><td>-</td></tr>
+<tr><td>4.608 B</td><td>1</td><td>System</td><td><code>esp_startup_start_app_common &lt; esp_startup_start_app &lt; start_cpu0_default</code></td><td>-</td></tr>
+<tr><td>4.440 B</td><td>2</td><td>BLE</td><td><code>task_create_wrapper &lt; btdm_controller_init &lt; esp_bt_controller_init</code></td><td>loopTask</td></tr>
+<tr><td>4.440 B</td><td>2</td><td>WLAN-Treiber</td><td><code>xTaskCreate &lt; _start_network_event_task &lt; wifiLowLevelInit(bool)</code></td><td>loopTask</td></tr>
+<tr><td>4.440 B</td><td>2</td><td>mDNS</td><td><code>_mdns_service_task_start &lt; MDNSResponder::begin(String const&amp;) &lt; MDNSResponder::begin(char const*)</code></td><td>loopTask</td></tr>
+<tr><td>3.416 B</td><td>2</td><td>BLE</td><td><code>esp_nimble_enable &lt; nimble_port_freertos_init &lt; NimBLEDevice::init(string const&amp;)</code></td><td>loopTask</td></tr>
+<tr><td>3.416 B</td><td>2</td><td>WLAN-Treiber</td><td><code>sys_thread_new &lt; tcpip_init &lt; esp_netif_init</code></td><td>loopTask</td></tr>
+<tr><td>2.928 B</td><td>3</td><td>System</td><td><code>esp_event_loop_create &lt; esp_event_loop_create_default &lt; _start_network_event_task</code></td><td>loopTask</td></tr>
+<tr><td>2.776 B</td><td>4</td><td>MeshCom-Anwendung</td><td><code>xRingbufferCreate &lt; uart_alloc_driver_obj &lt; uartBegin</code></td><td>loopTask</td></tr>
+<tr><td>2.736 B</td><td>4</td><td>System</td><td><code>esp_ipc_init &lt; do_global_ctors &lt; call_start_cpu0</code></td><td>-</td></tr>
+<tr><td>2.736 B</td><td>4</td><td>System</td><td><code>prvCreateIdleTasks &lt; esp_startup_start_app &lt; start_cpu0_default</code></td><td>-</td></tr>
+<tr><td>2.680 B</td><td>2</td><td>TCP/IP</td><td><code>mem_malloc &lt; pbuf_alloc &lt; tcp_pbuf_prealloc</code></td><td>tiT</td></tr>
+<tr><td>1.692 B</td><td>2</td><td>WLAN-Treiber</td><td><code>wifi_create_queue_wrapper &lt; pp_create_task &lt; ic_create_wifi_task</code></td><td>loopTask</td></tr>
+<tr><td>1.604 B</td><td>1</td><td>MeshCom-Anwendung</td><td><code>xQueueGenericCreate &lt; esp32setup() &lt; setup()</code></td><td>loopTask</td></tr>
+<tr><td>1.472 B</td><td>2</td><td>WLAN-Treiber</td><td><code>esf_buf_alloc_dynamic &lt; esf_buf_setup_static &lt; esf_buf_setup</code></td><td>wifi</td></tr>
+<tr><td>1.460 B</td><td>1</td><td>WLAN-Treiber</td><td><code>WiFiUDP::begin(IPAddress, unsigned short) &lt; WiFiUDP::begin(unsigned short) &lt; startMeshComUDP()</code></td><td>loopTask</td></tr>
+<tr><td>1.312 B</td><td>23</td><td>TCP/IP</td><td><code>mem_malloc &lt; do_memp_malloc_pool &lt; memp_malloc</code></td><td>loopTask, tiT</td></tr>
+<tr><td>1.168 B</td><td>1</td><td>BLE</td><td><code>os_msys_buf_alloc &lt; ble_buf_alloc &lt; esp_nimble_hci_init</code></td><td>loopTask</td></tr>
+<tr><td>1.040 B</td><td>1</td><td>MeshCom-Anwendung</td><td><code>String::changeBuffer(unsigned int) &lt; String::reserve(unsigned int) &lt; work_webpage()</code></td><td>loopTask</td></tr>
+<tr><td>1.024 B</td><td>8</td><td>System</td><td><code>ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&amp;) &lt; nvs::Page::mLoadEntryTable() &lt; nvs::Page::load(nvs::Partition*</code></td><td>main</td></tr>
+<tr><td>784 B</td><td>1</td><td>WLAN-Treiber</td><td><code>wdev_funcs_init &lt; esp_wifi_init_internal &lt; esp_wifi_init</code></td><td>loopTask</td></tr>
+<tr><td>628 B</td><td>2</td><td>BLE</td><td><code>r_llm_env_init &lt; btdm_controller_init &lt; esp_bt_controller_init</code></td><td>loopTask</td></tr>
+<tr><td>608 B</td><td>1</td><td>BLE</td><td><code>llm_hci_env_init &lt; r_llm_env_init &lt; btdm_controller_init</code></td><td>loopTask</td></tr>
+<tr><td>596 B</td><td>1</td><td>System</td><td><code>xQueueGenericCreate &lt; esp_event_loop_create &lt; esp_event_loop_create_default</code></td><td>loopTask</td></tr>
+</tbody></table></div>
+<h3>Update-Job während der Prüfung, größte Posten</h3>
+<div class="table-wrap"><table><thead><tr><th>Belegt</th><th>Blöcke</th><th>Aufrufkette</th></tr></thead><tbody>
+<tr><td>32.768 B</td><td>1</td><td><code>reservierter 32-KB-Puffer (buf32Acquire)</code></td></tr>
+<tr><td>12.632 B</td><td>2</td><td><code>startJob &lt; fwNetStart(FwNetJob, unsigned char) &lt; esp32loop()</code></td></tr>
+<tr><td>12.288 B</td><td>1</td><td><code>startJob &lt; fwNetStart(FwNetJob, unsigned char) &lt; commandAction(char*, bool)</code></td></tr>
+<tr><td>4.944 B</td><td>3</td><td><code>fwNetTask(void*)</code></td></tr>
+<tr><td>3.299 B</td><td>4</td><td><code>mbedtls_calloc &lt; x509_crt_parse_der_core &lt; mbedtls_x509_crt_parse_der_internal</code></td></tr>
+<tr><td>2.620 B</td><td>3</td><td><code>mbedtls_calloc &lt; ssl_handshake_init &lt; mbedtls_ssl_setup</code></td></tr>
+<tr><td>1.864 B</td><td>1</td><td><code>McTlsClient::McTlsClient() &lt; runCheck(FwChannel) &lt; fwNetTask(void*)</code></td></tr>
+<tr><td>1.400 B</td><td>25</td><td><code>mem_malloc &lt; do_memp_malloc_pool &lt; memp_malloc</code></td></tr>
+<tr><td>688 B</td><td>4</td><td><code>mbedtls_calloc &lt; eckey_alloc_wrap &lt; mbedtls_pk_setup</code></td></tr>
+<tr><td>688 B</td><td>2</td><td><code>mbedtls_calloc &lt; mbedtls_x509_crt_parse_der_internal &lt; mbedtls_x509_crt_parse_der_internal</code></td></tr>
+</tbody></table></div>
+<h3>Was noch fehlt: 26,2 KB ohne Trace-Eintrag (vorher 53 KB ohne Zuordnung)</h3>
+<ul>
+<li><strong>Verwaltungsdaten des Heaps:</strong> jeder Block hat einen Kopf, bei 379 Blöcken grob 3 bis 6 KB. <span class="tag e">Schätzung</span></li>
+<li><strong>WLAN-Empfangspuffer aus dem Interrupt:</strong> Der WLAN-Treiber legt sie im Interrupt an; dort schreibt der Trace nicht, er zählt nur. Ihre Freigaben sind sichtbar (<code>esf_buf_recycle</code>).</li>
+<li><strong>58 nicht geschriebene Ereignisse</strong> beim Start (Interrupt, vor dem Scheduler) und die Task, die den Trace ausgibt (rund 3,4 KB Stack).</li>
+<li><strong>Nebenwirkung:</strong> Der Trace bremst, wenn die serielle Leitung voll ist (Leerlauf 1 s Wartezeit, Update-Jobs 115 s). Die Zeitabläufe sind verzerrt, die Speicherwerte nicht.</li>
+</ul>
+<h3 id="s9b">T-Beam (ESP32 ohne PSRAM) im Vergleich, Leerlauf</h3>
+<p><strong>Der T-Beam hat 53,5 KB weniger Heap als die V3 (193,2 statt 246,7 KB) und belegt im Leerlauf 105,9 KB mit Verursacher. Frei bleiben 48,7 KB.</strong></p>
+<div class="table-wrap"><table><thead><tr><th>Bereich</th><th>Heltec V3</th><th>T-Beam</th><th>Differenz</th></tr></thead><tbody>
+<tr><td>BLE (Controller und NimBLE)</td><td>43.098 B</td><td>11.307 B</td><td>-31.791 B</td></tr>
+<tr><td>System (FreeRTOS, Timer, NVS, Start)</td><td>35.912 B</td><td>31.600 B</td><td>-4.312 B</td></tr>
+<tr><td>WLAN-Treiber</td><td>31.992 B</td><td>44.480 B</td><td>+12.488 B</td></tr>
+<tr><td>MeshCom-Anwendung</td><td>7.464 B</td><td>7.116 B</td><td>-348 B</td></tr>
+<tr><td>TCP/IP (lwIP)</td><td>5.308 B</td><td>3.992 B</td><td>-1.316 B</td></tr>
+<tr><td>mDNS</td><td>5.028 B</td><td>5.037 B</td><td>+9 B</td></tr>
+<tr><td>Sonstiges</td><td>2.056 B</td><td>2.408 B</td><td>+352 B</td></tr>
+<tr><td><strong>Belegt mit Verursacher</strong></td><td><strong>130.858 B</strong></td><td><strong>105.940 B</strong></td><td>-24.918 B</td></tr>
+<tr><td>Frei</td><td>89.680 B</td><td>48.688 B</td><td>-40.992 B</td></tr>
+<tr><td>Nicht im Trace</td><td>26.174 B</td><td>38.572 B</td><td>+12.398 B</td></tr>
+<tr><td>Heap gesamt</td><td>246.712 B</td><td>193.200 B</td><td>-53.512 B</td></tr>
+</tbody></table></div>
+<h3>T-Beam: die 15 größten Verursacher im Leerlauf</h3>
+<div class="table-wrap"><table><thead><tr><th>Belegt</th><th>Blöcke</th><th>Bereich</th><th>Aufrufkette</th></tr></thead><tbody>
+<tr><td>12.632 B</td><td>2</td><td>System</td><td><code>xTaskCreate &lt; app_main &lt; main_task</code></td></tr>
+<tr><td>9.764 B</td><td>9</td><td>WLAN-Treiber</td><td><code>wifi_malloc &lt; esf_buf_alloc_dynamic &lt; esf_buf_setup_static</code></td></tr>
+<tr><td>8.912 B</td><td>5</td><td>WLAN-Treiber</td><td><code>wDev_Rxbuf_Init &lt; ic_init &lt; wifi_lmac_init</code></td></tr>
+<tr><td>7.000 B</td><td>2</td><td>WLAN-Treiber</td><td><code>task_create_pinned_to_core_wrapper &lt; pp_create_task &lt; ic_create_wifi_task</code></td></tr>
+<tr><td>4.960 B</td><td>4</td><td>BLE</td><td><code>ble_buf_alloc &lt; esp_nimble_hci_init &lt; NimBLEDevice::init(string const&amp;)</code></td></tr>
+<tr><td>4.952 B</td><td>2</td><td>System</td><td><code>esp_timer_init &lt; __esp_system_init_fn_init_components0 &lt; do_system_init_fn</code></td></tr>
+<tr><td>4.440 B</td><td>2</td><td>WLAN-Treiber</td><td><code>xTaskCreate &lt; _start_network_event_task &lt; wifiLowLevelInit(bool)</code></td></tr>
+<tr><td>4.440 B</td><td>2</td><td>mDNS</td><td><code>_mdns_service_task_start &lt; MDNSResponder::begin(String const&amp;) &lt; MDNSResponder::begin(char const*)</code></td></tr>
+<tr><td>3.416 B</td><td>2</td><td>BLE</td><td><code>esp_nimble_enable &lt; nimble_port_freertos_init &lt; NimBLEDevice::init(string const&amp;)</code></td></tr>
+<tr><td>3.416 B</td><td>2</td><td>WLAN-Treiber</td><td><code>sys_thread_new &lt; tcpip_init &lt; esp_netif_init</code></td></tr>
+<tr><td>3.268 B</td><td>6</td><td>MeshCom-Anwendung</td><td><code>xRingbufferCreate &lt; uart_alloc_driver_obj &lt; uartBegin</code></td></tr>
+<tr><td>2.928 B</td><td>3</td><td>System</td><td><code>esp_event_loop_create &lt; esp_event_loop_create_default &lt; _start_network_event_task</code></td></tr>
+<tr><td>2.736 B</td><td>4</td><td>System</td><td><code>esp_ipc_init &lt; do_global_ctors &lt; call_start_cpu0</code></td></tr>
+<tr><td>2.736 B</td><td>4</td><td>System</td><td><code>prvCreateIdleTasks &lt; esp_startup_start_app &lt; start_cpu0_default</code></td></tr>
+<tr><td>2.288 B</td><td>1</td><td>WLAN-Treiber</td><td><code>wifi_calloc &lt; wifi_nvs_cfg_init &lt; wifi_nvs_init</code></td></tr>
+</tbody></table></div>
+<ul>
+<li><strong>Messung:</strong> DK5EN-92, T-Beam v1.2, 23.11.2026 23:11 bis 23:23, Image <code>469bb942</code> + Allokations-Trace, 10 Minuten Leerlauf, eine Web-Seite, Update-Prüfung. Kein Neustart.</li>
+<li><strong>Update-Prüfung mit dem Trace-Image abgelehnt:</strong> 73,9 KB frei plus Puffer, nötig 76 KB. Der Trace selbst kostet rund 5,4 KB (2 KB Puffer, 3,4 KB Ausgabe-Task). Ohne Trace bestand der T-Beam die Schwelle mit 77,4 KB (Abschnitt 1b).</li>
+<li><strong>Nicht im Trace 38,6 KB:</strong> Blockköpfe, WLAN-Puffer aus dem Interrupt, 55 nicht geschriebene Ereignisse beim Start, die Ausgabe-Task. Auf dem T-Beam 12,4 KB mehr als auf der V3, Ursache noch offen.</li>
+</ul>
+<p class="small">Quelle: <code>tools/bench/runs/harness/ota-lowheap-arena-20261123/heaptrace-tbeam2/</code>, Auswertung mit <code>trace-ttgo_tbeam.elf</code>.</p>
+
+<p class="small">Quelle: <code>tools/bench/runs/harness/ota-lowheap-arena-20261123/heaptrace-v3d/</code> (<code>map-idle.json</code>, <code>map-after_check.json</code>), Auswertung <code>tools/bench/heaptrace.py</code> mit <code>trace-heltec_wifi_lora_32_V3.elf</code>.</p>
+<details class="dev"><summary>Frühere Karte vom Vormittag (Tabellen-Image, 53 KB ohne Zuordnung) und die Balken dazu</summary>
+<h2 id="s2">2 Heap-Karte: Wer belegt wie viel und warum</h2>
+<p>Der interne Heap besteht aus sechs Regionen mit zusammen 225.320 B. Die Tabelle zeigt die erste Karte vor A und B, A und B ändern den dauerhaften Heap nicht. Jede Zeile rechnet a x b = c, die Spalte Hebel nennt, was sich ändern ließe.</p>
+<div class="table-wrap"><table class="map"><thead><tr><th>Eigentümer</th><th>belegt</th><th>Rechnung a x b = c</th><th>warum so viel</th><th>Hebel</th><th>Quelle</th></tr></thead><tbody><tr class=""><td>BLE-Controller</td><td>31.940 B <span class="tag m">gemessen</span></td><td>4.096 + 344 + 9 x 272 B + 25.052 = 31.940 B<br>Task-Stack, Kontrollblock, 9 Blöcke, Rest in 34 Blöcken <span class="tag u">Faktor unbekannt</span>, gemessen 25.052 B</td><td>Die vorkompilierte Controller-Bibliothek legt Funk- und Verbindungspuffer beim Start fest an. Der größte Block hat 9.356 B, sein Inhalt ist nicht dokumentiert.</td><td>Zur Laufzeit keiner: Abschalten und Neustart des Controllers stürzt auf dem S3 ab. Nur Build-Konfiguration, nicht gemessen.</td><td>Sites 187 bis 217, bt.c:683, esp32_main.cpp:725-726</td></tr><tr class=""><td>NimBLE-Host</td><td>10.636 B <span class="tag m">gemessen</span></td><td>3.072 + 344 + 3.000 + 1.152 + 520 + 288 + 4 x 292 B + 1.092 = 10.636 B<br>Host-Task, vier Transportpuffer, 4 msys-Blöcke, Rest 1.092 B</td><td>Host-Task und Puffer des Bluetooth-Protokolls. Vier msys-Blöcke stehen in der Konfiguration, 292 B je Block ist 1.168 geteilt durch 4 und im Aufbau unbekannt.</td><td>Schon beschnitten auf 1 Verbindung, 1 Bond, ohne Central und Observer. Rest klein.</td><td>Sites 221 bis 253, platformio.ini:1796-1802</td></tr><tr class=""><td>WLAN-Treiber</td><td>nicht einzeln gemessen, liegt in „nicht zugeordnet“ <span class="tag a">Annahme</span></td><td>4 x 2.216 B = 8.864 B statische RX-Puffer, Anzahl passt zu static_rx 4<br>Obergrenze bei Verkehr: 32 Puffer x 1.600 B = 51.200 B dynamische RX <span class="tag e">Schätzung</span></td><td>Der Treiber puffert Pakete zwischen Funk und IP-Stack. Dynamische Puffer belegen nur bei Verkehr, 1.600 B je Puffer stammt aus der ESP-IDF-Dokumentation und ist im Repo nicht belegt. TX: 32 dynamische Puffer, Größe <span class="tag u">Faktor unbekannt</span>.</td><td>Die Anzahl setzt das Arduino-Framework. Änderung nur per Framework-Patch, nicht geprüft.</td><td>WiFiGeneric.cpp:674-679, Blöcke der Karte</td></tr><tr class=""><td>lwIP und TCP</td><td>nicht einzeln gemessen, liegt in „nicht zugeordnet“ <span class="tag a">Annahme</span></td><td>2.560 + 344 = 2.904 B tcpip-Task, Größe passt zu sdkconfig.h:542<br>Fenster je Verbindung 5.760 B Obergrenze, 16 Sockets x <span class="tag u">Faktor unbekannt</span><br>Haltezeit nach Close: 2 x 60 s = 120 s</td><td>Jede TCP-Verbindung hält Fenster und Sendepuffer. Geschlossene Verbindungen bleiben 2 x TCP_MSL im Zustand TIME_WAIT, MSL ist hier 60 s.</td><td>TCP_MSL und Fenster sind Compile-Zeit im Framework, nicht per Firmware änderbar.</td><td>sdkconfig.h:496, :529, :532, :542</td></tr><tr class="tot"><td>System-Task-Stacks</td><td>23.056 B <span class="tag m">gemessen</span></td><td>12.632 + 4.952 + 2.736 + 2.736 = 23.056 B<br>Summe der vier Zeilen darunter</td><td>Jeder FreeRTOS-Task braucht seinen Stack als Heap-Block plus 344 B Kontrollblock. Der Stack ist der Platzbedarf im ungünstigsten Aufruf.</td><td>Siehe Zeilen darunter. BLE- und NimBLE-Task stehen in ihren eigenen Zeilen.</td><td>Sites 59, 29, 16, 41</td></tr><tr class="sub"><td>loopTask</td><td>12.632 B <span class="tag m">gemessen</span></td><td>12.288 + 344 = 12.632 B</td><td>Die Kette von der Extern-UDP-Annahme bis zur Konsolenausgabe braucht 8.672 B ohne Interrupts. Deshalb wurde der Default von 8.192 B auf 12.288 B angehoben.</td><td>Nur mit kürzerer Aufrufkette zurücknehmbar, nicht ohne neue Stack-Messung.</td><td>platformio.ini:1778-1794, Site 59</td></tr><tr class="sub"><td>esp_timer</td><td>4.952 B <span class="tag m">gemessen</span></td><td>4.096 + 344 + 512 = 4.952 B<br>512 B Rest <span class="tag u">Faktor unbekannt</span></td><td>Timer-Task des Systems, Stackgröße aus der SDK-Konfiguration.</td><td>Keiner im Repo, SDK-Wert.</td><td>sdkconfig.h:395, Site 29</td></tr><tr class="sub"><td>ipc0 und ipc1</td><td>2.736 B <span class="tag m">gemessen</span></td><td>2 x 1.024 B + 2 x 344 B = 2.736 B</td><td>Je CPU-Kern ein Task für Aufrufe zwischen den Kernen.</td><td>Keiner, SDK-Wert.</td><td>sdkconfig.h:354, Site 16</td></tr><tr class="sub"><td>idle0 und idle1</td><td>2.736 B <span class="tag m">gemessen</span></td><td>2 x 1.024 B + 2 x 344 B = 2.736 B</td><td>Je CPU-Kern ein Leerlauf-Task, der auch gelöschte Task-Stacks freigibt.</td><td>Keiner, SDK-Wert.</td><td>sdkconfig.h:472, Site 41</td></tr><tr class=""><td>Treiber und Queues</td><td>10.984 B <span class="tag m">gemessen</span></td><td>2.048 + 256 + 2 x 236 B + 4.792 + 2 x 200 B + 4 x 128 B + 32 + 2.472 = 10.984 B<br>UART-Ringpuffer, 36 Queue-Blöcke, I2C-Treiber, 4 Wire-Puffer, I2C-Kleinteile, Rest in 28 Blöcken</td><td>UART-Ringpuffer, Warteschlangen und Mutexe von FreeRTOS und Treibern. 26 der Queue-Blöcke haben je 84 B 26 x 84 B = 2.184 B, das ist ein Queue-Kopf ohne Datenbereich.</td><td>Klein. Der UART-Ring von 2.048 B ließe sich nur nach Prüfung der Datenrate kürzen, nicht geprüft.</td><td>Sites 0 bis 104 und 177 bis 185</td></tr><tr class=""><td>NVS</td><td>1.916 B <span class="tag m">gemessen</span></td><td>7 x 128 B + 11 x 28 B + 424 + 128 + 104 + 40 + 16 = 1.916 B<br>Hash-Liste, Einträge, Seitenverwaltung, Kleinteile</td><td>Der Speicher für Einstellungen hält eine Hash-Liste der Schlüssel im RAM.</td><td>Keiner, zu klein.</td><td>Sites 49 bis 57</td></tr><tr class=""><td>Webserver</td><td>dauerhaft nicht sichtbar, Spitze je Seite 4.568 bis 6.916 B <span class="tag m">gemessen</span></td><td>gehalten nach der Seite 1.624 bis 5.404 B, Faktor je Seite <span class="tag u">Faktor unbekannt</span><br>Konfigurationsseite: 6.144 + 1 = 6.145 B zusätzlich, danach frei</td><td>Jede Seite baut ihre Antwort in Stücken auf und hält Socket und Sendepuffer. 14 Seiten wurden einzeln in eine Senke gerendert.</td><td>Fix A: Während einer Update-Sitzung antwortet der Webserver mit 503 außer /austatus und den Assets. Der Tab, der das Update gestartet hat, bleibt immer offen.</td><td>Probe page_*, web_functions.cpp:589-602</td></tr><tr class=""><td>Mesh- und App-Puffer im Heap</td><td>2.600 B im Heap, darin enthalten in „nicht zugeordnet“ <span class="tag a">Annahme</span></td><td>10 x 260 B = 2.600 B RX-Log-Ring, 260 = 255 + 5 B je Zeile<br>Die Karte zeigt den 2.600-B-Block erst nach der rxlog-Seite</td><td>Der RX-Log-Ring wird erst beim ersten Aufruf der rxlog-Seite angelegt. Die Zuordnung folgt aus exakter Größe und Zeitpunkt.</td><td>Schon verzögert angelegt. Weitere Heap-Puffer der App sind klein und kurzlebig.</td><td>loop_functions.cpp:799, configuration_global.h:303, :354</td></tr><tr class=""><td>Mesh- und App-Puffer statisch, nicht im Heap</td><td>15.360 B im Datenbereich, nicht in der Karte <span class="tag m">gemessen</span></td><td>3 x 3.072 B + 6.144 = 15.360 B<br>3 Byte-Ringe für Telefon, Telefon-Befehle und UDP sowie 1 Ausfall-Puffer</td><td>Die Ringe sind feste Arrays und belegen keinen Heap. Sie verkleinern aber die Regionen, aus denen der Heap besteht.</td><td>Ringgrößen in configuration_global.h für den S3-Zweig.</td><td>configuration_global.h:355-358</td></tr><tr class=""><td>Heap-Verwaltung</td><td>9.928 B <span class="tag m">abgeleitet</span></td><td>225.320 - 215.392 = 9.928 B<br>Das sind rechnerisch 22,7 B je Block bei 438 Blöcken, Faktor <span class="tag u">Faktor unbekannt</span></td><td>Block-Köpfe, Ausrichtung und Randbereiche der sechs Regionen. Eine Messung dazu gibt es nicht.</td><td>Keiner.</td><td>Differenz aus INSTR-MAP sum und Regionen</td></tr><tr class="unowned"><td>Nicht zugeordnet, mit Tabelleneintrag 255</td><td>53.460 B <span class="tag m">gemessen</span></td><td>131.992 - 78.532 = 53.460 B belegt minus Eigentümer<br>Kartenscan: 208 Blöcke, 53.492 B, 32 B Abweichung</td><td>Die Standort-Tabelle war voll, alle späteren Blöcke landen in Eintrag 255 ohne Funktionsname. Die Owner-Tabelle (Welle 2a) benennt sie jetzt grob nach Task, siehe Abschnitt 2.</td><td>Owner-Tabelle nach Task liegt vor, feinere Zuordnung offen. Kandidaten stehen unter der Tabelle.</td><td>Site 255, INSTR-MAP sum used 131992</td></tr><tr class="unowned"><td>Nicht zugeordnet, ohne Tabelleneintrag</td><td>13.448 B <span class="tag m">gemessen</span></td><td>145.440 - 131.992 = 13.448 B Heap-Statistik minus Karte</td><td>Diese Blöcke sind belegt, die Tabelle kennt sie nicht. Mögliche Ursachen laut Code sind Allokationen vor dem Mitschnitt, andere Allokatoren und verworfene Einträge.</td><td>Owner-Tabelle nach Task liegt vor.</td><td>instrument_heap.cpp:1154-1156</td></tr><tr class="sum"><td>Summe aller Zeilen</td><td>225.320 B</td><td>78.532 + 53.460 + 13.448 + 69.952 + 9.928 = 225.320 B<br>Eigentümer: 31.940 + 10.636 + 23.056 + 10.984 + 1.916 = 78.532 B<br>Regionen: 57.904 + 65.536 + 38.672 + 22.308 + 32.768 + 8.132 = 225.320 B</td><td>Ein Byte steht genau einmal in der Summe. Die Zeilen „Mesh- und App-Puffer“, „WLAN“ und „lwIP“ stecken in „nicht zugeordnet“ und werden nicht addiert, die statischen Puffer liegen außerhalb des Heaps.</td><td>Siehe Abschnitt 5 und 6.</td><td>INSTR-MAP, Lauf 23.11.2026 10:07</td></tr></tbody></table></div>
+<p><strong>Ohne Eigentümer in der ersten Karte:</strong> 66.908 B, das sind 46 Prozent des belegten Speichers.</p>
+<h3>Eigentümer nach Task, Owner-Tabelle</h3>
+<p><strong>Die Owner-Tabelle liegt vor, sie ordnet aber nur nach Task-Name zu und ist grob.</strong> Der Start des BLE-Controllers läuft auf loopTask, deshalb steht der größte Teil von BLE bei loop. Die Summen stammen aus einem anderen Image und sind mit der Karte oben nicht vergleichbar.</p>
+<div class="table-wrap"><table class=""><thead><tr><th>Task</th><th>belegt</th><th>Blöcke</th><th>Spitze</th><th>Anmerkung</th></tr></thead><tbody><tr class=""><td>loop</td><td>74.708 B</td><td>219</td><td>76.168 B</td><td>Der Start des BLE-Controllers läuft auf loopTask, die meisten BLE-Bytes zählen deshalb hier und nicht bei BLE.</td></tr><tr class=""><td>main</td><td>28.224 B</td><td>74</td><td>28.224 B</td><td>Der loopTask-Stack von 12.632 B wird von main angelegt, Site 59 der Karte. Rest 28.224 - 12.632 = 15.592 B.</td></tr><tr class=""><td>wifi</td><td>11.204 B</td><td>32</td><td>12.508 B</td><td>WLAN-Treiber und Event-Verkehr.</td></tr><tr class=""><td>BLE</td><td>7.504 B</td><td>22</td><td>7.504 B</td><td>Nur Allokationen aus BLE-Tasks, grob.</td></tr><tr class=""><td>tcpip</td><td>4.020 B</td><td>28</td><td>4.104 B</td><td>lwIP-Task.</td></tr><tr class=""><td>evt</td><td>100 B</td><td>3</td><td>100 B</td><td></td></tr><tr class=""><td>other</td><td>240 B</td><td>8</td><td>292 B</td><td></td></tr><tr class=""><td>ipc</td><td>8 B</td><td>1</td><td>8 B</td><td></td></tr><tr class="sum"><td>Summe verfolgt</td><td>126.008 B</td><td></td><td></td><td>74.708 + 28.224 + 11.204 + 7.504 + 4.020 + 100 + 240 + 8 = 126.008 B<br>dazu 16.424 B ohne Eintrag und 83.680 B frei, INSTR-OWN sum</td></tr></tbody></table></div>
+<p>Während der Prüfung, Lauf 10:44:30:</p>
+<div class="table-wrap"><table class=""><thead><tr><th>Eigentümer während der Prüfung</th><th>Spitze</th><th>Rechnung</th><th>Anmerkung</th></tr></thead><tbody><tr class=""><td>TLS</td><td>49.384 B <span class="tag m">gemessen</span></td><td>28.232 Allokationen, 28.231 Freigaben, am Ende 84 B belegt</td><td>Allokationen der Update-Task innerhalb der TLS-Sitzung. Davon fest 2 x 16.717 B = 33.434 B.</td></tr><tr class=""><td>AU</td><td>39.688 B <span class="tag m">gemessen</span></td><td>6.144 + 2 x 16.717 B = 39.578 B<br>Gemessen 39.688 B, 110 B mehr</td><td>Das ist die eigene Probe des Gates, die sofort wieder freigegeben wird.</td></tr><tr class=""><td>loop</td><td>88.816 B Spitze bei 74.692 B belegt <span class="tag m">gemessen</span></td><td>88.816 - 74.692 = 14.124 B<br>Aufteilung <span class="tag u">Faktor unbekannt</span></td><td>Temporäre Allokationen der Loop-Task während der Prüfung.</td></tr><tr class=""><td>tcpip</td><td>5.668 B <span class="tag m">gemessen</span></td><td>Ruhe 4.020 B, Spitze 5.668 B</td><td>Fix A räumt alte TIME_WAIT-Verbindungen, die Wirkung ist nicht einzeln gemessen.</td></tr></tbody></table></div>
+<h3>Kurzzeitige Spitzen, nicht dauerhaft</h3>
+<div class="table-wrap"><table class=""><thead><tr><th>Vorgang</th><th>Spitze</th><th>Rechnung</th><th>Anmerkung</th><th>Quelle</th></tr></thead><tbody><tr class=""><td>DNS-Abfrage</td><td>15.440 B <span class="tag m">gemessen</span></td><td>12.288 + 3.152 = 15.440 B</td><td>Worker-Stack zählt mit, 3.152 B bleiben für Socket und Antwort.</td><td>Probe dns</td></tr><tr class=""><td>TLS-Handschlag ohne Prüfung</td><td>67.628 B <span class="tag m">gemessen</span></td><td>12.288 + 2 x 16.717 B + 21.906 = 67.628 B<br>Die 21.906 B sind die Differenz <span class="tag m">abgeleitet</span></td><td>Die Probe nutzt setInsecure, es gibt weder CA-Parsing noch Kettenprüfung.</td><td>Probe tls, instrument_probe.cpp:154</td></tr><tr class=""><td>Update-Prüfung im Instrument-Image</td><td>mindestens 73.376 B <span class="tag m">gemessen</span></td><td>Untergrenze, weil der Lauf bei 53 fehlgeschlagenen Allokationen abbrach</td><td>Der Lauf scheiterte mit -10368 bei 588 B Rest.</td><td>Probe au_check, [AU];tls;-10368</td></tr><tr class=""><td>Update-Prüfung vor A und B</td><td>85.096 B <span class="tag m">gemessen</span></td><td>96.000 - 10.904 = 85.096 B Gate-Wert ungefähr 96 KB minus Tiefstand</td><td>Lauf 23.11.2026 06:00, Standard-Client.</td><td>trigger-DK5EN-1.log, ota-lowheap-night-20261122</td></tr><tr class=""><td>Download und Stage vor A und B</td><td>94.064 B <span class="tag m">gemessen</span></td><td>96.956 - 2.892 = 94.064 B</td><td>Der Tiefstand von 2.892 B war der knappste Punkt der Nacht.</td><td>trigger-DK5EN-1.log</td></tr><tr class=""><td>Update-Prüfung mit A und B</td><td>61.408 B <span class="tag m">gemessen</span></td><td>85.700 - 24.292 = 61.408 B, 0 Allokationsfehler</td><td>Lauf 23.11.2026 10:58, Image ohne Heap-Tabellen.</td><td>aucheck-DK5EN-1.log</td></tr><tr class=""><td>Download und Stage mit A und B</td><td>69.512 B <span class="tag m">gemessen</span></td><td>85.108 - 15.596 = 69.512 B, 0 Allokationsfehler, 1.180.497 B in 10.943 ms</td><td>Erfolgreich, Stage ok.</td><td>aucheck-DK5EN-1.log</td></tr><tr class=""><td>WLAN-Scan</td><td>10.012 B <span class="tag m">gemessen</span></td><td>Anzahl gefundener Netze nicht protokolliert, Faktor <span class="tag u">Faktor unbekannt</span></td><td>Die Scan-Liste wächst mit den Netzen im Umfeld.</td><td>Probe wifi_scan</td></tr></tbody></table></div>
+<details class="dev"><summary>Kandidaten in den nicht zugeordneten Blöcken der ersten Karte, nur nach Größe vermutet</summary>
+<ul>
+<li><strong>Kartenscan:</strong> 208 Blöcke, davon 16 ab 1.300 B. Rechnung der großen: 4 x 2.216 B + 6.656 + 2 x 4.096 B + 3.072 + 2.600 + 2.560 + 1.684 + 1.460 + 1.432 + 3 x 1.340 B = 40.540 B</li>
+<li><strong>Kontrollblöcke:</strong> 5 x 344 B = 1.720 B <span class="tag m">abgeleitet</span>. Fünf Tasks außerhalb der Tabelle, 344 B je Block ist an vier Tasks gemessen.</li>
+<li><strong>4 x 2.216 B:</strong> Die Anzahl passt zu static_rx 4 in WiFiGeneric.cpp:679. <span class="tag a">Annahme</span></li>
+<li><strong>2.560 B:</strong> Gleich CONFIG_LWIP_TCPIP_TASK_STACK_SIZE in sdkconfig.h:542. <span class="tag a">Annahme</span></li>
+<li><strong>2.600 B:</strong> Gleich 10 x 260 B des RX-Log-Rings und neu nach der rxlog-Seite. <span class="tag a">Annahme</span></li>
+<li><strong>6.656 B, 2 x 4.096 B, 3.072 B, 1.684 B:</strong> Zuordnung offen.</li>
+<li><strong>Zwischen den zwei Karten 09:52 und 10:07:</strong> neu 2.600 + 1.432 + 3 x 1.340 B + 428 + 84 + 36 + 32 + 32 + 16 = 8.680 B, weggefallen 2 x 1.340 B + 424 + 2 x 16 B = 3.136 B, netto 8.680 - 3.136 = 5.544 B. Das passt zu 131.992 − 126.448 B.</li>
+</ul></details>
+<h2 id="s3">3 Die Karte als Balken</h2>
+<p>Der obere Balken fasst alle Regionen zusammen, darunter folgt jede Region in Adressreihenfolge. Die Breite ist proportional zu den Bytes. Stand der Karte ist 10:07, vor A und B.</p>
+<figure><svg viewBox="0 0 1040 320" role="img" aria-label="Heap-Karte der Heltec V3, Regionen und Eigentuemer">
+<text class="lab" x="0" y="37">Summe 225.320 B</text>
+<rect class="s-ble" x="175.00" y="20" width="120.49" height="26"><title>BLE-Controller 31.940 B</title></rect>
+<rect class="s-nimble" x="295.49" y="20" width="40.12" height="26"><title>NimBLE-Host 10.636 B</title></rect>
+<rect class="s-tasks" x="335.61" y="20" width="86.98" height="26"><title>System-Tasks 23.056 B</title></rect>
+<rect class="s-drv" x="422.59" y="20" width="41.44" height="26"><title>Treiber und Queues 10.984 B</title></rect>
+<rect class="s-nvs" x="464.03" y="20" width="7.23" height="26"><title>NVS 1.916 B</title></rect>
+<rect class="s-unowned" x="471.26" y="20" width="201.67" height="26"><title>ohne Eigentuemer 53.460 B</title></rect>
+<rect class="s-untr" x="672.93" y="20" width="50.73" height="26"><title>ohne Eintrag 13.448 B</title></rect>
+<rect class="s-free" x="723.66" y="20" width="263.89" height="26"><title>frei 69.952 B</title></rect>
+<rect class="s-ovh" x="987.55" y="20" width="37.45" height="26"><title>Verwaltung 9.928 B</title></rect>
+<text class="lab" x="0" y="87">Region 0 57.904 B</text>
+<rect class="s-free" x="175.00" y="70" width="4.19" height="26"><title>free 1.112 B</title></rect>
+<rect class="s-ble" x="179.19" y="70" width="0.40" height="26"><title>ble 84 B</title></rect>
+<rect class="s-free" x="179.51" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="179.57" y="70" width="0.81" height="26"><title>ble 216 B</title></rect>
+<rect class="s-free" x="180.39" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="180.45" y="70" width="1.06" height="26"><title>ble 280 B</title></rect>
+<rect class="s-free" x="181.50" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="181.56" y="70" width="3.68" height="26"><title>ble 976 B</title></rect>
+<rect class="s-free" x="185.25" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="185.31" y="70" width="9.54" height="26"><title>ble 2.528 B</title></rect>
+<rect class="s-free" x="194.84" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="194.90" y="70" width="1.07" height="26"><title>ble 284 B</title></rect>
+<rect class="s-free" x="195.97" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="196.03" y="70" width="0.83" height="26"><title>ble 220 B</title></rect>
+<rect class="s-free" x="196.86" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="196.93" y="70" width="1.54" height="26"><title>ble 408 B</title></rect>
+<rect class="s-free" x="198.46" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="198.52" y="70" width="2.29" height="26"><title>ble 608 B</title></rect>
+<rect class="s-free" x="200.82" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="200.88" y="70" width="1.67" height="26"><title>ble 444 B</title></rect>
+<rect class="s-free" x="202.55" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="202.61" y="70" width="0.98" height="26"><title>ble 260 B</title></rect>
+<rect class="s-free" x="203.59" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="203.66" y="70" width="7.88" height="26"><title>ble 2.088 B</title></rect>
+<rect class="s-free" x="211.53" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="211.59" y="70" width="35.29" height="26"><title>ble 9.356 B</title></rect>
+<rect class="s-free" x="246.89" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="246.95" y="70" width="7.05" height="26"><title>ble 1.868 B</title></rect>
+<rect class="s-free" x="253.99" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="254.05" y="70" width="0.40" height="26"><title>ble 12 B</title></rect>
+<rect class="s-free" x="254.10" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="254.16" y="70" width="1.24" height="26"><title>ble 328 B</title></rect>
+<rect class="s-free" x="255.40" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="255.46" y="70" width="4.07" height="26"><title>ble 1.080 B</title></rect>
+<rect class="s-free" x="259.53" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="259.59" y="70" width="2.32" height="26"><title>ble 616 B</title></rect>
+<rect class="s-free" x="261.92" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="261.98" y="70" width="0.75" height="26"><title>ble 200 B</title></rect>
+<rect class="s-free" x="262.73" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="262.79" y="70" width="4.75" height="26"><title>ble 1.260 B</title></rect>
+<rect class="s-free" x="267.54" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="267.61" y="70" width="2.04" height="26"><title>ble 540 B</title></rect>
+<rect class="s-free" x="269.64" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="269.70" y="70" width="2.84" height="26"><title>ble 752 B</title></rect>
+<rect class="s-free" x="272.54" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="272.60" y="70" width="0.40" height="26"><title>ble 104 B</title></rect>
+<rect class="s-free" x="272.99" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="273.05" y="70" width="1.03" height="26"><title>ble 272 B</title></rect>
+<rect class="s-free" x="274.08" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="274.14" y="70" width="1.03" height="26"><title>ble 272 B</title></rect>
+<rect class="s-free" x="275.17" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="275.23" y="70" width="1.03" height="26"><title>ble 272 B</title></rect>
+<rect class="s-free" x="276.25" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="276.31" y="70" width="1.03" height="26"><title>ble 272 B</title></rect>
+<rect class="s-free" x="277.34" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="277.40" y="70" width="1.03" height="26"><title>ble 272 B</title></rect>
+<rect class="s-free" x="278.42" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="278.48" y="70" width="1.03" height="26"><title>ble 272 B</title></rect>
+<rect class="s-free" x="279.51" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="279.57" y="70" width="1.03" height="26"><title>ble 272 B</title></rect>
+<rect class="s-free" x="280.60" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="280.66" y="70" width="1.03" height="26"><title>ble 272 B</title></rect>
+<rect class="s-free" x="281.68" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="281.74" y="70" width="1.03" height="26"><title>ble 272 B</title></rect>
+<rect class="s-free" x="282.77" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="282.83" y="70" width="11.59" height="26"><title>nimble 3.072 B</title></rect>
+<rect class="s-free" x="294.42" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="294.48" y="70" width="0.40" height="26"><title>unowned 20 B</title></rect>
+<rect class="s-free" x="294.56" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="294.62" y="70" width="0.72" height="26"><title>unowned 192 B</title></rect>
+<rect class="s-free" x="295.34" y="70" width="0.44" height="26"><title>free 116 B</title></rect>
+<rect class="s-unowned" x="295.78" y="70" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="295.84" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="295.90" y="70" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="295.96" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="296.02" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="296.06" y="70" width="0.40" height="26"><title>free 20 B</title></rect>
+<rect class="s-unowned" x="296.14" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="296.17" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="296.23" y="70" width="0.80" height="26"><title>unowned 212 B</title></rect>
+<rect class="s-free" x="297.03" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="297.09" y="70" width="11.59" height="26"><title>unowned 3.072 B</title></rect>
+<rect class="s-free" x="308.68" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="308.74" y="70" width="1.30" height="26"><title>unowned 344 B</title></rect>
+<rect class="s-free" x="310.04" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="310.10" y="70" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="310.41" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="310.47" y="70" width="0.40" height="26"><title>unowned 36 B</title></rect>
+<rect class="s-free" x="310.61" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="310.67" y="70" width="0.80" height="26"><title>unowned 212 B</title></rect>
+<rect class="s-free" x="311.47" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="311.53" y="70" width="0.40" height="26"><title>unowned 24 B</title></rect>
+<rect class="s-free" x="311.62" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="311.68" y="70" width="2.25" height="26"><title>unowned 596 B</title></rect>
+<rect class="s-free" x="313.93" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="313.99" y="70" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="314.31" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="314.37" y="70" width="9.66" height="26"><title>unowned 2.560 B</title></rect>
+<rect class="s-free" x="324.03" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="324.09" y="70" width="1.30" height="26"><title>unowned 344 B</title></rect>
+<rect class="s-free" x="325.38" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="325.44" y="70" width="15.45" height="26"><title>unowned 4.096 B</title></rect>
+<rect class="s-free" x="340.90" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="340.96" y="70" width="1.30" height="26"><title>unowned 344 B</title></rect>
+<rect class="s-free" x="342.25" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="342.31" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="342.36" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="342.42" y="70" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="342.48" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="342.54" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="342.57" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="342.63" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="342.66" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="342.72" y="70" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="342.78" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="342.84" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="342.87" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="342.93" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="342.96" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="343.02" y="70" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="343.08" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="343.14" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="343.17" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="343.23" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="343.26" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="343.33" y="70" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="343.39" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="343.45" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="343.48" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="343.54" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="343.57" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="343.63" y="70" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="343.69" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="343.75" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="343.78" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="343.84" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="343.87" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="343.93" y="70" width="0.40" height="26"><title>unowned 92 B</title></rect>
+<rect class="s-free" x="344.28" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="344.34" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="344.38" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="344.44" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="344.49" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="344.55" y="70" width="1.10" height="26"><title>unowned 292 B</title></rect>
+<rect class="s-free" x="345.65" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="345.71" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="345.75" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="345.81" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="345.85" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="345.91" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="345.95" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="346.01" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="346.06" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="346.12" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="346.15" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="346.21" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="346.24" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="346.30" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="346.34" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="346.40" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="346.43" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="346.49" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="346.52" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="346.58" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="346.63" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="346.69" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="346.72" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="346.78" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="346.81" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="346.87" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="346.92" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="346.98" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="347.01" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="347.07" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="347.10" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="347.16" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="347.20" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="347.26" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="347.29" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="347.35" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="347.38" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="347.44" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="347.49" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="347.55" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="347.58" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="347.64" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="347.67" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="347.73" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="347.78" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="347.84" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="347.87" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="347.93" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="347.96" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="348.02" y="70" width="0.40" height="26"><title>unowned 92 B</title></rect>
+<rect class="s-free" x="348.36" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="348.43" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="348.47" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="348.53" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="348.58" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="348.64" y="70" width="1.10" height="26"><title>unowned 292 B</title></rect>
+<rect class="s-free" x="349.74" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="349.80" y="70" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="349.86" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="349.92" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="349.95" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="350.01" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="350.06" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="350.12" y="70" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="350.43" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="350.49" y="70" width="2.96" height="26"><title>unowned 784 B</title></rect>
+<rect class="s-free" x="353.45" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="353.51" y="70" width="0.81" height="26"><title>unowned 216 B</title></rect>
+<rect class="s-free" x="354.33" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="354.39" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="354.42" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="354.48" y="70" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="354.79" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="354.85" y="70" width="0.40" height="26"><title>unowned 60 B</title></rect>
+<rect class="s-free" x="355.08" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="355.14" y="70" width="0.40" height="26"><title>unowned 20 B</title></rect>
+<rect class="s-free" x="355.22" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="355.28" y="70" width="0.40" height="26"><title>unowned 20 B</title></rect>
+<rect class="s-free" x="355.35" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="355.41" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="355.44" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="355.50" y="70" width="6.35" height="26"><title>unowned 1.684 B</title></rect>
+<rect class="s-free" x="361.86" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="361.92" y="70" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="361.95" y="70" width="0.40" height="26"><title>free 32 B</title></rect>
+<rect class="s-unowned" x="362.07" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="362.11" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="362.17" y="70" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="362.22" y="70" width="0.40" height="26"><title>free 20 B</title></rect>
+<rect class="s-unowned" x="362.29" y="70" width="25.11" height="26"><title>unowned 6.656 B</title></rect>
+<rect class="s-free" x="387.40" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="387.46" y="70" width="1.30" height="26"><title>unowned 344 B</title></rect>
+<rect class="s-free" x="388.76" y="70" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="388.82" y="70" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="389.14" y="70" width="4.30" height="26"><title>free 1.140 B</title></rect>
+<text class="lab" x="0" y="127">Region 1 65.536 B</text>
+<rect class="s-free" x="175.00" y="110" width="4.45" height="26"><title>free 1.180 B</title></rect>
+<rect class="s-unowned" x="179.45" y="110" width="0.40" height="26"><title>unowned 20 B</title></rect>
+<rect class="s-free" x="179.53" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="179.59" y="110" width="0.40" height="26"><title>unowned 20 B</title></rect>
+<rect class="s-free" x="179.66" y="110" width="38.72" height="26"><title>free 10.264 B</title></rect>
+<rect class="s-unowned" x="218.38" y="110" width="2.78" height="26"><title>unowned 736 B</title></rect>
+<rect class="s-free" x="221.16" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="221.22" y="110" width="2.78" height="26"><title>unowned 736 B</title></rect>
+<rect class="s-free" x="224.00" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="224.06" y="110" width="0.40" height="26"><title>unowned 48 B</title></rect>
+<rect class="s-free" x="224.24" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="224.30" y="110" width="8.36" height="26"><title>unowned 2.216 B</title></rect>
+<rect class="s-free" x="232.66" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="232.72" y="110" width="8.36" height="26"><title>unowned 2.216 B</title></rect>
+<rect class="s-free" x="241.08" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="241.14" y="110" width="8.36" height="26"><title>unowned 2.216 B</title></rect>
+<rect class="s-free" x="249.50" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="249.56" y="110" width="8.36" height="26"><title>unowned 2.216 B</title></rect>
+<rect class="s-free" x="257.92" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="257.98" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="258.10" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="258.16" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="258.28" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="258.34" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="258.46" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="258.52" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="258.64" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="258.70" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="258.82" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="258.88" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="259.00" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="259.06" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="259.19" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="259.25" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="259.37" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="259.43" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="259.55" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="259.61" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="259.73" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="259.79" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="259.91" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="259.97" y="110" width="0.40" height="26"><title>unowned 96 B</title></rect>
+<rect class="s-free" x="260.33" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="260.39" y="110" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="260.45" y="110" width="0.40" height="26"><title>free 24 B</title></rect>
+<rect class="s-unowned" x="260.54" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="260.66" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="260.72" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="260.85" y="110" width="5.87" height="26"><title>free 1.556 B</title></rect>
+<rect class="s-unowned" x="266.71" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="266.84" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="266.90" y="110" width="0.40" height="26"><title>unowned 24 B</title></rect>
+<rect class="s-free" x="266.99" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="267.05" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="267.17" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="267.23" y="110" width="0.40" height="26"><title>unowned 88 B</title></rect>
+<rect class="s-free" x="267.56" y="110" width="0.40" height="26"><title>free 72 B</title></rect>
+<rect class="s-unowned" x="267.83" y="110" width="0.40" height="26"><title>unowned 36 B</title></rect>
+<rect class="s-free" x="267.97" y="110" width="0.40" height="26"><title>free 56 B</title></rect>
+<rect class="s-unowned" x="268.18" y="110" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="268.50" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="268.56" y="110" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="268.87" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="268.93" y="110" width="0.40" height="26"><title>unowned 4 B</title></rect>
+<rect class="s-free" x="268.95" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="269.01" y="110" width="0.40" height="26"><title>unowned 4 B</title></rect>
+<rect class="s-free" x="269.02" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="269.08" y="110" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="269.13" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="269.19" y="110" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="269.23" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="269.30" y="110" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="269.61" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="269.67" y="110" width="5.51" height="26"><title>unowned 1.460 B</title></rect>
+<rect class="s-free" x="275.18" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="275.24" y="110" width="0.41" height="26"><title>unowned 108 B</title></rect>
+<rect class="s-free" x="275.65" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="275.71" y="110" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="276.03" y="110" width="0.40" height="26"><title>free 48 B</title></rect>
+<rect class="s-unowned" x="276.21" y="110" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="276.24" y="110" width="0.44" height="26"><title>free 116 B</title></rect>
+<rect class="s-unowned" x="276.67" y="110" width="0.40" height="26"><title>unowned 44 B</title></rect>
+<rect class="s-free" x="276.84" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="276.90" y="110" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="276.93" y="110" width="0.40" height="26"><title>free 36 B</title></rect>
+<rect class="s-unowned" x="277.07" y="110" width="0.40" height="26"><title>unowned 64 B</title></rect>
+<rect class="s-free" x="277.31" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="277.37" y="110" width="0.40" height="26"><title>unowned 28 B</title></rect>
+<rect class="s-free" x="277.47" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="277.53" y="110" width="0.40" height="26"><title>unowned 44 B</title></rect>
+<rect class="s-free" x="277.70" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="277.76" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="277.88" y="110" width="0.40" height="26"><title>free 44 B</title></rect>
+<rect class="s-unowned" x="278.05" y="110" width="0.40" height="26"><title>unowned 4 B</title></rect>
+<rect class="s-free" x="278.06" y="110" width="0.44" height="26"><title>free 116 B</title></rect>
+<rect class="s-unowned" x="278.50" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="278.62" y="110" width="0.40" height="26"><title>free 20 B</title></rect>
+<rect class="s-unowned" x="278.70" y="110" width="0.40" height="26"><title>unowned 64 B</title></rect>
+<rect class="s-free" x="278.94" y="110" width="0.40" height="26"><title>free 32 B</title></rect>
+<rect class="s-unowned" x="279.06" y="110" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="279.38" y="110" width="0.40" height="26"><title>free 8 B</title></rect>
+<rect class="s-unowned" x="279.41" y="110" width="0.40" height="26"><title>unowned 40 B</title></rect>
+<rect class="s-free" x="279.56" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="279.62" y="110" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="279.65" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="279.71" y="110" width="0.40" height="26"><title>unowned 80 B</title></rect>
+<rect class="s-free" x="280.01" y="110" width="0.40" height="26"><title>free 96 B</title></rect>
+<rect class="s-unowned" x="280.37" y="110" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="280.43" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="280.49" y="110" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="280.52" y="110" width="1.58" height="26"><title>free 420 B</title></rect>
+<rect class="s-unowned" x="282.11" y="110" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="282.17" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="282.23" y="110" width="0.40" height="26"><title>unowned 80 B</title></rect>
+<rect class="s-free" x="282.53" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="282.59" y="110" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="282.65" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="282.71" y="110" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="282.77" y="110" width="0.97" height="26"><title>free 256 B</title></rect>
+<rect class="s-unowned" x="283.74" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="283.86" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="283.92" y="110" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="283.98" y="110" width="0.40" height="26"><title>free 28 B</title></rect>
+<rect class="s-unowned" x="284.08" y="110" width="0.56" height="26"><title>unowned 148 B</title></rect>
+<rect class="s-free" x="284.64" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="284.70" y="110" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="285.02" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="285.08" y="110" width="0.40" height="26"><title>unowned 4 B</title></rect>
+<rect class="s-free" x="285.09" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="285.15" y="110" width="0.59" height="26"><title>unowned 156 B</title></rect>
+<rect class="s-free" x="285.74" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="285.80" y="110" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="286.12" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="286.18" y="110" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="286.21" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="286.27" y="110" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="286.33" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="286.39" y="110" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="286.45" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="286.51" y="110" width="0.40" height="26"><title>unowned 80 B</title></rect>
+<rect class="s-free" x="286.81" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="286.87" y="110" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="287.19" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="287.25" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="287.37" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="287.43" y="110" width="15.45" height="26"><title>unowned 4.096 B</title></rect>
+<rect class="s-free" x="302.88" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="302.95" y="110" width="1.30" height="26"><title>unowned 344 B</title></rect>
+<rect class="s-free" x="304.24" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="304.30" y="110" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="304.33" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="304.39" y="110" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="304.42" y="110" width="0.40" height="26"><title>free 28 B</title></rect>
+<rect class="s-unowned" x="304.53" y="110" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="304.59" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="304.65" y="110" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="304.68" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="304.74" y="110" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="304.86" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="304.92" y="110" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="305.24" y="110" width="0.40" height="26"><title>free 28 B</title></rect>
+<rect class="s-unowned" x="305.34" y="110" width="0.40" height="26"><title>unowned 64 B</title></rect>
+<rect class="s-free" x="305.59" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="305.65" y="110" width="0.41" height="26"><title>unowned 108 B</title></rect>
+<rect class="s-free" x="306.05" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="306.11" y="110" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="306.43" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="306.49" y="110" width="0.40" height="26"><title>unowned 64 B</title></rect>
+<rect class="s-free" x="306.73" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="306.79" y="110" width="0.40" height="26"><title>unowned 8 B</title></rect>
+<rect class="s-free" x="306.82" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="306.88" y="110" width="0.40" height="26"><title>unowned 4 B</title></rect>
+<rect class="s-free" x="306.90" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="306.96" y="110" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="307.28" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="307.34" y="110" width="0.40" height="26"><title>unowned 76 B</title></rect>
+<rect class="s-free" x="307.62" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="307.68" y="110" width="0.41" height="26"><title>unowned 108 B</title></rect>
+<rect class="s-free" x="308.09" y="110" width="0.44" height="26"><title>free 116 B</title></rect>
+<rect class="s-unowned" x="308.53" y="110" width="0.40" height="26"><title>unowned 72 B</title></rect>
+<rect class="s-free" x="308.80" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="308.86" y="110" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="308.91" y="110" width="0.40" height="26"><title>free 24 B</title></rect>
+<rect class="s-unowned" x="309.00" y="110" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="309.31" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="309.37" y="110" width="0.40" height="26"><title>unowned 76 B</title></rect>
+<rect class="s-free" x="309.66" y="110" width="0.65" height="26"><title>free 172 B</title></rect>
+<rect class="s-unowned" x="310.31" y="110" width="0.78" height="26"><title>unowned 208 B</title></rect>
+<rect class="s-free" x="311.09" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="311.15" y="110" width="0.40" height="26"><title>unowned 64 B</title></rect>
+<rect class="s-free" x="311.40" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="311.46" y="110" width="0.41" height="26"><title>unowned 108 B</title></rect>
+<rect class="s-free" x="311.86" y="110" width="1.37" height="26"><title>free 364 B</title></rect>
+<rect class="s-unowned" x="313.24" y="110" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="313.55" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="313.61" y="110" width="5.06" height="26"><title>unowned 1.340 B</title></rect>
+<rect class="s-free" x="318.67" y="110" width="0.45" height="26"><title>free 120 B</title></rect>
+<rect class="s-unowned" x="319.12" y="110" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="319.44" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="319.50" y="110" width="1.61" height="26"><title>unowned 428 B</title></rect>
+<rect class="s-free" x="321.11" y="110" width="8.62" height="26"><title>free 2.284 B</title></rect>
+<rect class="s-unowned" x="329.73" y="110" width="0.40" height="26"><title>unowned 36 B</title></rect>
+<rect class="s-free" x="329.87" y="110" width="0.40" height="26"><title>free 36 B</title></rect>
+<rect class="s-unowned" x="330.00" y="110" width="9.81" height="26"><title>unowned 2.600 B</title></rect>
+<rect class="s-free" x="339.81" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="339.87" y="110" width="5.06" height="26"><title>unowned 1.340 B</title></rect>
+<rect class="s-free" x="344.92" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="344.98" y="110" width="5.06" height="26"><title>unowned 1.340 B</title></rect>
+<rect class="s-free" x="350.04" y="110" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="350.10" y="110" width="5.40" height="26"><title>unowned 1.432 B</title></rect>
+<rect class="s-free" x="355.50" y="110" width="66.73" height="26"><title>free 17.688 B</title></rect>
+<text class="lab" x="0" y="167">Region 2 38.672 B</text>
+<rect class="s-free" x="175.00" y="150" width="145.89" height="26"><title>free 38.672 B</title></rect>
+<text class="lab" x="0" y="207">Region 3 22.308 B</text>
+<rect class="s-free" x="175.00" y="190" width="3.24" height="26"><title>free 860 B</title></rect>
+<rect class="s-nvs" x="178.24" y="190" width="0.40" height="26"><title>nvs 16 B</title></rect>
+<rect class="s-free" x="178.30" y="190" width="0.45" height="26"><title>free 120 B</title></rect>
+<rect class="s-drv" x="178.76" y="190" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="179.07" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="179.13" y="190" width="0.40" height="26"><title>nvs 40 B</title></rect>
+<rect class="s-free" x="179.29" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="179.35" y="190" width="0.40" height="26"><title>nvs 104 B</title></rect>
+<rect class="s-free" x="179.74" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="179.80" y="190" width="1.60" height="26"><title>nvs 424 B</title></rect>
+<rect class="s-free" x="181.40" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="181.46" y="190" width="0.48" height="26"><title>nvs 128 B</title></rect>
+<rect class="s-free" x="181.94" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="182.00" y="190" width="0.48" height="26"><title>nvs 128 B</title></rect>
+<rect class="s-free" x="182.48" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="182.54" y="190" width="0.48" height="26"><title>nvs 128 B</title></rect>
+<rect class="s-free" x="183.03" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="183.09" y="190" width="0.48" height="26"><title>nvs 128 B</title></rect>
+<rect class="s-free" x="183.57" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="183.63" y="190" width="0.48" height="26"><title>nvs 128 B</title></rect>
+<rect class="s-free" x="184.11" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="184.17" y="190" width="0.48" height="26"><title>nvs 128 B</title></rect>
+<rect class="s-free" x="184.66" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="184.72" y="190" width="0.48" height="26"><title>nvs 128 B</title></rect>
+<rect class="s-free" x="185.20" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="185.26" y="190" width="0.48" height="26"><title>nvs 128 B</title></rect>
+<rect class="s-free" x="185.74" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="185.80" y="190" width="0.40" height="26"><title>nvs 28 B</title></rect>
+<rect class="s-free" x="185.91" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="185.97" y="190" width="0.40" height="26"><title>nvs 28 B</title></rect>
+<rect class="s-free" x="186.08" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="186.14" y="190" width="0.40" height="26"><title>nvs 28 B</title></rect>
+<rect class="s-free" x="186.24" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="186.30" y="190" width="0.40" height="26"><title>nvs 28 B</title></rect>
+<rect class="s-free" x="186.41" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="186.47" y="190" width="0.40" height="26"><title>nvs 28 B</title></rect>
+<rect class="s-free" x="186.57" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="186.63" y="190" width="0.40" height="26"><title>nvs 28 B</title></rect>
+<rect class="s-free" x="186.74" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="186.80" y="190" width="0.40" height="26"><title>nvs 28 B</title></rect>
+<rect class="s-free" x="186.91" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="186.97" y="190" width="0.40" height="26"><title>nvs 28 B</title></rect>
+<rect class="s-free" x="187.07" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="187.13" y="190" width="0.40" height="26"><title>nvs 28 B</title></rect>
+<rect class="s-free" x="187.24" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="187.30" y="190" width="0.40" height="26"><title>nvs 28 B</title></rect>
+<rect class="s-free" x="187.40" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nvs" x="187.46" y="190" width="0.40" height="26"><title>nvs 28 B</title></rect>
+<rect class="s-free" x="187.57" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-tasks" x="187.63" y="190" width="46.36" height="26"><title>tasks 12.288 B</title></rect>
+<rect class="s-free" x="233.99" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-tasks" x="234.05" y="190" width="1.30" height="26"><title>tasks 344 B</title></rect>
+<rect class="s-free" x="235.34" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="235.40" y="190" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="235.72" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="235.78" y="190" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="236.10" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="236.16" y="190" width="0.40" height="26"><title>drv 16 B</title></rect>
+<rect class="s-free" x="236.22" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="236.28" y="190" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="236.60" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="236.66" y="190" width="0.92" height="26"><title>drv 244 B</title></rect>
+<rect class="s-free" x="237.58" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="237.64" y="190" width="1.22" height="26"><title>drv 324 B</title></rect>
+<rect class="s-free" x="238.86" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="238.92" y="190" width="0.89" height="26"><title>drv 236 B</title></rect>
+<rect class="s-free" x="239.81" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="239.87" y="190" width="7.73" height="26"><title>drv 2.048 B</title></rect>
+<rect class="s-free" x="247.60" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="247.66" y="190" width="0.89" height="26"><title>drv 236 B</title></rect>
+<rect class="s-free" x="248.55" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="248.61" y="190" width="0.97" height="26"><title>drv 256 B</title></rect>
+<rect class="s-free" x="249.57" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="249.63" y="190" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="249.95" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="250.01" y="190" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="250.33" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="250.39" y="190" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="250.70" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="250.77" y="190" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="251.08" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="251.14" y="190" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="251.46" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="251.52" y="190" width="0.40" height="26"><title>drv 40 B</title></rect>
+<rect class="s-free" x="251.67" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="251.73" y="190" width="0.40" height="26"><title>drv 8 B</title></rect>
+<rect class="s-free" x="251.76" y="190" width="0.40" height="26"><title>free 44 B</title></rect>
+<rect class="s-drv" x="251.93" y="190" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="252.24" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="252.30" y="190" width="0.48" height="26"><title>drv 128 B</title></rect>
+<rect class="s-free" x="252.79" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="252.85" y="190" width="0.48" height="26"><title>drv 128 B</title></rect>
+<rect class="s-free" x="253.33" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="253.39" y="190" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="253.71" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="253.77" y="190" width="0.75" height="26"><title>drv 200 B</title></rect>
+<rect class="s-free" x="254.52" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="254.58" y="190" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="254.90" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="254.96" y="190" width="0.40" height="26"><title>drv 88 B</title></rect>
+<rect class="s-free" x="255.29" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="255.35" y="190" width="0.40" height="26"><title>drv 8 B</title></rect>
+<rect class="s-free" x="255.38" y="190" width="0.54" height="26"><title>free 144 B</title></rect>
+<rect class="s-drv" x="255.93" y="190" width="0.40" height="26"><title>drv 16 B</title></rect>
+<rect class="s-free" x="255.99" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="256.05" y="190" width="0.40" height="26"><title>drv 16 B</title></rect>
+<rect class="s-free" x="256.11" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="256.17" y="190" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="256.48" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="256.54" y="190" width="0.48" height="26"><title>drv 128 B</title></rect>
+<rect class="s-free" x="257.03" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="257.09" y="190" width="0.48" height="26"><title>drv 128 B</title></rect>
+<rect class="s-free" x="257.57" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="257.63" y="190" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="257.95" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="258.01" y="190" width="0.75" height="26"><title>drv 200 B</title></rect>
+<rect class="s-free" x="258.76" y="190" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="258.82" y="190" width="0.40" height="26"><title>drv 8 B</title></rect>
+<rect class="s-free" x="258.85" y="190" width="0.40" height="26"><title>free 44 B</title></rect>
+<rect class="s-drv" x="259.02" y="190" width="0.40" height="26"><title>drv 16 B</title></rect>
+<rect class="s-free" x="259.08" y="190" width="0.40" height="26"><title>free 20 B</title></rect>
+<text class="lab" x="0" y="247">Region 4 32.768 B</text>
+<rect class="s-free" x="175.00" y="230" width="2.82" height="26"><title>free 748 B</title></rect>
+<rect class="s-drv" x="177.82" y="230" width="0.40" height="26"><title>drv 4 B</title></rect>
+<rect class="s-free" x="177.84" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="177.90" y="230" width="0.72" height="26"><title>drv 192 B</title></rect>
+<rect class="s-free" x="178.62" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="178.68" y="230" width="0.72" height="26"><title>drv 192 B</title></rect>
+<rect class="s-free" x="179.41" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="179.47" y="230" width="0.72" height="26"><title>drv 192 B</title></rect>
+<rect class="s-free" x="180.19" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="180.25" y="230" width="1.61" height="26"><title>drv 428 B</title></rect>
+<rect class="s-free" x="181.87" y="230" width="1.19" height="26"><title>free 316 B</title></rect>
+<rect class="s-drv" x="183.06" y="230" width="0.48" height="26"><title>drv 128 B</title></rect>
+<rect class="s-free" x="183.54" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="183.60" y="230" width="0.48" height="26"><title>drv 128 B</title></rect>
+<rect class="s-free" x="184.08" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="184.14" y="230" width="0.40" height="26"><title>drv 12 B</title></rect>
+<rect class="s-free" x="184.19" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="184.25" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="184.57" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="184.63" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="184.94" y="230" width="0.53" height="26"><title>free 140 B</title></rect>
+<rect class="s-drv" x="185.47" y="230" width="0.40" height="26"><title>drv 8 B</title></rect>
+<rect class="s-free" x="185.50" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="185.56" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="185.88" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="185.94" y="230" width="0.40" height="26"><title>drv 12 B</title></rect>
+<rect class="s-free" x="185.99" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="186.05" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="186.36" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="186.42" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="186.74" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="186.80" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="187.12" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-tasks" x="187.18" y="230" width="3.86" height="26"><title>tasks 1.024 B</title></rect>
+<rect class="s-free" x="191.04" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-tasks" x="191.10" y="230" width="1.30" height="26"><title>tasks 344 B</title></rect>
+<rect class="s-free" x="192.40" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="192.46" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="192.78" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="192.84" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="193.15" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="193.21" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="193.53" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-tasks" x="193.59" y="230" width="3.86" height="26"><title>tasks 1.024 B</title></rect>
+<rect class="s-free" x="197.45" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-tasks" x="197.51" y="230" width="1.30" height="26"><title>tasks 344 B</title></rect>
+<rect class="s-free" x="198.81" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="198.87" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="199.19" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="199.25" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="199.57" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="199.63" y="230" width="0.40" height="26"><title>nimble 4 B</title></rect>
+<rect class="s-free" x="199.64" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="199.70" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="200.02" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="200.08" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="200.40" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="200.46" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="200.77" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="200.83" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="201.15" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="201.21" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="201.53" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="201.59" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="201.90" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="201.97" y="230" width="0.40" height="26"><title>drv 48 B</title></rect>
+<rect class="s-free" x="202.15" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-tasks" x="202.21" y="230" width="17.38" height="26"><title>tasks 4.608 B</title></rect>
+<rect class="s-free" x="219.59" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-tasks" x="219.65" y="230" width="1.30" height="26"><title>tasks 344 B</title></rect>
+<rect class="s-free" x="220.95" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="221.01" y="230" width="0.40" height="26"><title>drv 8 B</title></rect>
+<rect class="s-free" x="221.04" y="230" width="0.40" height="26"><title>free 44 B</title></rect>
+<rect class="s-drv" x="221.20" y="230" width="0.40" height="26"><title>drv 8 B</title></rect>
+<rect class="s-free" x="221.23" y="230" width="0.40" height="26"><title>free 28 B</title></rect>
+<rect class="s-drv" x="221.34" y="230" width="0.40" height="26"><title>drv 48 B</title></rect>
+<rect class="s-free" x="221.52" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="221.58" y="230" width="0.40" height="26"><title>drv 48 B</title></rect>
+<rect class="s-free" x="221.76" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="221.82" y="230" width="0.40" height="26"><title>drv 48 B</title></rect>
+<rect class="s-free" x="222.00" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="222.06" y="230" width="0.40" height="26"><title>drv 48 B</title></rect>
+<rect class="s-free" x="222.25" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="222.31" y="230" width="0.40" height="26"><title>drv 48 B</title></rect>
+<rect class="s-free" x="222.49" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="222.55" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="222.86" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="222.92" y="230" width="0.40" height="26"><title>drv 8 B</title></rect>
+<rect class="s-free" x="222.95" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="223.02" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="223.33" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="223.39" y="230" width="0.40" height="26"><title>drv 48 B</title></rect>
+<rect class="s-free" x="223.57" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="223.63" y="230" width="0.40" height="26"><title>drv 8 B</title></rect>
+<rect class="s-free" x="223.66" y="230" width="0.40" height="26"><title>free 44 B</title></rect>
+<rect class="s-drv" x="223.83" y="230" width="0.40" height="26"><title>drv 88 B</title></rect>
+<rect class="s-free" x="224.16" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="224.22" y="230" width="0.50" height="26"><title>drv 132 B</title></rect>
+<rect class="s-free" x="224.72" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="224.78" y="230" width="0.40" height="26"><title>drv 28 B</title></rect>
+<rect class="s-free" x="224.89" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="224.95" y="230" width="0.40" height="26"><title>drv 24 B</title></rect>
+<rect class="s-free" x="225.04" y="230" width="1.71" height="26"><title>free 452 B</title></rect>
+<rect class="s-drv" x="226.74" y="230" width="6.05" height="26"><title>drv 1.604 B</title></rect>
+<rect class="s-free" x="232.79" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-drv" x="232.85" y="230" width="0.40" height="26"><title>drv 84 B</title></rect>
+<rect class="s-free" x="233.17" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="233.23" y="230" width="0.40" height="26"><title>unowned 12 B</title></rect>
+<rect class="s-free" x="233.28" y="230" width="0.85" height="26"><title>free 224 B</title></rect>
+<rect class="s-ble" x="234.12" y="230" width="0.40" height="26"><title>ble 40 B</title></rect>
+<rect class="s-free" x="234.27" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="234.33" y="230" width="0.40" height="26"><title>ble 8 B</title></rect>
+<rect class="s-free" x="234.36" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="234.42" y="230" width="0.40" height="26"><title>ble 84 B</title></rect>
+<rect class="s-free" x="234.74" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="234.80" y="230" width="0.40" height="26"><title>ble 8 B</title></rect>
+<rect class="s-free" x="234.83" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="234.89" y="230" width="0.47" height="26"><title>ble 124 B</title></rect>
+<rect class="s-free" x="235.36" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="235.42" y="230" width="0.40" height="26"><title>ble 8 B</title></rect>
+<rect class="s-free" x="235.45" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="235.51" y="230" width="0.40" height="26"><title>ble 84 B</title></rect>
+<rect class="s-free" x="235.83" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="235.89" y="230" width="0.40" height="26"><title>ble 8 B</title></rect>
+<rect class="s-free" x="235.92" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="235.98" y="230" width="0.40" height="26"><title>ble 84 B</title></rect>
+<rect class="s-free" x="236.29" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="236.35" y="230" width="1.30" height="26"><title>ble 344 B</title></rect>
+<rect class="s-free" x="237.65" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="237.71" y="230" width="0.40" height="26"><title>ble 8 B</title></rect>
+<rect class="s-free" x="237.74" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-ble" x="237.80" y="230" width="0.40" height="26"><title>ble 84 B</title></rect>
+<rect class="s-free" x="238.12" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="238.18" y="230" width="1.09" height="26"><title>nimble 288 B</title></rect>
+<rect class="s-free" x="239.27" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="239.33" y="230" width="1.96" height="26"><title>nimble 520 B</title></rect>
+<rect class="s-free" x="241.29" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="241.35" y="230" width="0.40" height="26"><title>nimble 84 B</title></rect>
+<rect class="s-free" x="241.67" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="241.73" y="230" width="0.80" height="26"><title>nimble 212 B</title></rect>
+<rect class="s-free" x="242.53" y="230" width="0.40" height="26"><title>free 28 B</title></rect>
+<rect class="s-tasks" x="242.63" y="230" width="3.86" height="26"><title>tasks 1.024 B</title></rect>
+<rect class="s-free" x="246.49" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-tasks" x="246.56" y="230" width="1.30" height="26"><title>tasks 344 B</title></rect>
+<rect class="s-free" x="247.85" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-tasks" x="247.91" y="230" width="3.86" height="26"><title>tasks 1.024 B</title></rect>
+<rect class="s-free" x="251.78" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-tasks" x="251.84" y="230" width="1.30" height="26"><title>tasks 344 B</title></rect>
+<rect class="s-free" x="253.13" y="230" width="0.40" height="26"><title>free 100 B</title></rect>
+<rect class="s-ble" x="253.51" y="230" width="15.45" height="26"><title>ble 4.096 B</title></rect>
+<rect class="s-free" x="268.96" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="269.02" y="230" width="4.41" height="26"><title>nimble 1.168 B</title></rect>
+<rect class="s-free" x="273.43" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="273.49" y="230" width="4.35" height="26"><title>nimble 1.152 B</title></rect>
+<rect class="s-free" x="277.84" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="277.90" y="230" width="11.32" height="26"><title>nimble 3.000 B</title></rect>
+<rect class="s-free" x="289.21" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="289.27" y="230" width="0.40" height="26"><title>nimble 84 B</title></rect>
+<rect class="s-free" x="289.59" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="289.65" y="230" width="0.40" height="26"><title>nimble 84 B</title></rect>
+<rect class="s-free" x="289.97" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="290.03" y="230" width="0.40" height="26"><title>nimble 84 B</title></rect>
+<rect class="s-free" x="290.35" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="290.41" y="230" width="0.40" height="26"><title>nimble 32 B</title></rect>
+<rect class="s-free" x="290.53" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="290.59" y="230" width="0.40" height="26"><title>nimble 84 B</title></rect>
+<rect class="s-free" x="290.90" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="290.96" y="230" width="0.40" height="26"><title>nimble 32 B</title></rect>
+<rect class="s-free" x="291.08" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="291.15" y="230" width="1.30" height="26"><title>nimble 344 B</title></rect>
+<rect class="s-free" x="292.44" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="292.50" y="230" width="0.40" height="26"><title>nimble 32 B</title></rect>
+<rect class="s-free" x="292.62" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="292.68" y="230" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="292.74" y="230" width="0.40" height="26"><title>free 24 B</title></rect>
+<rect class="s-nimble" x="292.84" y="230" width="0.40" height="26"><title>nimble 24 B</title></rect>
+<rect class="s-free" x="292.93" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="292.99" y="230" width="0.40" height="26"><title>unowned 4 B</title></rect>
+<rect class="s-free" x="293.00" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="293.06" y="230" width="0.40" height="26"><title>unowned 20 B</title></rect>
+<rect class="s-free" x="293.14" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="293.20" y="230" width="0.40" height="26"><title>nimble 68 B</title></rect>
+<rect class="s-free" x="293.45" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="293.51" y="230" width="0.40" height="26"><title>nimble 64 B</title></rect>
+<rect class="s-free" x="293.76" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="293.82" y="230" width="0.40" height="26"><title>nimble 24 B</title></rect>
+<rect class="s-free" x="293.91" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="293.97" y="230" width="0.40" height="26"><title>unowned 4 B</title></rect>
+<rect class="s-free" x="293.98" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="294.04" y="230" width="0.40" height="26"><title>nimble 64 B</title></rect>
+<rect class="s-free" x="294.28" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="294.34" y="230" width="0.40" height="26"><title>nimble 24 B</title></rect>
+<rect class="s-free" x="294.43" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="294.49" y="230" width="0.40" height="26"><title>nimble 8 B</title></rect>
+<rect class="s-free" x="294.53" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-nimble" x="294.59" y="230" width="0.40" height="26"><title>nimble 84 B</title></rect>
+<rect class="s-free" x="294.90" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="294.96" y="230" width="0.40" height="26"><title>unowned 64 B</title></rect>
+<rect class="s-free" x="295.20" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="295.26" y="230" width="1.51" height="26"><title>unowned 400 B</title></rect>
+<rect class="s-free" x="296.77" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="296.83" y="230" width="0.40" height="26"><title>unowned 24 B</title></rect>
+<rect class="s-free" x="296.92" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="296.98" y="230" width="0.40" height="26"><title>unowned 24 B</title></rect>
+<rect class="s-free" x="297.08" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="297.14" y="230" width="0.40" height="26"><title>unowned 32 B</title></rect>
+<rect class="s-free" x="297.26" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="297.32" y="230" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="297.63" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="297.69" y="230" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="298.01" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="298.07" y="230" width="0.40" height="26"><title>unowned 84 B</title></rect>
+<rect class="s-free" x="298.39" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="298.45" y="230" width="0.40" height="26"><title>unowned 16 B</title></rect>
+<rect class="s-free" x="298.51" y="230" width="0.40" height="26"><title>free 16 B</title></rect>
+<rect class="s-unowned" x="298.57" y="230" width="0.40" height="26"><title>unowned 4 B</title></rect>
+<rect class="s-free" x="298.58" y="230" width="0.40" height="26"><title>free 8 B</title></rect>
+<text class="lab" x="0" y="287">Region 5 8.132 B RTC</text>
+<rect class="s-free" x="175.00" y="270" width="30.68" height="26"><title>free 8.132 B</title></rect>
+</svg><figcaption>Abb. 1: Nur 31 Prozent des Heaps sind frei, weitere 30 Prozent hatten in der ersten Karte noch keinen Eigentümer. Region 2 und die RTC-Region zeigen keine belegten Blöcke.</figcaption></figure>
+<div class="legend"><span class="l-ble">BLE-Controller 31,9 KB</span><span class="l-nimble">NimBLE-Host 10,6 KB</span><span class="l-tasks">System-Tasks 23,1 KB</span><span class="l-drv">Treiber und Queues 11,0 KB</span><span class="l-nvs">NVS 1,9 KB</span><span class="l-unowned">belegt, ohne Eigentümer 53,5 KB</span><span class="l-untr">belegt, ohne Tabelleneintrag 13,4 KB</span><span class="l-free">frei, in den Regionen auch ohne Eintrag 70,0 KB</span><span class="l-ovh">Verwaltung 9,9 KB</span></div>
+</details>
+<h2 id="s4">4 TLS je Phase: Was eine Sitzung belegt</h2>
+<p><strong>Mit Fix B belegt die TLS-Sitzung der Update-Task höchstens 49.384 B, davon 33.434 B fest für die Datensätze.</strong> Messung: Owner-Tabelle, Update-Prüfung 23.11.2026 10:44, DK5EN-1.</p>
+<p>Der frühere Handschlag-Test mit dem Standard-Client und setInsecure kam auf 67.628 B inklusive Worker-Stack von 12.288 B, ohne den Stack 67.628 - 12.288 = 55.340 B. Das waren 5.956 B mehr als die jetzige Spitze, obwohl dort keine Kette geprüft wurde. Beide Zahlen zählen verschieden: Die Probe zählt den ganzen Heap, die Owner-Spitze nur die Allokationen der Update-Task, ohne WLAN und lwIP.</p>
+<p>Warum 16 KB: Ein TLS-Datensatz darf bis zu 16.384 B Nutzdaten tragen, die vorkompilierte mbedTLS-Bibliothek reserviert dafür je Richtung einen Puffer (sdkconfig.h:560). Dazu kommen 333 B für Kopf und Zusatz, das ergibt 16.717 B (fw_update.h:876).</p>
+<div class="table-wrap"><table class=""><thead><tr><th>Phase</th><th>Was geschieht</th><th>Rechnung a x b = c</th><th>gemessen oder geschätzt</th><th>Hebel</th></tr></thead><tbody><tr class=""><td>1 Verbindung</td><td>DNS, TCP-Socket und der Job-Stack</td><td>12.288 + 3.152 = 15.440 B<br>Job-Stack im echten Update: 1 x 12.288 B<br>Stack-Spitze im Prüflauf: 12.288 - 6.348 = 5.940 B</td><td><span class="tag m">gemessen</span> DNS, Stack-Größe und Spitze</td><td>Stack auf 10.240 B wie Classic: 12.288 - 10.240 = 2.048 B. Rest dann 10.240 - 5.940 = 4.300 B, nur der Prüflauf ist gemessen <span class="tag a">Annahme</span>.</td></tr><tr class=""><td>2 Datensätze</td><td>Eingangs- und Ausgangspuffer der TLS-Schicht</td><td>2 Puffer x 16.717 B = 33.434 B<br>Warum 16.717 B: 16.717 - 16.384 = 333 B, also 16.384 B Nutzdaten plus 333 B</td><td><span class="tag m">gemessen</span> beide Blöcke im Schritt-Log</td><td>Kein Knopf in der vorkompilierten Bibliothek. Mit Fix B werden sie zuerst angelegt, ein Abbruch kostet dann nichts mehr.</td></tr><tr class=""><td>3 CA-Parsing</td><td>Die Wurzel des Hosts in den Speicher laden</td><td>Mit Fix B 1 Wurzel: 574 B oder 1.325 B DER, geparst Faktor <span class="tag u">Faktor unbekannt</span><br>Vorher 5 Wurzeln: 659 + 574 + 1.391 + 543 + 1.325 = 4.492 B DER</td><td><span class="tag u">Faktor unbekannt</span> nicht einzeln gemessen</td><td>Bündel nur bei Prüffehler und freiem Block ab 40.000 B als Rückfall (McTlsClient.cpp:77, :89).</td></tr><tr class=""><td>4 Handschlag, Schlüsseltausch, Kette prüfen</td><td>Server-Kette einlesen, ECDHE, Signaturen gegen die Wurzel</td><td>TLS-Spitze minus Datensätze: 49.384 - 33.434 = 15.950 B</td><td><span class="tag m">abgeleitet</span> aus der Owner-Spitze 49.384 B, die Phasen sind nicht getrennt</td><td>Die Kettenprüfung steckt in diesen 15.950 B. Mehr als diese Summe kann ein Abschalten nicht sparen.</td></tr><tr class=""><td>5 Datenübertragung</td><td>Datensätze bleiben, Staging-Block kommt dazu</td><td>Download und Stage minus Prüfung: 69.512 - 61.408 = 8.104 B, Aufteilung <span class="tag u">Faktor unbekannt</span></td><td><span class="tag m">gemessen</span> beide Verbräuche, Differenz abgeleitet</td><td>Fix B gibt die CA-Kette direkt nach dem Handschlag frei (mc_ssl_client.cpp:207, :225).</td></tr><tr class=""><td>Gegenprobe Prüfung</td><td>Plausibilität der Summe</td><td>Job-Stack plus TLS-Spitze: 12.288 + 49.384 = 61.672 B, gemessen 61.408 B, Abweichung 61.672 - 61.408 = 264 B</td><td><span class="tag m">abgeleitet</span> Läufe von verschiedenen Images</td><td>Zeigt, dass Stack und TLS fast den ganzen Verbrauch der Prüfung ausmachen.</td></tr></tbody></table></div>
+<h3>Messung von A und B gegen vorher</h3>
+<div class="table-wrap"><table class=""><thead><tr><th>Vorgang</th><th>vorher</th><th>nachher</th><th>Ersparnis</th><th>Quelle</th></tr></thead><tbody><tr class=""><td>Update-Prüfung</td><td>96.000 - 10.904 = 85.096 B ungefähr</td><td>85.700 - 24.292 = 61.408 B</td><td>85.096 - 61.408 = 23.688 B</td><td>trigger-DK5EN-1.log, aucheck-DK5EN-1.log</td></tr><tr class=""><td>Download und Stage</td><td>96.956 - 2.892 = 94.064 B</td><td>85.108 - 15.596 = 69.512 B, 0 Fehler</td><td>94.064 - 69.512 = 24.552 B</td><td>trigger-DK5EN-1.log, aucheck-DK5EN-1.log</td></tr></tbody></table></div>
+<p>Die Ausgangswerte unterscheiden sich um 96.956 - 85.108 = 11.848 B, verglichen wird deshalb der Verbrauch als Gate-Wert minus Tiefstand. Die Schwelle: 78.000 - 69.512 = 8.488 B.</p>
+<p>Die festen Teile summieren sich auf 12.288 + 33.434 + 4.096 = 49.818 B: Job-Stack, zwei Datensätze, Staging-Block. Sie sind der Kern des Verbrauchs von 69.512 B, der Rest ist TLS-Handschlag und Verwaltung.</p>
+<h2 id="s5">5 Zertifikate: Fünf Wurzeln, ein Host braucht eine</h2>
+<p><strong>Fix B ist eingebaut: Je Host wird nur eine Wurzel geladen, die Datensätze werden zuerst angelegt und die CA-Kette ist direkt nach dem Handschlag wieder frei.</strong></p>
+<div class="table-wrap"><table class=""><thead><tr><th>Wurzel</th><th>DER-Größe</th><th>Wer braucht sie</th><th>Warum sie im Bündel steht</th><th>Mit Fix B</th></tr></thead><tbody><tr class=""><td>USERTrust ECC</td><td>659 B</td><td>api.github.com und github.com nur über die Kreuzsignatur</td><td>Sie signiert Sectigo E46 gegen. Server schicken die Kreuzsignatur mit, vertraut wird aber auch E46 allein.</td><td>nicht geladen</td></tr><tr class=""><td>Sectigo Root E46</td><td>574 B</td><td>api.github.com und github.com</td><td>Selbstsigniert, Anker der Kette Blatt, Sectigo DV E36, E46.</td><td>einzige Wurzel für github.com</td></tr><tr class=""><td>ISRG Root X1</td><td>1.391 B, RSA 4096</td><td>release-assets.githubusercontent.com nur über die Kreuzsignatur</td><td>Sie signiert Root YR gegen. Let's Encrypt kann die Kreuzsignatur abschalten.</td><td>nicht geladen</td></tr><tr class=""><td>ISRG Root X2</td><td>543 B</td><td>kein Host heute</td><td>Reserve, ECDSA-Wurzel von Let's Encrypt.</td><td>nicht geladen</td></tr><tr class=""><td>ISRG Root YR</td><td>1.325 B, RSA 4096</td><td>release-assets.githubusercontent.com</td><td>Selbstsigniert, gleicher Schlüssel wie die Kreuzsignatur, die GitHub heute schickt. Das Update überlebt so den Wegfall von X1.</td><td>einzige Wurzel für githubusercontent.com</td></tr><tr class="sum"><td>Summe</td><td>659 + 574 + 1.391 + 543 + 1.325 = 4.492 B</td><td></td><td></td><td>574 B oder 1.325 B je Sitzung</td></tr></tbody></table></div>
+<ul>
+<li><strong>Zuordnung:</strong> api.github.com und github.com laufen gegen Sectigo Root E46, alle githubusercontent.com-Hosts gegen ISRG Root YR (fw_update_roots.h:150-151, geprüft am 23.11.2026 mit openssl s_client).</li>
+<li><strong>Drei Sitzungen je Update:</strong> API, Download-Adresse auf github.com, danach der Sprung auf release-assets.githubusercontent.com. Jeder Host bekommt seine Wurzel (fwRootForHost).</li>
+<li><strong>Reihenfolge vorher:</strong> ssl_client.cpp verband in Zeile 97, parste alle fünf Wurzeln in Zeile 181 und legte die Datensätze erst in Zeile 263 an. Die Wurzeln lebten bis zum Ende der Sitzung.</li>
+<li><strong>Reihenfolge jetzt:</strong> mc_ssl_client.cpp legt die Datensätze in Zeile 83 an, parst die eine Wurzel in Zeile 95 und gibt die Kette nach dem Handschlag in Zeile 207 und 225 frei.</li>
+<li><strong>Rückfall:</strong> Nur bei einem Prüffehler und mit einem freien Block ab 40.000 B lädt der Client das Fünferbündel erneut (McTlsClient.cpp:77, :89).</li>
+<li><strong>Geparste Größe:</strong> Der Code-Kommentar nennt etwa 50 kleine Allokationen und 1,5 KB, der Berater schätzt 10 KB. Einzeln wurde sie nicht gemessen, die Wirkung insgesamt sind die 24 KB je Vorgang.</li></ul>
+<h3>Kettenprüfung abschalten, die Firmware hat doch eine Prüfsumme?</h3>
+<ul>
+<li><strong>Woher der Digest kommt:</strong> Der SHA-256 stammt aus dem JSON von api.github.com, das über TLS geholt wird (fw_update_net.cpp:938, Stand Arbeitsbaum 23.11.2026).</li>
+<li><strong>Wo er geprüft wird:</strong> Nach dem Download vergleicht die Firmware den Digest mit dem gerechneten Wert und bricht bei Abweichung ab (fw_update_net.cpp:1294).</li>
+<li><strong>Folge:</strong> Die Prüfsumme ist nur so vertrauenswürdig wie die API-Sitzung. Sie sichert den Download, nicht die Herkunft des Digests.</li></ul>
+<div class="table-wrap"><table class=""><thead><tr><th>Variante</th><th>Was ein Angreifer im Pfad tut</th><th>Schützt die Prüfsumme?</th><th>Risiko</th><th>Ersparnis an Heap</th></tr></thead><tbody><tr class=""><td>a Prüfung aus für die API-Verbindung</td><td>Fremdes WLAN oder DNS liefert JSON mit eigenem Digest und eigener Download-Adresse und danach sein eigenes Image.</td><td>Nein. Der Digest stammt vom Angreifer.</td><td>Fremde Firmware wird geladen und installiert.</td><td>Höchstens der Teil ohne Datensätze, bis 15,95 KB <span class="tag m">abgeleitet</span></td></tr><tr class=""><td>b Prüfung aus nur für den Download-Host</td><td>Er kann das Image austauschen. Digest und Adresse kamen aus der geprüften API-Sitzung.</td><td>Ja. Ein verändertes Image scheitert am Vergleich vor dem Eintrag.</td><td>Download und Staging-Bereich sind verbraucht, installiert wird nichts.</td><td>Höchstens der Teil ohne Datensätze, bis 15,95 KB <span class="tag m">abgeleitet</span>, real weniger, da der Handschlag bleibt</td></tr><tr class=""><td>c Signierte Images</td><td>Er kann nichts austauschen, weil die Signatur nicht passt.</td><td>Die Signatur trägt die Echtheit.</td><td>TLS-Prüfung könnte überall entfallen. Heute nicht vorhanden.</td><td>Wie b, aber erst nach Bau der Signatur</td></tr></tbody></table></div>
+<p>Die Ersparnis ist durch die TLS-Spitze begrenzt: 49.384 - 33.434 = 15.950 B für Handschlag und Prüfung zusammen. Sie ist nicht einzeln gemessen.</p>
+<p class="reco">Empfehlung: Die Prüfung auf allen Verbindungen anlassen. Mit A und B ist die Ersparnis nicht nötig, sie wäre auf der API-Verbindung ein Sicherheitsverlust.</p>
+<h2 id="s7">5b Abschaltläufe: Was jede Funktion kostet und wohin der Download-Speicher geht</h2>
+<p><strong>Keine Funktion verändert den Bedarf des Downloads, sie verschieben nur den Startpunkt. Der Download selbst braucht immer 66 bis 69 KB, und die Hälfte davon sind die zwei TLS-Puffer.</strong></p>
+<div class="table-wrap"><table>
+<tr><th>Lauf</th><th>Schalter</th><th>V3 frei im Leerlauf</th><th>V3 Download braucht</th><th>V3 tiefster Wert</th><th>T-Beam</th></tr>
+<tr><td>R0</td><td>Grundzustand</td><td>97,6 KB</td><td>68,3 KB</td><td>14,7 KB</td><td>46,4 KB frei, Ablehnung an der Schwelle</td></tr>
+<tr><td>R1</td><td>Webserver aus</td><td>103,6 KB</td><td>68,4 KB</td><td>20,7 KB</td><td>52,4 KB frei, Schwelle bestanden, Download fertig, dann Fehler „nomem“</td></tr>
+<tr><td>R2</td><td>KISS an</td><td>97,2 KB</td><td>65,8 KB</td><td>16,7 KB</td><td>minus 0,4 KB</td></tr>
+<tr><td>R3</td><td>AppLink an</td><td>93,3 KB</td><td>65,8 KB</td><td>12,9 KB</td><td>minus 4,3 KB</td></tr>
+<tr><td>R4</td><td>Gateway aus</td><td>95,8 KB</td><td>69,3 KB</td><td>12,8 KB</td><td>schon aus</td></tr>
+<tr><td>R5</td><td>Mailbox an</td><td>97,7 KB</td><td>66,3 KB</td><td>16,8 KB</td><td>nicht lesbar</td></tr>
+<tr><td>R6</td><td>Display an (Kontrolle)</td><td>97,7 KB</td><td>69,2 KB</td><td>13,9 KB</td><td>keine Änderung</td></tr>
+<tr><td>R7</td><td>Webserver und Gateway aus</td><td>103,6 KB</td><td>69,1 KB</td><td>20,0 KB</td><td>wie R1</td></tr>
+</table></div>
+<ul>
+<li><strong>Einziger Schalter mit Wirkung:</strong> Webserver aus bringt 6 KB. AppLink kostet 4,3 KB, wenn an. Gateway, Mailbox-Modus und Display kosten nichts; die Mailbox-Tabellen (13,5 KB) sind statisch.</li>
+<li><strong>Wohin der Download-Speicher geht (T-Beam, Schritte je 5 KB):</strong> zwei TLS-Puffer zu je 16.717 B (33,4 KB), TLS-Sitzung und Handshake etwa 10 bis 15 KB, WLAN-Empfangspuffer etwa 4 bis 6 KB, ein Teil ohne Zuordnung im Haupt-Task etwa 6 KB, eigene Download-Puffer etwa 3 KB.</li>
+<li><strong>Kein Stau:</strong> Jeder WLAN-Puffer (1.458 B) wird freigegeben, bevor der nächste kommt. Der Flash bremst nicht, das TCP-Fenster begrenzt, was unterwegs sein kann.</li>
+<li><strong>T-Beam, eigentlicher Engpass:</strong> Nach dem Download braucht die Prüfung des Images 32 KB am Stück (Wörterbuch der Entpackung, fw_update_net.cpp:1218). Der größte freie Block ist dann 22,5 KB.</li>
+<li><strong>Warum „Wörterbuch vorher reservieren“ auf dem T-Beam nicht reicht:</strong> Zu Beginn der Prüfung gibt es noch einen 40,9-KB-Block, zu Beginn der Installation nur noch 22,5 KB, weil die TLS-Sitzung der Prüfung den Speicher zerstückelt. Und 32 KB plus Download (56 bis 68 KB) wären 88 bis 100 KB, frei sind 76 KB. Vorschlag: eine Arena von 34 KB zu Beginn der AU-Sitzung, in der die TLS-Puffer liegen und die nach dem Download als Wörterbuch dient (Freigabe offen).</li>
+<li><strong>Nächster Schritt:</strong> TLS-Ausgangspuffer von 16 KB auf 4 KB, als eigene mbedTLS-Objekte statt der vorgebauten Bibliothek. Der Eingangspuffer bleibt bei 16 KB, weil GitHub Datensätze bis 16 KB schickt. Erwartete Ersparnis etwa 12 KB je TLS-Sitzung.</li>
+</ul>
+<p class="small">Quelle: <code>tools/bench/ota_lowheap_knockout.py</code>, Läufe <code>tools/bench/runs/harness/ota-lowheap-knockout-20261123*</code>, T-Beam seriell <code>tbeam-r1-serial.log</code>. Messimage (INSTRUMENT), 23.11.2026.</p>
+<h2 id="s6">6 Grenzen: Was gemessen und was geschätzt ist</h2>
+<p><strong>Gemessen sind Karte, Owner-Tabelle und Update-Läufe eines Knotens. Alles mit dem Etikett Schätzung oder Annahme ist nicht gemessen.</strong></p>
+<ul>
+<li><strong>Release-Heap:</strong> Die 107,0 KB im Ruhezustand sind 100.300 + 6.700 = 107.000 B, also 100,3 KB beim Boot im Instrument-Image plus 6,7 KB Unterschied zum Release. Beide Werte stammen aus den Bench-Messungen vom 23.11.2026, die Summe ist <span class="tag e">Schätzung</span>.</li>
+<li><strong>Telefon am BLE:</strong> nicht gemessen. Die 6 KB sind eine Annahme, ebenso 8 KB für den Tab.</li>
+<li><strong>Owner-Tabelle:</strong> Sie ordnet nach Task-Name. BLE-Controller und NimBLE-Host stehen größtenteils bei loop.</li>
+<li><strong>Ein Lauf je Messung:</strong> Prüfung und Download je einmal auf DK5EN-1, die Ausgangswerte vorher und nachher unterscheiden sich.</li>
+<li><strong>RTC-Region:</strong> Die Region 5 mit 8.132 B zählt der Heap als intern. Ob normale Allokationen dort landen, ist nicht geprüft.</li>
+<li><strong>Faktoren unbekannt:</strong> Inhalt der 25.052 B im BLE-Controller, 512 B beim esp_timer, 292 B je msys-Block, Größe je Socket, TX-Puffer des WLAN, geparste Größe der Wurzeln, Aufteilung von 15.950 B im Handschlag, Verwaltung je Block.</li>
+<li><strong>Sichtprüfung:</strong> Das HTML wurde auf Syntax und Rechnungen geprüft und im Headless-Browser hell angesehen, dunkel nicht.</li></ul>
+<details class="dev"><summary>Abweichungen zur Berater-Rechnung vom 23.11.2026</summary><ul>
+<li><strong>Budget der ersten Karte:</strong> Die Berater-Summe 228 gegen 225 KB lässt 13,4 KB ohne Eintrag und 9,9 KB Verwaltung weg. Diese Rechnung ist durch die Messung mit A und B überholt.</li>
+<li><strong>Verwaltung:</strong> Die 23 KB des Beraters sind 13,4 KB ohne Eintrag plus 9,9 KB Verwaltung plus die RTC-Region von 8,1 KB.</li>
+<li><strong>Ohne Eigentümer:</strong> Berater 62.384 B, hier 66.908 B, weil die Standort-Tabelle in Summe 127.468 B zählt und die Karte 131.992 B belegt.</li>
+<li><strong>loopTask:</strong> 12.632 B sind 12.288 B Stack plus 344 B Kontrollblock, nicht 8.192 B plus ein Block.</li>
+<li><strong>Handschlag-Probe:</strong> Die 67,6 KB enthalten den Worker-Stack von 12.288 B und keine Kettenprüfung.</li>
+<li><strong>Ruhe-Heap:</strong> 100,3 + 6,7 ergibt 107,0 KB, die Vorgabe nannte rund 106 KB. Gerechnet wurde mit 107,0 KB, mit 106 KB wäre das Gate-Frei 92 KB und der Tiefstand 22,5 KB.</li>
+<li><strong>Zwei überlappende Tabelleneinträge:</strong> In der Standort-Tabelle überlappen zwei Einträge der Site 255 um 60 B.</li></ul></details>
+<div class="foot"><p><strong>Nicht die offizielle MeshCom-Firmware.</strong> Dies ist ein Messbericht der Fork-Entwicklung.</p>
+<p>Stand: 23.11.2026. Quellen: dk5en-1-sites-round1.txt, heaprun-DK5EN-1.log, aucheck-DK5EN-1.log, aucheck-DK5EN-1-AB-check.log, trigger-DK5EN-1.log, platformio.ini:1778-1802, sdkconfig.h der Arduino-ESP32-Plattform für esp32s3, WiFiGeneric.cpp:674-679, src/fw_update.h:876 und :900, src/fw_update_roots.h, src/esp32/fw_update_net.cpp, src/esp32/mc_tls/, ssl_client.cpp:97, :181, :263, docs/campaign-ota-lowheap-01-20261122.md.</p></div>
+</div></body></html>
