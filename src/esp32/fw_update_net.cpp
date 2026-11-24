@@ -12,6 +12,8 @@
 #include "mc_tls/McTlsClient.h" // OTA-LOWHEAP-01 fix B: fork TLS client (records first, one root per host)
 
 #include <esp_flash.h>
+#include <esp_freertos_hooks.h> // AU-29: CPU0 idle hook during the staging erase
+#include <esp_timer.h>
 #include <esp_heap_caps.h>
 #include <esp_image_format.h>
 #include <esp_ota_ops.h>
@@ -1444,6 +1446,21 @@ const char *stageDryRun(const Stage &sg, uint8_t *in, uint32_t ilen)
     return why;
 }
 
+// AU-29: CPU0 idle hook of the staging erase. Runs in the IDLE0 task: flag + longest gap between two runs.
+// 32-bit microseconds (wrap after 71 min, far beyond an erase): single-word stores, no torn 64-bit reads.
+static volatile bool s_idle0Ran = false;
+static volatile uint32_t s_idle0Last = 0;
+static volatile uint32_t s_idle0MaxUs = 0;
+static bool idle0Hook(void)
+{
+    const uint32_t now = (uint32_t)esp_timer_get_time();
+    if (now - s_idle0Last > s_idle0MaxUs)
+        s_idle0MaxUs = now - s_idle0Last;
+    s_idle0Last = now;
+    s_idle0Ran = true;
+    return true;
+}
+
 // Returns nullptr, or the reason. On a reason nothing is left allocated and no record
 // survives; refusals before the first destructive step were printed by refuse(), the
 // lowheap refusal by heapGateOk(). minBlock != 0 only switches the pre-TLS heap gate on.
@@ -1507,18 +1524,50 @@ const char *stagePrepare(Stage &sg, uint32_t zlen, uint32_t ilen, uint32_t minBl
     sg.dl.zlen = zlen;
     sha256Init(sg.dl.sha);
 
-    // erase in 64 KB steps with a yield between them
+    // erase in 64 KB steps; AU-29: each block blacks out CPU0 for ~300 ms, so after it sleep a real gap
+    // and wait (bounded) until the CPU0 idle task ran, else IDLE0 starves past the 5 s task watchdog.
     const char *err = nullptr;
     const uint32_t eraseLen = (zlen + 0xFFFu) & ~0xFFFu;
-    for (uint32_t e = 0; e < eraseLen && err == nullptr; e += 0x10000u)
+    const uint32_t nBlk = (eraseLen + FW_ERASE_STEP - 1u) / FW_ERASE_STEP;
+    uint32_t maxBlkMs = 0, maxGapMs = 0, failAt = 0;
+    auLog("[AU];erase;start;len;%u;blk;%u\n", (unsigned)eraseLen, (unsigned)nBlk);
+    s_idle0Ran = false;
+    const int64_t t0 = esp_timer_get_time();
+    s_idle0Last = (uint32_t)t0; // before the hook is registered: its first run must not see stale stamps
+    s_idle0MaxUs = 0;
+    const bool hooked = esp_register_freertos_idle_hook_for_cpu(idle0Hook, 0) == ESP_OK;
+    if (!hooked) // no idle guarantee then, only the fixed gap: say so, the idle0max below is meaningless
+        auLog("[AU];erase;nohook\n");
+    for (uint32_t e = 0; e < eraseLen && err == nullptr; e += FW_ERASE_STEP)
     {
-        uint32_t n = eraseLen - e < 0x10000u ? eraseLen - e : 0x10000u;
+        uint32_t n = eraseLen - e < FW_ERASE_STEP ? eraseLen - e : FW_ERASE_STEP;
+        const int64_t b0 = esp_timer_get_time();
         if (stageFlash(STAGE_ERASE, off + e, nullptr, n) != ESP_OK)
+        {
             err = "erase";
-        vTaskDelay(1);
+            failAt = e;
+        }
+        const int64_t b1 = esp_timer_get_time();
+        s_idle0Ran = false;
+        vTaskDelay(pdMS_TO_TICKS(FWNET_ERASE_GAP_MS));
+        for (uint32_t w = FWNET_ERASE_GAP_MS; hooked && !s_idle0Ran && w < 100u; w += 5u) // 100 ms total incl. the gap
+            vTaskDelay(pdMS_TO_TICKS(5));
+        const int64_t b2 = esp_timer_get_time();
+        const uint32_t blkMs = (uint32_t)((b1 - b0) / 1000), gapMs = (uint32_t)((b2 - b1) / 1000);
+        if (blkMs > maxBlkMs)
+            maxBlkMs = blkMs;
+        if (gapMs > maxGapMs)
+            maxGapMs = gapMs;
     }
+    if (hooked)
+        esp_deregister_freertos_idle_hook_for_cpu(idle0Hook, 0);
+    const uint32_t idle0Max = (uint32_t)(s_idle0MaxUs / 1000);
+    if (err == nullptr)
+        auLog("[AU];erase;ok;ms;%u;maxblk;%u;maxgap;%u;idle0max;%u\n",
+              (unsigned)((esp_timer_get_time() - t0) / 1000), (unsigned)maxBlkMs, (unsigned)maxGapMs, (unsigned)idle0Max);
     if (err != nullptr)
     {
+        auLog("[AU];erase;fail;at;%u\n", (unsigned)failAt);
         heap_caps_free(blk);
         sg.blk = nullptr;
         stageFlashDisarm();

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 TOOLS = Path(__file__).resolve().parents[1]
+FIXTURES = Path(__file__).resolve().parent / "fixtures" / "au_http"
 FRAMEWORK = Path.home() / ".platformio/packages/framework-arduinoespressif32"
 
 
@@ -28,6 +29,13 @@ def _synthetic(pairs):
 
 
 # (id, transform, anchor pairs)
+# patch id -> marker text inside the patched file (AE-01 is versioned, AU-28)
+MARKER = {
+    "AE-01": AP.HTTP_MARKER,
+    "AE-02": "/* MESHCOM-PATCH AE-02 */",
+    "AE-03": "/* MESHCOM-PATCH AE-03 */",
+}
+
 CASES = [
     ("AE-01", AP.patch_http_text, AP.HTTP_PAIRS),
     ("AE-02", AP.patch_udp_text, AP.UDP_PAIRS),
@@ -42,7 +50,7 @@ def test_applies_once_and_is_idempotent(pid, fn, pairs):
     src = _synthetic(pairs)
     out = fn(src)
     assert out != src
-    assert f"/* MESHCOM-PATCH {pid} */" in out
+    assert MARKER[pid] in out
     for orig, _ in pairs:
         assert orig not in out
     assert fn(out) == out
@@ -56,15 +64,69 @@ def test_changed_text_raises_naming_the_id(pid, fn, pairs):
         fn(_synthetic(pairs) + _synthetic(pairs))  # anchor twice
 
 
+@pytest.mark.parametrize("pid,fn,pairs", CASES, ids=IDS)
+def test_stale_or_edited_patch_raises_never_skips(pid, fn, pairs):
+    """A marker without the exact current patched block must fail loud (AU-28)."""
+    patched = fn(_synthetic(pairs))
+    stale = patched.replace(pairs[0][1], pairs[0][1].replace("\n", "\n// edited\n", 1))
+    assert stale != patched
+    with pytest.raises(RuntimeError, match=pid):
+        fn(stale)
+    with pytest.raises(RuntimeError, match=pid):
+        fn(patched + patched)  # block twice: not the current single patch
+
+
+def _fixture_headers(name):
+    raw = (FIXTURES / name).read_bytes().split(b"\r\n")
+    return [ln for ln in raw if ln]
+
+
+def _longest_used_header_len():
+    """Longest Location / Content-Length line of the captured AU responses (fixture-derived)."""
+    used = (b"location:", b"content-length:", b"transfer-encoding:", b"connection:")
+    return max(
+        len(ln)
+        for f in sorted(FIXTURES.glob("*.hdr"))
+        for ln in _fixture_headers(f.name)
+        if ln.lower().startswith(used)
+    )
+
+
 def test_http_behavior():
     out = AP.patch_http_text(_synthetic(AP.HTTP_PAIRS))
     assert "readStringUntil" not in out
-    assert f"headerLine.length() >= {AP.HTTP_MAX_LINE}" in out
+    assert f"headerLine.length() < {AP.HTTP_MAX_LINE}" in out
     assert f"> {AP.HTTP_HEADER_DEADLINE_MS}UL" in out
-    assert "HTTPC_ERROR_NO_HTTP_SERVER" in out
+    assert f"++headerBytes > {AP.HTTP_MAX_HEADER}" in out
+    assert "HTTPC_ERROR_TOO_LESS_RAM" in out
+    assert "HTTPC_ERROR_NO_HTTP_SERVER" not in out  # v2 never reports an over-long line as -7
     assert "HTTPC_ERROR_READ_TIMEOUT" in out
-    assert AP.HTTP_MAX_LINE >= 1024
     assert AP.HTTP_HEADER_DEADLINE_MS > 5000
+    # AU-28: the cap derives from the captured responses, not from a guess. A used header
+    # (Location) may grow well past today's value, and the real 302 carries an unused line > 2 KiB.
+    assert AP.HTTP_MAX_LINE >= 2 * _longest_used_header_len()
+    longest = max(len(ln) for ln in _fixture_headers("github_302.hdr"))
+    assert longest > 2048
+    assert AP.HTTP_MAX_HEADER >= 4 * sum(len(ln) + 2 for ln in _fixture_headers("github_302.hdr"))
+
+
+def test_http_v1_store_is_upgraded_to_v2():
+    """T3: a store patched with the frozen v1 block ends byte-identical to stock -> v2."""
+    stock = _synthetic(AP.HTTP_PAIRS)
+    v1 = stock.replace(AP.HTTP_ORIGINAL, AP.HTTP_PATCHED_V1)
+    assert AP.HTTP_MARKER_V1 in v1 and AP.HTTP_MARKER not in v1
+    assert AP.patch_http_text(v1) == AP.patch_http_text(stock)
+    assert "length() >= 2048" not in AP.patch_http_text(v1)
+
+
+def test_http_v1_marker_with_edited_body_raises():
+    """T4: the v1 marker with a body that is neither v1 nor v2 must not be skipped or guessed."""
+    edited = AP.HTTP_PATCHED_V1.replace("2048", "8192")
+    assert edited != AP.HTTP_PATCHED_V1
+    with pytest.raises(RuntimeError, match="AE-01"):
+        AP.patch_http_text("// head\n" + edited + "// tail\n")
+    with pytest.raises(RuntimeError, match="AE-01"):
+        AP.patch_http_text("// head\n" + AP.HTTP_MARKER_V1 + "\n// tail\n")
 
 
 def test_udp_behavior():
@@ -108,10 +170,17 @@ def test_anchors_match_real_framework_once(pid, rel, pairs):
     if not AP.is_anchor_version(version):
         pytest.skip(f"global package is framework {version or 'unknown'}, anchors are 2.0.17")
     text = path.read_text()
-    if f"/* MESHCOM-PATCH {pid} */" in text:
-        pytest.skip("global package already patched")
-    for orig, _ in pairs:
-        assert text.count(orig) == 1
+    stale_v1 = pid == "AE-01" and AP.HTTP_MARKER_V1 in text
+    if MARKER[pid] in text or stale_v1:
+        # T5 (AU-28): a patched store must hold the CURRENT block, never just a marker. A store
+        # still on AE-01 v1 fails here until a build (the pre-script) upgrades it; that is the point.
+        for _, patched in pairs:
+            assert text.count(patched) == 1, (
+                f"{rel}: patched with a stale {pid} block; run a build to upgrade the store"
+            )
+    else:
+        for orig, _ in pairs:
+            assert text.count(orig) == 1
 
 
 def test_patch_list_and_paths():
@@ -181,5 +250,7 @@ def test_markers_present_lists_patched_targets(tmp_path):
     pid, rel, _ = ae.PATCHES[0]
     f = tmp_path / rel
     f.parent.mkdir(parents=True)
-    f.write_text("x /* MESHCOM-PATCH %s */ y" % pid)
-    assert ae.markers_present(tmp_path) == [f"{pid}@{Path(rel).name}"]
+    f.write_text("x /* MESHCOM-PATCH %s */ y" % ae.HTTP_MARKER_ID)
+    assert ae.markers_present(tmp_path) == [f"AE-01v2@{Path(rel).name}"]  # versioned id
+    f.write_text("x /* MESHCOM-PATCH AE-01 */ y")  # a stale v1 store is not reported as patched
+    assert ae.markers_present(tmp_path) == []

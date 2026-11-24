@@ -459,3 +459,33 @@ images built before today's commits. Both need an operator decision; measurement
   that build; same symptom as AU-24 (first download TASK_WDT on the T-Beam in gateway mode).
 - Next: longlist (BLE pause on the classic ESP32, staging erase in 64 KB steps, buf32 fallback path, NimBLE patches),
   verification, fix.
+
+### Fixed 2026-11-24 (AU-28, AU-29)
+
+- **Process:** six read-only finders wrote a longlist (about 90 suspects, scratch), two independent Opus verifiers cut it
+  to one confirmed cause per bug and refuted the rest; an Opus advisor approved the fix (two optional precision items
+  applied). Verdicts: [review/au28-au29-20261124/](review/au28-au29-20261124/).
+- **AU-28 confirmed:** AE-01 v1 failed every header line `>= 2048` bytes with -7. A host harness built from the real
+  patched function returns -7 on the real github.com 302 (4204-byte CSP line) and 200/206 on the API and asset
+  responses. Every image built before 2026-11-23 17:03 has the stock function, every later one the 2047 compare.
+- **AU-28 fix (AE-01v2, `tools/arduino_esp32_patch.py`):** at most 4096 bytes stored per header line, the rest drained;
+  32 KB header budget; 30 s deadline unchanged. A cut line fails (-8, `HTTPC_ERROR_TOO_LESS_RAM`) only if the client uses
+  it (status line, Location, Content-Length, Transfer-Encoding, Connection, collected headers). A v1-patched store is
+  upgraded in place; a marker whose block is not the current text now raises (AE-01, AE-02, AE-03), so a changed patch
+  can no longer be skipped silently. Tests: `tools/tests/test_au_http_headers.py` (host harness, real redacted GitHub
+  headers, 17 cases, 13 red on v1) and `test_arduino_esp32_patch.py` (upgrade, stale marker, real store).
+- **AU-29 confirmed:** the staging erase (19-20 blocks of 64 KB) holds CPU0 in ipc0 for 260-900 ms per block on the
+  T-Beam; the 1-tick yield between blocks let IDLE0 starve past the 5 s task watchdog. Not a regression: 4 of 11 T-Beam
+  installs that reached the erase reset, on every image generation.
+- **AU-29 fix (`stagePrepare()`):** 20 ms sleep after each block plus a bounded wait (100 ms) until the CPU0 idle hook ran;
+  log `[AU];erase;start` and `[AU];erase;ok;ms;maxblk;maxgap;idle0max`. Native test pins the model.
+- **Bench (fix images, INSTRUMENT, `ota-lowheap-arena-20261123/fix-bench/`, `fix2-series/`):**
+  - DK5EN-1 (V3): dev download staged (1,205,064 bytes, 13.6 s, two TLS sessions `hit;4`), erase 2.8 s, idle0max 156 ms.
+    Prod was not offered (`newer;0` against the local build of today), so the prod hop was proven on the T-Beam.
+  - DK5EN-92 (T-Beam): 10 x check + install on prod, 0 TASK_WDT; 9 complete downloads (1,240,686 bytes), 1 heap-gate
+    refusal; erase 5.9 s, idle0max 280-914 ms (pass mark 1000).
+- **New open item (not AU-28/29):** on the T-Beam every download now ends `[AU];fail;nomem` right after the download (the
+  32 KB inflate dictionary or an 11.4 KB block), the OTA-LOWHEAP-01 T-Beam heap problem that the download failure hid.
+- Host gate `tools/regression.sh --stage 1,2` PASS (129 envs, 4223 Unity cases); it also needed two fixes in the
+  TESTGATE-01 work committed unverified as `a6833f44` (tdeck test compile error, flag parsing in
+  `test_regression_select.py`).

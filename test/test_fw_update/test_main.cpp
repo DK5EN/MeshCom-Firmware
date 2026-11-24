@@ -1878,6 +1878,17 @@ static void test_web_refuse_pages_and_actions_during_session(void)
     TEST_ASSERT_FALSE(fwWebAdmit(true, nullptr));
 }
 
+// AU-29: the staging erase must keep CPU0's IDLE task running inside the 5 s task watchdog.
+// A native test cannot starve IDLE0, so the invariant is pinned: a real gap, and the modelled worst case.
+static void test_erase_gap_keeps_idle0_inside_the_watchdog(void)
+{
+    const uint32_t blockMs = 300, blocks = 19, twdtMs = 5000;
+    TEST_ASSERT_TRUE(FWNET_ERASE_GAP_MS >= 10u); // old vTaskDelay(1) = 1 tick (1-3 ms)
+    TEST_ASSERT_EQUAL_UINT32(0x10000u, FW_ERASE_STEP);
+    TEST_ASSERT_TRUE(fwEraseWorstIdleGapMs(blockMs, FWNET_ERASE_GAP_MS, blocks, true) < twdtMs);
+    TEST_ASSERT_TRUE(fwEraseWorstIdleGapMs(blockMs, 1, blocks, false) >= twdtMs); // the old behaviour
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -2007,5 +2018,6 @@ int main(int, char **)
     RUN_TEST(test_shed_second_stage_console_only_when_the_estimate_closes_the_gap);
     RUN_TEST(test_shed_settled_waits_only_for_what_was_shed);
     RUN_TEST(test_notify_due_for_a_finished_newer_check_once);
+    RUN_TEST(test_erase_gap_keeps_idle0_inside_the_watchdog);
     return UNITY_END();
 }

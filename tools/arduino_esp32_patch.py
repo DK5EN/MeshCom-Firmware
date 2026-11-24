@@ -2,7 +2,7 @@
 
 NOTE: this patches the GLOBAL package store (~/.platformio/packages/
 framework-arduinoespressif32), which every project on the machine shares. The patch is
-idempotent (marker, no write when patched) and refuses unknown text (RuntimeError naming
+idempotent (marker plus the exact current block, no write when patched) and refuses unknown text (RuntimeError naming
 the id). The folder is swapped between arduino-esp32 2.0.17 (package.json "3.20017..."),
 Tasmota 3.3.x (safeboot) and 2.0.14 (espressif32@6.5.0 envs), so the build step patches only
 the 2.0.17 line the anchors were taken from; on any other version it prints one loud line
@@ -10,17 +10,26 @@ the 2.0.17 line the anchors were taken from; on any other version it prints one 
 failing the build of an env that cannot use the patches.
 Origin: IDF 4.4 review, FORMAL-01 wave 3b (docs/campaign-formal-01-20261123.md, rows 4, 5, 8).
 
-AE-01, libraries/HTTPClient/src/HTTPClient.cpp (handleHeaderResponse):
-What: the response header lines are read byte by byte with a cap of 2048 bytes per line and a
-30 s deadline for the whole header phase (plus the existing idle timeout _tcpTimeout between
-bytes). A longer line fails with HTTPC_ERROR_NO_HTTP_SERVER, an expired deadline or idle gap
-with HTTPC_ERROR_READ_TIMEOUT, a lost connection with HTTPC_ERROR_CONNECTION_LOST; the
-connection is then not reused.
+AE-01 (v2, AU-28), libraries/HTTPClient/src/HTTPClient.cpp (handleHeaderResponse):
+What: the response header lines are read byte by byte. At most 4096 bytes of a line are stored;
+the rest of a longer line is drained (read and dropped, so the stream stays in sync) up to its
+newline. The whole header block is capped at 32768 bytes and the header phase has a 30 s deadline
+(plus the existing idle timeout _tcpTimeout between bytes). A cut line fails only if it is the
+status line, has no ':' in the stored prefix, or is a header the client uses (Location,
+Content-Length, Transfer-Encoding, Connection, or any key in _currentHeaders); it then fails with
+HTTPC_ERROR_TOO_LESS_RAM, as does an exhausted header budget. Any other cut line is dropped whole.
+An expired deadline or idle gap gives HTTPC_ERROR_READ_TIMEOUT, a lost connection
+HTTPC_ERROR_CONNECTION_LOST. On every failure the connection is not reused.
 Why: readStringUntil('\\n') grows a String without limit and each byte restarts the timeout, so
 a hostile or MITM server can exhaust the heap or hold the caller for as long as it trickles.
-Limits: real header lines (Location, Set-Cookie, Content-Security-Policy) stay far below
-2 KiB and a 2 KiB String is an allocation a fragmented heap still serves. 30 s is six
-times the default tcp timeout (5 s) and covers a slow but honest server.
+Limits: header lines are NOT always small. Measured 2026-11-24: the github.com 302 for a release
+asset carries a 4204-byte Content-Security-Policy line (Location 959 B, whole block 5.8 KB). v1
+failed every line >= 2048 bytes with HTTPC_ERROR_NO_HTTP_SERVER and so broke every Auto Update
+download (AU-28, "conn -7"). v2 bounds memory by the stored prefix (4 KB per line, 32 KB per
+block), not by rejecting lines the client does not use. 30 s is six times the default tcp
+timeout (5 s) and covers a slow but honest server.
+Upgrade: a store patched with v1 (marker "AE-01") is upgraded in place to v2; any marker whose
+block is not exactly the current text raises, so a changed patch can never be skipped silently.
 Remove when arduino-esp32 caps header lines (not in 2.0.17 or the 3.x tree we checked).
 
 AE-02, libraries/WiFi/src/WiFiUdp.cpp (parsePacket) and WiFiClient.cpp (WiFiClient(int fd),
@@ -70,13 +79,25 @@ from pathlib import Path
 
 PACKAGE = "framework-arduinoespressif32"
 
-HTTP_MAX_LINE = 2048
+HTTP_MAX_LINE = 4096  # stored bytes per header line (Location is ~960 B today)
+HTTP_MAX_HEADER = 32768  # whole header block (real: ~5.8 KB)
 HTTP_HEADER_DEADLINE_MS = 30000
 
 
 def _apply(text: str, marker: str, pairs, pid: str, where: str) -> str:
-    """Apply every (original, patched) pair once; unchanged if marker present; RuntimeError if unknown."""
+    """Apply every (original, patched) pair once.
+
+    Marker present: the text must hold every CURRENT patched block, else RuntimeError (a stale
+    or edited patch must never be skipped silently, AU-28). RuntimeError if an anchor is unknown.
+    """
     if marker in text:
+        for _, patched in pairs:
+            if text.count(patched) != 1:
+                raise RuntimeError(
+                    f"arduino_esp32_patch {pid}: {where} carries the marker but not the current "
+                    "patched block; the patch changed or the file was edited, "
+                    "re-install the framework package"
+                )
         return text
     for original, _ in pairs:
         if text.count(original) != 1:
@@ -91,7 +112,9 @@ def _apply(text: str, marker: str, pairs, pid: str, where: str) -> str:
 
 # --- AE-01: HTTPClient header lines ---
 
-HTTP_MARKER = "/* MESHCOM-PATCH AE-01 */"
+HTTP_MARKER_ID = "AE-01v2"
+HTTP_MARKER = "/* MESHCOM-PATCH " + HTTP_MARKER_ID + " */"
+HTTP_MARKER_V1 = "/* MESHCOM-PATCH AE-01 */"
 HTTP_REL = "libraries/HTTPClient/src/HTTPClient.cpp"
 
 HTTP_ORIGINAL = """    while(connected()) {
@@ -101,11 +124,52 @@ HTTP_ORIGINAL = """    while(connected()) {
             headerLine.trim(); // remove \\r
 """
 
+# AE-01 v1 (commit 9696a3ba), frozen literally (2048 / 30000 baked in): a store patched by it is
+# upgraded in place. v1 failed every header line >= 2048 bytes (AU-28). Never edit this text.
+HTTP_PATCHED_V1 = """    /* MESHCOM-PATCH AE-01 */
+    const unsigned long headerStart = millis();
+    while(connected()) {
+        if((millis() - headerStart) > 30000UL) {
+            _canReuse = false;
+            return HTTPC_ERROR_READ_TIMEOUT;
+        }
+        size_t len = _client->available();
+        if(len > 0) {
+            String headerLine;
+            bool lineDone = false;
+            while(!lineDone) {
+                if((millis() - headerStart) > 30000UL || (millis() - lastDataTime) > _tcpTimeout) {
+                    _canReuse = false;
+                    return HTTPC_ERROR_READ_TIMEOUT;
+                }
+                int c = _client->available() ? _client->read() : -1;
+                if(c < 0) {
+                    if(!connected()) {
+                        _canReuse = false;
+                        return HTTPC_ERROR_CONNECTION_LOST;
+                    }
+                    delay(1);
+                    continue;
+                }
+                lastDataTime = millis();
+                if(c == '\\n') {
+                    lineDone = true;
+                } else if(headerLine.length() >= 2048) {
+                    _canReuse = false;
+                    return HTTPC_ERROR_NO_HTTP_SERVER;
+                } else {
+                    headerLine += (char)c;
+                }
+            }
+            headerLine.trim(); // remove \\r
+"""
+
 HTTP_PATCHED = (
     """    """
     + HTTP_MARKER
     + """
     const unsigned long headerStart = millis();
+    size_t headerBytes = 0;
     while(connected()) {
         if((millis() - headerStart) > """
     + str(HTTP_HEADER_DEADLINE_MS)
@@ -117,6 +181,7 @@ HTTP_PATCHED = (
         if(len > 0) {
             String headerLine;
             bool lineDone = false;
+            bool lineCut = false;
             while(!lineDone) {
                 if((millis() - headerStart) > """
     + str(HTTP_HEADER_DEADLINE_MS)
@@ -134,16 +199,37 @@ HTTP_PATCHED = (
                     continue;
                 }
                 lastDataTime = millis();
-                if(c == '\\n') {
-                    lineDone = true;
-                } else if(headerLine.length() >= """
-    + str(HTTP_MAX_LINE)
+                if(++headerBytes > """
+    + str(HTTP_MAX_HEADER)
     + """) {
                     _canReuse = false;
-                    return HTTPC_ERROR_NO_HTTP_SERVER;
-                } else {
-                    headerLine += (char)c;
+                    return HTTPC_ERROR_TOO_LESS_RAM;
                 }
+                if(c == '\\n') {
+                    lineDone = true;
+                } else if(headerLine.length() < """
+    + str(HTTP_MAX_LINE)
+    + """) {
+                    headerLine += (char)c;
+                } else {
+                    lineCut = true;
+                }
+            }
+            if(lineCut) {
+                int colon = headerLine.indexOf(':');
+                String cutName = colon > 0 ? headerLine.substring(0, colon) : String();
+                cutName.trim();
+                bool used = firstLine || colon <= 0
+                    || cutName.equalsIgnoreCase("Location") || cutName.equalsIgnoreCase("Content-Length")
+                    || cutName.equalsIgnoreCase("Transfer-Encoding") || cutName.equalsIgnoreCase("Connection");
+                for(size_t i = 0; !used && i < _headerKeysCount; i++) {
+                    used = _currentHeaders[i].key.equalsIgnoreCase(cutName);
+                }
+                if(used) {
+                    _canReuse = false;
+                    return HTTPC_ERROR_TOO_LESS_RAM;
+                }
+                continue; // over-long header we do not use: drained, not stored
             }
             headerLine.trim(); // remove \\r
 """
@@ -153,7 +239,16 @@ HTTP_PAIRS = ((HTTP_ORIGINAL, HTTP_PATCHED),)
 
 
 def patch_http_text(text: str) -> str:
-    """AE-01: return patched text; unchanged if already patched; RuntimeError if unknown."""
+    """AE-01 v2: return patched text; v1 is upgraded; unchanged if current; RuntimeError if unknown."""
+    if HTTP_MARKER in text:
+        return _apply(text, HTTP_MARKER, HTTP_PAIRS, "AE-01", "handleHeaderResponse() header loop")
+    if HTTP_MARKER_V1 in text:
+        if text.count(HTTP_PATCHED_V1) != 1:
+            raise RuntimeError(
+                "arduino_esp32_patch AE-01: v1 marker without the exact v1 block; "
+                "the file was edited, re-install the framework package"
+            )
+        return text.replace(HTTP_PATCHED_V1, HTTP_PATCHED)
     return _apply(text, HTTP_MARKER, HTTP_PAIRS, "AE-01", "handleHeaderResponse() header loop")
 
 
@@ -360,13 +455,18 @@ def patch_framework(root: Path) -> list:
     return done
 
 
+# patch id -> id inside the marker comment, where it differs (a v1 marker is not listed)
+MARKER_IDS = {"AE-01": HTTP_MARKER_ID}
+
+
 def markers_present(root: Path) -> list:
     """Return "<id>@<file>" for every patch target whose marker is in the file (build-log evidence)."""
     out = []
     for pid, rel, _transform in PATCHES:
         path = root / rel
-        if path.is_file() and f"/* MESHCOM-PATCH {pid} */" in path.read_text(errors="replace"):
-            out.append(f"{pid}@{Path(rel).name}")
+        mid = MARKER_IDS.get(pid, pid)  # versioned id where the patch has versions (AE-01v2)
+        if path.is_file() and f"/* MESHCOM-PATCH {mid} */" in path.read_text(errors="replace"):
+            out.append(f"{mid}@{Path(rel).name}")
     return out
 
 

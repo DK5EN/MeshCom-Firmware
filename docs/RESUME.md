@@ -27,9 +27,11 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
   - Next: advisor verdict on 3b+3c, then the gate (board builds sequential, link proof for the overrides, host stage
     1,2 without `--formal`), then commit on fork-dev.
 
-- **AU-28 / AU-29 (2026-11-24):** Auto Update download fails `conn -7` on every ESP32 image built since 2026-11-23
-  17:03 (CI release 11.21 downloads fine; lead suspect FORMAL-01 AE-01, HTTP header line cap 2 KB vs github.com's 4.2 KB
-  CSP header). T-Beam TASK_WDT reset 6 s into the install, also on 11.21. Campaign doc section "2026-11-24".
+- **AU-28 / AU-29 fixed (2026-11-24):** Auto Update download failed `conn -7` on every ESP32 image built since
+  2026-11-23 17:03 (FORMAL-01 AE-01 capped HTTP header lines at 2 KB; github.com sends a 4.2 KB CSP line); AE-01v2 drains
+  long unused lines, the store upgrades itself. T-Beam TASK_WDT in the staging erase fixed with a real gap + IDLE0 wait.
+  Bench green on DK5EN-1 and DK5EN-92 (fix images flashed). Open: T-Beam `nomem` right after the download. Campaign doc
+  section "2026-11-24".
 
 - **OTA-LOWHEAP-01 running (fork issue DK5EN/MeshCom-Firmware#3):** ESP32-S3 Auto Update refuses with "Not enough
   free memory" after long uptime (field, 11.22 rollout). Campaign

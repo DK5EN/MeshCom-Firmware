@@ -1,0 +1,28 @@
+HTTP/1.1 206 Partial Content
+Connection: close
+Content-Length: 100
+Last-Modified: Sat, 21 Nov 2026 20:13:38 GMT
+ETag: "0x8DF480BEDDE3497"
+Server: Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+x-ms-request-id: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+x-ms-version: 2018-11-09
+x-ms-creation-time: Sat, 21 Nov 2026 20:13:38 GMT
+x-ms-blob-content-md5: T1epAy2abZXSlM3ydgP9PA==
+x-ms-lease-status: unlocked
+x-ms-lease-state: available
+x-ms-blob-type: BlockBlob
+x-ms-server-encrypted: true
+x-ms-access-tier: Hot
+x-ms-access-tier-inferred: true
+Via: 1.1 varnish, 1.1 varnish
+Accept-Ranges: bytes
+Date: Tue, 24 Nov 2026 07:19:03 GMT
+Age: 0
+X-Served-By: cache-iad-kiad7000174-IAD, cache-muc13975-MUC
+X-Cache: MISS, MISS
+X-Cache-Hits: 0, 0
+X-Timer: S1795504743.881009,VS0,VE135
+Content-Disposition: attachment; filename=heltec_wifi_lora_32_V3.autoupdate
+Content-Type: application/octet-stream
+Content-Range: bytes 0-99/1205064
+

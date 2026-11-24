@@ -865,6 +865,23 @@ inline bool fwNetHeapOk(uint32_t freeB, uint32_t largestBlk, uint32_t minFree, u
     return freeB >= minFree && largestBlk >= minBlk;
 }
 
+// AU-29: staging erase in 64 KB blocks. Each block erase holds CPU0 (ipc0, cache off) for ~260-300 ms;
+// with only a 1-tick yield between blocks the CPU0 IDLE task starved past the 5 s task watchdog
+// (T-Beam TASK_WDT during the install). The gap is a real sleep, followed by a bounded wait until IDLE0 ran.
+#ifndef FW_ERASE_STEP
+#define FW_ERASE_STEP 0x10000u
+#endif
+#ifndef FWNET_ERASE_GAP_MS
+#define FWNET_ERASE_GAP_MS 20u
+#endif
+// Modelled worst-case time CPU0's IDLE task does not run during the staging erase. Without the idle
+// guarantee the backlog after a block can eat every gap, so all blocks add up; with it (the loop waits
+// for an IDLE0 run after each block) the worst case is one block plus one gap.
+static inline uint32_t fwEraseWorstIdleGapMs(uint32_t blockMs, uint32_t gapMs, uint32_t blocks, bool idleGuaranteed)
+{
+    return idleGuaranteed ? blockMs + gapMs : blocks * blockMs;
+}
+
 // AU-13: heap gate for boards whose mbedTLS runs on the PSRAM-first allocator. The handshake
 // buffers then live in PSRAM (needs a block for the 16 KB records), but mbedTLS and WiFi still
 // take small internal allocations, so a floor of INTERNAL free heap stays. Without the allocator
