@@ -87,7 +87,7 @@ want() { case ",$STAGES," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
 
 # ---------------------------------------------------------------- change-based selection
 # REG_SEL_MODE: "" (every step of the asked stages), or "select" with REG_SEL_STEPS,
-# REG_SEL_ENVS, REG_SEL_SUITES, REG_SEL_LINKS and REG_SEL_PYTEST_FW. The stage 2 child
+# REG_SEL_ENVS, REG_SEL_GROUPS, REG_SEL_LINKS and REG_SEL_PYTEST_FW. The stage 2 child
 # run inherits them from the environment.
 if [ "$CHANGED" = 1 ]; then
     SEL_OUT=$(python3 tools/regression_select.py --shell ${CHANGED_BASE:+--base "$CHANGED_BASE"}) || {
@@ -100,7 +100,7 @@ if [ "$CHANGED" = 1 ]; then
         full) echo "   -> full gate" ;;
         select)
             export REG_SEL_MODE=select REG_SEL_STEPS="$STEPS" REG_SEL_ENVS="$UNITY_ENVS"
-            export REG_SEL_SUITES="$UNITY_SUITES" REG_SEL_LINKS="$NRF52_LINKS" REG_SEL_LINKS_ESP32="$ESP32_LINKS"
+            export REG_SEL_GROUPS="$UNITY_GROUPS" REG_SEL_LINKS="$NRF52_LINKS" REG_SEL_LINKS_ESP32="$ESP32_LINKS"
             export REG_SEL_PYTEST_FW="$PYTEST_FIRMWARE"
             echo "   -> steps: $STEPS"
             STAGES=""
@@ -241,26 +241,36 @@ stage1() {
     if [ "$LIST" != 1 ] && pio_busy; then
         record "stage 1" FAIL "another pio process is running -- one pio at a time"; return 1
     fi
-    local envs e args="" log json rc line st n ok fail skip secs
+    local envs e args log json rc line st n ok fail skip secs groups grp genvs gsuites gi=0
     envs=$(grep -oE '^\[env:native[^]]*\]' platformio.ini | tr -d '[]' | sed 's/^env://')
+    # One group is one `pio test` call: "env,env[:suite,suite]". The full gate is one
+    # group of every native env. A change-based run gets its groups from the selector,
+    # because a -f on the command line replaces the test_filter of every env of the call.
+    groups=$(echo $envs | tr ' ' ',')
     if [ "${REG_SEL_MODE:-}" = select ]; then
-        envs=""; sel unity && envs="$REG_SEL_ENVS"
-        for e in $REG_SEL_SUITES; do args="$args -f $e"; done
+        envs=""; groups=""; sel unity && { envs="$REG_SEL_ENVS"; groups="$REG_SEL_GROUPS"; }
     fi
     case " $envs " in *" native_topo_shadow "*) ensure_topo_raw ;; esac
     for e in $envs; do
-        ENV_COUNT=$((ENV_COUNT + 1)); args="$args -e $e"
+        ENV_COUNT=$((ENV_COUNT + 1))
         [ "$LIST" = 1 ] && printf 'PLAN   %-44s pio test -e %s (one pio call for all envs)\n' "pio test $e" "$e"
     done
-    if [ "$LIST" != 1 ] && [ -n "$envs" ]; then
-        # One pio process for every native env: each separate start costs about
-        # 0.6 s of project parsing (measured 2026-11-23, 8 envs: 10 s apart, 5 s together).
+    [ "$LIST" = 1 ] && groups=""
+    for grp in $groups; do
+        # One pio process for as many native envs as possible: each separate start costs
+        # about 0.6 s of project parsing (measured 2026-11-23, 8 envs: 10 s apart, 5 s together).
         # The verdict per env comes from pio's JSON report, not from the text log.
-        log="$OUT/stage1-unity.log"; json="$OUT/stage1-unity.json"
+        genvs=$(echo "${grp%%:*}" | tr ',' ' '); gsuites=""
+        case "$grp" in *:*) gsuites=$(echo "${grp#*:}" | tr ',' ' ') ;; esac
+        args=""; for e in $genvs; do args="$args -e $e"; done
+        for e in $gsuites; do args="$args -f $e"; done
+        if [ "$gi" = 0 ]; then log="$OUT/stage1-unity.log"; json="$OUT/stage1-unity.json"
+        else log="$OUT/stage1-unity-$gi.log"; json="$OUT/stage1-unity-$gi.json"; fi
+        gi=$((gi + 1))
         # shellcheck disable=SC2086
         pio test $args --json-output-path "$json" > "$log" 2>&1; rc=$?
         if [ ! -s "$json" ]; then
-            record "pio test (all native envs)" FAIL "exit $rc, no JSON report -- $log"
+            record "pio test ($genvs)" FAIL "exit $rc, no JSON report -- $log"
         else
             while IFS="$(printf '\t')" read -r e st n ok fail skip secs; do
                 TOTAL_CASES=$((TOTAL_CASES + n)); TOTAL_OK=$((TOTAL_OK + ok))
@@ -268,11 +278,11 @@ stage1() {
                 if [ "$st" = OK ]; then REC_SECS=$secs record "pio test $e" OK "$n cases, $ok ok, $skip skipped"
                 else REC_SECS=$secs record "pio test $e" FAIL "$st, $n cases, $fail failed -- grep '$e' $log"; fi
             done <<EOF_UNITY
-$(python3 tools/regression_unity.py "$json" $envs)
+$(python3 tools/regression_unity.py "$json" $genvs)
 EOF_UNITY
             STEP_T0=$(date +%s)
         fi
-    fi
+    done
     # The tools/mock suites run in the stage 2 pytest step; selftest.sh skips them then.
     # In a change-based run they belong to the pytest rule as well.
     if sel selftest; then

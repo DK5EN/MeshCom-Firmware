@@ -1858,11 +1858,13 @@ void test_replay_reproduces_dk5en98_20260923_boot(void)
     for (size_t i = 0; i < rr.parse_errors.size() && i < 5; i++)
         printf("[nbr_replay] parse error: %s\n", rr.parse_errors[i].c_str());
 
-    long post_total = 0, post_mismatched = 0;
+    long post_total = 0, post_mismatched = 0, all_mismatched = 0;
     std::vector<const TriggerGroup *> post_fail;
     for (size_t i = 0; i < rr.groups.size(); i++)
     {
         const TriggerGroup &g = rr.groups[i];
+        if (!group_matches(g, CompareMode::DECISION))
+            all_mismatched++;
         if (g.up < CONVERGENCE_MINUTE)
             continue;
         post_total++;
@@ -1891,6 +1893,13 @@ void test_replay_reproduces_dk5en98_20260923_boot(void)
                                   "NEED line(s) whose msg_id had no preceding [LOG] line in the fixture");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)post_mismatched,
                                   "post-convergence decision-mode group mismatches against the capture");
+    // TESTGATE-01 3.6: exact counts of this fixture (run of 2026-11-24). A
+    // change in any of them is a behaviour change of the replay and wants a
+    // look, also when it stays inside the tolerated pre-convergence window.
+    TEST_ASSERT_EQUAL_INT_MESSAGE(3483, (int)rr.groups.size(), "trigger groups in the fixture");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2697, (int)post_total, "post-convergence groups");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(41, (int)all_mismatched,
+                                  "pre-convergence decision-mode mismatches (boot phase, known)");
 }
 
 // B: dense reference vs. edge pool, line for line, every group, every hour.
@@ -1899,7 +1908,7 @@ void test_differential_dense_vs_edge_pool_compat(void)
     ReplayResult &d = dense_run();
     long me_decoupled = 0;
     ReplayResult e = strip_run(d, edge_run(false), false, &me_decoupled);
-    TEST_ASSERT_TRUE(d.groups.size() > 1000);
+    TEST_ASSERT_EQUAL_INT(3483, (int)d.groups.size());
     long bad = diff_runs("B dense vs edge", d, e, normalize_b);
     printf("[nbr_replay] B: ME_DECOUPLED lines removed = %ld, stage-2 types = %ld\n", me_decoupled,
            count_stage2_types(e));
@@ -2141,8 +2150,19 @@ void test_production_rules_against_dense(void)
            PROBE_CALL, snaps, dense_zero, prod_zero, PROBE_EXCL, prod_has);
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)cat_count["OTHER"], "unexplained dense/production differences");
+    // TESTGATE-01 3.6: exact category counts (run of 2026-11-24, identical
+    // for 64 and 128 rows). A regression inside a known category fails here
+    // instead of being counted.
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2201, (int)compared, "decisions compared");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(4, (int)cat_count["SHARE"], "category SHARE");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)cat_count["HALVE/SNRAVG"], "category HALVE/SNRAVG");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(177, (int)cat_count["CAPACITY"], "category CAPACITY");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(724, (int)cat_count["GW-EXPIRY"], "category GW-EXPIRY");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(35, (int)share_eff, "isolated effect SHARE");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)halve_eff, "isolated effect HALVE/SNRAVG");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(724, (int)gw_eff, "isolated effect GW-EXPIRY");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, gd.probe_x, "dense: DB0ED-99 #X at the final snapshot");
-    TEST_ASSERT_TRUE_MESSAGE(gp.probe_x >= 1, "production: DB0ED-99 #X >= 1 at the final snapshot");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(2, gp.probe_x, "production: DB0ED-99 #X at the final snapshot");
     TEST_ASSERT_TRUE_MESSAGE(
         ("," + gp.probe_set + ",").find(std::string(",") + PROBE_EXCL + ",") != std::string::npos,
         "production: DB0FHR-12 in DB0ED-99's exclusive set at the final snapshot");

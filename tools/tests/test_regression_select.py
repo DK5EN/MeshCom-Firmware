@@ -53,6 +53,33 @@ def test_every_compiled_source_selects_its_env(project: rs.Project) -> None:
     assert not missing, missing[:5]
 
 
+def test_a_suite_filter_never_reaches_an_env_without_that_suite(project: rs.Project) -> None:
+    """Regression 2026-11-24: `pio test -e A -e B -f x -f y` ran x and y in both envs.
+
+    A change to three suites of five envs gave ten false failures. Every call of a
+    selection may filter only for suites that each of its envs holds.
+    """
+    changed = [
+        "test/test_ack_replay/test_ack_replay.cpp",
+        "test/test_nbr_replay/test_nbr_replay.cpp",
+        "test/test_topo_shadow/test_topo_shadow.cpp",
+    ]
+    sel = rs.select(changed, project)
+    assert sel["mode"] == "select"
+    groups = sel["unity_groups"]
+    assert sorted(e for envs, _ in groups for e in envs) == sorted(sel["unity"])
+    for envs, suites in groups:
+        for env in envs:
+            if suites:
+                assert set(suites) <= set(project.env_suites(env)), (env, suites)
+                assert sorted(suites) == sel["unity"][env]
+            else:
+                assert sel["unity"][env] == sorted(project.env_suites(env)), env
+    assert (["native"], ["test_ack_replay"]) in groups
+    line = next(ln for ln in rs.shell_lines(sel) if ln.startswith("UNITY_GROUPS="))
+    assert "native:test_ack_replay" in line
+
+
 def test_every_native_env_has_a_suite(project: rs.Project) -> None:
     """An env whose test_filter matches no directory would silently run nothing."""
     assert [e for e in project.envs if not project.env_suites(e)] == []

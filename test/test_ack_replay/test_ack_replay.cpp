@@ -100,8 +100,8 @@ static void test_filter_verwirft_keinen_honorierten_ack(void)
     printf("\n[ack] %d im Feld honorierte ACKs geprueft, %d wuerden heute verworfen\n",
            checked, rejected);
 
-    TEST_ASSERT_GREATER_THAN_MESSAGE(10, checked,
-        "zu wenige Frames -- Trace zu kurz oder Format geaendert");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(30, checked,
+        "Anzahl Frames im Trace geaendert -- Trace oder Format angefasst");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, rejected,
         "isPlausibleAckFrame() wuerde ein ACK verwerfen, das im Feld eine "
         "wartende Nachricht quittiert hat -- der Filter schneidet ins Fleisch");

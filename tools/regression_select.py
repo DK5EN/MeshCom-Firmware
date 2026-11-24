@@ -26,7 +26,7 @@ Rules, in this order:
 5. A changed path that no rule and no closure knows selects the whole gate. The selector
    never guesses "nothing to run" for a file it does not understand.
 
-`--shell` prints MODE (full, select or none), STEPS, UNITY_ENVS, UNITY_SUITES,
+`--shell` prints MODE (full, select or none), STEPS, UNITY_ENVS, UNITY_GROUPS,
 NRF52_LINKS and ESP32_LINKS for `eval`, and the reasons as comment lines. tools/tests/test_regression_select.py
 checks the closure against the compiler's own dependency list.
 """
@@ -392,6 +392,9 @@ def select(changed: list[str], project: Project) -> dict:
         "mode": mode,
         "steps": sorted(steps),
         "unity": {e: sorted(s) for e, s in sorted(want.items())},
+        "unity_groups": unity_groups(
+            {e: sorted(s) for e, s in sorted(want.items())}, {e: project.env_suites(e) for e in want}
+        ),
         "links": links_needed,
         "links_esp32": esp_links_needed,
         "reasons": reasons,
@@ -399,15 +402,32 @@ def select(changed: list[str], project: Project) -> dict:
     }
 
 
+def unity_groups(unity: dict[str, list[str]], all_suites: dict[str, list[str]]) -> list[tuple[list[str], list[str]]]:
+    """The `pio test` calls of a selection, as (envs, suite filter) pairs.
+
+    A `-f` on the command line replaces the test_filter of EVERY env of that call, so
+    one call for several envs with the union of their suites runs each suite in each
+    env (found 2026-11-24: three suites in five envs, ten false failures). Envs whose
+    selection is all of their suites share one call without a filter; an env with a
+    partial selection gets a call of its own.
+    """
+    whole = [e for e, ss in unity.items() if sorted(ss) == sorted(all_suites[e])]
+    groups: list[tuple[list[str], list[str]]] = [(whole, [])] if whole else []
+    groups += [([e], sorted(ss)) for e, ss in unity.items() if e not in whole]
+    return groups
+
+
 def shell_lines(sel: dict) -> list[str]:
     envs = " ".join(sel["unity"])
-    suites = " ".join(sorted({s for ss in sel["unity"].values() for s in ss}))
+    groups = " ".join(
+        ",".join(es) + (":" + ",".join(ss) if ss else "") for es, ss in sel["unity_groups"]
+    )
     lines = [f"# {r}" for r in sel["reasons"]]
     lines += [
         f"MODE={sel['mode']}",
         f"STEPS=\"{' '.join(sel['steps'])}\"",
         f'UNITY_ENVS="{envs}"',
-        f'UNITY_SUITES="{suites}"',
+        f'UNITY_GROUPS="{groups}"',
         f"NRF52_LINKS={1 if sel['links'] else 0}",
         f"ESP32_LINKS={1 if sel['links_esp32'] else 0}",
         f"PYTEST_FIRMWARE=\"{' '.join(PYTEST_FIRMWARE)}\"",

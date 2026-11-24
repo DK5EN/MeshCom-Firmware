@@ -1453,6 +1453,37 @@ static void print_report(const Report &r, const char *label)
 void setUp(void) {}
 void tearDown(void) {}
 
+// TESTGATE-01 3.6: exact category counts instead of "nothing in OTHER". A
+// regression inside a known category (B2, WINDOW_EDGE, DIRECT, ...) fails
+// here instead of being counted. Numbers are the run of 2026-11-24.
+struct ExpectedCounts
+{
+    long minutes;
+    long set_mismatch_minutes;
+    long cat[CAT_COUNT];        // CAPACITY, WINDOW_EDGE, DROP_TOKLOOP, HN, B2, OTHER
+    long path_visible;
+    long path_cat[PCAT_COUNT];  // DIRECT, SHORT, OWN_SENDER, OWN_ELSEWHERE, AGE, EVICT_H, TEXT, OTHER
+    long dist_compared;
+};
+
+static void assert_exact_counts(const Report &r, const ExpectedCounts &e)
+{
+    TEST_ASSERT_EQUAL_MESSAGE(e.minutes, r.total_minutes, "minutes replayed");
+    TEST_ASSERT_EQUAL_MESSAGE(e.set_mismatch_minutes, r.total_set_mismatch_minutes, "minutes with a SET mismatch");
+    for (int c = 0; c < CAT_COUNT; c++)
+    {
+        long total = 0;
+        for (const auto &kv : r.hours)
+            total += kv.second.cat[c];
+        TEST_ASSERT_EQUAL_MESSAGE(e.cat[c], total, CAT_NAME[c]);
+    }
+    TEST_ASSERT_EQUAL_MESSAGE(e.path_visible, r.path_hop_agree, "path table visible");
+    for (int c = 0; c < PCAT_COUNT; c++)
+        TEST_ASSERT_EQUAL_MESSAGE(e.path_cat[c], r.path_cat[c], PCAT_NAME[c]);
+    TEST_ASSERT_EQUAL_MESSAGE(e.dist_compared, r.dist_compared, "DIST compared");
+    TEST_ASSERT_EQUAL_MESSAGE(r.dist_compared, r.dist_agree, "DIST agree");
+}
+
 static void test_checked_in_fixture(void)
 {
     g_report = Report();
@@ -1460,7 +1491,8 @@ static void test_checked_in_fixture(void)
     replay_stream(paths, g_report);
     print_report(g_report, "checked-in fixture (2026-09-24 only)");
 
-    TEST_ASSERT_GREATER_THAN(0, g_report.total_minutes);
+    const ExpectedCounts want = {562, 0, {0, 0, 0, 0, 359, 0}, 18327, {1539, 0, 0, 0, 0, 0, 0, 0}, 2681};
+    assert_exact_counts(g_report, want);
 
     // Brief W3b: "Assert OTHER == 0". Verified against a real build once
     // W3a's contract landed (src/nbr_matrix.cpp's Welle-3 additions,
@@ -1516,7 +1548,8 @@ static void test_full_window_if_present(void)
     g_report = Report();
     replay_stream(paths, g_report);
     print_report(g_report, "full window (2026-09-21..24, from ~/Downloads)");
-    TEST_ASSERT_GREATER_THAN(0, g_report.total_minutes);
+    const ExpectedCounts want = {4122, 6, {0, 6, 0, 0, 2219, 0}, 142713, {16840, 0, 3514, 7, 0, 0, 0, 0}, 19435};
+    assert_exact_counts(g_report, want);
 
     // Orchestrator follow-up 4a: the full-window run gets the same OTHER==0
     // gate the checked-in fixture already has.
