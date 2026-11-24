@@ -113,6 +113,10 @@ Extended: `test_charset_filter` (+ `charset_wire_field` cases), `test_lora_aprs_
 Added 2026-11-22 (WEB-INA-01, telegram P-0391): pytest site pin `tools/tests/test_ina_web_site.py` (2): the web UI
 INA226 block has no stray `<` in its labels (`vBUS<:`) and keeps the units V, mV, mA, mW.
 
+Added 2026-11-24 (WEB-WX-01, telegram P-0394): pytest site pin `tools/tests/test_wx_web_site.py` (2): the web UI
+WX table has a row for BMP390, AHT20, SHT21 and INA226 (each under its `ENABLE_` define, on and found flags), and
+the temperature rows name their source (I2C, 1-Wire).
+
 The per-suite sums were recomputed from the tree on 2026-10-04 (every
 `RUN_TEST` under `test/test_*`). The totals before that date were stale: the
 old header said 96 suites / 1563 cases, while the table below already listed

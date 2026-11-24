@@ -1911,6 +1911,17 @@ void sub_page_rxlog()
 }
 
 /**
+ * one sensor row of the WX table: "off", or "on (found)" / "on (error)" as in --info
+ */
+static void _wx_sensor_row(const char *label, bool on, bool found)
+{
+    if (on)
+        web_client.printf("<tr><td>%s</td><td>on (%s)</td></tr>\n", label, (found ? "found" : "error"));
+    else
+        web_client.printf("<tr><td>%s</td><td>off</td></tr>\n", label);
+}
+
+/**
  * ###########################################################################################################################
  * delivers the wx-page to be injected into the scaffold
  */
@@ -1936,10 +1947,25 @@ void sub_page_wx()
     web_client.printf("<tr><td>BME(P)280</td><td>%s %s</td></tr>\n", (bBMX ? "on" : "off"), cbme);
     web_client.printf("<tr><td>BME680</td><td>%s %s</td></tr>\n", (bBME680ON ? "on" : "off"), c680);
     web_client.printf("<tr><td>MCU811</td><td>%s %s</td></tr>\n", (bMCU811ON ? "on" : "off"), c811);
+    // WEB-WX-01 (telegram P-0394): every I2C sensor that can feed Temperature/Humidity gets a row,
+    // so a node with only an AHT20 no longer shows all sensors "off" next to live values.
+    #if defined(ENABLE_BMP390)
+    _wx_sensor_row("BMP390", bBMP3ON, bmp3_found);
+    #endif
+    #if defined(ENABLE_AHT20)
+    _wx_sensor_row("AHT20", bAHT20ON, aht20_found);
+    #endif
+    #if defined(ENABLE_SHT21)
+    _wx_sensor_row("SHT21", bSHT21ON, sht21_found);
+    #endif
+    #if defined(ENABLE_INA226)
+    _wx_sensor_row("INA226", bINA226ON, ina226_found);
+    #endif
     web_client.printf("<tr><td>LPS33</td><td>%s (RAK)</td></tr>\n", (bLPS33 ? "on" : "off"));
     web_client.printf("<tr><td>1-Wire</td><td>%s (GPIO %i, DHT%i)</td></tr>\n", (bONEWIRE ? "on" : "off"), meshcom_settings.node_owgpio, meshcom_settings.node_dht_type); // SENS-05(c): DHT11 or DHT22 (--dht)
-    web_client.printf("<tr><td>Temperature</td><td>%.1f &deg;C</td></tr>\n", meshcom_settings.node_temp);
-    web_client.printf("<tr><td>Tout</td><td>%.1f &deg;C</td></tr>\n", meshcom_settings.node_temp2);
+    // the air format carries one I2C and one 1-Wire temperature; the offsets are --tempoff in / out
+    web_client.printf("<tr><td>Temperature (I2C)</td><td>%.1f &deg;C</td></tr>\n", meshcom_settings.node_temp);
+    web_client.printf("<tr><td>Tout (1-Wire)</td><td>%.1f &deg;C</td></tr>\n", meshcom_settings.node_temp2);
     web_client.printf("<tr><td>Humidity</td><td>%.1f%% rH</td></tr>\n", meshcom_settings.node_hum);
     web_client.printf("<tr><td>QFE</td><td>%.1f hPa</td></tr>\n", meshcom_settings.node_press);
     web_client.printf("<tr><td>QNH</td><td>%.1f hPa</td></tr>\n", meshcom_settings.node_press_asl);
