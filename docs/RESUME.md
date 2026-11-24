@@ -8,6 +8,10 @@ fixes); three operator decisions come first.** Release plan and working checklis
 
 ## Now (2026-11-24)
 
+- **Campaign RC-BENCH running:** [campaign-rc-bench-20261125.md](campaign-rc-bench-20261125.md) is the resume point
+  (release-candidate bench, sync-word A/B, wave-5 bench, one night, release and PR documents). Operator decisions of
+  2026-11-24: no mbedTLS copy, one combined upstream PR, one OTA flash of DK5EN-98 with the RC image, stop before tag
+  and PR. Done: mbedTLS copy removed (`5488f0bc`), `hmac_connect.py` fix (`732238bd`, HMAC-WIN-01).
 - **Upstream sync 2026-11-24:** merged `upstream/dev` `68286e07` (#1320): nRF52 sync word `0x242B` -> `0x24B4` from one
   source (`src/lora_syncword.h`, `154014dc`) and two `tools/hmac_connect.py` commits. No conflicts; macro baseline
   regenerated; host gate stage 1,2 PASS (five board builds, not every env). Code review (Opus, high): sound as code.
