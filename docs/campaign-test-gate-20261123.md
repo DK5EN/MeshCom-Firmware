@@ -5,7 +5,7 @@
 - Source: [review-test-gate-20261123.md](review-test-gate-20261123.md) (findings, evidence, the five decisions)
 - Resume point: this file. Update the status table after every wave.
 
-**The full host gate is green in 5.7 min with two ESP32 builds added, against 11.6 min before. The change-based run
+**The full host gate is green in 3.1 min warm (5.7 min when the two new ESP32 builds recompile), against 11.6 min before. The change-based run
 for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Everything is committed.**
 
 ## What to do next
@@ -30,7 +30,7 @@ for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Ever
 | 0    | Baseline and honest reporting                      | done, committed                            | green together with wave 1                   |
 | 1    | Speed of the full gate                             | done, committed                            | full gate green 2026-11-24                   |
 | 2    | Change-based run (`tools/regression.sh --changed`) | done, committed                            | two change-based runs 2026-11-24, see wave 2 |
-| 3    | Test debt                                          | steps 3.1, 3.2, 3.4, 3.5 done; rest open   | full gate green 2026-11-24                   |
+| 3    | Test debt                                          | steps 3.1, 3.2, 3.4 to 3.6 done; rest open | full gate green 2026-11-24                   |
 | 4    | Gaps: ESP32 builds, coverage, generated suite map  | steps 4.1, 4.2, 4.5 done; 4.3 and 4.4 open | full gate green 2026-11-24                   |
 
 ## Measured
@@ -42,7 +42,9 @@ for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Ever
 | Wave 1, run 2            | 323 s          | 2 envs red         |        |                | red, see below           |
 | Wave 1, run 3            | 165 s          |                    |        |                | green, 4245 Unity cases  |
 | All waves, 2026-11-24    | 339 s          |                    | 67 s   | 3 s            | green, 4236 + 1828 cases |
+| Second run, 2026-11-24   | 188 s          |                    | 65 s   | 4 s            | green, 4236 + 1829 cases |
 
+- **339 s is the first build of the two ESP32 boards on that commit, 188 s the warm repeat.**
 - **The 339 s run is the first with the two ESP32 builds** (53 s and 45 s) and the sanitizers. It ran on `e73f7db8`
   with a clean tree: 129 Unity envs, 4236 cases, 1828 pytest cases, five board builds, no skips except the opt-in
   formal checks.
@@ -108,6 +110,9 @@ for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Ever
   compiler's own dependency list, every suite file selects its envs, every native env has a suite.
 - **Not built:** the replay of 10 past commits. The structural checks replace it; a replay over git history breaks
   on files that no longer exist.
+- **Defect found and fixed 2026-11-24:** a change to suites of several envs ran every suite in every env, because
+  a suite filter on the `pio` command line replaces the filter of each env. Three suites in five envs gave ten false
+  failures. The selector now emits one `pio` call per filter group; the selector tests hold the case.
 - **Known limit:** a dirty tree selects more than the wave. Files of a parallel session count as changed.
 
 ## Wave 3 (test debt)
@@ -119,7 +124,7 @@ for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Ever
 | 3.3  | One shared repository-root finder for all pin tests                                                                   | open; only the two readers that ignored an unreadable file now fail on it                   |
 | 3.4  | ASan/UBSan on `native_conf_frame`, `native_xml`, `native_parsers`, `native_aprs`, `native_config`, `native_dhcps_opt` | done; no findings, and a planted overflow is caught                                         |
 | 3.5  | Literal AX.25 address bytes                                                                                           | done in `test_kiss_ax25`; bytes worked out by hand from the AX.25 rules, not from a capture |
-| 3.6  | Exact category counts in `test_nbr_replay`, `test_topo_shadow`, `test_ack_replay`                                     | open                                                                                        |
+| 3.6  | Exact category counts in `test_nbr_replay`, `test_topo_shadow`, `test_ack_replay`                                     | done: exact counts of every category and of the fixture sizes, in all three suites          |
 | 3.7  | Remove "old logic asserted against itself" cases in eight suites                                                      | open                                                                                        |
 | 3.8  | Extraction for `test_command_setters`, `test_display_clock`, `test_command_toggles`                                   | open: changes `src/`, not responsible without a build and a bench look                      |
 

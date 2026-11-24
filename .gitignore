@@ -498,4 +498,4 @@ specs/tla/archive/heap/traces/
 tools/bench/runs/harness/**/*.bin
 tools/bench/runs/harness/**/*.elf
 # raw per-run Unity dumps of tools/regression.sh (12 MB each); the summaries are kept
-tools/bench/runs/regression-*/stage1-unity.json
+tools/bench/runs/regression-*/stage1-unity*.json
