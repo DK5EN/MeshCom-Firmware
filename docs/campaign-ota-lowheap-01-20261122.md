@@ -489,3 +489,20 @@ images built before today's commits. Both need an operator decision; measurement
 - Host gate `tools/regression.sh --stage 1,2` PASS (129 envs, 4223 Unity cases); it also needed two fixes in the
   TESTGATE-01 work committed unverified as `a6833f44` (tdeck test compile error, flag parsing in
   `test_regression_select.py`).
+
+### T-Beam `nomem` after the download: INSTRUMENT artefact (2026-11-24)
+
+- The T-Beam staged releases before: 2026-10-17 (10.16) and 2026-11-06 (11.01, already with the 44 KB image check
+  from `b7e99ffc`). Today CI release v4.40a.11.21 stages 11.22 on DK5EN-92 (`tbeam-release-bisect/v4.40a.11.21/`).
+- Today's code as a production build (no INSTRUMENT, `MC_BUILD_TAG=v4.40a.11.21` so 11.22 counts as newer) stages
+  too: buf32 held at the install start, dictionary from buf32, `[AU];stage;ok`, erase idle0max 281 ms
+  (`tbeam-release-bisect/head-prod/serial3.log`). One run; more need the INSTRUMENT-only `--update unstage`.
+- Boot heap: production 149.8 KB, INSTRUMENT 142.8 KB. The INSTRUMENT image costs about 7 KB static RAM plus its own
+  allocations; on the T-Beam that is the difference between a 32 KB block at the install start and none. All T-Beam
+  `nomem` results of 2026-11-23/24 ran on INSTRUMENT images.
+- Margin stays thin: largest block at the install's BLE pause 34.8 KB (needs 32 KB). The advisor review of the operator's
+  ideas (`docs/review/au28-au29-20261124/verdict-tbeam-heap.md`): defragmentation is not possible; boot reservation
+  costs too much idle heap; one BLE pause for check + download and holding buf32 from check into download widen the
+  margin.
+- Note: a local build without a date in its version honours the "last installed tag" lock (AU-27), so after a staged
+  11.22 it reports `newer;0`; bench builds that must download need `MC_BUILD_TAG`.
