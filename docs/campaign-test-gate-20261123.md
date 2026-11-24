@@ -6,12 +6,13 @@
 - Resume point: this file. Update the status table after every wave.
 
 **The full host gate is green in 3.1 min warm (5.7 min when the two new ESP32 builds recompile), against 11.6 min before. The change-based run
-for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Everything is committed.**
+for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Open is only step 3.8, the extraction from `src/`.**
 
 ## What to do next
 
-1. Continue with the steps marked open in waves 3 and 4.
-2. Full host gate at the end of the campaign.
+1. Step 3.8 is the only open step. It changes `command_functions.cpp` and `loop_functions.cpp` and needs a bench
+   look; the operator names the setters and whether an upstream PR is planned (decision 3).
+2. Nothing else. The full host gate at the end of the campaign ran green on 2026-11-24.
 
 ## Operator decisions (2026-11-23)
 
@@ -25,13 +26,13 @@ for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Ever
 
 ## Status
 
-| Wave | Content                                            | State                                      | Gate                                         |
-| ---- | -------------------------------------------------- | ------------------------------------------ | -------------------------------------------- |
-| 0    | Baseline and honest reporting                      | done, committed                            | green together with wave 1                   |
-| 1    | Speed of the full gate                             | done, committed                            | full gate green 2026-11-24                   |
-| 2    | Change-based run (`tools/regression.sh --changed`) | done, committed                            | two change-based runs 2026-11-24, see wave 2 |
-| 3    | Test debt                                          | steps 3.1, 3.2, 3.4 to 3.6 done; rest open | full gate green 2026-11-24                   |
-| 4    | Gaps: ESP32 builds, coverage, generated suite map  | steps 4.1, 4.2, 4.5 done; 4.3 and 4.4 open | full gate green 2026-11-24                   |
+| Wave | Content                                            | State                           | Gate                                         |
+| ---- | -------------------------------------------------- | ------------------------------- | -------------------------------------------- |
+| 0    | Baseline and honest reporting                      | done, committed                 | green together with wave 1                   |
+| 1    | Speed of the full gate                             | done, committed                 | full gate green 2026-11-24                   |
+| 2    | Change-based run (`tools/regression.sh --changed`) | done, committed                 | two change-based runs 2026-11-24, see wave 2 |
+| 3    | Test debt                                          | steps 3.1 to 3.7 done; 3.8 open | full gate green 2026-11-24                   |
+| 4    | Gaps: ESP32 builds, coverage, generated suite map  | done                            | full gate green 2026-11-24                   |
 
 ## Measured
 
@@ -43,6 +44,7 @@ for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Ever
 | Wave 1, run 3            | 165 s          |                    |        |                | green, 4245 Unity cases  |
 | All waves, 2026-11-24    | 339 s          |                    | 67 s   | 3 s            | green, 4236 + 1828 cases |
 | Second run, 2026-11-24   | 188 s          |                    | 65 s   | 4 s            | green, 4236 + 1829 cases |
+| Campaign end, 2026-11-24 | 162 s          |                    | 67 s   | 4 s            | green, 4234 + 1830 cases |
 
 - **339 s is the first build of the two ESP32 boards on that commit, 188 s the warm repeat.**
 - **The 339 s run is the first with the two ESP32 builds** (53 s and 45 s) and the sanitizers. It ran on `e73f7db8`
@@ -92,7 +94,6 @@ for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Ever
   `meshlogger.py` and the OTA tools.
 - **Pytest was not split into two steps.** The change-based run uses a firmware file list instead
   (`PYTEST_FIRMWARE` in the selector).
-- **Object cache not tried.** It only matters for board builds; step 4.3.
 - **Waves 3 and 4 were written without any run** (operator 2026-11-23: implement straight, no test runs) and
   verified one day later.
 - **A parallel session committed one of my renames.** `tools/test_pages_flasher.py` to
@@ -113,6 +114,10 @@ for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Ever
 - **Defect found and fixed 2026-11-24:** a change to suites of several envs ran every suite in every env, because
   a suite filter on the `pio` command line replaces the filter of each env. Three suites in five envs gave ten false
   failures. The selector now emits one `pio` call per filter group; the selector tests hold the case.
+- **Second defect, found and fixed 2026-11-24:** the selector finds source-text pins only in a suite file that
+  opens a file. After step 3.3, 26 suites read only through the shared reader and dropped out of the selection; a
+  change to a pinned file would have selected nothing. The selector knows the shared reader names now, and a test
+  holds the case.
 - **Known limit:** a dirty tree selects more than the wave. Files of a parallel session count as changed.
 
 ## Wave 3 (test debt)
@@ -121,12 +126,12 @@ for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Ever
 | ---- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | 3.1  | Delete `test_web_stop_gate`, `test_millis_rollover`, `test_gps_sky_layout` and our `test_compress.cpp`                | done; `platformio.ini` and the resolved-config baseline updated                             |
 | 3.2  | `test_decodetinyxml`: field size as in production (150 bytes), truncation case adjusted                               | done; the stub is still a hand copy, only its size is right                                 |
-| 3.3  | One shared repository-root finder for all pin tests                                                                   | open; only the two readers that ignored an unreadable file now fail on it                   |
+| 3.3  | One shared repository-root finder for all pin tests                                                                   | done: `test/support/repo_file.h`, 47 suites moved, two silent empty reads now fail          |
 | 3.4  | ASan/UBSan on `native_conf_frame`, `native_xml`, `native_parsers`, `native_aprs`, `native_config`, `native_dhcps_opt` | done; no findings, and a planted overflow is caught                                         |
 | 3.5  | Literal AX.25 address bytes                                                                                           | done in `test_kiss_ax25`; bytes worked out by hand from the AX.25 rules, not from a capture |
 | 3.6  | Exact category counts in `test_nbr_replay`, `test_topo_shadow`, `test_ack_replay`                                     | done: exact counts of every category and of the fixture sizes, in all three suites          |
-| 3.7  | Remove "old logic asserted against itself" cases in eight suites                                                      | open                                                                                        |
-| 3.8  | Extraction for `test_command_setters`, `test_display_clock`, `test_command_toggles`                                   | open: changes `src/`, not responsible without a build and a bench look                      |
+| 3.7  | Remove "old logic asserted against itself" cases in eight suites                                                      | done in seven suites; `test_ble_phone_harness` kept, see below                              |
+| 3.8  | Extraction for `test_command_setters`, `test_display_clock`, `test_command_toggles`                                   | open: changes `src/`, needs the operator and a bench look                                   |
 
 - **`test/test_compress/` is not gone.** `compress_functions.cpp` and `.h` are upstream files and stay as inert
   copies, as before 2026-10-03. Only our suite file against them was removed. Deleting the directory would be a
@@ -135,14 +140,26 @@ for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Ever
   exactly the removed env, the three removed filter entries and the sanitizer flags of the six envs.
 - **`native_blocked_calls` and `native` were left without sanitizers.** `native` holds 71 suites.
 
+- **Step 3.3:** one header finds the repository root and reads files. A file a test needs fails the test when
+  it cannot be read; an optional file stays optional. `test_clock_tick` and `test_display_clock` read a missing
+  file as an empty string before. `test_udp_frame_twin` lost its macOS-only root lookup on the way.
+- **Step 3.7, removed:** the cases and helper copies in `test_batt_pipeline` (two old curves), `test_charge_led_mode`,
+  `test_command_match`, `test_fw_update`, `test_ina226_cal`, `test_posinfo_next` and `test_pong_format` (dead
+  helpers). Two cases went with them; the rest were single assertions inside kept cases.
+- **Step 3.7, kept on purpose:**
+  - `test_ble_phone_harness`: its old drain is a switch (`BLE_HARNESS_OLD_LOGIC=1`) that proves the harness sees
+    the lost frame.
+  - `test_clock_tick`, `test_display_clock`, `test_nbr_views`: they compare the old logic with the production
+    function over many inputs. That tests `src/`.
+
 ## Wave 4 (gaps)
 
 | Step | Content                                                                                | State                                                                               |
 | ---- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | 4.1  | Two ESP32 board builds in the full gate: `heltec_wifi_lora_32_V3`, `ttgo_tbeam`        | done: 53 s and 45 s in the full gate; no flash percentage limit of our own          |
 | 4.2  | Selector: `src/nrf52/` selects only the nRF52 builds, ESP32-only directories the ESP32 | done; covered by the selector self-test                                             |
-| 4.3  | Try `build_cache_dir`; measure one cold board build with and without                   | open: needs runs                                                                    |
-| 4.4  | Line coverage of the native envs as an opt-in report                                   | open                                                                                |
+| 4.3  | Try `build_cache_dir`; measure one cold board build with and without                   | done: 58 s to 10 s for a wiped Heltec V3 build; on in the gate runner               |
+| 4.4  | Line coverage of the native envs as an opt-in report                                   | done: `tools/coverage_native.sh`, first report below                                |
 | 4.5  | Suite inventory generated from the tree                                                | done and executed: `tools/suite_map.py`, `docs/test-suite-inventory.md`, gate check |
 
 - **The inventory after the removals:** 129 native envs, 211 suites, 3924 `RUN_TEST` cases counted once per suite.
@@ -150,6 +167,17 @@ for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Ever
 - **A new suite, env or case now needs** `python3 tools/suite_map.py --write`, otherwise the gate step
   "suite inventory up to date" is red.
 - **The ESP32 builds make the full gate longer:** 339 s against 160 s without them and without the sanitizers.
+
+- **Build cache (4.3):** `tools/regression.sh` sets `PLATFORMIO_BUILD_CACHE_DIR` to `.pio/build-cache`. It is not
+  in `platformio.ini`, so release and CI builds are unchanged. Measured on `heltec_wifi_lora_32_V3` after deleting
+  its build directory: 58 s without, 59 s while filling, 10 s from the full cache. The cache held 521 MB after one
+  full gate; files unused for 14 days are deleted at the end of a run.
+- **Coverage (4.4), first report 2026-11-24:** 87 % of 27038 executable lines, in 237 of 644 `src/` files
+  (`tools/bench/runs/coverage-20261124-133537/coverage.txt`). The run takes about 4 min and builds into
+  `.pio/build-cov`.
+  - The 87 % counts only files a native env compiles or includes. 407 files are in no env, among them
+    `command_functions.cpp` and `loop_functions.cpp`.
+  - Lowest files: `Regexp.cpp` 31 %, `dedup_functions.cpp` 51 %, `nrf52_flash.cpp` 60 %, `nbr_matrix.cpp` 67 %.
 
 ## Left alone on purpose
 

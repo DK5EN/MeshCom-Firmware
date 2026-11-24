@@ -80,6 +80,33 @@ def test_a_suite_filter_never_reaches_an_env_without_that_suite(project: rs.Proj
     assert "native:test_ack_replay" in line
 
 
+def test_a_suite_on_the_shared_reader_is_seen_as_reading_files(project: rs.Project) -> None:
+    """Regression 2026-11-24: the suites moved to test/support/repo_file.h and lost their own
+    fopen. The closure finds text pins only in a file FILE_READ_RE matches, so 26 suites
+    silently dropped out of it (the inventory went from 48 reading suites to 22)."""
+    unseen = []
+    for suite in project.suites:
+        for f in project.files:
+            if not f.startswith(f"test/{suite}/") or not f.endswith(rs.SOURCE_SUFFIXES):
+                continue
+            body = project.text(f)
+            if "support/repo_file.h" in body and not rs.FILE_READ_RE.search(
+                body.replace("support/repo_file.h", "")
+            ):
+                unseen.append(f)
+    assert not unseen, unseen
+    # One concrete pin: test_sset3_restore reads src/ files only through the shared reader.
+    body = project.text("test/test_sset3_restore/test_sset3_restore.cpp")
+    assert "fopen" not in body and "ifstream" not in body
+    pinned = next(
+        n for lit in rs.STRING_RE.findall(body) for n in rs.NAME_RE.findall(lit)
+        if any(h.startswith("src/") for h in project.by_name.get(n, ()))
+    )
+    src = next(h for h in project.by_name[pinned] if h.startswith("src/"))
+    sel = rs.select([src], project)
+    assert sel["mode"] == "full" or any("test_sset3_restore" in ss for ss in sel["unity"].values()), src
+
+
 def test_every_native_env_has_a_suite(project: rs.Project) -> None:
     """An env whose test_filter matches no directory would silently run nothing."""
     assert [e for e in project.envs if not project.env_suites(e)] == []

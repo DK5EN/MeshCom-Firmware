@@ -62,6 +62,13 @@ set -u
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
+# Object cache for every pio build of the gate (TESTGATE-01 step 4.3). An edit to
+# platformio.ini makes pio wipe .pio/build; with the cache a wiped Heltec V3 build
+# takes 10 s instead of 58 s (measured 2026-11-24). It is set here and not in
+# platformio.ini, so release and CI builds stay as they are. Objects unused for
+# 14 days are removed at the end of a run.
+export PLATFORMIO_BUILD_CACHE_DIR="${PLATFORMIO_BUILD_CACHE_DIR:-$ROOT/.pio/build-cache}"
+
 STAGES="1,2"
 FORMAL=0
 OUT=""
@@ -479,6 +486,9 @@ fi
 echo "summary: $OUT/summary.log"
 [ "${REGRESSION_CHILD:-0}" = 1 ] || prune_runs
 if [ $FAILS -gt 0 ]; then echo "RESULT: FAIL ($FAILS step(s))"; exit 1; fi
+if [ "${REGRESSION_CHILD:-0}" != 1 ] && [ -d "$PLATFORMIO_BUILD_CACHE_DIR" ]; then
+    find "$PLATFORMIO_BUILD_CACHE_DIR" -type f -atime +14 -delete 2>/dev/null
+fi
 if [ "${REG_SEL_MODE:-}" = select ] && [ "${REGRESSION_CHILD:-0}" != 1 ]; then
     echo "RESULT: PASS (change-based: ${#STEP_NAMES[@]} step(s); the full gate is still due before release, PR and sync)"
     exit 0

@@ -126,7 +126,13 @@ READ_BY_A_STEP: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 INCLUDE_RE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*["<]([^">]+)[">]', re.M)
 STRING_RE = re.compile(r'"((?:[^"\\\n]|\\.)*)"')
-FILE_READ_RE = re.compile(r"\b(ifstream|fopen|freopen|slurp|read_repo_file|read_file|readFile|load_file)\b")
+# The repo_* names are the shared readers of test/support/repo_file.h (TESTGATE-01 step 3.3).
+# A suite that reads only through them has no fopen of its own; without these names its
+# text pins drop out of the closure and a change to the pinned file selects nothing.
+FILE_READ_RE = re.compile(
+    r"\b(ifstream|fopen|freopen|slurp|read_repo_file|read_file|readFile|load_file"
+    r"|repo_slurp|repo_try_slurp|repo_fopen|repo_path|repo_root)\b"
+)
 NAME_RE = re.compile(r"[\w.+-]+\.(?:cpp|c|h|hpp|ini|html|js|css|json|txt|csv|py|bin|md)\b")
 SOURCE_SUFFIXES = (".c", ".cc", ".cpp", ".h", ".hpp", ".ino", ".inc")
 

@@ -39,6 +39,8 @@ Open-source MeshCom Firmware. We contribute via PRs against the **upstream DEV b
 - `/full-regression` wraps the runner (`.claude/commands/`, local and gitignored).
 - **Never run bare `pio test`**: it walks the board envs and flashes attached hardware.
 - **One `pio` process at a time** (shared build cache and global package store; `test/golden/selftest.sh` shells out to `pio project config`). Parallel writers route every `pio` call through a mkdir-lock wrapper (`piolock.sh` in the scratchpad).
+- A suite reads repository files only through `test/support/repo_file.h` (`repo_slurp`, `repo_fopen`).
+- Line coverage of `src/` by the native envs, opt-in: `tools/coverage_native.sh` (about 4 min, builds into `.pio/build-cov`).
 - Suite inventory: `docs/test-suite-map.md`; the per-suite table is generated (`docs/test-suite-inventory.md`, `python3 tools/suite_map.py --write` after adding a suite, env or case).
 
 ## Toolchain Pitfalls
