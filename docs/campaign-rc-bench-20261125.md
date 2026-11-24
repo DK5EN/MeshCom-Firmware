@@ -321,3 +321,32 @@ only, compared with DK5EN-98's log). Raw logs: `tools/bench/runs/harness/rc-benc
   [pr-combined-scope-20261125.md](pr-combined-scope-20261125.md). Issue drafts:
   [upstream-issue-drafts-20261125.md](upstream-issue-drafts-20261125.md).
 - Tag name `v4.40a.11.25` free on origin and upstream (2026-11-24).
+
+## Next (morning 2026-11-25), campaign ends 07:30
+
+State at handover (2026-11-24 about 20:00): `fork-dev` at `413e0f2d` + this doc commit, pushed. Bench nodes:
+DK5EN-1, -92, -14 on the night images (`MC_AU_TEST=1`, tag 11.21, clean worktree `../MeshCom-RC-732238bd`);
+DK5EN-90 on image B (`52723f33`), `--loradebug` on; DK5EN-98 on the RC image (no tag), untouched since 15:38.
+Detached on the Mac: three `ota_lowheap_trigger.py` runs (end about 02:00), `meshlogger.py` for DK5EN-98
+(`--no-debug-flags`, ends 09:00), `caffeinate`.
+
+1. **Read the night** before writing "verified": `night/trigger.summary` (9 lines expected: attempts 1-3 per node,
+   verdict, `after_min`), `night/trigger-*.log` (`[AU];fail`, `refuse`, `TASK_WDT`, `Guru`, `rst:`, uptime going
+   backwards = reboot), DK5EN-98 log for reboots (`dk5en-98-log/2026-11-2*.log`, boot banner) and its STAT lines.
+   A failed download, a reboot or a lowheap refusal stops the release line: write it down, ask the operator.
+2. **Release prep** (no tag): `FLASH_VERSION` 20261125 in `src/configuration_global.h`; full host gate
+   `tools/regression.sh --stage 1,2`; fill the `[morning]` placeholders in `release-notes.md` and
+   `docs/release-journal.md` (gate counts, night figures); prettier; idle heap on DK5EN-92 is optional (night image,
+   not the release image) and must be stated as such.
+3. **PR text:** fill the night figures in [pr-combined-text-20261125.md](pr-combined-text-20261125.md).
+4. **Desktop plan:** new Fassung 12 dated 25.11.2026 of `~/Desktop/upstream-releaseplan-*.html`, Fassung 11 moved to
+   `~/Documents/MeshCom-Archiv/`; checklist current; pointers in RESUME and
+   [campaign-release-train-20261115.md](campaign-release-train-20261115.md).
+5. **Close:** campaign table final, RESUME and BACKLOG current, commit (explicit paths; leave foreign changes such as
+   `docs/research-esp32-wifi-sdr-20261124.md` alone), push `fork-dev`. Stop the DK5EN-98 logger at 07:30
+   (`pkill -f "meshlogger.py 192.168.68.65"`) if it still runs, and `caffeinate`. Remove the worktree
+   `../MeshCom-RC-732238bd` (`git worktree remove`).
+6. **Final report** to the operator: outcome first, per step what stands with numbers, deviations, then the asks:
+   go for tag `v4.40a.11.25`; go for the PR plus the open scope questions (#1306 QA-RX-07/02, #1307 `--udphold`
+   wording, #1308 EXT-PEER-01, #1309 "Refs" only) and the PR-branch build + bench run (no FORMAL-01 in it); go for
+   the three issue drafts.

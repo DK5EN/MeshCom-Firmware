@@ -8,10 +8,18 @@ fixes); three operator decisions come first.** Release plan and working checklis
 
 ## Now (2026-11-24)
 
-- **Campaign RC-BENCH running:** [campaign-rc-bench-20261125.md](campaign-rc-bench-20261125.md) is the resume point
-  (release-candidate bench, sync-word A/B, wave-5 bench, one night, release and PR documents). Operator decisions of
-  2026-11-24: no mbedTLS copy, one combined upstream PR, one OTA flash of DK5EN-98 with the RC image, stop before tag
-  and PR. Done: mbedTLS copy removed (`5488f0bc`), `hmac_connect.py` fix (`732238bd`, HMAC-WIN-01).
+- **Campaign RC-BENCH running, ends 2026-11-25 07:30:** [campaign-rc-bench-20261125.md](campaign-rc-bench-20261125.md)
+  is the resume point; its section "Next (morning 2026-11-25)" is the work list. Operator decisions 2026-11-24: no
+  mbedTLS copy, one combined upstream PR (TLS allocation cap travels with AU), one OTA flash of DK5EN-98 (done 15:38),
+  desk commit `35ae3418` (WX table) ships as low-risk host-tested, sensitivity margin not testable on the table; stop
+  before tag, PR branch push, PR and issues.
+  - Done 2026-11-24: mbedTLS copy removed (`5488f0bc`), all 36 envs built (35 green), fleet + DK5EN-98 on `732238bd`,
+    AU staged on V3/T-Beam/T-Deck Plus, sync-word A/B no side effect ([syncword-ab-bench-20261124.md](syncword-ab-bench-20261124.md)),
+    `hmac_connect.py` fix (`732238bd`), wave 5 #1307/#1308/#1303 pass, new row CAD-RXLOSS-01.
+  - Running: night AU runs (3 per ESP32 node, detached, end about 02:00), DK5EN-98 read-only logger (until 09:00).
+  - Drafts with `[morning]` placeholders: `release-notes.md`, `docs/release-journal.md`; PR text
+    [pr-combined-text-20261125.md](pr-combined-text-20261125.md), scope [pr-combined-scope-20261125.md](pr-combined-scope-20261125.md),
+    issues [upstream-issue-drafts-20261125.md](upstream-issue-drafts-20261125.md).
 - **Upstream sync 2026-11-24:** merged `upstream/dev` `68286e07` (#1320): nRF52 sync word `0x242B` -> `0x24B4` from one
   source (`src/lora_syncword.h`, `154014dc`) and two `tools/hmac_connect.py` commits. No conflicts; macro baseline
   regenerated; host gate stage 1,2 PASS (five board builds, not every env). Code review (Opus, high): sound as code.
