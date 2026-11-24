@@ -6,13 +6,14 @@
 - Resume point: this file. Update the status table after every wave.
 
 **The full host gate is green in 3.1 min warm (5.7 min when the two new ESP32 builds recompile), against 11.6 min before. The change-based run
-for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Open is only step 3.8, the extraction from `src/`.**
+for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. The campaign is closed; step 3.8, the extraction from `src/`, is deferred.**
 
 ## What to do next
 
-1. Step 3.8 is the only open step. It changes `command_functions.cpp` and `loop_functions.cpp` and needs a bench
-   look; the operator names the setters and whether an upstream PR is planned (decision 3).
-2. Nothing else. The full host gate at the end of the campaign ran green on 2026-11-24.
+Nothing. The campaign was closed on 2026-11-24 with a green full host gate.
+
+- **Step 3.8 is deferred** (operator 2026-11-24): it changes `command_functions.cpp` and `loop_functions.cpp`, the
+  change surface is large and the risk high. It stays in `BACKLOG.md` under TESTGATE-01 for later.
 
 ## Operator decisions (2026-11-23)
 
@@ -26,13 +27,13 @@ for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Open
 
 ## Status
 
-| Wave | Content                                            | State                           | Gate                                         |
-| ---- | -------------------------------------------------- | ------------------------------- | -------------------------------------------- |
-| 0    | Baseline and honest reporting                      | done, committed                 | green together with wave 1                   |
-| 1    | Speed of the full gate                             | done, committed                 | full gate green 2026-11-24                   |
-| 2    | Change-based run (`tools/regression.sh --changed`) | done, committed                 | two change-based runs 2026-11-24, see wave 2 |
-| 3    | Test debt                                          | steps 3.1 to 3.7 done; 3.8 open | full gate green 2026-11-24                   |
-| 4    | Gaps: ESP32 builds, coverage, generated suite map  | done                            | full gate green 2026-11-24                   |
+| Wave | Content                                            | State                               | Gate                                         |
+| ---- | -------------------------------------------------- | ----------------------------------- | -------------------------------------------- |
+| 0    | Baseline and honest reporting                      | done, committed                     | green together with wave 1                   |
+| 1    | Speed of the full gate                             | done, committed                     | full gate green 2026-11-24                   |
+| 2    | Change-based run (`tools/regression.sh --changed`) | done, committed                     | two change-based runs 2026-11-24, see wave 2 |
+| 3    | Test debt                                          | steps 3.1 to 3.7 done; 3.8 deferred | full gate green 2026-11-24                   |
+| 4    | Gaps: ESP32 builds, coverage, generated suite map  | done                                | full gate green 2026-11-24                   |
 
 ## Measured
 
@@ -131,7 +132,7 @@ for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Open
 | 3.5  | Literal AX.25 address bytes                                                                                           | done in `test_kiss_ax25`; bytes worked out by hand from the AX.25 rules, not from a capture |
 | 3.6  | Exact category counts in `test_nbr_replay`, `test_topo_shadow`, `test_ack_replay`                                     | done: exact counts of every category and of the fixture sizes, in all three suites          |
 | 3.7  | Remove "old logic asserted against itself" cases in eight suites                                                      | done in seven suites; `test_ble_phone_harness` kept, see below                              |
-| 3.8  | Extraction for `test_command_setters`, `test_display_clock`, `test_command_toggles`                                   | open: changes `src/`, needs the operator and a bench look                                   |
+| 3.8  | Extraction for `test_command_setters`, `test_display_clock`, `test_command_toggles`                                   | deferred by the operator 2026-11-24: large change surface, high risk                        |
 
 - **`test/test_compress/` is not gone.** `compress_functions.cpp` and `.h` are upstream files and stay as inert
   copies, as before 2026-10-03. Only our suite file against them was removed. Deleting the directory would be a
