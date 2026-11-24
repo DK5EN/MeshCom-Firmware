@@ -110,7 +110,7 @@ static std::string read_repo_file(const char *rel)
     }
     std::ifstream f((dir + "/" + rel).c_str());
     // An unreadable file must not pass as "string absent" (TESTGATE-01).
-    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel.c_str());
+    TEST_ASSERT_TRUE_MESSAGE(f.good(), rel);
     std::stringstream ss;
     ss << f.rdbuf();
     return ss.str();

@@ -7,6 +7,7 @@ the header-only native envs, where the flags are fully known from platformio.ini
 
 from __future__ import annotations
 
+import shlex
 import shutil
 import subprocess
 import sys
@@ -68,9 +69,28 @@ def test_every_suite_is_in_an_env(project: rs.Project) -> None:
     assert sorted(with_sources - in_env - {"test_compress"}) == []
 
 
+def _define_and_include_flags(build_flags: str) -> list[str]:
+    """-D/-I/-std flags of a build_flags value; "-D NAME" / "-I dir" keep their separate argument."""
+    tokens: list[str] = []
+    for line in build_flags.splitlines():
+        line = line.split(";", 1)[0].strip()  # ini comment
+        if line:
+            tokens += shlex.split(line)
+    flags: list[str] = []
+    it = iter(tokens)
+    for tok in it:
+        if tok in ("-D", "-I"):
+            arg = next(it, None)
+            if arg is not None:
+                flags += [tok, arg]
+        elif tok.startswith(("-D", "-I", "-std")):
+            flags.append(tok)
+    return flags
+
+
 def _compiler_deps(project: rs.Project, env: str, source: str) -> set[str] | None:
     """Repo-relative files the compiler reads for *source* under the env's flags, or None."""
-    flags = [f for f in project.opt(env, "build_flags").split() if f.startswith(("-D", "-I", "-std"))]
+    flags = _define_and_include_flags(project.opt(env, "build_flags"))
     unity = sorted(ROOT.glob(".pio/libdeps/native*/Unity/src/unity.h"))  # present after one gate run
     if not unity:
         return None
