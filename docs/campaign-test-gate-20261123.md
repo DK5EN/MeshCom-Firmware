@@ -5,23 +5,13 @@
 - Source: [review-test-gate-20261123.md](review-test-gate-20261123.md) (findings, evidence, the five decisions)
 - Resume point: this file. Update the status table after every wave.
 
-**The full host gate ran in about 2.7 min instead of 11.6 min with the same cases. Everything changed after those
-runs was written without a single run, on operator instruction: the change-based run, the suite removals, the
-sanitizers, the ESP32 builds and the generated inventory.**
+**The full host gate is green in 5.7 min with two ESP32 builds added, against 11.6 min before. The change-based run
+for wave commits is verified: 5 s for a suite edit, 53 s for a leaf header. Everything is committed.**
 
 ## What to do next
 
-> **Nothing here is committed, and the tree has not passed the gate since the last edits.** Expect the first run to
-> show failures from the blind edits. That run is the missing verification, not a regression hunt.
-
-1. Run `tools/regression.sh --stage 1,2` once. Likely places for red, in order:
-   - the six parser envs under ASan/UBSan (real findings are the purpose of the step);
-   - `tools/tests/test_regression_select.py` (new, never run);
-   - the two ESP32 board builds (first cold build takes minutes);
-   - `test_decodetinyxml` and `test_kiss_ax25` (edited by hand, never compiled).
-2. Run `tools/regression.sh --changed` after a small edit to a header and compare with "Wave 2, open checks".
-3. Commit (file list under "Uncommitted files").
-4. Continue with the steps marked open in waves 3 and 4.
+1. Continue with the steps marked open in waves 3 and 4.
+2. Full host gate at the end of the campaign.
 
 ## Operator decisions (2026-11-23)
 
@@ -35,13 +25,13 @@ sanitizers, the ESP32 builds and the generated inventory.**
 
 ## Status
 
-| Wave | Content                                            | State                                               | Gate                                              |
-| ---- | -------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------- |
-| 0    | Baseline and honest reporting                      | done, uncommitted                                   | green together with wave 1                        |
-| 1    | Speed of the full gate                             | done, uncommitted                                   | 2 of 3 runs green; the red one was a foreign wipe |
-| 2    | Change-based run (`tools/regression.sh --changed`) | built with its test file, uncommitted, never run    | plan output and selector self-test only           |
-| 3    | Test debt                                          | steps 3.1, 3.2, 3.4, 3.5 written blind; rest open   | none                                              |
-| 4    | Gaps: ESP32 builds, coverage, generated suite map  | steps 4.1, 4.2, 4.5 written blind; 4.3 and 4.4 open | none                                              |
+| Wave | Content                                            | State                                      | Gate                                         |
+| ---- | -------------------------------------------------- | ------------------------------------------ | -------------------------------------------- |
+| 0    | Baseline and honest reporting                      | done, committed                            | green together with wave 1                   |
+| 1    | Speed of the full gate                             | done, committed                            | full gate green 2026-11-24                   |
+| 2    | Change-based run (`tools/regression.sh --changed`) | done, committed                            | two change-based runs 2026-11-24, see wave 2 |
+| 3    | Test debt                                          | steps 3.1, 3.2, 3.4, 3.5 done; rest open   | full gate green 2026-11-24                   |
+| 4    | Gaps: ESP32 builds, coverage, generated suite map  | steps 4.1, 4.2, 4.5 done; 4.3 and 4.4 open | full gate green 2026-11-24                   |
 
 ## Measured
 
@@ -51,6 +41,16 @@ sanitizers, the ESP32 builds and the generated inventory.**
 | Wave 1, run 1            | 160 s          | 107 s of test time | 67 s   | 3 s            | green, 4245 + 1792 cases |
 | Wave 1, run 2            | 323 s          | 2 envs red         |        |                | red, see below           |
 | Wave 1, run 3            | 165 s          |                    |        |                | green, 4245 Unity cases  |
+| All waves, 2026-11-24    | 339 s          |                    | 67 s   | 3 s            | green, 4236 + 1828 cases |
+
+- **The 339 s run is the first with the two ESP32 builds** (53 s and 45 s) and the sanitizers. It ran on `e73f7db8`
+  with a clean tree: 129 Unity envs, 4236 cases, 1828 pytest cases, five board builds, no skips except the opt-in
+  formal checks.
+- **The first run of the blind edits was red in two steps**, both faults of the edits and fixed in `e2ad38c8`: a
+  compile error in `test_tdeck_pattern` and a flag parser in `test_regression_select.py` that made its closure test
+  check nothing.
+- **The sanitizers found nothing in the six parser envs.** The runtime is linked into all six binaries, and a
+  deliberate heap overflow in `test_dhcps_opt` turned the env red.
 
 - **Run 2 is not a test failure.** The linker reported object files of the `native` env as missing
   (`stage1-unity.log`: "no such file or directory: .pio/build/native/..."). A second session built in the same tree
@@ -91,38 +91,37 @@ sanitizers, the ESP32 builds and the generated inventory.**
 - **Pytest was not split into two steps.** The change-based run uses a firmware file list instead
   (`PYTEST_FIRMWARE` in the selector).
 - **Object cache not tried.** It only matters for board builds; step 4.3.
-- **Waves 3 and 4 were written without any run** (operator 2026-11-23: implement straight, no test runs). Only
-  the selector self-test, the inventory generator and the baseline export were executed.
+- **Waves 3 and 4 were written without any run** (operator 2026-11-23: implement straight, no test runs) and
+  verified one day later.
 - **A parallel session committed one of my renames.** `tools/test_pages_flasher.py` to
   `tools/tests/test_pages_flasher_args.py` is part of `0e2fefd9`; the content fix of that file is still uncommitted.
 
-## Wave 2, open checks
+## Wave 2, verified 2026-11-24
 
-- **No change-based run has been executed.** Checked: the shell syntax, the plan output for one header, and the 22
-  self-checks of the selector on the real tree.
-- **Expectation for an edit to `src/rtc_offset.h`:** Unity `native_rtc_offset`, lint self-test, two ESP32 and three
-  nRF52 builds, the firmware pytest subset, the model drift check. The board builds dominate the time; not measured.
-- **Selector tests are written, not run:** `tools/tests/test_regression_select.py`.
-  - The include closure against the compiler's own dependency list (`c++ -MM`) for the header-only envs. It needs
-    the Unity header under `.pio/libdeps/native*/`, so it works only after one gate run.
-  - Every suite file selects the envs of its suite; every compiled source selects its env.
-  - Every native env has a suite; every suite directory with sources is in an env.
-- **Not built:** the replay of 10 past commits. The two structural checks above replace it; a replay over git
-  history breaks on files that no longer exist.
+| Change                                | Steps selected                                                                                                   | Time | Result            |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---- | ----------------- |
+| `test/test_dhcps_opt/test_main.cpp`   | Unity `native_dhcps_opt`, lint self-test, suite inventory                                                        | 5 s  | red, as intended  |
+| `src/rtc_offset.h` (comment appended) | Unity `native_rtc_offset`, lint self-test, two ESP32 and three nRF52 builds, firmware pytest subset, model drift | 53 s | green, as planned |
+
+- **The suite edit was the deliberate heap overflow**; the red is the sanitizer report.
+- **The selector tests run in the gate** (`tools/tests/test_regression_select.py`): the include closure against the
+  compiler's own dependency list, every suite file selects its envs, every native env has a suite.
+- **Not built:** the replay of 10 past commits. The structural checks replace it; a replay over git history breaks
+  on files that no longer exist.
 - **Known limit:** a dirty tree selects more than the wave. Files of a parallel session count as changed.
 
 ## Wave 3 (test debt)
 
-| Step | Content                                                                                                               | State                                                                                             |
-| ---- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| 3.1  | Delete `test_web_stop_gate`, `test_millis_rollover`, `test_gps_sky_layout` and our `test_compress.cpp`                | done blind; `platformio.ini` and the resolved-config baseline updated                             |
-| 3.2  | `test_decodetinyxml`: field size as in production (150 bytes), truncation case adjusted                               | done blind; the stub is still a hand copy, only its size is right                                 |
-| 3.3  | One shared repository-root finder for all pin tests                                                                   | open; only the two readers that ignored an unreadable file now fail on it                         |
-| 3.4  | ASan/UBSan on `native_conf_frame`, `native_xml`, `native_parsers`, `native_aprs`, `native_config`, `native_dhcps_opt` | done blind; findings unknown until the first run                                                  |
-| 3.5  | Literal AX.25 address bytes                                                                                           | done blind in `test_kiss_ax25`; bytes worked out by hand from the AX.25 rules, not from a capture |
-| 3.6  | Exact category counts in `test_nbr_replay`, `test_topo_shadow`, `test_ack_replay`                                     | open: the numbers only exist after a run                                                          |
-| 3.7  | Remove "old logic asserted against itself" cases in eight suites                                                      | open                                                                                              |
-| 3.8  | Extraction for `test_command_setters`, `test_display_clock`, `test_command_toggles`                                   | open: changes `src/`, not responsible without a build and a bench look                            |
+| Step | Content                                                                                                               | State                                                                                       |
+| ---- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 3.1  | Delete `test_web_stop_gate`, `test_millis_rollover`, `test_gps_sky_layout` and our `test_compress.cpp`                | done; `platformio.ini` and the resolved-config baseline updated                             |
+| 3.2  | `test_decodetinyxml`: field size as in production (150 bytes), truncation case adjusted                               | done; the stub is still a hand copy, only its size is right                                 |
+| 3.3  | One shared repository-root finder for all pin tests                                                                   | open; only the two readers that ignored an unreadable file now fail on it                   |
+| 3.4  | ASan/UBSan on `native_conf_frame`, `native_xml`, `native_parsers`, `native_aprs`, `native_config`, `native_dhcps_opt` | done; no findings, and a planted overflow is caught                                         |
+| 3.5  | Literal AX.25 address bytes                                                                                           | done in `test_kiss_ax25`; bytes worked out by hand from the AX.25 rules, not from a capture |
+| 3.6  | Exact category counts in `test_nbr_replay`, `test_topo_shadow`, `test_ack_replay`                                     | open                                                                                        |
+| 3.7  | Remove "old logic asserted against itself" cases in eight suites                                                      | open                                                                                        |
+| 3.8  | Extraction for `test_command_setters`, `test_display_clock`, `test_command_toggles`                                   | open: changes `src/`, not responsible without a build and a bench look                      |
 
 - **`test/test_compress/` is not gone.** `compress_functions.cpp` and `.h` are upstream files and stay as inert
   copies, as before 2026-10-03. Only our suite file against them was removed. Deleting the directory would be a
@@ -135,7 +134,7 @@ sanitizers, the ESP32 builds and the generated inventory.**
 
 | Step | Content                                                                                | State                                                                               |
 | ---- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 4.1  | Two ESP32 board builds in the full gate: `heltec_wifi_lora_32_V3`, `ttgo_tbeam`        | done blind; build must succeed, no flash percentage limit of our own                |
+| 4.1  | Two ESP32 board builds in the full gate: `heltec_wifi_lora_32_V3`, `ttgo_tbeam`        | done: 53 s and 45 s in the full gate; no flash percentage limit of our own          |
 | 4.2  | Selector: `src/nrf52/` selects only the nRF52 builds, ESP32-only directories the ESP32 | done; covered by the selector self-test                                             |
 | 4.3  | Try `build_cache_dir`; measure one cold board build with and without                   | open: needs runs                                                                    |
 | 4.4  | Line coverage of the native envs as an opt-in report                                   | open                                                                                |
@@ -145,24 +144,10 @@ sanitizers, the ESP32 builds and the generated inventory.**
   48 suites read source files as text. 40 suites run under ASan/UBSan in every env.
 - **A new suite, env or case now needs** `python3 tools/suite_map.py --write`, otherwise the gate step
   "suite inventory up to date" is red.
-- **The ESP32 builds make the full gate longer.** The 160 s were measured without them.
+- **The ESP32 builds make the full gate longer:** 339 s against 160 s without them and without the sanitizers.
 
 ## Left alone on purpose
 
 - **Waits in the bench-tool tests** (`test_meshlogger.py`, `test_ota_regression.py`). Stage 2 runs alongside stage 1
   and finishes first, so shorter waits would not shorten the gate. Changing timing inside `meshlogger.py` without a
   run risks the soak logger.
-
-## Uncommitted files
-
-- Runner: `tools/regression.sh`, `tools/regression_unity.py`, `tools/regression_select.py`, `tools/suite_map.py`
-- Tool tests: `tools/tests/test_regression_select.py`, `tools/tests/test_pages_flasher_args.py`
-- Lints: `test/golden/selftest.sh`, `test/golden/verify_captures.py`, `test/golden/native/variant-ini-effective.json`
-- Build configuration: `platformio.ini`
-- Suites edited: `test/test_decodetinyxml/` (stub and test), `test/test_kiss_ax25/test_main.cpp`,
-  `test/test_t114_theme/`, `test/test_tdeck_pattern/`
-- Suites removed (deleted in the working tree, not staged): `test/test_web_stop_gate/`, `test/test_millis_rollover/`,
-  `test/test_gps_sky_layout/`, `test/test_compress/test_compress.cpp`
-- Documents: `CLAUDE.md`, `docs/RESUME.md`, `docs/BACKLOG.md`, `docs/test-suite-map.md`,
-  `docs/test-suite-inventory.md`, `docs/review-test-gate-20261123.md`, `docs/campaign-test-gate-20261123.md`
-- `.claude/commands/full-regression.md` is local and gitignored.

@@ -33,7 +33,7 @@ Open-source MeshCom Firmware. We contribute via PRs against the **upstream DEV b
 
 ## Testing and Gates
 
-- Host gate: `tools/regression.sh --stage 1,2` (all `[env:native*]` Unity envs in one `pio` call, golden selftest, two ESP32 and three nRF52 board builds, pytest and tool suites; about 3 min warm before the ESP32 builds were added).
+- Host gate: `tools/regression.sh --stage 1,2` (all `[env:native*]` Unity envs in one `pio` call, golden selftest, two ESP32 and three nRF52 board builds, pytest and tool suites; about 6 min warm).
 - Wave commits: `tools/regression.sh --changed` runs only the steps the uncommitted changes can turn red (`tools/regression_select.py`; an unknown path means the full gate). The full host gate stays mandatory before a release, an upstream PR, after an upstream sync and at the end of a campaign.
 - With bench hardware: `tools/regression.sh --stage all` (adds stage 3, `tools/bench/bench_suite.py`; `--flash`, `--extudp`, `--deepsleep` are opt-in, passed after `--`).
 - `/full-regression` wraps the runner (`.claude/commands/`, local and gitignored).

@@ -108,8 +108,8 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
 
 ## Running campaigns
 
-- **Test gate rework (TESTGATE-01) 2026-11-23:** [campaign-test-gate-20261123.md](campaign-test-gate-20261123.md) -- uncommitted and
-  not gated since the last edits; first step is one full host gate run. `tools/regression.sh --changed` is the new gate for wave commits.
+- **Test gate rework (TESTGATE-01) 2026-11-23:** [campaign-test-gate-20261123.md](campaign-test-gate-20261123.md) -- committed, full
+  host gate green 2026-11-24 (339 s). Open: waves 3 and 4 rest. `tools/regression.sh --changed` is the gate for wave commits.
 - **Ticket triage 2026-11-21:** [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.md) -- the fixes for wave 3.
 - **Release train 2026-11-15:** [campaign-release-train-20261115.md](campaign-release-train-20261115.md) -- the active one.
 - **Channel access stabilisation** (ACK-AGE-01, ACK-CANCEL-01, CSMA-04/02, CSMA-03, PWR-01/02, soak): dates and exit
