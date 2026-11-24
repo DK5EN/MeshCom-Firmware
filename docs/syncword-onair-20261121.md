@@ -2,8 +2,9 @@
 
 **With `0x24B4` the RAK4631 sends the MeshCom sync word exactly like a Heltec V3 (SX1262). Today's
 nRF52 setting `0x242B` puts the second sync symbol where no other board sends it, and the SX1278 sends
-it 128 bins away from every SX126x.** Nothing is changed in the firmware yet. The switch to `0x24B4` is
-backlog row SYNC-NRF-01 and waits for OE1KFR's decision.
+it 128 bins away from every SX126x.** Upstream switched the nRF52 boards to `0x24B4` on 2026-11-23
+(`154014dc`, #1320); fork-dev has it since the sync of 2026-11-24. The line numbers below are those of
+2026-11-21. Open before a fork release: the mixed bench test in backlog row SYNC-NRF-01.
 
 ## Why this was measured
 

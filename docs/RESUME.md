@@ -1,11 +1,28 @@
 # RESUME -- pick up here
 
-**Resume here: section "Now" below. Next date: upstream wave 3, two to four fix PRs by Thu 2026-11-26.** Active
-campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.md) (the fixes),
-[campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves). Release plan and working checklist: operator's Desktop
-`upstream-releaseplan-20261122.html` (Fassung 10; the separate Desktop checklist is retired).
+**Resume here: section "Now" below. Next date: upstream wave 4 on Fri 2026-11-27, PR A (Auto Update) and PR B (small
+fixes); three operator decisions come first.** Release plan and working checklist: operator's Desktop
+`upstream-releaseplan-20261124.html` (Fassung 11). Active campaigns:
+[campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
+[campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).
 
-## Now (2026-11-23)
+## Now (2026-11-24)
+
+- **Upstream sync 2026-11-24:** merged `upstream/dev` `68286e07` (#1320): nRF52 sync word `0x242B` -> `0x24B4` from one
+  source (`src/lora_syncword.h`, `154014dc`) and two `tools/hmac_connect.py` commits. No conflicts; macro baseline
+  regenerated; host gate stage 1,2 PASS (five board builds, not every env). Code review (Opus, high): sound as code.
+  **Before the next fork release:** the mixed old/new nRF52 bench test (BACKLOG `SYNC-NRF-01`) and a build of every
+  env. `HMAC-WIN-01` (Windows hang in `hmac_connect.py`) is upstream's to fix.
+- **Next upstream PRs (plan Fassung 11):** PR A Auto Update (OTA-LOWHEAP-01 A+B, 32 KB buffer, AU-29, AU-30,
+  schedule + AU-23) and PR B small fixes (RAM-WSP-01 #1305, QA-RX-03 + BL-02 #1306, INA226-CAL-01, WEB-INA-01).
+  Operator decides: AU with or without the vendored mbedTLS override (recommended without; `mc_tls` links only with it
+  today), lift the NIGHTLY-01 condition, one PR or two. Then: decouple, fork release, one night on the bench, T-Deck
+  Plus measured, upstream issue for the heap part.
+- **TESTGATE-01 closed 2026-11-24:** see "Running campaigns". The FORMAL-01 patches and the formal rework noted below
+  as uncommitted are committed (`9696a3ba`, `6bbca7a2`, `8cc67569`); the "likely GitHub-side" download failure below
+  was AU-28, the fork's own HTTP client patch, fixed.
+
+## Earlier (2026-11-23)
 
 - **Formal checks reworked, unrun (2026-11-23):** review [formal-review-20261123.md](formal-review-20261123.md), how to
   run [`specs/README.md`](../specs/README.md). Runners repaired, tautologies removed, `netconsole.tla` rewritten, heap
