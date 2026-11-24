@@ -177,8 +177,8 @@ static void test_document_exceeds_buffer_fields_truncate_without_overrun(void)
 {
     const std::string longName(150, 'X');
     const std::string longUnit(80, 'Y');
-    const std::string longDatetime =
-        "2025-04-22T13:00:00-EXTRA-LONG-SUFFIX-THAT-DOES-NOT-FIT";
+    // Longer than node_parm_t[150] of src/meshcom_settings.h (the stub carries the same size).
+    const std::string longDatetime = "2025-04-22T13:00:00-" + std::string(200, 'Z');
 
     const std::string doc =
         "<StationDataList>"
@@ -201,10 +201,11 @@ static void test_document_exceeds_buffer_fields_truncate_without_overrun(void)
     TEST_ASSERT_EQUAL_STRING(expectedParm1.c_str(), meshcom_settings.node_parm_1);
     TEST_ASSERT_EQUAL_size_t(99, strlen(meshcom_settings.node_parm_1));
 
-    // node_parm_t[25]: truncated to 24 chars + NUL
-    const std::string expectedParmT = longDatetime.substr(0, 24);
+    // node_parm_t[150]: truncated to 149 chars + NUL
+    TEST_ASSERT_EQUAL_size_t(150, sizeof(meshcom_settings.node_parm_t));
+    const std::string expectedParmT = longDatetime.substr(0, 149);
     TEST_ASSERT_EQUAL_STRING(expectedParmT.c_str(), meshcom_settings.node_parm_t);
-    TEST_ASSERT_EQUAL_size_t(24, strlen(meshcom_settings.node_parm_t));
+    TEST_ASSERT_EQUAL_size_t(149, strlen(meshcom_settings.node_parm_t));
 
     // node_unit[50]: truncated to 49 chars + NUL
     const std::string expectedUnit = longUnit.substr(0, 49);

@@ -25,6 +25,8 @@ static double contrast(uint16_t a, uint16_t b)
 static std::string slurp(const char *p)
 {
     std::ifstream f(p);
+    // An unreadable file must not pass as "string absent" (TESTGATE-01).
+    TEST_ASSERT_TRUE_MESSAGE(f.good(), p);
     std::stringstream s; s << f.rdbuf();
     return s.str();
 }

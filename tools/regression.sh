@@ -4,25 +4,31 @@
 #   tools/regression.sh                 # stages 1 and 2 (no hardware)
 #   tools/regression.sh --stage all     # stages 1, 2 and 3 (bench fleet on USB)
 #   tools/regression.sh --stage 2       # one stage only
+#   tools/regression.sh --changed       # only the steps the uncommitted changes can turn red
+#   tools/regression.sh --changed <commit>   # ... plus everything committed since <commit>
 #   tools/regression.sh --list          # print the plan, run nothing
 #   tools/regression.sh --formal        # also TLA+ (run_tlc.sh) and ESBMC/CBMC (run_cbmc.sh), opt-in
 #   tools/regression.sh --stage 3 -- --flash --extudp   # pass-through to bench_suite.py
+#   python3 tools/regression_unity.py --self-test       # the Unity verdict parser
 #
-# Stage 1  host:   every [env:native*] in platformio.ini, one `pio test` each,
+# Stage 1  host:   every [env:native*] in platformio.ini, in ONE `pio test` call
+#                  (verdict per env from pio's JSON report, tools/regression_unity.py),
 #                  then test/golden/selftest.sh (lints, tool self-tests, mock
 #                  server). The topo_shadow full-window case needs four raw
 #                  DK5EN-98 logs under ~/Downloads/dk5en-98-nbr/; when absent
 #                  they come from the ~/meshlog/dk5en-98-nbr/ copy, else are
 #                  fetched from rpizero (and mirrored into ~/meshlog).
-#                  Then one `pio run` per nRF52 board env (BOARD_LINK_ENVS):
+#                  Then one `pio run` per ESP32 board env (BOARD_LINK_ENVS_ESP32: the
+#                  image must build) and per nRF52 board env (BOARD_LINK_ENVS):
 #                  the image must link and stay at or below
 #                  BOARD_FLASH_MAX_PCT of flash.
 # Stage 2  tools:  ruff lint gate (rules in ruff.toml, over tools and test,
 #                  ruff pinned); pytest over
 #                  tools/bench, tools/tests, tools/mock; the PEP-723 scripts
 #                  in test/test_nbrlog; node --test over tools/tests/*.mjs;
-#                  the jsdom-based safeboot and Remote page tests; the four --self-test
-#                  tools not covered by selftest.sh. Only with --formal: the TLA+
+#                  every jsdom page test (tools/safeboot_page_test.js and
+#                  tools/webgui_*_test.js by pattern, minus LIVE_NODE_TESTS); the
+#                  --self-test tools not covered by selftest.sh. Only with --formal: the TLA+
 #                  models (specs/tla/run_tlc.sh --all) and the ESBMC/CBMC jobs
 #                  (specs/cbmc/run_cbmc.sh --all), SKIP when the tools are missing.
 #                  --formal runs the quick tier; the heavy jobs: specs/cbmc/run_cbmc.sh --all --heavy.
@@ -33,9 +39,22 @@
 #
 # Every step logs to <out>/<step>.log (default
 # tools/bench/runs/regression-<timestamp>/, *.log is gitignored) and the
-# script ends with one summary table. Exit 1 if any step failed. Stages run
-# sequentially: `pio` must never run twice at once (shared build cache), and
-# selftest.sh itself shells out to `pio project config`.
+# Stages 1 and 2 run side by side when both are asked for (stage 2 runs no pio);
+# REGRESSION_SERIAL=1 restores one after another. pytest runs in
+# PYTEST_WORKERS processes (default 8). The
+# script ends with one summary table (status, seconds, step, detail; skipped
+# cases are part of the detail). Exit 1 if any step failed. Old run directories
+# are pruned at the end: the newest REGRESSION_KEEP (default 20) stay, and so
+# does every run that holds a git-tracked file or is cited under docs/.
+# `pio` must never run twice at once (shared build cache): every pio step
+# (Unity, the `pio project config` inside selftest.sh, board links, stage 3) sits
+# in the sequential part.
+#
+# --changed asks tools/regression_select.py which steps the changed files can
+# affect: Unity envs by include closure, the other steps by path rules. A path
+# no rule knows, platformio.ini or the runner itself selects the full gate. It
+# is the gate for a wave commit; the full gate stays mandatory before a release,
+# an upstream PR, after an upstream sync and at the end of a campaign.
 #
 # The inventory behind the three stages: docs/test-suite-map.md.
 
@@ -47,20 +66,54 @@ STAGES="1,2"
 FORMAL=0
 OUT=""
 LIST=0
+CHANGED=0
+CHANGED_BASE=""
 BENCH_ARGS=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --stage) STAGES="$2"; shift 2 ;;
         --out) OUT="$2"; shift 2 ;;
         --list) LIST=1; shift ;;
+        --changed) CHANGED=1; shift
+            case "${1:-}" in ""|--*) ;; *) CHANGED_BASE="$1"; shift ;; esac ;;
         --formal) FORMAL=1; shift ;;
         --) shift; BENCH_ARGS=("$@"); break ;;
-        -h|--help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,49p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
 done
 [ "$STAGES" = "all" ] && STAGES="1,2,3"
 want() { case ",$STAGES," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
+
+# ---------------------------------------------------------------- change-based selection
+# REG_SEL_MODE: "" (every step of the asked stages), or "select" with REG_SEL_STEPS,
+# REG_SEL_ENVS, REG_SEL_SUITES, REG_SEL_LINKS and REG_SEL_PYTEST_FW. The stage 2 child
+# run inherits them from the environment.
+if [ "$CHANGED" = 1 ]; then
+    SEL_OUT=$(python3 tools/regression_select.py --shell ${CHANGED_BASE:+--base "$CHANGED_BASE"}) || {
+        echo "regression.sh: the selector failed -- run the full gate" >&2; exit 2; }
+    eval "$(printf '%s\n' "$SEL_OUT" | grep -v '^#')"
+    echo "== Change-based run: $CHANGED_COUNT changed file(s)${CHANGED_BASE:+ since $CHANGED_BASE}"
+    printf '%s\n' "$SEL_OUT" | grep '^#' | sed 's/^# /   /' | grep -v ': no gate step reads it$' | head -60
+    case "$MODE" in
+        none) echo "RESULT: PASS (no gate step reads the changed files)"; exit 0 ;;
+        full) echo "   -> full gate" ;;
+        select)
+            export REG_SEL_MODE=select REG_SEL_STEPS="$STEPS" REG_SEL_ENVS="$UNITY_ENVS"
+            export REG_SEL_SUITES="$UNITY_SUITES" REG_SEL_LINKS="$NRF52_LINKS" REG_SEL_LINKS_ESP32="$ESP32_LINKS"
+            export REG_SEL_PYTEST_FW="$PYTEST_FIRMWARE"
+            echo "   -> steps: $STEPS"
+            STAGES=""
+            case " $STEPS " in *" unity "*|*" selftest "*|*" links "*) STAGES="1" ;; esac
+            case " $STEPS " in *" ruff "*|*" pytest "*|*" pytest_fw "*|*" wiredoc "*|*" nbrlog "*|*" mjs "*|*" pages "*|*" selftools "*|*" specs "*|*" inventory "*)
+                STAGES="${STAGES:+$STAGES,}2" ;; esac ;;
+    esac
+fi
+# sel <step>: true when the step is part of this run.
+sel() {
+    [ "${REG_SEL_MODE:-}" = select ] || return 0
+    case " $REG_SEL_STEPS " in *" $1 "*) return 0 ;; *) return 1 ;; esac
+}
 
 if [ -z "$OUT" ]; then
     OUT="$ROOT/tools/bench/runs/regression-$(date +%Y%m%d-%H%M%S)"
@@ -71,7 +124,11 @@ fi
 STEP_NAMES=()
 STEP_STATUS=()
 STEP_DETAIL=()
+STEP_SECS=()
 FAILS=0
+# Steps run strictly one after another, so a step's duration is the time since
+# the previous record() (or since the start of the run for the first one).
+STEP_T0=$(date +%s)
 record() {   # record <name> <OK|FAIL|SKIP> <detail>; a name is recorded once
     local i=0
     while [ $i -lt ${#STEP_NAMES[@]} ]; do
@@ -81,9 +138,13 @@ record() {   # record <name> <OK|FAIL|SKIP> <detail>; a name is recorded once
         fi
         i=$((i + 1))
     done
-    STEP_NAMES+=("$1"); STEP_STATUS+=("$2"); STEP_DETAIL+=("$3")
+    # REC_SECS, when set by the caller, is the step's own measured duration (steps
+    # that ran inside one pio call or in the parallel stage 2 child).
+    local now secs; now=$(date +%s)
+    if [ -n "${REC_SECS:-}" ]; then secs=$REC_SECS; else secs=$((now - STEP_T0)); STEP_T0=$now; fi
+    STEP_NAMES+=("$1"); STEP_STATUS+=("$2"); STEP_DETAIL+=("$3"); STEP_SECS+=("$secs")
     [ "$2" = "FAIL" ] && FAILS=$((FAILS + 1))
-    printf '%-6s %-44s %s\n' "$2" "$1" "$3"
+    printf '%-6s %4ss %-44s %s\n' "$2" "${STEP_SECS[$((${#STEP_SECS[@]} - 1))]}" "$1" "$3"
 }
 # run_step <name> <log-basename> <command...>: runs, logs, records by exit code.
 run_step() {
@@ -107,7 +168,10 @@ step_detail() {
     [ -n "$l" ] && { echo "${l##*: }"; return; }
     grep -q '^All checks passed!' "$1" && { echo "0 errors"; return; }
     l=$(grep -oE '^Found [0-9]+ errors?' "$1" | tail -1); [ -n "$l" ] && { echo "${l#Found }"; return; }
-    l=$(grep -oE '[0-9]+ passed' "$1" | tail -1); [ -n "$l" ] && { echo "$l"; return; }
+    # pytest: keep the skipped (and xfailed) counts next to "N passed" -- a skip
+    # depends on local state (.pio/libdeps, a compiler) and must stay visible.
+    l=$(grep -E '[0-9]+ passed' "$1" | tail -1 | grep -oE '[0-9]+ (passed|skipped|xfailed|xpassed|deselected)' | paste -sd, - | sed 's/,/, /g')
+    [ -n "$l" ] && { echo "$l"; return; }
     l=$(grep -oE '^# pass [0-9]+' "$1" | tail -1); [ -n "$l" ] && { echo "${l#\# }"; return; }
     l=$(grep -cE '^(PASS|ok|OK)\b' "$1"); [ "$l" -gt 0 ] && { echo "$l checks"; return; }
     echo "ok"
@@ -151,9 +215,14 @@ ensure_topo_raw() {
 # their image: t_echo overflowed unnoticed for two commits (2026-10-06).
 BOARD_LINK_ENVS="t_echo heltec_t114 wiscore_rak4631"
 BOARD_FLASH_MAX_PCT=95
-board_links() {
-    local e log rc pct
-    for e in $BOARD_LINK_ENVS; do
+# TESTGATE-01 (operator 2026-11-23): two ESP32 boards build in the full gate, the two
+# that sit on the bench. No percentage limit of our own here: the linker and PlatformIO's
+# size check fail the build when the app partition overflows.
+BOARD_LINK_ENVS_ESP32="heltec_wifi_lora_32_V3 ttgo_tbeam"
+BOARD_FLASH_MAX_PCT_ESP32=100
+board_links() {   # board_links "<envs>" <max flash percent>
+    local e log rc pct BOARD_FLASH_MAX_PCT="$2"
+    for e in $1; do
         if [ "$LIST" = 1 ]; then printf 'PLAN   %-44s pio run -e %s (flash <= %s %%)\n' "board link $e" "$e" "$BOARD_FLASH_MAX_PCT"; continue; fi
         log="$OUT/stage1-link-$e.log"
         pio run -e "$e" > "$log" 2>&1; rc=$?
@@ -168,89 +237,118 @@ board_links() {
     done
 }
 stage1() {
-    echo "== Stage 1: host (Unity envs + golden selftest + nRF52 board links)"
+    echo "== Stage 1: host (Unity envs + golden selftest + board builds)"
     if [ "$LIST" != 1 ] && pio_busy; then
         record "stage 1" FAIL "another pio process is running -- one pio at a time"; return 1
     fi
-    ensure_topo_raw
-    local envs e log line n ok fail skip rc
+    local envs e args="" log json rc line st n ok fail skip secs
     envs=$(grep -oE '^\[env:native[^]]*\]' platformio.ini | tr -d '[]' | sed 's/^env://')
+    if [ "${REG_SEL_MODE:-}" = select ]; then
+        envs=""; sel unity && envs="$REG_SEL_ENVS"
+        for e in $REG_SEL_SUITES; do args="$args -f $e"; done
+    fi
+    case " $envs " in *" native_topo_shadow "*) ensure_topo_raw ;; esac
     for e in $envs; do
-        ENV_COUNT=$((ENV_COUNT + 1))
-        if [ "$LIST" = 1 ]; then printf 'PLAN   %-44s pio test -e %s\n' "pio test $e" "$e"; continue; fi
-        log="$OUT/stage1-$e.log"
-        pio test -e "$e" > "$log" 2>&1; rc=$?
-        line=$(grep -E '[0-9]+ test cases?:' "$log" | tail -1)
-        n=$(echo "$line" | grep -oE '[0-9]+ test case' | grep -oE '[0-9]+'); n=${n:-0}
-        ok=$(echo "$line" | grep -oE '[0-9]+ succeeded' | grep -oE '[0-9]+'); ok=${ok:-0}
-        fail=$(echo "$line" | grep -oE '[0-9]+ failed' | grep -oE '[0-9]+'); fail=${fail:-0}
-        skip=$(echo "$line" | grep -oE '[0-9]+ skipped' | grep -oE '[0-9]+'); skip=${skip:-0}
-        TOTAL_CASES=$((TOTAL_CASES + n)); TOTAL_OK=$((TOTAL_OK + ok))
-        TOTAL_FAIL=$((TOTAL_FAIL + fail)); TOTAL_SKIP=$((TOTAL_SKIP + skip))
-        if [ $rc -eq 0 ] && [ "$fail" = 0 ] && [ "$n" != 0 ]; then
-            record "pio test $e" OK "$n cases, $ok ok, $skip skipped"
-        else
-            record "pio test $e" FAIL "exit $rc, $n cases, $fail failed -- $log"
-        fi
+        ENV_COUNT=$((ENV_COUNT + 1)); args="$args -e $e"
+        [ "$LIST" = 1 ] && printf 'PLAN   %-44s pio test -e %s (one pio call for all envs)\n' "pio test $e" "$e"
     done
-    run_step "golden selftest" stage1-selftest sh test/golden/selftest.sh
-    board_links
+    if [ "$LIST" != 1 ] && [ -n "$envs" ]; then
+        # One pio process for every native env: each separate start costs about
+        # 0.6 s of project parsing (measured 2026-11-23, 8 envs: 10 s apart, 5 s together).
+        # The verdict per env comes from pio's JSON report, not from the text log.
+        log="$OUT/stage1-unity.log"; json="$OUT/stage1-unity.json"
+        # shellcheck disable=SC2086
+        pio test $args --json-output-path "$json" > "$log" 2>&1; rc=$?
+        if [ ! -s "$json" ]; then
+            record "pio test (all native envs)" FAIL "exit $rc, no JSON report -- $log"
+        else
+            while IFS="$(printf '\t')" read -r e st n ok fail skip secs; do
+                TOTAL_CASES=$((TOTAL_CASES + n)); TOTAL_OK=$((TOTAL_OK + ok))
+                TOTAL_FAIL=$((TOTAL_FAIL + fail)); TOTAL_SKIP=$((TOTAL_SKIP + skip))
+                if [ "$st" = OK ]; then REC_SECS=$secs record "pio test $e" OK "$n cases, $ok ok, $skip skipped"
+                else REC_SECS=$secs record "pio test $e" FAIL "$st, $n cases, $fail failed -- grep '$e' $log"; fi
+            done <<EOF_UNITY
+$(python3 tools/regression_unity.py "$json" $envs)
+EOF_UNITY
+            STEP_T0=$(date +%s)
+        fi
+    fi
+    # The tools/mock suites run in the stage 2 pytest step; selftest.sh skips them then.
+    # In a change-based run they belong to the pytest rule as well.
+    if sel selftest; then
+        if want 2 || [ "${REG_SEL_MODE:-}" = select ]; then
+            SELFTEST_MOCK_IN_STAGE2=1 run_step "golden selftest" stage1-selftest sh test/golden/selftest.sh
+        else run_step "golden selftest" stage1-selftest sh test/golden/selftest.sh; fi
+    fi
+    if sel links && [ "${REG_SEL_LINKS:-1}" = 1 ]; then board_links "$BOARD_LINK_ENVS" "$BOARD_FLASH_MAX_PCT"; fi
+    if sel links && [ "${REG_SEL_LINKS_ESP32:-1}" = 1 ]; then board_links "$BOARD_LINK_ENVS_ESP32" "$BOARD_FLASH_MAX_PCT_ESP32"; fi
 }
 
 # ---------------------------------------------------------------- stage 2
+# Page tests that need a live node; everything else matching the pattern runs.
+LIVE_NODE_TESTS="webgui_badge_test.js webgui_tick_test.js"
+# --self-test tools that test/golden/selftest.sh does not run.
+SELF_TEST_TOOLS="tools/bench/tdeck_screenshot.py tools/bench/oled_screenshot.py tools/nbrlog.py tools/soakstatus.py tools/webflash.py tools/resource_watch.py tools/wire_doc_html.py tools/bench/identity_guard.py tools/bench/console_golden.py"
 stage2() {
     echo "== Stage 2: host tools (pytest, nbrlog scripts, node, self-tests)"
-    run_step "ruff lint gate" stage2-ruff \
+    sel ruff && run_step "ruff lint gate" stage2-ruff \
         uv run --quiet --with ruff==0.17.0 ruff check --output-format concise \
         tools test
-    run_step "pytest tools/bench tools/tests tools/mock" stage2-pytest \
-        uv run --quiet --with pytest --with markdown-it-py==3.0.0 pytest -q tools/bench tools/tests tools/mock tools/gps
-    run_step "wire doc HTML up to date" stage2-wire-doc-html \
+    if sel pytest; then
+        run_step "pytest tools/bench tools/tests tools/mock tools/gps" stage2-pytest \
+            uv run --quiet --with pytest --with pytest-xdist --with markdown-it-py==3.0.0 pytest -q -rs \
+            -n "${PYTEST_WORKERS:-8}" tools/bench tools/tests tools/mock tools/gps
+    elif sel pytest_fw; then
+        # The pytest files that read firmware sources, build configuration or build patches.
+        # shellcheck disable=SC2086
+        run_step "pytest firmware subset" stage2-pytest \
+            uv run --quiet --with pytest --with pytest-xdist --with markdown-it-py==3.0.0 pytest -q -rs \
+            -n "${PYTEST_WORKERS:-8}" $REG_SEL_PYTEST_FW
+    fi
+    sel wiredoc && run_step "wire doc HTML up to date" stage2-wire-doc-html \
         uv run --quiet tools/wire_doc_html.py --check
+    # docs/test-suite-inventory.md is generated from the tree; a new suite, env or case needs
+    # `python3 tools/suite_map.py --write`.
+    sel inventory && run_step "suite inventory up to date" stage2-suite-inventory \
+        python3 tools/suite_map.py --check
     local f
     for f in test/test_nbrlog/test_*.py; do
+        sel nbrlog || continue
         run_step "nbrlog $(basename "$f" .py)" "stage2-$(basename "$f" .py)" uv run --quiet "$f"
     done
     for f in tools/tests/*.mjs; do
+        sel mjs || continue
         run_step "node $(basename "$f")" "stage2-$(basename "$f" .mjs)" \
             node --test --test-reporter=tap "$f"
     done
     local jsdom="${MESHCOM_JSDOM_DIR:-$HOME/.cache/meshcom-jsdom}"
-    if [ "$LIST" != 1 ] && [ ! -d "$jsdom/node_modules/jsdom" ]; then
+    if sel pages && [ "$LIST" != 1 ] && [ ! -d "$jsdom/node_modules/jsdom" ]; then
         mkdir -p "$jsdom"
         npm install --silent --prefix "$jsdom" jsdom@24 > "$OUT/stage2-jsdom-install.log" 2>&1 \
-            || record "jsdom install" FAIL "see $OUT/stage2-jsdom-install.log"
+            || { record "jsdom install" FAIL "page tests not run -- see $OUT/stage2-jsdom-install.log"; jsdom=""; }
     fi
-    NODE_PATH="$jsdom/node_modules" run_step "node safeboot_page_test.js" stage2-safeboot-page \
-        node tools/safeboot_page_test.js
-    NODE_PATH="$jsdom/node_modules" run_step "node webgui_rm_test.js" stage2-webgui-rm \
-        node tools/webgui_rm_test.js
-    NODE_PATH="$jsdom/node_modules" run_step "node webgui_settings_test.js" stage2-webgui-settings \
-        node tools/webgui_settings_test.js
-    NODE_PATH="$jsdom/node_modules" run_step "node webgui_tdeck_theme_test.js" stage2-webgui-tdeck-theme \
-        node tools/webgui_tdeck_theme_test.js
-    NODE_PATH="$jsdom/node_modules" run_step "node webgui_theme_test.js" stage2-webgui-theme \
-        node tools/webgui_theme_test.js
-    NODE_PATH="$jsdom/node_modules" run_step "node webgui_look_test.js" stage2-webgui-look \
-        node tools/webgui_look_test.js
-    NODE_PATH="$jsdom/node_modules" run_step "node webgui_au_test.js" stage2-webgui-au \
-        node tools/webgui_au_test.js
-    NODE_PATH="$jsdom/node_modules" run_step "node webgui_au_sbwhy_test.js" stage2-webgui-au-sbwhy \
-        node tools/webgui_au_sbwhy_test.js
-    NODE_PATH="$jsdom/node_modules" run_step "node webgui_queue_test.js" stage2-webgui-queue \
-        node tools/webgui_queue_test.js
-    NODE_PATH="$jsdom/node_modules" run_step "node webgui_pins_test.js" stage2-webgui-pins node tools/webgui_pins_test.js
-    NODE_PATH="$jsdom/node_modules" run_step "node webgui_login_test.js" stage2-webgui-login \
-        node tools/webgui_login_test.js
-    NODE_PATH="$jsdom/node_modules" run_step "node webgui_load_test.js" stage2-webgui-load \
-        node tools/webgui_load_test.js
-    for f in tools/bench/tdeck_screenshot.py tools/bench/oled_screenshot.py tools/nbrlog.py tools/soakstatus.py tools/webflash.py tools/resource_watch.py tools/wire_doc_html.py; do
+    # Every page test on disk runs: a new tools/webgui_*_test.js needs no edit here.
+    # LIVE_NODE_TESTS need a node on the LAN (stage 3 runs the badge test).
+    for f in tools/safeboot_page_test.js tools/webgui_*_test.js; do
+        case " $LIVE_NODE_TESTS " in *" $(basename "$f") "*) continue ;; esac
+        sel pages || continue
+        [ -n "$jsdom" ] || continue   # install failed: one FAIL above, not one per page test
+        NODE_PATH="$jsdom/node_modules" run_step "node $(basename "$f")" \
+            "stage2-$(basename "$f" _test.js | tr '_' '-')" node "$f"
+    done
+    sel selftools && run_step "self-test regression_unity.py" stage2-selftest-regression_unity \
+        python3 tools/regression_unity.py --self-test
+    sel selftools && run_step "self-test regression_select.py" stage2-selftest-regression_select \
+        python3 tools/regression_select.py --self-test
+    for f in $SELF_TEST_TOOLS; do
+        sel selftools || continue
         run_step "self-test $(basename "$f")" "stage2-selftest-$(basename "$f" .py)" \
             uv run --quiet "$f" --self-test
     done
     # Formal instruments, always: static lint of the TLA+ models, drift check of the models against src/
     # (specs/manifest.json), verdict logic of both runners on canned tool output. No solver, no Java.
-    run_step "formal instruments self-test (specs/selftest.sh)" stage2-formal-selftest specs/selftest.sh
+    sel specs && run_step "formal instruments self-test (specs/selftest.sh)" stage2-formal-selftest specs/selftest.sh
+    [ "${REG_SEL_MODE:-}" = select ] && return 0
     # FORMAL-01: TLA+ models (every cfg incl. expect-fail mutations) and bounded model checking
     # (ESBMC/CBMC jobs incl. mutations). Opt-in with --formal (operator 2026-11-23: too heavy for every
     # run; run_cbmc.sh --all took > 13 min, up to 6 GB per job). Missing tools are a SKIP, not a pass.
@@ -292,11 +390,61 @@ stage3() {
     fi
 }
 
+# ---------------------------------------------------------------- housekeeping
+# Keep the newest REGRESSION_KEEP run directories. A run that holds a
+# git-tracked file or is named under docs/ is never removed.
+prune_runs() {
+    local keep="${REGRESSION_KEEP:-20}" runs="$ROOT/tools/bench/runs" d n=0 removed=0
+    case "$OUT" in "$runs"/regression-*) ;; *) return 0 ;; esac
+    for d in $(ls -1d "$runs"/regression-* 2>/dev/null | sort -r); do
+        n=$((n + 1))
+        [ $n -le "$keep" ] && continue
+        [ -n "$(git ls-files "$d" 2>/dev/null | head -1)" ] && continue
+        grep -rqF "$(basename "$d")" "$ROOT/docs" 2>/dev/null && continue
+        rm -rf "$d" && removed=$((removed + 1))
+    done
+    [ $removed -gt 0 ] && echo "pruned $removed old run director$([ $removed -eq 1 ] && echo y || echo ies) (kept the newest $keep)"
+    return 0
+}
+
 # ---------------------------------------------------------------- main
 START=$(date +%s)
-echo "regression $(git rev-parse --short HEAD 2>/dev/null) on $(git branch --show-current 2>/dev/null), stages $STAGES, out $OUT"
+echo "regression $(git rev-parse --short HEAD 2>/dev/null) on $(git branch --show-current 2>/dev/null), stages $STAGES${REG_SEL_MODE:+ (change-based)}, out $OUT"
+# Stages 1 and 2 together: stage 2 starts as a child run and works alongside
+# stage 1. Stage 2 runs no pio (the one `pio project config` call of the gate
+# sits in selftest.sh, stage 1), and its pytest step mostly waits on timeouts,
+# so the two do not compete. The child's steps are imported into this summary.
+# REGRESSION_SERIAL=1 runs them one after another, as before.
+S2_PID=""
+if want 1 && want 2 && [ "$LIST" != 1 ] && [ "${REGRESSION_SERIAL:-0}" != 1 ]; then
+    S2_ARGS="--stage 2 --out $OUT/stage2"
+    [ "$FORMAL" = 1 ] && S2_ARGS="$S2_ARGS --formal"
+    # shellcheck disable=SC2086
+    REGRESSION_CHILD=1 "$0" $S2_ARGS > "$OUT/stage2-child.log" 2>&1 &
+    S2_PID=$!
+    echo "== Stage 2 started alongside stage 1 (log $OUT/stage2-child.log)"
+fi
 want 1 && stage1
-want 2 && stage2
+if [ -n "$S2_PID" ]; then
+    wait "$S2_PID"; S2_RC=$?
+    echo "== Stage 2: host tools (ran alongside stage 1)"
+    S2_SEEN=0
+    if [ -s "$OUT/stage2/summary.log" ]; then
+        while IFS="$(printf '\t')" read -r st secs name detail; do
+            case "$st" in OK|FAIL|SKIP) ;; *) continue ;; esac
+            S2_SEEN=$((S2_SEEN + 1))
+            REC_SECS=$secs record "$name" "$st" "$detail"
+        done < "$OUT/stage2/summary.log"
+    fi
+    # The child's exit code and its step list must agree; a child that died early is a failure.
+    if [ "$S2_SEEN" -eq 0 ]; then
+        REC_SECS=0 record "stage 2" FAIL "child run left no summary (exit $S2_RC) -- $OUT/stage2-child.log"
+    elif [ "$S2_RC" -ne 0 ] && [ "$FAILS" -eq 0 ]; then
+        REC_SECS=0 record "stage 2" FAIL "child run exit $S2_RC without a failed step -- $OUT/stage2-child.log"
+    fi
+elif want 2; then
+    stage2
+fi
 want 3 && stage3
 [ "$LIST" = 1 ] && exit 0
 
@@ -304,20 +452,25 @@ echo
 echo "== Summary ($(( $(date +%s) - START )) s)"
 i=0
 while [ $i -lt ${#STEP_NAMES[@]} ]; do
-    printf '%-6s %-44s %s\n' "${STEP_STATUS[$i]}" "${STEP_NAMES[$i]}" "${STEP_DETAIL[$i]}"
+    printf '%-6s %4ss %-44s %s\n' "${STEP_STATUS[$i]}" "${STEP_SECS[$i]}" "${STEP_NAMES[$i]}" "${STEP_DETAIL[$i]}"
     i=$((i + 1))
 done
 if want 1; then
     echo "Unity: $ENV_COUNT envs, $TOTAL_CASES cases, $TOTAL_OK ok, $TOTAL_FAIL failed, $TOTAL_SKIP skipped"
 fi
 {
-    echo "regression $(git rev-parse --short HEAD 2>/dev/null) stages $STAGES $(date -u +%FT%TZ)"
+    echo "regression $(git rev-parse --short HEAD 2>/dev/null) stages $STAGES${REG_SEL_MODE:+ change-based: $REG_SEL_STEPS} $(date -u +%FT%TZ)"
     i=0
     while [ $i -lt ${#STEP_NAMES[@]} ]; do
-        printf '%s\t%s\t%s\n' "${STEP_STATUS[$i]}" "${STEP_NAMES[$i]}" "${STEP_DETAIL[$i]}"; i=$((i + 1))
+        printf '%s\t%s\t%s\t%s\n' "${STEP_STATUS[$i]}" "${STEP_SECS[$i]}" "${STEP_NAMES[$i]}" "${STEP_DETAIL[$i]}"; i=$((i + 1))
     done
     want 1 && echo "unity	$ENV_COUNT envs	$TOTAL_CASES cases	$TOTAL_OK ok	$TOTAL_FAIL failed	$TOTAL_SKIP skipped"
 } > "$OUT/summary.log"
 echo "summary: $OUT/summary.log"
+[ "${REGRESSION_CHILD:-0}" = 1 ] || prune_runs
 if [ $FAILS -gt 0 ]; then echo "RESULT: FAIL ($FAILS step(s))"; exit 1; fi
+if [ "${REG_SEL_MODE:-}" = select ] && [ "${REGRESSION_CHILD:-0}" != 1 ]; then
+    echo "RESULT: PASS (change-based: ${#STEP_NAMES[@]} step(s); the full gate is still due before release, PR and sync)"
+    exit 0
+fi
 echo "RESULT: PASS"

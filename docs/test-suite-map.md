@@ -142,15 +142,20 @@ received the same fix but has no host test.
 
 ## 2. Gates
 
-| Gate                                 | What it runs                                                                                                                  |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| CI `meshcom-ci.yml`                  | tags only: full `pio run`, UF2/.autoupdate packaging, release publish; no tests (`ci-build.yml` removed 2026-10-17)           |
-| Release (`/release-firmware` step 2) | every `[env:native*]` sequentially plus `selftest.sh`; step 5 adds the pages/flasher tests                                    |
-| `tools/regression.sh` stage 1        | same as the release gate; also fetches the topo_shadow raw window from rpizero when absent                                    |
-| `tools/regression.sh` stage 2        | pytest over tools/, nbrlog scripts, node tests, jsdom page tests (safeboot, Remote page, Settings), the four stray self-tests |
-| `tools/regression.sh` stage 3        | bench fleet over USB: identity guard, per-board harness, OTA; `--flash`, `--extudp`, `--deepsleep` opt-in                     |
+| Gate                                 | What it runs                                                                                                                                  |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| CI `meshcom-ci.yml`                  | tags only: full `pio run`, UF2/.autoupdate packaging, release publish; no tests (`ci-build.yml` removed 2026-10-17)                           |
+| Release (`/release-firmware` step 2) | every `[env:native*]` sequentially plus `selftest.sh`; step 5 adds the pages/flasher tests                                                    |
+| `tools/regression.sh` stage 1        | every native env in one `pio test` call, `selftest.sh`, three nRF52 board links; fetches the topo_shadow raw window when absent               |
+| `tools/regression.sh` stage 2        | ruff, pytest over tools/ (8 workers), nbrlog scripts, node tests, every jsdom page test on disk, the stray self-tests; runs alongside stage 1 |
+| `tools/regression.sh --changed`      | the steps of stages 1 and 2 that the changed files can affect (`tools/regression_select.py`); gate for a wave commit                          |
+| `tools/regression.sh` stage 3        | bench fleet over USB: identity guard, per-board harness, OTA; `--flash`, `--extudp`, `--deepsleep` opt-in                                     |
 
-Stages run strictly one after another. `pio` must never run twice at once
+Counts in section 1 are stale since the 2026-11-23 review (tree: 130 envs, 215 suites, 4245 cases, 1792 pytest
+cases); see `docs/review-test-gate-20261123.md` and `docs/campaign-test-gate-20261123.md` (wave 4 replaces this file
+by a generated one; section 5 already is).
+
+Every `pio` step sits in the sequential part of the run. `pio` must never run twice at once
 (shared build cache), and `selftest.sh` itself shells out to
 `pio project config`. Never run bare `pio test`: it walks the board envs and
 flashes whatever is attached.
@@ -189,165 +194,7 @@ flashes whatever is attached.
 
 ## 5. Per-suite inventory
 
-| Suite                        | Category      | Cases | Env(s)                                                       |
-| ---------------------------- | ------------- | ----: | ------------------------------------------------------------ |
-| test_ack_phone_frame         | Unit          |    13 | native                                                       |
-| test_ack_replay              | Oracle/Replay |     1 | native                                                       |
-| test_ack_validate            | Unit          |    17 | native                                                       |
-| test_alt_fusion              | Unit          |     7 | native                                                       |
-| test_aprs_corpus             | Oracle/Replay |     2 | native_aprs                                                  |
-| test_aprs_decode             | Oracle/Replay |    14 | native_aprs                                                  |
-| test_aprs_epilogue           | Contract      |     8 | native_aprs                                                  |
-| test_aprs_fuzz               | Fuzz          |     4 | native_aprs_fuzz                                             |
-| test_aprs_reencode           | Oracle/Replay |     1 | native_aprs_fuzz                                             |
-| test_aprs_spec               | Contract      |     8 | native_aprs                                                  |
-| test_backpressure            | Unit          |    39 | native                                                       |
-| test_batt_detect             | Regression    |    31 | native_batt_detect                                           |
-| test_batt_pipeline           | Unit          |    67 | native_batt_pipeline                                         |
-| test_beacon_rate             | Regression    |     9 | native                                                       |
-| test_applink_auth            | Unit          |    18 | native_applink_auth                                          |
-| test_applink_conn            | Unit          |    21 | native_applink_conn                                          |
-| test_applink_ws              | Contract      |    31 | native_applink_ws                                            |
-| test_ble_json_frame          | Regression    |     8 | native                                                       |
-| test_ble_phone_frame         | Contract      |     8 | native_ble_phone_frame                                       |
-| test_ble_session             | Regression    |    17 | native_ble_session                                           |
-| test_ble_phone_harness       | Integration   |    28 | native_ble_phone_harness                                     |
-| test_ble_settings_v1         | Contract      |    10 | native_ble_settings_v1                                       |
-| test_blocked_calls           | Unit          |    31 | native_blocked_calls                                         |
-| test_bp_echo_guard           | Regression    |    10 | native                                                       |
-| test_bp_notice_frame         | Contract      |    18 | native_aprs                                                  |
-| test_bp_regression           | Regression    |     4 | native_aprs                                                  |
-| test_byte_fifo               | Unit          |    27 | native_byte_fifo                                             |
-| test_capture_ring            | Unit          |    10 | native_capture                                               |
-| test_charset_filter          | Unit          |    29 | native                                                       |
-| test_checkvia                | Unit          |    13 | native_parsers                                               |
-| test_command_match           | Unit          |    11 | native_command_match                                         |
-| test_command_setters         | Unit          |    39 | native_command_setters                                       |
-| test_command_toggles         | Unit          |    37 | native_command_toggles                                       |
-| test_compress                | Unit          |    12 | native                                                       |
-| test_conf_frame              | Unit          |    12 | native_conf_frame                                            |
-| test_config_json             | Contract      |    35 | native_config                                                |
-| test_country_twin            | Twin          |     5 | native_country_esp32, native_country_nrf52                   |
-| test_csma_timing             | Unit          |    10 | native                                                       |
-| test_daylight                | Unit          |    11 | native_daylight                                              |
-| test_decodeaprspos           | Unit          |    22 | native_parsers                                               |
-| test_decodetinyxml           | Unit          |    14 | native_xml                                                   |
-| test_dedup_replay            | Oracle/Replay |     2 | native_dedup                                                 |
-| test_dm_dedup                | Unit          |    12 | native                                                       |
-| test_dm_stats                | Unit          |    13 | native                                                       |
-| test_dm_text_escape          | Unit          |    11 | native                                                       |
-| test_drift_dr16_gates        | Regression    |     7 | native                                                       |
-| test_esp32_flash_lifecycle   | Regression    |    13 | native_esp32_flash_lifecycle                                 |
-| test_esp32_settings_nvs      | Integration   |     6 | native_esp32_settings_nvs                                    |
-| test_eth_recovery            | Unit          |    22 | native_eth_recovery                                          |
-| test_extern_msg_json         | Contract      |     6 | native                                                       |
-| test_extern_notice_json      | Contract      |     7 | native                                                       |
-| test_extern_tele_json        | Contract      |     8 | native                                                       |
-| test_external_radio_protocol | Unit          |    66 | native_extradio                                              |
-| test_external_radio_tcp      | Unit          |    37 | native_extradio                                              |
-| test_external_radio_txq      | Unit          |    23 | native_extradio                                              |
-| test_extudp_target           | Unit          |     7 | native                                                       |
-| test_gateway_service_twin    | Twin          |    12 | native_gateway_twin                                          |
-| test_getextern               | Unit          |    32 | native_extern                                                |
-| test_gps_filter              | Regression    |    17 | native                                                       |
-| test_gw_link_status          | Unit          |    16 | native                                                       |
-| test_gwflood_frames          | Contract      |     6 | native_aprs                                                  |
-| test_hey_policy              | Unit          |     7 | native                                                       |
-| test_hey_echo_upload         | Unit          |    10 | native                                                       |
-| test_hey_report              | Unit          |     8 | native_aprs                                                  |
-| test_kbd_repeat              | Unit          |    39 | native                                                       |
-| test_kiss_ax25               | Unit          |    23 | native_extradio                                              |
-| test_fw_update               | Unit          |    62 | native_fw_update                                             |
-| test_fw_update_assets        | Unit          |    22 | native_fw_update_assets                                      |
-| test_fw_update_http          | Unit          |    13 | native_fw_update_http                                        |
-| test_hmac_sha256             | Unit          |    20 | native_hmac_sha256                                           |
-| test_kiss_frame              | Unit          |    18 | native_kiss_frame                                            |
-| test_phone_link              | Unit          |    11 | native_phone_link                                            |
-| test_pong_format             | Unit          |     7 | native_pong_format                                           |
-| test_loop_breadcrumb         | Unit          |    11 | native                                                       |
-| test_loop_scheduler          | Twin          |    26 | native_loop_scheduler                                        |
-| test_lora_aprs_encode        | Regression    |     4 | native_aprs_fuzz                                             |
-| test_mask_secret             | Unit          |     6 | native                                                       |
-| test_maxhop                  | Unit          |     7 | native                                                       |
-| test_deferred_save           | Unit          |     5 | native                                                       |
-| test_mc_text                 | Unit          |    21 | native_mc_text                                               |
-| test_mcp17_bits              | Unit          |     8 | native                                                       |
-| test_mh_phone                | Unit          |    12 | native_mh_phone                                              |
-| test_millis_rollover         | Regression    |     4 | native                                                       |
-| test_msg_input_budget        | Regression    |     7 | native_msg_input_budget                                      |
-| test_pin_status              | Unit          |    22 | native_pin_status                                            | Pin status and pin assignment JSON: escaping, limits, LED and MCP state, assignable masks (`src/pin_status_json.h`, `src/pin_assign_json.h`) |
-| test_gpio_control            | Unit          |    11 | native_gpio_control                                          | Free GPIO control state machine: master switch, refusals, on/off/in/release, function wins (`src/gpio_control.h`)                            |
-| test_pin_policy              | Unit          |    14 | native_pin_policy                                            | Pin policy: classes per board table, assign and load-repair rules, no free pin without a reviewed table (`src/pin_policy.h`)                 |
-| test_ext_reg                 | Unit          |    26 | native_ext_reg                                               | EXTUDP register query: request parse, secret filter (`src/ext_reg.h`)                                                                        |
-| test_au_schedule             | Unit          |    44 | native_au_schedule                                           | Auto update schedule and notice, install stays off (`src/fw_schedule.h`)                                                                     |
-| test_udp_hold                | Unit          |    32 | native_udp_hold                                              | Server outage hold ring: text filter, release, replay, limits (`src/udp_hold.h`)                                                             |
-| test_oled_shot               | Regression    |     5 | native_oled_shot                                             | OLED screenshot: u8g2 frame buffer layout (`src/oled_shot.h`)                                                                                |
-| test_screen_shadow           | Regression    |     5 | native_screen_shadow                                         | T-Deck screenshot: LVGL flush copy, clipping                                                                                                 |
-| test_gps_skyplot             | Unit          |    28 | native_gps_skyplot                                           | GPS sky plot core: satellite positions and colours (`src/gps_skyplot.h`)                                                                     |
-| test_gps_sky_layout          | Regression    |     6 | native_gps_sky_layout                                        | T-Deck Position tab: SKY/TEXT side tabs with nose, SEND POS clearance (`src/t-deck/tdeck_gps_sky_layout.h`)                                  |
-| test_cet_age                 | Regression    |    19 | native_cet_age                                               | `{CET}` beacon: age guard and forward-only filter with quorum, night-run replays (`src/cet_filter.h`)                                        |
-| test_msgid_counter           | Unit          |     6 | native                                                       |
-| test_msgstore                | Unit          |    60 | native                                                       |
-| test_msgstore_hook           | Unit          |     6 | native_msgstore_hook                                         |
-| test_nbr_matrix              | Unit          |    88 | native_nbr_matrix                                            |
-| test_nbr_replay              | Oracle/Replay |    15 | native_nbr_replay, native_nbr_replay64, native_nbr_replay128 |
-| test_nbr_report              | Unit          |     4 | native_nbr_report                                            |
-| test_nbr_views               | Unit          |    28 | native_nbr_views, native_nbr_views64                         |
-| test_netif_mtu               | Unit          |     3 | native_netif_mtu                                             |
-| test_nrf52_settings_paths    | Integration   |    26 | native_nrf52_settings_paths                                  |
-| test_ntp_async               | Regression    |    10 | native                                                       |
-| test_ntp_harvest             | Regression    |     4 | native                                                       |
-| test_onrx_stats              | Unit          |    12 | native                                                       |
-| test_own_msg_status          | Regression    |    13 | native                                                       |
-| test_pn_retry                | Unit          |    34 | native_pnretry                                               |
-| test_pos_filter              | Unit          |    32 | native                                                       |
-| test_pos_grid_hold           | Unit          |    10 | native                                                       |
-| test_pos_pipeline            | Unit          |    13 | native                                                       |
-| test_pos_persist             | Unit          |     9 | native                                                       |
-| test_pos_tag_nan             | Regression    |     7 | native_parsers                                               |
-| test_printfdeb_format        | Regression    |    13 | native                                                       |
-| test_node_position           | Unit          |     6 | native_node_position                                         |
-| test_radio_units             | Regression    |    16 | native                                                       |
-| test_reack_limiter           | Unit          |     8 | native                                                       |
-| test_regex_call              | Unit          |    13 | native                                                       |
-| test_remote_cmd              | Unit          |   101 | native_remote_cmd                                            |
-| test_rm_nodes_store          | Unit          |    23 | native_rm_nodes_store                                        |
-| test_rm_sender_policy        | Unit          |    43 | native_rm_sender_policy                                      |
-| test_rm_web_parse            | Unit          |     8 | native_rm_web_parse                                          |
-| test_rm_format               | Unit          |    32 | native_rm_format                                             |
-| test_charge_led_mode         | Regression    |    11 | native_charge_led_mode                                       |
-| test_telemetry_app           | Regression    |     4 | native_telemetry_app                                         |
-| test_ina226_cal              | Regression    |     7 | native_ina226_cal                                            |
-| test_board_led               | Unit          |    13 | native_board_led                                             |
-| test_gw_reg_state            | Unit          |    35 | native_gw_reg_state                                          |
-| test_web_txbuf               | Unit          |    34 | native_web_txbuf                                             |
-| test_rm_text                 | Unit          |     8 | native_rm_text                                               |
-| test_rm_policy_rx            | Regression    |    16 | native_rm_policy_rx                                          |
-| test_rm_client_cmd           | Regression    |    15 | native_rm_client_cmd                                         |
-| test_web_auth                | Unit          |    23 | native_web_auth                                              |
-| test_web_guard               | Unit          |    56 | native_web_guard                                             |
-| test_rtc_offset              | Regression    |     8 | native_rtc_offset                                            |
-| test_safeboot_state          | Unit          |    17 | native_safeboot                                              |
-| test_safeboot_ver            | Unit          |    16 | native_safeboot                                              |
-| test_serial_command_twin     | Twin          |     6 | native_serial_esp32, native_serial_nrf52                     |
-| test_setlog_lines            | Unit          |    29 | native                                                       |
-| test_settings_members        | Contract      |     5 | native_settings_members_esp32, native_settings_members_nrf52 |
-| test_settings_roundtrip      | Contract      |     9 | native_settings_roundtrip                                    |
-| test_settings_sanitize       | Regression    |    25 | native                                                       |
-| test_settings_store          | Unit          |    24 | native_settings_store                                        |
-| test_stor_announce           | Unit          |    22 | native_stor_announce                                         |
-| test_sto_notice              | Unit          |    26 | native                                                       |
-| test_temp_offset             | Regression    |     5 | native_temp_offset                                           |
-| test_tft_backlight           | Regression    |     4 | native                                                       |
-| test_tile_cache              | Unit          |    10 | native                                                       |
-| test_topo_shadow             | Oracle/Replay |     2 | native_topo_shadow                                           |
-| test_txprio_replay           | Oracle/Replay |     1 | native_aprs                                                  |
-| test_txring                  | Unit          |    43 | native_aprs                                                  |
-| test_txring_flood            | Regression    |    11 | native_aprs                                                  |
-| test_tz_anchor               | Unit          |     8 | native_tz_anchor                                             |
-| test_tz_rule                 | Unit          |    12 | native_tz_rule                                               |
-| test_udp_frame_twin          | Twin          |    42 | native_udp_frame_twin                                        |
-| test_udp_send_twin           | Twin          |    18 | native_udp_send_twin                                         |
-| test_unconfigured            | Unit          |    14 | native_aprs                                                  |
-| test_url_decode              | Regression    |    14 | native                                                       |
-| test_wifi_start_gate         | Regression    |     8 | native                                                       |
+The per-suite table is generated: [test-suite-inventory.md](test-suite-inventory.md) (`tools/suite_map.py --write`,
+checked by the host gate). It lists cases, envs, the production files a suite compiles or includes, whether it reads
+source files as text, and whether it runs under ASan/UBSan. The hand-kept table that stood here until 2026-11-23 was
+stale (67 envs and 124 suites in its header against 130 and 215 in the tree).

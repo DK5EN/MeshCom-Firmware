@@ -33,12 +33,13 @@ Open-source MeshCom Firmware. We contribute via PRs against the **upstream DEV b
 
 ## Testing and Gates
 
-- Host gate: `tools/regression.sh --stage 1,2` (all `[env:native*]` Unity envs, golden selftest, pytest and tool suites).
+- Host gate: `tools/regression.sh --stage 1,2` (all `[env:native*]` Unity envs in one `pio` call, golden selftest, two ESP32 and three nRF52 board builds, pytest and tool suites; about 3 min warm before the ESP32 builds were added).
+- Wave commits: `tools/regression.sh --changed` runs only the steps the uncommitted changes can turn red (`tools/regression_select.py`; an unknown path means the full gate). The full host gate stays mandatory before a release, an upstream PR, after an upstream sync and at the end of a campaign.
 - With bench hardware: `tools/regression.sh --stage all` (adds stage 3, `tools/bench/bench_suite.py`; `--flash`, `--extudp`, `--deepsleep` are opt-in, passed after `--`).
 - `/full-regression` wraps the runner (`.claude/commands/`, local and gitignored).
 - **Never run bare `pio test`**: it walks the board envs and flashes attached hardware.
 - **One `pio` process at a time** (shared build cache and global package store; `test/golden/selftest.sh` shells out to `pio project config`). Parallel writers route every `pio` call through a mkdir-lock wrapper (`piolock.sh` in the scratchpad).
-- Suite inventory: `docs/test-suite-map.md`.
+- Suite inventory: `docs/test-suite-map.md`; the per-suite table is generated (`docs/test-suite-inventory.md`, `python3 tools/suite_map.py --write` after adding a suite, env or case).
 
 ## Toolchain Pitfalls
 

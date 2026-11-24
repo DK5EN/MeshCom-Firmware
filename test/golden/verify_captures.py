@@ -80,6 +80,10 @@ def main() -> int:
         print(p, file=sys.stderr)
     print(f"verify_captures: {checked} capture(s) checked, {len(problems)} problem(s)",
           file=sys.stderr)
+    if checked == 0 and not problems:
+        # Zero captures is a broken lookup (moved directory, renamed files), not a pass.
+        print("verify_captures: no capture found to check", file=sys.stderr)
+        return 1
     return 1 if problems else 0
 
 

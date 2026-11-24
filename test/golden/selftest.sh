@@ -111,6 +111,7 @@ run python3 test/golden/variant_macros_lint.py
 # for all 68 envs against the pre-refactor baseline, ignoring only the
 # structural `extends` key -- see test/golden/variant_ini_effective.py for why
 # a macro dump (variant_macros_effective.py) cannot see this class of change.
+run python3 test/golden/variant_macros_effective.py --self-test
 run python3 test/golden/variant_ini_effective.py --self-test
 run python3 test/golden/variant_ini_effective.py
 run python3 test/golden/twin_diff.py --self-test
@@ -137,10 +138,14 @@ run python3 test/golden/drift_matrix_lint.py
 run python3 tools/bench/w3_upgrade_check.py --self-test
 run python3 test/golden/verify_captures.py
 run python3 test/golden/corpus_lint.py test/golden/corpus/
-# A pipeline runs its first command in a subshell, so run() cannot count it;
-# the counter is bumped by hand here. (Its exit status is tail's, as before.)
-RUN_COUNT=$((RUN_COUNT + 1))
-# No pipe here: a `| tail -3` made the line's status tail's, so a failing mock
-# suite never aborted the gate (found by the W1 writer 2026-10-03).
-python3 -m unittest discover tools/mock -q
+# The tools/mock suites (320 cases). tools/regression.sh runs the same files in
+# its stage 2 pytest step and sets SELFTEST_MOCK_IN_STAGE2=1 when that stage is
+# part of the run, so they are not run twice. Standalone (release step 2) they
+# run here. No pipe: a `| tail -3` made the line's status tail's, so a failing
+# mock suite never aborted the gate (found by the W1 writer 2026-10-03).
+if [ "${SELFTEST_MOCK_IN_STAGE2:-0}" = 1 ]; then
+    echo "selftest: tools/mock suites left to the stage 2 pytest step"
+else
+    run python3 -m unittest discover tools/mock -q
+fi
 echo "selftest: $RUN_COUNT commands run, all green"

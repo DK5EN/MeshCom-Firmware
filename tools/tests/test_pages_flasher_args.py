@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests for tools/pages_flasher.py argument defaults.
 
-    python3 -m unittest tools/test_pages_flasher.py
+    python3 -m unittest tools/tests/test_pages_flasher_args.py
 """
 
 import sys
@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pages_flasher  # noqa: E402
 
 

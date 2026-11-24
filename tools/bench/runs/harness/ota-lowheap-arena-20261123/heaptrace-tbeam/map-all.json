@@ -1,0 +1,5597 @@
+{
+ "segment": 0,
+ "shadowed": 46,
+ "untraced_bytes": 0,
+ "markers": [
+  {
+   "marker": "idle",
+   "t": 602615,
+   "ifree": 47572,
+   "iblk": 45044,
+   "drops": 55,
+   "live_total": 37000,
+   "live_blocks": 113,
+   "itotal": 193200,
+   "waitms": 3683,
+   "untracked": 108628,
+   "by_caller": [
+    {
+     "bytes": 12632,
+     "blocks": 2,
+     "function": "xTaskCreate",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/freertos/task.h:450",
+     "pc": "0x4016f5bc",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 4952,
+     "blocks": 2,
+     "function": "esp_timer_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/esp_timer.c:475",
+     "pc": "0x401a0281",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 3388,
+     "blocks": 17,
+     "function": "mem_malloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/mem.c:237",
+     "pc": "0x4018c09b",
+     "tasks": [
+      "con_auth",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "esp_ipc_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ipc/src/esp_ipc.c:113",
+     "pc": "0x401b8d65",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "prvCreateIdleTasks",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/tasks.c:2382",
+     "pc": "0x4009b621",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2448,
+     "blocks": 26,
+     "function": "xQueueGenericCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/queue.c:447",
+     "pc": "0x40099048",
+     "tasks": [
+      "-",
+      "con_auth",
+      "loopTask",
+      "main",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 2304,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:882",
+     "pc": "0x4009816f",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1104,
+     "blocks": 3,
+     "function": "String::changeBuffer(unsigned int)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/WString.cpp:200 (discriminator 4)",
+     "pc": "0x4016d722",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1024,
+     "blocks": 8,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017b09a",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 472,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:881",
+     "pc": "0x40098161",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 428,
+     "blocks": 1,
+     "function": "__sfmoreglue",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/findfp.c:132",
+     "pc": "0x40092710",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 424,
+     "blocks": 1,
+     "function": "nvs::PageManager::load(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_pagemanager.cpp:20 (discriminator 4)",
+     "pc": "0x4017c446",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 384,
+     "blocks": 2,
+     "function": "esp_vfs_register_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/vfs/vfs.c:76",
+     "pc": "0x4017f1f0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 344,
+     "blocks": 1,
+     "function": "esp_startup_start_app_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/port/port_common.c:78",
+     "pc": "0x4009bcef",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 308,
+     "blocks": 11,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017a9c9",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 2,
+     "function": "__smakebuf_r",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/makebuf.c:53",
+     "pc": "0x40093249",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 244,
+     "blocks": 1,
+     "function": "uartBegin",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-uart.c:433",
+     "pc": "0x40170c52",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 240,
+     "blocks": 5,
+     "function": "load_partitions",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/spi_flash/partition.c:214",
+     "pc": "0x40178c62",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017ae62",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5329",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_schm_init",
+     "location": "??:?",
+     "pc": "0x401d5dc2",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "_GLOBAL__sub_I_timerSerial",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/esp32_main.cpp:912",
+     "pc": "0x400f15aa",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "Module::Module(unsigned int, unsigned int, unsigned int, unsigned int)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/RadioLib/src/Module.cpp:11",
+     "pc": "0x4015460c",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017ad5e",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 2,
+     "function": "pthread_key_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:60",
+     "pc": "0x4017c9d0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017c774",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "addApbChangeCallback",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-cpu.c:93",
+     "pc": "0x4016e9f6",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "rtc_isr_register",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/driver/rtc_module.c:92",
+     "pc": "0x401751a9",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 1,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:255",
+     "pc": "0x4017cac9",
+     "tasks": [
+      "con_auth"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5359",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "esp_intr_alloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_hw_support/intr_alloc.c:604",
+     "pc": "0x4019f732",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "pthread_mutex_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread.c:545",
+     "pc": "0x4017c876",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "esp_newlib_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/newlib/newlib_init.c:147",
+     "pc": "0x401a05f7",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:230",
+     "pc": "0x4017caa0",
+     "tasks": [
+      "con_auth"
+     ]
+    }
+   ],
+   "by_first_outside_allocator": [
+    {
+     "bytes": 12632,
+     "blocks": 2,
+     "function": "xTaskCreate",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/freertos/task.h:450",
+     "pc": "0x4016f5bc",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 4952,
+     "blocks": 2,
+     "function": "esp_timer_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/esp_timer.c:475",
+     "pc": "0x401a0281",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "esp_ipc_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ipc/src/esp_ipc.c:113",
+     "pc": "0x401b8d65",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "prvCreateIdleTasks",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/tasks.c:2382",
+     "pc": "0x4009b621",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2680,
+     "blocks": 2,
+     "function": "tcp_pbuf_prealloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/tcp_out.c:263",
+     "pc": "0x401934b4",
+     "tasks": [
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 2448,
+     "blocks": 26,
+     "function": "xQueueGenericCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/queue.c:447",
+     "pc": "0x40099048",
+     "tasks": [
+      "-",
+      "con_auth",
+      "loopTask",
+      "main",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 2304,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:882",
+     "pc": "0x4009816f",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1040,
+     "blocks": 1,
+     "function": "work_webpage()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/web_functions/web_functions.cpp:1051",
+     "pc": "0x401446f0",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 768,
+     "blocks": 6,
+     "function": "nvs::Page::mLoadEntryTable()",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_page.cpp:761",
+     "pc": "0x4017bfdf",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 696,
+     "blocks": 13,
+     "function": "memp_malloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/memp.c:350 (discriminator 2)",
+     "pc": "0x4018c174",
+     "tasks": [
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 472,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:881",
+     "pc": "0x40098161",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 428,
+     "blocks": 1,
+     "function": "__sfmoreglue",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/findfp.c:132",
+     "pc": "0x40092710",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 424,
+     "blocks": 1,
+     "function": "nvs::PageManager::load(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_pagemanager.cpp:20 (discriminator 4)",
+     "pc": "0x4017c446",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 384,
+     "blocks": 2,
+     "function": "esp_vfs_register_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/vfs/vfs.c:76",
+     "pc": "0x4017f1f0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 344,
+     "blocks": 1,
+     "function": "esp_startup_start_app_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/port/port_common.c:78",
+     "pc": "0x4009bcef",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 308,
+     "blocks": 11,
+     "function": "nvs::NVSPartitionManager::init_custom(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:92",
+     "pc": "0x4017ae99",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 2,
+     "function": "__smakebuf_r",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/makebuf.c:53",
+     "pc": "0x40093249",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 2,
+     "function": "nvs::Page::mLoadEntryTable()",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_page.cpp:679",
+     "pc": "0x4017bec3",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 244,
+     "blocks": 1,
+     "function": "uartBegin",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-uart.c:433",
+     "pc": "0x40170c52",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 240,
+     "blocks": 5,
+     "function": "load_partitions",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/spi_flash/partition.c:214",
+     "pc": "0x40178c62",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 1,
+     "function": "nvs::NVSPartitionManager::init_partition(char const*)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:54",
+     "pc": "0x4017af4c",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5329",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_schm_init",
+     "location": "??:?",
+     "pc": "0x401d5dc2",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "_GLOBAL__sub_I_timerSerial",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/esp32_main.cpp:912",
+     "pc": "0x400f15aa",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 64,
+     "blocks": 2,
+     "function": "String::copy(char const*, unsigned int)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/WString.cpp:224",
+     "pc": "0x4016d7c8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "Module::Module(unsigned int, unsigned int, unsigned int, unsigned int)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/RadioLib/src/Module.cpp:11",
+     "pc": "0x4015460c",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 1,
+     "function": "nvs_flash_init_partition",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_api.cpp:129",
+     "pc": "0x401793b3",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 2,
+     "function": "pthread_key_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:60",
+     "pc": "0x4017c9d0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "addApbChangeCallback",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-cpu.c:93",
+     "pc": "0x4016e9f6",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "nvs::NVSPartitionManager::init_partition(char const*)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:46 (discriminator 2)",
+     "pc": "0x4017af33",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "rtc_isr_register",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/driver/rtc_module.c:92",
+     "pc": "0x401751a9",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 1,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:255",
+     "pc": "0x4017cac9",
+     "tasks": [
+      "con_auth"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5359",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "esp_intr_alloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_hw_support/intr_alloc.c:604",
+     "pc": "0x4019f732",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "pthread_mutex_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread.c:545",
+     "pc": "0x4017c876",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "sys_mbox_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/port/esp32/freertos/sys_arch.c:221",
+     "pc": "0x4019c16a",
+     "tasks": [
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "esp_newlib_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/newlib/newlib_init.c:147",
+     "pc": "0x401a05f7",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:230",
+     "pc": "0x4017caa0",
+     "tasks": [
+      "con_auth"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "sys_thread_sem_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/port/esp32/freertos/sys_arch.c:530",
+     "pc": "0x4019c378",
+     "tasks": [
+      "con_auth"
+     ]
+    }
+   ],
+   "delta": null
+  },
+  {
+   "marker": "after_check",
+   "t": 653824,
+   "ifree": 47732,
+   "iblk": 42996,
+   "drops": 89,
+   "live_total": 83851,
+   "live_blocks": 188,
+   "itotal": 193200,
+   "waitms": 4037,
+   "untracked": 61617,
+   "by_caller": [
+    {
+     "bytes": 12632,
+     "blocks": 2,
+     "function": "xTaskCreate",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/freertos/task.h:450",
+     "pc": "0x4016f5bc",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 10928,
+     "blocks": 3,
+     "function": "_ZN12_GLOBAL__N_18startJobE8FwNetJobhPKNS_6LanArgE$part$2",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/fw_update_net.cpp:2019",
+     "pc": "0x400f4450",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 6488,
+     "blocks": 3,
+     "function": "esp_nimble_enable",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/nimble_port_freertos.c:60",
+     "pc": "0x4016703c",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 5120,
+     "blocks": 2,
+     "function": "bf_attach_all(byte_fifo_t* const*, unsigned short const*, unsigned char, void* (*)(unsigned int), void (*)(void*))",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/byte_fifo.cpp:262",
+     "pc": "0x400da676",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4952,
+     "blocks": 2,
+     "function": "esp_timer_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/esp_timer.c:475",
+     "pc": "0x401a0281",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4784,
+     "blocks": 3,
+     "function": "task_create_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:870 (discriminator 4)",
+     "pc": "0x401a0d5c",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4620,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d60",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 3324,
+     "blocks": 18,
+     "function": "mem_malloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/mem.c:237",
+     "pc": "0x4018c09b",
+     "tasks": [
+      "loopTask",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 3188,
+     "blocks": 33,
+     "function": "xQueueGenericCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/queue.c:447",
+     "pc": "0x40099048",
+     "tasks": [
+      "-",
+      "con_auth",
+      "fwnet",
+      "loopTask",
+      "main",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 3000,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:241",
+     "pc": "0x40166361",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "esp_ipc_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ipc/src/esp_ipc.c:113",
+     "pc": "0x401b8d65",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "prvCreateIdleTasks",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/tasks.c:2382",
+     "pc": "0x4009b621",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2604,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d4a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 2304,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:882",
+     "pc": "0x4009816f",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1364,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3dc1",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1168,
+     "blocks": 1,
+     "function": "os_msys_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/nimble/src/os_msys_init.c:153",
+     "pc": "0x40166fae",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1152,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:234",
+     "pc": "0x40166341",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1104,
+     "blocks": 3,
+     "function": "String::changeBuffer(unsigned int)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/WString.cpp:200 (discriminator 4)",
+     "pc": "0x4016d722",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1024,
+     "blocks": 8,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017b09a",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 912,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5ecd",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 892,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d34",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 520,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:238",
+     "pc": "0x40166351",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 472,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:881",
+     "pc": "0x40098161",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 428,
+     "blocks": 1,
+     "function": "__sfmoreglue",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/findfp.c:132",
+     "pc": "0x40092710",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 424,
+     "blocks": 1,
+     "function": "nvs::PageManager::load(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_pagemanager.cpp:20 (discriminator 4)",
+     "pc": "0x4017c446",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 400,
+     "blocks": 1,
+     "function": "ble_att_svr_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_att_svr.c:3163",
+     "pc": "0x4015b734",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 384,
+     "blocks": 2,
+     "function": "esp_vfs_register_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/vfs/vfs.c:76",
+     "pc": "0x4017f1f0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 344,
+     "blocks": 1,
+     "function": "esp_startup_start_app_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/port/port_common.c:78",
+     "pc": "0x4009bcef",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 308,
+     "blocks": 11,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017a9c9",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 288,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:230",
+     "pc": "0x40166330",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 2,
+     "function": "__smakebuf_r",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/makebuf.c:53",
+     "pc": "0x40093249",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 248,
+     "blocks": 1,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:1474",
+     "pc": "0x401a117a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 244,
+     "blocks": 1,
+     "function": "uartBegin",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-uart.c:433",
+     "pc": "0x40170c52",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 240,
+     "blocks": 5,
+     "function": "load_partitions",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/spi_flash/partition.c:214",
+     "pc": "0x40178c62",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 2,
+     "function": "customer_queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:758",
+     "pc": "0x401a0f08",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 2,
+     "function": "queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:746",
+     "pc": "0x401a0fb0",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 2,
+     "function": "NimBLEService::createCharacteristic(NimBLEUUID const&, unsigned int, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEService.cpp:207",
+     "pc": "0x401596d0",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 4,
+     "function": "ets_timer_setfn",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/ets_timer_legacy.c:69",
+     "pc": "0x401a03b5",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017ae62",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 4,
+     "function": "hli_semaphore_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/hli_api.c:257",
+     "pc": "0x401a1490",
+     "tasks": [
+      "btContro",
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 96,
+     "blocks": 3,
+     "function": "npl_freertos_callout_init",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/npl_os_freertos.c:1799",
+     "pc": "0x4016745e",
+     "tasks": [
+      "fwnet",
+      "nimble_h"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3e66",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3ef9",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5329",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_schm_init",
+     "location": "??:?",
+     "pc": "0x401d5dc2",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:1509 (discriminator 15)",
+     "pc": "0x401a11fc",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "r_vhci_init",
+     "location": "??:?",
+     "pc": "0x401b7be8",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "NimBLEService::start()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEService.cpp:124 (discriminator 4)",
+     "pc": "0x401593de",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "_GLOBAL__sub_I_timerSerial",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/esp32_main.cpp:912",
+     "pc": "0x400f15aa",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "hli_customer_queue_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/hli_api.c:246",
+     "pc": "0x401a1470",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 72,
+     "blocks": 1,
+     "function": "queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:750",
+     "pc": "0x401a0fe3",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 68,
+     "blocks": 1,
+     "function": "NimBLEServer::createService(NimBLEUUID const&)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEServer.cpp:95",
+     "pc": "0x40158ee4",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 64,
+     "blocks": 1,
+     "function": "NimBLEDevice::getAdvertising()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEDevice.cpp:191",
+     "pc": "0x40158611",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "Module::Module(unsigned int, unsigned int, unsigned int, unsigned int)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/RadioLib/src/Module.cpp:11",
+     "pc": "0x4015460c",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3c2f",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 42,
+     "blocks": 2,
+     "function": "NimBLEAttValue::NimBLEAttValue(unsigned short, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEAttValue.cpp:34",
+     "pc": "0x40158320",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017ad5e",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "NimBLEDevice::createServer()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEDevice.cpp:127",
+     "pc": "0x401585da",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1658",
+     "pc": "0x4015e2c3",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1678",
+     "pc": "0x4015e23e",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 2,
+     "function": "pthread_key_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:60",
+     "pc": "0x4017c9d0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 21,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<unsigned char>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x4016765a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017c774",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "addApbChangeCallback",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-cpu.c:93",
+     "pc": "0x4016e9f6",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "rtc_isr_register",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/driver/rtc_module.c:92",
+     "pc": "0x401751a9",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 3,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:230",
+     "pc": "0x4017caa0",
+     "tasks": [
+      "con_auth",
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 1,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:255",
+     "pc": "0x4017cac9",
+     "tasks": [
+      "con_auth"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLECharacteristic*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x40159631",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5e91",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5eb8",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_core_enable",
+     "location": "??:?",
+     "pc": "0x401d5449",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5359",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "esp_intr_alloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_hw_support/intr_alloc.c:604",
+     "pc": "0x4019f732",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "pthread_mutex_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread.c:545",
+     "pc": "0x4017c876",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLEService*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x40158ead",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "esp_newlib_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/newlib/newlib_init.c:147",
+     "pc": "0x401a05f7",
+     "tasks": [
+      "-"
+     ]
+    }
+   ],
+   "by_first_outside_allocator": [
+    {
+     "bytes": 12632,
+     "blocks": 2,
+     "function": "xTaskCreate",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/freertos/task.h:450",
+     "pc": "0x4016f5bc",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 10928,
+     "blocks": 3,
+     "function": "_ZN12_GLOBAL__N_18startJobE8FwNetJobhPKNS_6LanArgE$part$2",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/fw_update_net.cpp:2019",
+     "pc": "0x400f4450",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 6488,
+     "blocks": 3,
+     "function": "esp_nimble_enable",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/nimble_port_freertos.c:60",
+     "pc": "0x4016703c",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 5120,
+     "blocks": 2,
+     "function": "bf_attach_all(byte_fifo_t* const*, unsigned short const*, unsigned char, void* (*)(unsigned int), void (*)(void*))",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/byte_fifo.cpp:262",
+     "pc": "0x400da676",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4952,
+     "blocks": 2,
+     "function": "esp_timer_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/esp_timer.c:475",
+     "pc": "0x401a0281",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4784,
+     "blocks": 3,
+     "function": "task_create_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:870 (discriminator 4)",
+     "pc": "0x401a0d5c",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4620,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d60",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 3188,
+     "blocks": 33,
+     "function": "xQueueGenericCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/queue.c:447",
+     "pc": "0x40099048",
+     "tasks": [
+      "-",
+      "con_auth",
+      "fwnet",
+      "loopTask",
+      "main",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 3000,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:241",
+     "pc": "0x40166361",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "esp_ipc_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ipc/src/esp_ipc.c:113",
+     "pc": "0x401b8d65",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "prvCreateIdleTasks",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/tasks.c:2382",
+     "pc": "0x4009b621",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2680,
+     "blocks": 2,
+     "function": "tcp_pbuf_prealloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/tcp_out.c:263",
+     "pc": "0x401934b4",
+     "tasks": [
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 2604,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d4a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 2304,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:882",
+     "pc": "0x4009816f",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1364,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3dc1",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1168,
+     "blocks": 1,
+     "function": "os_msys_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/nimble/src/os_msys_init.c:153",
+     "pc": "0x40166fae",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1152,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:234",
+     "pc": "0x40166341",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1040,
+     "blocks": 1,
+     "function": "work_webpage()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/web_functions/web_functions.cpp:1051",
+     "pc": "0x401446f0",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 912,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5ecd",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 892,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d34",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 768,
+     "blocks": 6,
+     "function": "nvs::Page::mLoadEntryTable()",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_page.cpp:761",
+     "pc": "0x4017bfdf",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 628,
+     "blocks": 14,
+     "function": "memp_malloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/memp.c:350 (discriminator 2)",
+     "pc": "0x4018c174",
+     "tasks": [
+      "loopTask",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 520,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:238",
+     "pc": "0x40166351",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 472,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:881",
+     "pc": "0x40098161",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 428,
+     "blocks": 1,
+     "function": "__sfmoreglue",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/findfp.c:132",
+     "pc": "0x40092710",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 424,
+     "blocks": 1,
+     "function": "nvs::PageManager::load(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_pagemanager.cpp:20 (discriminator 4)",
+     "pc": "0x4017c446",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 400,
+     "blocks": 1,
+     "function": "ble_att_svr_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_att_svr.c:3163",
+     "pc": "0x4015b734",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 384,
+     "blocks": 2,
+     "function": "esp_vfs_register_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/vfs/vfs.c:76",
+     "pc": "0x4017f1f0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 344,
+     "blocks": 1,
+     "function": "esp_startup_start_app_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/port/port_common.c:78",
+     "pc": "0x4009bcef",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 308,
+     "blocks": 11,
+     "function": "nvs::NVSPartitionManager::init_custom(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:92",
+     "pc": "0x4017ae99",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 288,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:230",
+     "pc": "0x40166330",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 2,
+     "function": "__smakebuf_r",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/makebuf.c:53",
+     "pc": "0x40093249",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 2,
+     "function": "nvs::Page::mLoadEntryTable()",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_page.cpp:679",
+     "pc": "0x4017bec3",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 248,
+     "blocks": 1,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:1474",
+     "pc": "0x401a117a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 244,
+     "blocks": 1,
+     "function": "uartBegin",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-uart.c:433",
+     "pc": "0x40170c52",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 240,
+     "blocks": 5,
+     "function": "load_partitions",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/spi_flash/partition.c:214",
+     "pc": "0x40178c62",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 2,
+     "function": "customer_queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:758",
+     "pc": "0x401a0f08",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 2,
+     "function": "queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:746",
+     "pc": "0x401a0fb0",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 2,
+     "function": "NimBLEService::createCharacteristic(NimBLEUUID const&, unsigned int, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEService.cpp:207",
+     "pc": "0x401596d0",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 4,
+     "function": "ets_timer_setfn",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/ets_timer_legacy.c:69",
+     "pc": "0x401a03b5",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 4,
+     "function": "hli_semaphore_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/hli_api.c:257",
+     "pc": "0x401a1490",
+     "tasks": [
+      "btContro",
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 1,
+     "function": "nvs::NVSPartitionManager::init_partition(char const*)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:54",
+     "pc": "0x4017af4c",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 96,
+     "blocks": 3,
+     "function": "npl_freertos_callout_init",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/npl_os_freertos.c:1799",
+     "pc": "0x4016745e",
+     "tasks": [
+      "fwnet",
+      "nimble_h"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3e66",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3ef9",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5329",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_schm_init",
+     "location": "??:?",
+     "pc": "0x401d5dc2",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:1509 (discriminator 15)",
+     "pc": "0x401a11fc",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "r_vhci_init",
+     "location": "??:?",
+     "pc": "0x401b7be8",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "NimBLEService::start()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEService.cpp:124 (discriminator 4)",
+     "pc": "0x401593de",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "_GLOBAL__sub_I_timerSerial",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/esp32_main.cpp:912",
+     "pc": "0x400f15aa",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "hli_customer_queue_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/hli_api.c:246",
+     "pc": "0x401a1470",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 72,
+     "blocks": 1,
+     "function": "queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:750",
+     "pc": "0x401a0fe3",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 68,
+     "blocks": 1,
+     "function": "NimBLEServer::createService(NimBLEUUID const&)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEServer.cpp:95",
+     "pc": "0x40158ee4",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 64,
+     "blocks": 1,
+     "function": "NimBLEDevice::getAdvertising()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEDevice.cpp:191",
+     "pc": "0x40158611",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 64,
+     "blocks": 2,
+     "function": "String::copy(char const*, unsigned int)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/WString.cpp:224",
+     "pc": "0x4016d7c8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "Module::Module(unsigned int, unsigned int, unsigned int, unsigned int)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/RadioLib/src/Module.cpp:11",
+     "pc": "0x4015460c",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3c2f",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 42,
+     "blocks": 2,
+     "function": "NimBLEAttValue::NimBLEAttValue(unsigned short, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEAttValue.cpp:34",
+     "pc": "0x40158320",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 1,
+     "function": "nvs_flash_init_partition",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_api.cpp:129",
+     "pc": "0x401793b3",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "NimBLEDevice::createServer()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEDevice.cpp:127",
+     "pc": "0x401585da",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1658",
+     "pc": "0x4015e2c3",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1678",
+     "pc": "0x4015e23e",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 2,
+     "function": "pthread_key_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:60",
+     "pc": "0x4017c9d0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 21,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<unsigned char>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x4016765a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "addApbChangeCallback",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-cpu.c:93",
+     "pc": "0x4016e9f6",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "nvs::NVSPartitionManager::init_partition(char const*)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:46 (discriminator 2)",
+     "pc": "0x4017af33",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "rtc_isr_register",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/driver/rtc_module.c:92",
+     "pc": "0x401751a9",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 2,
+     "function": "sys_mbox_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/port/esp32/freertos/sys_arch.c:221",
+     "pc": "0x4019c16a",
+     "tasks": [
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 3,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:230",
+     "pc": "0x4017caa0",
+     "tasks": [
+      "con_auth",
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 1,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:255",
+     "pc": "0x4017cac9",
+     "tasks": [
+      "con_auth"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLECharacteristic*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x40159631",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5e91",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5eb8",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_core_enable",
+     "location": "??:?",
+     "pc": "0x401d5449",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5359",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "esp_intr_alloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_hw_support/intr_alloc.c:604",
+     "pc": "0x4019f732",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "pthread_mutex_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread.c:545",
+     "pc": "0x4017c876",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLEService*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x40158ead",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "esp_newlib_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/newlib/newlib_init.c:147",
+     "pc": "0x401a05f7",
+     "tasks": [
+      "-"
+     ]
+    }
+   ],
+   "delta": {
+    "from": "idle",
+    "live": 46851,
+    "ifree_drop": -160,
+    "blocks": 75,
+    "overhead_per_block": -626.8133333333334
+   }
+  },
+  {
+   "marker": "after_install",
+   "t": 704677,
+   "ifree": 47320,
+   "iblk": 42996,
+   "drops": 111,
+   "live_total": 84414,
+   "live_blocks": 197,
+   "itotal": 193200,
+   "waitms": 4366,
+   "untracked": 61466,
+   "by_caller": [
+    {
+     "bytes": 12632,
+     "blocks": 2,
+     "function": "xTaskCreate",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/freertos/task.h:450",
+     "pc": "0x4016f5bc",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 10584,
+     "blocks": 2,
+     "function": "_ZN12_GLOBAL__N_18startJobE8FwNetJobhPKNS_6LanArgE$part$2",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/fw_update_net.cpp:2019",
+     "pc": "0x400f4450",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 6488,
+     "blocks": 3,
+     "function": "esp_nimble_enable",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/nimble_port_freertos.c:60",
+     "pc": "0x4016703c",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 5128,
+     "blocks": 4,
+     "function": "task_create_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:870 (discriminator 4)",
+     "pc": "0x401a0d5c",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 5120,
+     "blocks": 2,
+     "function": "bf_attach_all(byte_fifo_t* const*, unsigned short const*, unsigned char, void* (*)(unsigned int), void (*)(void*))",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/byte_fifo.cpp:262",
+     "pc": "0x400da676",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4952,
+     "blocks": 2,
+     "function": "esp_timer_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/esp_timer.c:475",
+     "pc": "0x401a0281",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4620,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d60",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 3536,
+     "blocks": 20,
+     "function": "mem_malloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/mem.c:237",
+     "pc": "0x4018c09b",
+     "tasks": [
+      "con_auth",
+      "loopTask",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 3188,
+     "blocks": 33,
+     "function": "xQueueGenericCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/queue.c:447",
+     "pc": "0x40099048",
+     "tasks": [
+      "-",
+      "con_auth",
+      "fwnet",
+      "loopTask",
+      "main",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 3000,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:241",
+     "pc": "0x40166361",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "esp_ipc_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ipc/src/esp_ipc.c:113",
+     "pc": "0x401b8d65",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "prvCreateIdleTasks",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/tasks.c:2382",
+     "pc": "0x4009b621",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2604,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d4a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 2304,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:882",
+     "pc": "0x4009816f",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1364,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3dc1",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1168,
+     "blocks": 1,
+     "function": "os_msys_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/nimble/src/os_msys_init.c:153",
+     "pc": "0x40166fae",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1152,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:234",
+     "pc": "0x40166341",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1104,
+     "blocks": 3,
+     "function": "String::changeBuffer(unsigned int)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/WString.cpp:200 (discriminator 4)",
+     "pc": "0x4016d722",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1024,
+     "blocks": 8,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017b09a",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 912,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5ecd",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 892,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d34",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 520,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:238",
+     "pc": "0x40166351",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 472,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:881",
+     "pc": "0x40098161",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 428,
+     "blocks": 1,
+     "function": "__sfmoreglue",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/findfp.c:132",
+     "pc": "0x40092710",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 424,
+     "blocks": 1,
+     "function": "nvs::PageManager::load(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_pagemanager.cpp:20 (discriminator 4)",
+     "pc": "0x4017c446",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 400,
+     "blocks": 1,
+     "function": "ble_att_svr_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_att_svr.c:3163",
+     "pc": "0x4015b734",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 384,
+     "blocks": 2,
+     "function": "esp_vfs_register_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/vfs/vfs.c:76",
+     "pc": "0x4017f1f0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 344,
+     "blocks": 1,
+     "function": "esp_startup_start_app_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/port/port_common.c:78",
+     "pc": "0x4009bcef",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 308,
+     "blocks": 11,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017a9c9",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 288,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:230",
+     "pc": "0x40166330",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 2,
+     "function": "__smakebuf_r",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/makebuf.c:53",
+     "pc": "0x40093249",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 248,
+     "blocks": 1,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:1474",
+     "pc": "0x401a117a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 244,
+     "blocks": 1,
+     "function": "uartBegin",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-uart.c:433",
+     "pc": "0x40170c52",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 240,
+     "blocks": 5,
+     "function": "load_partitions",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/spi_flash/partition.c:214",
+     "pc": "0x40178c62",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 192,
+     "blocks": 6,
+     "function": "ets_timer_setfn",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/ets_timer_legacy.c:69",
+     "pc": "0x401a03b5",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 192,
+     "blocks": 6,
+     "function": "npl_freertos_callout_init",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/npl_os_freertos.c:1799",
+     "pc": "0x4016745e",
+     "tasks": [
+      "fwnet",
+      "nimble_h"
+     ]
+    },
+    {
+     "bytes": 187,
+     "blocks": 1,
+     "function": "esf_buf_alloc_dynamic",
+     "location": "??:?",
+     "pc": "0x40226328",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 2,
+     "function": "customer_queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:758",
+     "pc": "0x401a0f08",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 2,
+     "function": "queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:746",
+     "pc": "0x401a0fb0",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 2,
+     "function": "NimBLEService::createCharacteristic(NimBLEUUID const&, unsigned int, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEService.cpp:207",
+     "pc": "0x401596d0",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017ae62",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 4,
+     "function": "hli_semaphore_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/hli_api.c:257",
+     "pc": "0x401a1490",
+     "tasks": [
+      "btContro",
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3e66",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3ef9",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5329",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_schm_init",
+     "location": "??:?",
+     "pc": "0x401d5dc2",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:1509 (discriminator 15)",
+     "pc": "0x401a11fc",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "r_vhci_init",
+     "location": "??:?",
+     "pc": "0x401b7be8",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "NimBLEService::start()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEService.cpp:124 (discriminator 4)",
+     "pc": "0x401593de",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "_GLOBAL__sub_I_timerSerial",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/esp32_main.cpp:912",
+     "pc": "0x400f15aa",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "hli_customer_queue_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/hli_api.c:246",
+     "pc": "0x401a1470",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 72,
+     "blocks": 1,
+     "function": "queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:750",
+     "pc": "0x401a0fe3",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 68,
+     "blocks": 1,
+     "function": "NimBLEServer::createService(NimBLEUUID const&)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEServer.cpp:95",
+     "pc": "0x40158ee4",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 64,
+     "blocks": 1,
+     "function": "NimBLEDevice::getAdvertising()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEDevice.cpp:191",
+     "pc": "0x40158611",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "Module::Module(unsigned int, unsigned int, unsigned int, unsigned int)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/RadioLib/src/Module.cpp:11",
+     "pc": "0x4015460c",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3c2f",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 42,
+     "blocks": 2,
+     "function": "NimBLEAttValue::NimBLEAttValue(unsigned short, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEAttValue.cpp:34",
+     "pc": "0x40158320",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017ad5e",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "NimBLEDevice::createServer()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEDevice.cpp:127",
+     "pc": "0x401585da",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1658",
+     "pc": "0x4015e2c3",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1678",
+     "pc": "0x4015e23e",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 2,
+     "function": "pthread_key_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:60",
+     "pc": "0x4017c9d0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 21,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<unsigned char>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x4016765a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017c774",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "addApbChangeCallback",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-cpu.c:93",
+     "pc": "0x4016e9f6",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 4,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:230",
+     "pc": "0x4017caa0",
+     "tasks": [
+      "con_auth",
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "rtc_isr_register",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/driver/rtc_module.c:92",
+     "pc": "0x401751a9",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 1,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:255",
+     "pc": "0x4017cac9",
+     "tasks": [
+      "con_auth"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLECharacteristic*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x40159631",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5e91",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5eb8",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_core_enable",
+     "location": "??:?",
+     "pc": "0x401d5449",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5359",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "esp_intr_alloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_hw_support/intr_alloc.c:604",
+     "pc": "0x4019f732",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "pthread_mutex_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread.c:545",
+     "pc": "0x4017c876",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLEService*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x40158ead",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "esp_newlib_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/newlib/newlib_init.c:147",
+     "pc": "0x401a05f7",
+     "tasks": [
+      "-"
+     ]
+    }
+   ],
+   "by_first_outside_allocator": [
+    {
+     "bytes": 12632,
+     "blocks": 2,
+     "function": "xTaskCreate",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/freertos/task.h:450",
+     "pc": "0x4016f5bc",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 10584,
+     "blocks": 2,
+     "function": "_ZN12_GLOBAL__N_18startJobE8FwNetJobhPKNS_6LanArgE$part$2",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/fw_update_net.cpp:2019",
+     "pc": "0x400f4450",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 6488,
+     "blocks": 3,
+     "function": "esp_nimble_enable",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/nimble_port_freertos.c:60",
+     "pc": "0x4016703c",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 5128,
+     "blocks": 4,
+     "function": "task_create_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:870 (discriminator 4)",
+     "pc": "0x401a0d5c",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 5120,
+     "blocks": 2,
+     "function": "bf_attach_all(byte_fifo_t* const*, unsigned short const*, unsigned char, void* (*)(unsigned int), void (*)(void*))",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/byte_fifo.cpp:262",
+     "pc": "0x400da676",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4952,
+     "blocks": 2,
+     "function": "esp_timer_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/esp_timer.c:475",
+     "pc": "0x401a0281",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4620,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d60",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 3188,
+     "blocks": 33,
+     "function": "xQueueGenericCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/queue.c:447",
+     "pc": "0x40099048",
+     "tasks": [
+      "-",
+      "con_auth",
+      "fwnet",
+      "loopTask",
+      "main",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 3000,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:241",
+     "pc": "0x40166361",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "esp_ipc_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ipc/src/esp_ipc.c:113",
+     "pc": "0x401b8d65",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "prvCreateIdleTasks",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/tasks.c:2382",
+     "pc": "0x4009b621",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2680,
+     "blocks": 2,
+     "function": "tcp_pbuf_prealloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/tcp_out.c:263",
+     "pc": "0x401934b4",
+     "tasks": [
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 2604,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d4a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 2304,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:882",
+     "pc": "0x4009816f",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1364,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3dc1",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1168,
+     "blocks": 1,
+     "function": "os_msys_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/nimble/src/os_msys_init.c:153",
+     "pc": "0x40166fae",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1152,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:234",
+     "pc": "0x40166341",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1040,
+     "blocks": 1,
+     "function": "work_webpage()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/web_functions/web_functions.cpp:1051",
+     "pc": "0x401446f0",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 912,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5ecd",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 892,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d34",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 836,
+     "blocks": 15,
+     "function": "memp_malloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/memp.c:350 (discriminator 2)",
+     "pc": "0x4018c174",
+     "tasks": [
+      "loopTask",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 768,
+     "blocks": 6,
+     "function": "nvs::Page::mLoadEntryTable()",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_page.cpp:761",
+     "pc": "0x4017bfdf",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 520,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:238",
+     "pc": "0x40166351",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 472,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:881",
+     "pc": "0x40098161",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 428,
+     "blocks": 1,
+     "function": "__sfmoreglue",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/findfp.c:132",
+     "pc": "0x40092710",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 424,
+     "blocks": 1,
+     "function": "nvs::PageManager::load(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_pagemanager.cpp:20 (discriminator 4)",
+     "pc": "0x4017c446",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 400,
+     "blocks": 1,
+     "function": "ble_att_svr_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_att_svr.c:3163",
+     "pc": "0x4015b734",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 384,
+     "blocks": 2,
+     "function": "esp_vfs_register_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/vfs/vfs.c:76",
+     "pc": "0x4017f1f0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 344,
+     "blocks": 1,
+     "function": "esp_startup_start_app_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/port/port_common.c:78",
+     "pc": "0x4009bcef",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 308,
+     "blocks": 11,
+     "function": "nvs::NVSPartitionManager::init_custom(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:92",
+     "pc": "0x4017ae99",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 288,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:230",
+     "pc": "0x40166330",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 2,
+     "function": "__smakebuf_r",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/makebuf.c:53",
+     "pc": "0x40093249",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 2,
+     "function": "nvs::Page::mLoadEntryTable()",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_page.cpp:679",
+     "pc": "0x4017bec3",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 248,
+     "blocks": 1,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:1474",
+     "pc": "0x401a117a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 244,
+     "blocks": 1,
+     "function": "uartBegin",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-uart.c:433",
+     "pc": "0x40170c52",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 240,
+     "blocks": 5,
+     "function": "load_partitions",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/spi_flash/partition.c:214",
+     "pc": "0x40178c62",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 192,
+     "blocks": 6,
+     "function": "ets_timer_setfn",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/ets_timer_legacy.c:69",
+     "pc": "0x401a03b5",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 192,
+     "blocks": 6,
+     "function": "npl_freertos_callout_init",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/npl_os_freertos.c:1799",
+     "pc": "0x4016745e",
+     "tasks": [
+      "fwnet",
+      "nimble_h"
+     ]
+    },
+    {
+     "bytes": 187,
+     "blocks": 1,
+     "function": "esf_buf_alloc_dynamic",
+     "location": "??:?",
+     "pc": "0x40226328",
+     "tasks": [
+      "wifi"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 2,
+     "function": "customer_queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:758",
+     "pc": "0x401a0f08",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 2,
+     "function": "queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:746",
+     "pc": "0x401a0fb0",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 2,
+     "function": "NimBLEService::createCharacteristic(NimBLEUUID const&, unsigned int, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEService.cpp:207",
+     "pc": "0x401596d0",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 4,
+     "function": "hli_semaphore_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/hli_api.c:257",
+     "pc": "0x401a1490",
+     "tasks": [
+      "btContro",
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 1,
+     "function": "nvs::NVSPartitionManager::init_partition(char const*)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:54",
+     "pc": "0x4017af4c",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3e66",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3ef9",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5329",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_schm_init",
+     "location": "??:?",
+     "pc": "0x401d5dc2",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:1509 (discriminator 15)",
+     "pc": "0x401a11fc",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "r_vhci_init",
+     "location": "??:?",
+     "pc": "0x401b7be8",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "NimBLEService::start()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEService.cpp:124 (discriminator 4)",
+     "pc": "0x401593de",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "_GLOBAL__sub_I_timerSerial",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/esp32_main.cpp:912",
+     "pc": "0x400f15aa",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "hli_customer_queue_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/hli_api.c:246",
+     "pc": "0x401a1470",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 72,
+     "blocks": 1,
+     "function": "queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:750",
+     "pc": "0x401a0fe3",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 68,
+     "blocks": 1,
+     "function": "NimBLEServer::createService(NimBLEUUID const&)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEServer.cpp:95",
+     "pc": "0x40158ee4",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 64,
+     "blocks": 1,
+     "function": "NimBLEDevice::getAdvertising()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEDevice.cpp:191",
+     "pc": "0x40158611",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 64,
+     "blocks": 2,
+     "function": "String::copy(char const*, unsigned int)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/WString.cpp:224",
+     "pc": "0x4016d7c8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "Module::Module(unsigned int, unsigned int, unsigned int, unsigned int)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/RadioLib/src/Module.cpp:11",
+     "pc": "0x4015460c",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3c2f",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 42,
+     "blocks": 2,
+     "function": "NimBLEAttValue::NimBLEAttValue(unsigned short, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEAttValue.cpp:34",
+     "pc": "0x40158320",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 1,
+     "function": "nvs_flash_init_partition",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_api.cpp:129",
+     "pc": "0x401793b3",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "NimBLEDevice::createServer()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEDevice.cpp:127",
+     "pc": "0x401585da",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1658",
+     "pc": "0x4015e2c3",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1678",
+     "pc": "0x4015e23e",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 2,
+     "function": "pthread_key_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:60",
+     "pc": "0x4017c9d0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 21,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<unsigned char>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x4016765a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "addApbChangeCallback",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-cpu.c:93",
+     "pc": "0x4016e9f6",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "nvs::NVSPartitionManager::init_partition(char const*)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:46 (discriminator 2)",
+     "pc": "0x4017af33",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 4,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:230",
+     "pc": "0x4017caa0",
+     "tasks": [
+      "con_auth",
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "rtc_isr_register",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/driver/rtc_module.c:92",
+     "pc": "0x401751a9",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 2,
+     "function": "sys_mbox_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/port/esp32/freertos/sys_arch.c:221",
+     "pc": "0x4019c16a",
+     "tasks": [
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 1,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:255",
+     "pc": "0x4017cac9",
+     "tasks": [
+      "con_auth"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLECharacteristic*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x40159631",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5e91",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5eb8",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_core_enable",
+     "location": "??:?",
+     "pc": "0x401d5449",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5359",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "esp_intr_alloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_hw_support/intr_alloc.c:604",
+     "pc": "0x4019f732",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "pthread_mutex_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread.c:545",
+     "pc": "0x4017c876",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLEService*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x40158ead",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "esp_newlib_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/newlib/newlib_init.c:147",
+     "pc": "0x401a05f7",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "sys_thread_sem_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/port/esp32/freertos/sys_arch.c:530",
+     "pc": "0x4019c378",
+     "tasks": [
+      "con_auth"
+     ]
+    }
+   ],
+   "delta": {
+    "from": "after_check",
+    "live": 563,
+    "ifree_drop": 412,
+    "blocks": 9,
+    "overhead_per_block": -16.77777777777778
+   }
+  },
+  {
+   "marker": "end",
+   "t": 711196,
+   "ifree": 47524,
+   "iblk": 42996,
+   "drops": 111,
+   "live_total": 83879,
+   "live_blocks": 194,
+   "itotal": 193200,
+   "waitms": 4374,
+   "untracked": 61797,
+   "by_caller": [
+    {
+     "bytes": 12632,
+     "blocks": 2,
+     "function": "xTaskCreate",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/freertos/task.h:450",
+     "pc": "0x4016f5bc",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 10240,
+     "blocks": 1,
+     "function": "_ZN12_GLOBAL__N_18startJobE8FwNetJobhPKNS_6LanArgE$part$2",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/fw_update_net.cpp:2019",
+     "pc": "0x400f4450",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 6488,
+     "blocks": 3,
+     "function": "esp_nimble_enable",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/nimble_port_freertos.c:60",
+     "pc": "0x4016703c",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 5128,
+     "blocks": 4,
+     "function": "task_create_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:870 (discriminator 4)",
+     "pc": "0x401a0d5c",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 5120,
+     "blocks": 2,
+     "function": "bf_attach_all(byte_fifo_t* const*, unsigned short const*, unsigned char, void* (*)(unsigned int), void (*)(void*))",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/byte_fifo.cpp:262",
+     "pc": "0x400da676",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4952,
+     "blocks": 2,
+     "function": "esp_timer_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/esp_timer.c:475",
+     "pc": "0x401a0281",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4620,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d60",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 3532,
+     "blocks": 19,
+     "function": "mem_malloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/mem.c:237",
+     "pc": "0x4018c09b",
+     "tasks": [
+      "loopTask",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 3188,
+     "blocks": 33,
+     "function": "xQueueGenericCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/queue.c:447",
+     "pc": "0x40099048",
+     "tasks": [
+      "-",
+      "con_auth",
+      "fwnet",
+      "loopTask",
+      "main",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 3000,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:241",
+     "pc": "0x40166361",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "esp_ipc_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ipc/src/esp_ipc.c:113",
+     "pc": "0x401b8d65",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "prvCreateIdleTasks",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/tasks.c:2382",
+     "pc": "0x4009b621",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2604,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d4a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 2304,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:882",
+     "pc": "0x4009816f",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1364,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3dc1",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1168,
+     "blocks": 1,
+     "function": "os_msys_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/nimble/src/os_msys_init.c:153",
+     "pc": "0x40166fae",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1152,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:234",
+     "pc": "0x40166341",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1104,
+     "blocks": 3,
+     "function": "String::changeBuffer(unsigned int)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/WString.cpp:200 (discriminator 4)",
+     "pc": "0x4016d722",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1024,
+     "blocks": 8,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017b09a",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 912,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5ecd",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 892,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d34",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 520,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:238",
+     "pc": "0x40166351",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 472,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:881",
+     "pc": "0x40098161",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 428,
+     "blocks": 1,
+     "function": "__sfmoreglue",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/findfp.c:132",
+     "pc": "0x40092710",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 424,
+     "blocks": 1,
+     "function": "nvs::PageManager::load(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_pagemanager.cpp:20 (discriminator 4)",
+     "pc": "0x4017c446",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 400,
+     "blocks": 1,
+     "function": "ble_att_svr_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_att_svr.c:3163",
+     "pc": "0x4015b734",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 384,
+     "blocks": 2,
+     "function": "esp_vfs_register_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/vfs/vfs.c:76",
+     "pc": "0x4017f1f0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 344,
+     "blocks": 1,
+     "function": "esp_startup_start_app_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/port/port_common.c:78",
+     "pc": "0x4009bcef",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 308,
+     "blocks": 11,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017a9c9",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 288,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:230",
+     "pc": "0x40166330",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 2,
+     "function": "__smakebuf_r",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/makebuf.c:53",
+     "pc": "0x40093249",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 248,
+     "blocks": 1,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:1474",
+     "pc": "0x401a117a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 244,
+     "blocks": 1,
+     "function": "uartBegin",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-uart.c:433",
+     "pc": "0x40170c52",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 240,
+     "blocks": 5,
+     "function": "load_partitions",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/spi_flash/partition.c:214",
+     "pc": "0x40178c62",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 192,
+     "blocks": 6,
+     "function": "ets_timer_setfn",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/ets_timer_legacy.c:69",
+     "pc": "0x401a03b5",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 192,
+     "blocks": 6,
+     "function": "npl_freertos_callout_init",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/npl_os_freertos.c:1799",
+     "pc": "0x4016745e",
+     "tasks": [
+      "fwnet",
+      "nimble_h"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 2,
+     "function": "customer_queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:758",
+     "pc": "0x401a0f08",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 2,
+     "function": "queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:746",
+     "pc": "0x401a0fb0",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 2,
+     "function": "NimBLEService::createCharacteristic(NimBLEUUID const&, unsigned int, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEService.cpp:207",
+     "pc": "0x401596d0",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017ae62",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 4,
+     "function": "hli_semaphore_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/hli_api.c:257",
+     "pc": "0x401a1490",
+     "tasks": [
+      "btContro",
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3e66",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3ef9",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5329",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_schm_init",
+     "location": "??:?",
+     "pc": "0x401d5dc2",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:1509 (discriminator 15)",
+     "pc": "0x401a11fc",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "r_vhci_init",
+     "location": "??:?",
+     "pc": "0x401b7be8",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "NimBLEService::start()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEService.cpp:124 (discriminator 4)",
+     "pc": "0x401593de",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "_GLOBAL__sub_I_timerSerial",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/esp32_main.cpp:912",
+     "pc": "0x400f15aa",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "hli_customer_queue_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/hli_api.c:246",
+     "pc": "0x401a1470",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 72,
+     "blocks": 1,
+     "function": "queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:750",
+     "pc": "0x401a0fe3",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 68,
+     "blocks": 1,
+     "function": "NimBLEServer::createService(NimBLEUUID const&)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEServer.cpp:95",
+     "pc": "0x40158ee4",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 64,
+     "blocks": 1,
+     "function": "NimBLEDevice::getAdvertising()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEDevice.cpp:191",
+     "pc": "0x40158611",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "Module::Module(unsigned int, unsigned int, unsigned int, unsigned int)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/RadioLib/src/Module.cpp:11",
+     "pc": "0x4015460c",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3c2f",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 42,
+     "blocks": 2,
+     "function": "NimBLEAttValue::NimBLEAttValue(unsigned short, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEAttValue.cpp:34",
+     "pc": "0x40158320",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017ad5e",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "NimBLEDevice::createServer()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEDevice.cpp:127",
+     "pc": "0x401585da",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1658",
+     "pc": "0x4015e2c3",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1678",
+     "pc": "0x4015e23e",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 2,
+     "function": "pthread_key_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:60",
+     "pc": "0x4017c9d0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 21,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<unsigned char>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x4016765a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "ExceptionlessAllocatable::operator new(unsigned int, std::nothrow_t const&)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_memory_management.hpp:53",
+     "pc": "0x4017c774",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "addApbChangeCallback",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-cpu.c:93",
+     "pc": "0x4016e9f6",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 4,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:230",
+     "pc": "0x4017caa0",
+     "tasks": [
+      "con_auth",
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "rtc_isr_register",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/driver/rtc_module.c:92",
+     "pc": "0x401751a9",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 1,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:255",
+     "pc": "0x4017cac9",
+     "tasks": [
+      "con_auth"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLECharacteristic*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x40159631",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5e91",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5eb8",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_core_enable",
+     "location": "??:?",
+     "pc": "0x401d5449",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5359",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "esp_intr_alloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_hw_support/intr_alloc.c:604",
+     "pc": "0x4019f732",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "pthread_mutex_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread.c:545",
+     "pc": "0x4017c876",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLEService*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x40158ead",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "esp_newlib_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/newlib/newlib_init.c:147",
+     "pc": "0x401a05f7",
+     "tasks": [
+      "-"
+     ]
+    }
+   ],
+   "by_first_outside_allocator": [
+    {
+     "bytes": 12632,
+     "blocks": 2,
+     "function": "xTaskCreate",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/freertos/task.h:450",
+     "pc": "0x4016f5bc",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 10240,
+     "blocks": 1,
+     "function": "_ZN12_GLOBAL__N_18startJobE8FwNetJobhPKNS_6LanArgE$part$2",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/fw_update_net.cpp:2019",
+     "pc": "0x400f4450",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 6488,
+     "blocks": 3,
+     "function": "esp_nimble_enable",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/nimble_port_freertos.c:60",
+     "pc": "0x4016703c",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 5128,
+     "blocks": 4,
+     "function": "task_create_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:870 (discriminator 4)",
+     "pc": "0x401a0d5c",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 5120,
+     "blocks": 2,
+     "function": "bf_attach_all(byte_fifo_t* const*, unsigned short const*, unsigned char, void* (*)(unsigned int), void (*)(void*))",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/byte_fifo.cpp:262",
+     "pc": "0x400da676",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4952,
+     "blocks": 2,
+     "function": "esp_timer_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/esp_timer.c:475",
+     "pc": "0x401a0281",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4620,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d60",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 3188,
+     "blocks": 33,
+     "function": "xQueueGenericCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/queue.c:447",
+     "pc": "0x40099048",
+     "tasks": [
+      "-",
+      "con_auth",
+      "fwnet",
+      "loopTask",
+      "main",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 3000,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:241",
+     "pc": "0x40166361",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "esp_ipc_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ipc/src/esp_ipc.c:113",
+     "pc": "0x401b8d65",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2736,
+     "blocks": 4,
+     "function": "prvCreateIdleTasks",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/tasks.c:2382",
+     "pc": "0x4009b621",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 2680,
+     "blocks": 2,
+     "function": "tcp_pbuf_prealloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/tcp_out.c:263",
+     "pc": "0x401934b4",
+     "tasks": [
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 2604,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d4a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 2304,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:882",
+     "pc": "0x4009816f",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 1364,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3dc1",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1168,
+     "blocks": 1,
+     "function": "os_msys_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/nimble/src/os_msys_init.c:153",
+     "pc": "0x40166fae",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1152,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:234",
+     "pc": "0x40166341",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 1040,
+     "blocks": 1,
+     "function": "work_webpage()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/web_functions/web_functions.cpp:1051",
+     "pc": "0x401446f0",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 912,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5ecd",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 892,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3d34",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 836,
+     "blocks": 15,
+     "function": "memp_malloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/lwip/src/core/memp.c:350 (discriminator 2)",
+     "pc": "0x4018c174",
+     "tasks": [
+      "loopTask",
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 768,
+     "blocks": 6,
+     "function": "nvs::Page::mLoadEntryTable()",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_page.cpp:761",
+     "pc": "0x4017bfdf",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 520,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:238",
+     "pc": "0x40166351",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 472,
+     "blocks": 2,
+     "function": "xRingbufferCreate",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_ringbuf/ringbuf.c:881",
+     "pc": "0x40098161",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 428,
+     "blocks": 1,
+     "function": "__sfmoreglue",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/findfp.c:132",
+     "pc": "0x40092710",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 424,
+     "blocks": 1,
+     "function": "nvs::PageManager::load(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_pagemanager.cpp:20 (discriminator 4)",
+     "pc": "0x4017c446",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 400,
+     "blocks": 1,
+     "function": "ble_att_svr_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_att_svr.c:3163",
+     "pc": "0x4015b734",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 384,
+     "blocks": 2,
+     "function": "esp_vfs_register_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/vfs/vfs.c:76",
+     "pc": "0x4017f1f0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 344,
+     "blocks": 1,
+     "function": "esp_startup_start_app_common",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/freertos/port/port_common.c:78",
+     "pc": "0x4009bcef",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 308,
+     "blocks": 11,
+     "function": "nvs::NVSPartitionManager::init_custom(nvs::Partition*, unsigned int, unsigned int)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:92",
+     "pc": "0x4017ae99",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 288,
+     "blocks": 1,
+     "function": "ble_buf_alloc",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/transport/src/transport.c:230",
+     "pc": "0x40166330",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 2,
+     "function": "__smakebuf_r",
+     "location": "/Users/brnomac003/.gitlab-runner/builds/qR2TxTby/0/idf/crosstool-NG/.build/xtensa-esp32-elf/src/newlib/newlib/libc/stdio/makebuf.c:53",
+     "pc": "0x40093249",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 256,
+     "blocks": 2,
+     "function": "nvs::Page::mLoadEntryTable()",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_page.cpp:679",
+     "pc": "0x4017bec3",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 248,
+     "blocks": 1,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:1474",
+     "pc": "0x401a117a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 244,
+     "blocks": 1,
+     "function": "uartBegin",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-uart.c:433",
+     "pc": "0x40170c52",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 240,
+     "blocks": 5,
+     "function": "load_partitions",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/spi_flash/partition.c:214",
+     "pc": "0x40178c62",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 192,
+     "blocks": 6,
+     "function": "ets_timer_setfn",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_timer/src/ets_timer_legacy.c:69",
+     "pc": "0x401a03b5",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 192,
+     "blocks": 6,
+     "function": "npl_freertos_callout_init",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/porting/npl/freertos/src/npl_os_freertos.c:1799",
+     "pc": "0x4016745e",
+     "tasks": [
+      "fwnet",
+      "nimble_h"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 2,
+     "function": "customer_queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:758",
+     "pc": "0x401a0f08",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 132,
+     "blocks": 2,
+     "function": "queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:746",
+     "pc": "0x401a0fb0",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 128,
+     "blocks": 2,
+     "function": "NimBLEService::createCharacteristic(NimBLEUUID const&, unsigned int, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEService.cpp:207",
+     "pc": "0x401596d0",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 4,
+     "function": "hli_semaphore_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/hli_api.c:257",
+     "pc": "0x401a1490",
+     "tasks": [
+      "btContro",
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 104,
+     "blocks": 1,
+     "function": "nvs::NVSPartitionManager::init_partition(char const*)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:54",
+     "pc": "0x4017af4c",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3e66",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3ef9",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5329",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "coex_schm_init",
+     "location": "??:?",
+     "pc": "0x401d5dc2",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "esp_bt_controller_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:1509 (discriminator 15)",
+     "pc": "0x401a11fc",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 92,
+     "blocks": 2,
+     "function": "r_vhci_init",
+     "location": "??:?",
+     "pc": "0x401b7be8",
+     "tasks": [
+      "btContro"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "NimBLEService::start()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEService.cpp:124 (discriminator 4)",
+     "pc": "0x401593de",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "_GLOBAL__sub_I_timerSerial",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/src/esp32/esp32_main.cpp:912",
+     "pc": "0x400f15aa",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 84,
+     "blocks": 1,
+     "function": "hli_customer_queue_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/hli_api.c:246",
+     "pc": "0x401a1470",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 72,
+     "blocks": 1,
+     "function": "queue_create_hlevel_wrapper",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/bt/controller/esp32/bt.c:750",
+     "pc": "0x401a0fe3",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 68,
+     "blocks": 1,
+     "function": "NimBLEServer::createService(NimBLEUUID const&)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEServer.cpp:95",
+     "pc": "0x40158ee4",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 64,
+     "blocks": 1,
+     "function": "NimBLEDevice::getAdvertising()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEDevice.cpp:191",
+     "pc": "0x40158611",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 64,
+     "blocks": 2,
+     "function": "String::copy(char const*, unsigned int)",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/WString.cpp:224",
+     "pc": "0x4016d7c8",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "Module::Module(unsigned int, unsigned int, unsigned int, unsigned int)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/RadioLib/src/Module.cpp:11",
+     "pc": "0x4015460c",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 48,
+     "blocks": 1,
+     "function": "btdm_controller_init",
+     "location": "??:?",
+     "pc": "0x401a3c2f",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 42,
+     "blocks": 2,
+     "function": "NimBLEAttValue::NimBLEAttValue(unsigned short, unsigned short)",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEAttValue.cpp:34",
+     "pc": "0x40158320",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 40,
+     "blocks": 1,
+     "function": "nvs_flash_init_partition",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_api.cpp:129",
+     "pc": "0x401793b3",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "NimBLEDevice::createServer()",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/NimBLEDevice.cpp:127",
+     "pc": "0x401585da",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1658",
+     "pc": "0x4015e2c3",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 1,
+     "function": "ble_gatts_start",
+     "location": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/.pio/libdeps/ttgo_tbeam/NimBLE-Arduino/src/nimble/nimble/host/src/ble_gatts.c:1678",
+     "pc": "0x4015e23e",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 24,
+     "blocks": 2,
+     "function": "pthread_key_create",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:60",
+     "pc": "0x4017c9d0",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 21,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<unsigned char>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x4016765a",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "addApbChangeCallback",
+     "location": "/Users/martinwerner/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-cpu.c:93",
+     "pc": "0x4016e9f6",
+     "tasks": [
+      "loopTask"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "nvs::NVSPartitionManager::init_partition(char const*)",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/nvs_flash/src/nvs_partition_manager.cpp:46 (discriminator 2)",
+     "pc": "0x4017af33",
+     "tasks": [
+      "main"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 4,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:230",
+     "pc": "0x4017caa0",
+     "tasks": [
+      "con_auth",
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 1,
+     "function": "rtc_isr_register",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/driver/rtc_module.c:92",
+     "pc": "0x401751a9",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 16,
+     "blocks": 2,
+     "function": "sys_mbox_new",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/lwip/port/esp32/freertos/sys_arch.c:221",
+     "pc": "0x4019c16a",
+     "tasks": [
+      "tiT"
+     ]
+    },
+    {
+     "bytes": 12,
+     "blocks": 1,
+     "function": "pthread_setspecific",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread_local_storage.c:255",
+     "pc": "0x4017cac9",
+     "tasks": [
+      "con_auth"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLECharacteristic*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x40159631",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5e91",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_arbit_init",
+     "location": "??:?",
+     "pc": "0x401d5eb8",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_core_enable",
+     "location": "??:?",
+     "pc": "0x401d5449",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "coex_core_pre_init",
+     "location": "??:?",
+     "pc": "0x401d5359",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "esp_intr_alloc",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/esp_hw_support/intr_alloc.c:604",
+     "pc": "0x4019f732",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 8,
+     "blocks": 1,
+     "function": "pthread_mutex_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/pthread/pthread.c:545",
+     "pc": "0x4017c876",
+     "tasks": [
+      "-"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "__gnu_cxx::new_allocator<NimBLEService*>::allocate(unsigned int, void const*)",
+     "location": "/Users/martinwerner/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/ext/new_allocator.h:111",
+     "pc": "0x40158ead",
+     "tasks": [
+      "fwnet"
+     ]
+    },
+    {
+     "bytes": 4,
+     "blocks": 1,
+     "function": "esp_newlib_init",
+     "location": "/home/runner/work/esp32-arduino-lib-builder/esp32-arduino-lib-builder/esp-idf/components/newlib/newlib_init.c:147",
+     "pc": "0x401a05f7",
+     "tasks": [
+      "-"
+     ]
+    }
+   ],
+   "delta": {
+    "from": "after_install",
+    "live": -535,
+    "ifree_drop": -204,
+    "blocks": -3,
+    "overhead_per_block": -110.33333333333333
+   }
+  }
+ ]
+}

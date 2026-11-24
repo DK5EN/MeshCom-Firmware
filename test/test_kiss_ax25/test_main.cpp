@@ -163,6 +163,30 @@ void test_ax25_addr_roundtrip_basic(void)
     TEST_ASSERT_TRUE(a[6] & 0x01);            // ext bit
 }
 
+// TESTGATE-01 (2026-11-23): literal wire bytes, worked out by hand from AX.25 2.2 section 3.12
+// (each call character shifted left one bit, padded with spaces; last octet 0 1 1 SSID(4) ext).
+// The roundtrip cases around this one pass on a symmetric encoder/decoder bug; this one does not.
+void test_ax25_addr_literal_wire_bytes(void)
+{
+    // "DK5EN-1", last address of the field: D K 5 E N <space>, then 0x60 | 1<<1 | 0x01.
+    const uint8_t want_last[7] = {0x88, 0x96, 0x6A, 0x8A, 0x9C, 0x40, 0x63};
+    uint8_t a[7];
+    TEST_ASSERT_EQUAL_INT(7, ax25EncodeAddr(a, "DK5EN-1", 0x00, true));
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(want_last, a, 7);
+
+    // "DK5EN" (SSID 0) with the command bit set and more addresses following: 0x80 | 0x60.
+    const uint8_t want_first[7] = {0x88, 0x96, 0x6A, 0x8A, 0x9C, 0x40, 0xE0};
+    TEST_ASSERT_EQUAL_INT(7, ax25EncodeAddr(a, "DK5EN", 0x80, false));
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(want_first, a, 7);
+
+    // The decoder reads the same literals back, without help from the encoder.
+    char out[16];
+    ax25DecodeCall(want_last, out, sizeof(out));
+    TEST_ASSERT_EQUAL_STRING("DK5EN-1", out);
+    ax25DecodeCall(want_first, out, sizeof(out));
+    TEST_ASSERT_EQUAL_STRING("DK5EN", out);
+}
+
 void test_ax25_addr_roundtrip_ssid(void)
 {
     uint8_t a[7]; char out[16];
@@ -368,6 +392,7 @@ int main(int, char**)
     RUN_TEST(test_deframe_escape_split_across_pushes);
 
     RUN_TEST(test_ax25_addr_roundtrip_basic);
+    RUN_TEST(test_ax25_addr_literal_wire_bytes);
     RUN_TEST(test_ax25_addr_roundtrip_ssid);
     RUN_TEST(test_ax25_addr_ssid_over_15_clamps_to_15);
     RUN_TEST(test_ax25_addr_long_base_truncated);

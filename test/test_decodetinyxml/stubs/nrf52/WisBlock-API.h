@@ -24,7 +24,7 @@
 typedef struct s_meshcom_settings
 {
     char node_parm_1[100] = {0};
-    char node_parm_t[25] = {0};
+    char node_parm_t[150] = {0};   // as src/meshcom_settings.h (was 25 here until TESTGATE-01, 2026-11-23)
     char node_parm_id[100] = {0};
     char node_unit[50] = {0};
     char node_values[50] = {0};
