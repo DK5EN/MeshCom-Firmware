@@ -27,6 +27,10 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
   - Next: advisor verdict on 3b+3c, then the gate (board builds sequential, link proof for the overrides, host stage
     1,2 without `--formal`), then commit on fork-dev.
 
+- **AU-28 / AU-29 (2026-11-24):** Auto Update download fails `conn -7` on every ESP32 image built since 2026-11-23
+  17:03 (CI release 11.21 downloads fine; lead suspect FORMAL-01 AE-01, HTTP header line cap 2 KB vs github.com's 4.2 KB
+  CSP header). T-Beam TASK_WDT reset 6 s into the install, also on 11.21. Campaign doc section "2026-11-24".
+
 - **OTA-LOWHEAP-01 running (fork issue DK5EN/MeshCom-Firmware#3):** ESP32-S3 Auto Update refuses with "Not enough
   free memory" after long uptime (field, 11.22 rollout). Campaign
   [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md); analysis
@@ -102,6 +106,8 @@ campaigns: [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.
 
 ## Running campaigns
 
+- **Test gate rework (TESTGATE-01) 2026-11-23:** [campaign-test-gate-20261123.md](campaign-test-gate-20261123.md) -- uncommitted and
+  not gated since the last edits; first step is one full host gate run. `tools/regression.sh --changed` is the new gate for wave commits.
 - **Ticket triage 2026-11-21:** [campaign-ticket-triage-20261121.md](campaign-ticket-triage-20261121.md) -- the fixes for wave 3.
 - **Release train 2026-11-15:** [campaign-release-train-20261115.md](campaign-release-train-20261115.md) -- the active one.
 - **Channel access stabilisation** (ACK-AGE-01, ACK-CANCEL-01, CSMA-04/02, CSMA-03, PWR-01/02, soak): dates and exit

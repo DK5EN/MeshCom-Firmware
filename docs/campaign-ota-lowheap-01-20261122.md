@@ -427,3 +427,35 @@ images built before today's commits. Both need an operator decision; measurement
 - Maps: Desktop `ota-lowheap-heapmap-20261123.html` section 2; chains JSON in
   `ota-lowheap-arena-20261123/heaptrace-v3d/` and `heaptrace-tbeam2/`.
 - Next: break down the T-Beam's extra 12 KB not in the trace; the download failure (GitHub side, open).
+
+## 2026-11-24: download failure found (AU-28) and T-Beam watchdog reset (AU-29)
+
+**AU-28, download fails with `[AU];fail;conn -7` (all ESP32 images built since 2026-11-23 17:03).**
+
+- Symptom: `--update check` passes, `--update install` fails about 2 s after the gate with `conn -7`
+  (HTTPClient `HTTPC_ERROR_NO_HTTP_SERVER`). Same on the prod channel (icssw-org) and the dev channel (DK5EN), on the
+  Heltec V3 (DK5EN-1) and the T-Beam (DK5EN-92).
+- The "GitHub-side since 18:10" reading of 2026-11-23 was wrong. Every good download that day ran on one image built at
+  13:04 (it stayed on DK5EN-1 until the knockout runs ended at 18:10); every image built later fails. The "older"
+  bisect builds (`6bbca7a2`, `38041491`) were built after the patch scripts had already patched the shared package
+  store (`tools/arduino_esp32_patch.py` writes into `~/.platformio/packages/framework-arduinoespressif32`), so
+  they were not clean.
+- Control (2026-11-24 07:55): CI release `v4.40a.11.21` (clean libraries) flashed on DK5EN-1 downloads and stages
+  11.22 from prod: 1,180,497 bytes in 13.5 s. Logs: `tools/bench/runs/harness/ota-lowheap-arena-20261123/release-11.21/`.
+- Mechanism (lead suspect, verification pending): FORMAL-01 patch **AE-01** (`9696a3ba`) caps every HTTP response
+  header line at 2048 bytes and returns `HTTPC_ERROR_NO_HTTP_SERVER` (-7) on a longer line. The github.com 302 that
+  redirects to the release asset carries a 4204-byte `Content-Security-Policy` line (measured 2026-11-24); the
+  `Location` line is 959 bytes. The check goes to api.github.com, whose longest header line is 324 bytes, so it passes.
+- Next: longlist of all download-path suspects from the library patches and later commits, independent verification,
+  fix, rebuild, bench download on both boards.
+
+**AU-29, T-Beam resets with TASK_WDT about 6 s into `--update install`.**
+
+- `E task_wdt: IDLE0 (CPU 0)` starved, running task on CPU 0 `ipc0` or `wifi`, backtrace corrupted, reboot. Seen on
+  the plain INSTRUMENT image of `0e2fefd9` (prod install, after `[AU];buf32;none`) and on the CI release
+  `v4.40a.11.21` (prod and dev install). The dev install on `0e2fefd9` failed with `conn -7` without a reset.
+- The T-Beam image built 2026-11-23 13:04 downloaded three times without a reset (17:38, 17:45, 17:49,
+  `ota-lowheap-knockout-20261123/tbeam-r1-serial.log`). The defect is older than FORMAL-01 and was masked or fixed in
+  that build; same symptom as AU-24 (first download TASK_WDT on the T-Beam in gateway mode).
+- Next: longlist (BLE pause on the classic ESP32, staging erase in 64 KB steps, buf32 fallback path, NimBLE patches),
+  verification, fix.
