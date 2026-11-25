@@ -11,6 +11,10 @@
 
 #include <gw_link_status.h>
 
+#include <string>
+
+#include "../support/repo_file.h"
+
 static char out[160];
 
 static void fmt(bool gateway, bool hasIp, uint32_t now)
@@ -163,6 +167,111 @@ void test_null_host_clears(void)
     TEST_ASSERT_EQUAL_STRING("no IP address", out);
 }
 
+void test_alive_outage_1324(void)
+{
+    gwLinkSetDest("inet", "srv");
+    gwLinkNoteRx(1000);
+    TEST_ASSERT_FALSE(gwLinkServerAlive(true, true, 71000)); // 70 s ago: ISP down, router up
+}
+
+void test_alive_connected_30s(void)
+{
+    gwLinkSetDest("inet", "srv");
+    gwLinkNoteRx(1000);
+    TEST_ASSERT_TRUE(gwLinkServerAlive(true, true, 31000));
+}
+
+void test_alive_boundary(void)
+{
+    gwLinkSetDest("inet", "srv");
+    gwLinkNoteRx(1000);
+    TEST_ASSERT_TRUE(gwLinkServerAlive(true, true, 66000));
+    TEST_ASSERT_FALSE(gwLinkServerAlive(true, true, 66001));
+}
+
+void test_alive_never_received(void)
+{
+    gwLinkSetDest("inet", "srv");
+    TEST_ASSERT_FALSE(gwLinkServerAlive(true, true, 1000));
+}
+
+void test_alive_no_destination(void)
+{
+    gwLinkNoteRx(1000);
+    TEST_ASSERT_FALSE(gwLinkServerAlive(true, true, 2000));
+}
+
+void test_alive_gateway_off(void)
+{
+    gwLinkSetDest("inet", "srv");
+    gwLinkNoteRx(1000);
+    TEST_ASSERT_FALSE(gwLinkServerAlive(false, true, 2000));
+}
+
+void test_alive_no_ip(void)
+{
+    gwLinkSetDest("inet", "srv");
+    gwLinkNoteRx(1000);
+    TEST_ASSERT_FALSE(gwLinkServerAlive(true, false, 2000));
+}
+
+void test_alive_millis_wrap(void)
+{
+    gwLinkSetDest("inet", "srv");
+    gwLinkNoteRx(0xFFFFF000u);
+    TEST_ASSERT_TRUE(gwLinkServerAlive(true, true, 0x00001000u));
+}
+
+void test_alive_stale_across_wrap(void)
+{
+    gwLinkSetDest("inet", "srv");
+    gwLinkNoteRx(0xFFFFF000u);
+    TEST_ASSERT_FALSE(gwLinkServerAlive(true, true, 0x0000F000u)); // ~65.5 s later
+}
+
+void test_alive_forgotten_on_reconnect(void)
+{
+    gwLinkSetDest("inet", "srv");
+    gwLinkNoteRx(1000);
+    TEST_ASSERT_TRUE(gwLinkServerAlive(true, true, 2000));
+    gwLinkSetDest("hamnet", "srv2"); // reconnect / server switch
+    TEST_ASSERT_FALSE(gwLinkServerAlive(true, true, 3000));
+}
+
+// #1324 call sites: the RF relay's msg_server flag and the phone "server
+// reached" ACK must ask gwLinkServerAlive(), not hasIPaddress alone. The
+// condition sits on the line(s) right above the marker comment/statement.
+static void assert_site_uses_alive(const char *rel, const char *marker, int lines_back)
+{
+    const std::string src = repo_slurp(rel);
+    const size_t at = src.find(marker);
+    TEST_ASSERT_TRUE_MESSAGE(at != std::string::npos, marker);
+
+    size_t from = at;
+    for (int i = 0; i <= lines_back && from > 0; i++)
+    {
+        from = src.rfind('\n', from - 1);
+        if (from == std::string::npos)
+        {
+            from = 0;
+            break;
+        }
+    }
+    const std::string window = src.substr(from, at - from);
+    TEST_ASSERT_TRUE_MESSAGE(window.find("gwLinkServerAlive(") != std::string::npos, rel);
+    TEST_ASSERT_TRUE_MESSAGE(window.find("bGATEWAY && meshcom_settings.node_hasIPaddress") == std::string::npos, rel);
+}
+
+void test_site_relay_server_flag_1324(void)
+{
+    assert_site_uses_alive("src/lora_functions.cpp", "signal to another gateway not to send", 1);
+}
+
+void test_site_phone_server_ack_1324(void)
+{
+    assert_site_uses_alive("src/loop_functions.cpp", "set Info message send and Server reached", 2);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -184,5 +293,17 @@ int main(int argc, char **argv)
     RUN_TEST(test_len_one_and_zero);
     RUN_TEST(test_long_host_truncated_in_store);
     RUN_TEST(test_null_host_clears);
+    RUN_TEST(test_alive_outage_1324);
+    RUN_TEST(test_alive_connected_30s);
+    RUN_TEST(test_alive_boundary);
+    RUN_TEST(test_alive_never_received);
+    RUN_TEST(test_alive_no_destination);
+    RUN_TEST(test_alive_gateway_off);
+    RUN_TEST(test_alive_no_ip);
+    RUN_TEST(test_alive_millis_wrap);
+    RUN_TEST(test_alive_stale_across_wrap);
+    RUN_TEST(test_alive_forgotten_on_reconnect);
+    RUN_TEST(test_site_relay_server_flag_1324);
+    RUN_TEST(test_site_phone_server_ack_1324);
     return UNITY_END();
 }

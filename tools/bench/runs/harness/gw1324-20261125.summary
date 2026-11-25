@@ -1,0 +1,9 @@
+# GW-SRV-1324 bench, 2026-11-25, DK5EN-14 (T-Deck Plus) as gateway, DK5EN-92 source, group 9999, 2 dBm
+# Observable: the relaying gateway's TX-LoRa line, field S = msg_server bit (byte 5, 0x80)
+# Dead server: --srvip 192.0.2.1 (RFC 5737, unroutable), WiFi up; INSTRUMENT images (srvip is INSTRUMENT-only)
+before (HEAD 1e87b09d call sites)  server silent    S1   23:43:05 TX-LoRa 057 : x4106E330 H03 S1 ... DK5EN-92,DK5EN-14>9999:gw1324 before dead1
+before                             server answers   S1   23:43:52 TX-LoRa 057 : x4106E331 H03 S1 ... DK5EN-92,DK5EN-14>9999:gw1324 before live1
+after  (gwLinkServerAlive)         server silent    S0   23:47:42 TX-LoRa 056 : x4106E332 H03 S0 ... DK5EN-92,DK5EN-14>9999:gw1324 after dead1
+after                              server answers   S1   23:48:22 TX-LoRa 056 : x4106E333 H03 S1 ... DK5EN-92,DK5EN-14>9999:gw1324 after live1
+RESULT PASS: the flag follows server liveness, not the IP address. Phone "server reached" ACK not bench-tested (needs a BLE phone).
+Restored: DK5EN-14 normal image of the fixed tree, mesh off, gateway off, setinfo off.

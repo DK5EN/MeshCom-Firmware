@@ -7,6 +7,7 @@ Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 
 ## Now (2026-11-25)
 
+- **GW-SRV-1324 on `fork-dev` 2026-11-25:** upstream issue #1324 (IS0GQX-12): with the ISP down but WiFi up a gateway kept setting the "already on the server" bit on RF relays, so neighbouring gateways skipped the upload and nodes heard only by it vanished from the map. Fix: `gwLinkServerAlive()` in `gw_link_status` (a real server frame within 65 s) replaces `bGATEWAY && node_hasIPaddress` at the relay flag and at the phone "server reached" ACK. 28 cases in `test_gw_link_status`, two pin the call sites. Gate stage 1,2 PASS; Opus advisor APPROVED; bench DK5EN-14 S1 -> S0 with a silent server, S1 again once it answers (`tools/bench/runs/harness/gw1324-20261125.summary`). `--srvip` is INSTRUMENT-only. Next: `/submit-pr`.
 - **Combined upstream PR filed as [#1328](https://github.com/icssw-org/MeshCom-Firmware/pull/1328) (2026-11-25):** branch `pr/combined` in worktree `../MeshCom-PR-next`, 13 commits on
   `upstream/dev` `2dcac7d8`, 59 files, +5472/-529. Contents: Auto Update (OTA-LOWHEAP-01, AU-29, AU-30, schedule, TLS
   cap), RAM-WSP-01, RX path with QA-RX-07/02, INA226, gateway hold (always on, 0 B on T114/T-Echo), EXTUDP register
