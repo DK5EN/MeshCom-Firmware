@@ -1,9 +1,9 @@
 {
   "releases": [
     {
-      "version": "v4.40a.11.22",
-      "date": "2026-11-21",
-      "notes": "https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.11.22",
+      "version": "v4.40a.11.25",
+      "date": "2026-11-25",
+      "notes": "https://github.com/DK5EN/MeshCom-Firmware/releases/tag/v4.40a.11.25",
       "boards": [
         {
           "env": "E22-DevKitC",
