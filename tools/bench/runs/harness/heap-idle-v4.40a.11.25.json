@@ -3,31 +3,31 @@
   "boot_marks": [
     {
       "label": "stat",
-      "free": 63756
+      "free": 65360
     },
     {
       "label": "stat",
-      "free": 63620
+      "free": 65360
     },
     {
       "label": "stat",
-      "free": 62992
+      "free": 64440
     }
   ],
   "last_mon_free": null,
-  "last_stat_free": 62992,
-  "idle_free": 62992,
+  "last_stat_free": 64440,
+  "idle_free": 64440,
   "min_free": null,
-  "min_free_seen": 62992,
+  "min_free_seen": 64440,
   "largest_block": null,
   "psram_last_free": null,
   "samples": 3,
   "firmware_version": "40a/20261125",
   "channel": "net2323",
-  "raw_log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/harness/heap_idle_192.168.68.61_20261125_184659.log",
+  "raw_log": "/Users/martinwerner/WebDev/MeshCom-Firmware-DEV-Main/tools/bench/runs/harness/heap_idle_192.168.68.61_20261125_201458.log",
   "baseline": {
     "idle_free": 64016,
-    "delta": -1024,
+    "delta": 424,
     "tolerance": 3072,
     "result": "pass"
   }

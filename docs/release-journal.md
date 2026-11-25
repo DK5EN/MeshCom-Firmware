@@ -13,7 +13,7 @@ Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
 
 Getaggt am 2026-11-25 auf `fork-dev` nach dem Go des Betreibers, mit den T-Deck-Fixes TD-35 und TD-36, die nach der Nacht des Release-Kandidaten kamen. Gebaut wird von GitHub CI (`MeshCom CI`, Tag `v4.40a.11.25`, `MC_BUILD_TAG` und `MC_AU_DEV_CHANNEL=1` gesetzt), 69 Assets wie `v4.40a.11.22`. Der Tagname ist auf beiden Remotes frei (geprüft 2026-11-24).
 `FLASH_VERSION` 20261125, `FLASH_STRUCT_VERSION` 20260724 unverändert, die Einstellungen bleiben erhalten. Safeboot unverändert seit `v4.40a.11.20`.
-Basis ist `upstream/dev` `68286e07` (#1320, 2026-11-23) mit unserem gemergten Welle-3-PR #1316; upstream hat beides noch nicht released. Das offizielle `v4.40a.11.22` von upstream trägt nur denselben Namen wie unser `v4.40a.11.22`.
+Basis ist `upstream/dev` `2dcac7d8` (#1321, 2026-11-25) mit unserem gemergten Welle-3-PR #1316 und #1320; upstream hat nichts davon released. Das offizielle `v4.40a.11.22` von upstream trägt nur denselben Namen wie unser `v4.40a.11.22`.
 
 Handlungsbedarf: RAK4631, T114 und T-Echo senden das Sync-Word `0x24B4` statt `0x242B` (SYNC-NRF-01, upstream #1320). Auf dem Bench ohne Nebenwirkung gegen ESP32-Boards; nRF52 alt gegen nRF52 neu ist nicht gemessen. Knoten einer reinen nRF52-Strecke zusammen aktualisieren.
 
@@ -22,6 +22,7 @@ Inhalt, neu gegenüber `v4.40a.11.22`:
 - Auto Update ohne Speicherfehler auf ESP32 ohne PSRAM (OTA-LOWHEAP-01, Fork-Issue #3): Zulassungsregeln vor dem Download, Webserver bedient während eines Laufs nur die Update-Seite, eigener TLS-Client mit einer Vertrauenswurzel je Host, ein Puffer von 33.440 Byte je Lauf für beide TLS-Puffer und danach als Wörterbuch der Image-Prüfung (`878ebef4`, `469bb942`, `f6c6acd7`, `5488f0bc`). Die kopierte mbedTLS-Bibliothek (rund 23.000 Zeilen) vom 23.11. ist vor dem Release wieder entfernt; TLS kommt aus dem Framework.
 - T-Beam: kein Watchdog-Neustart beim Löschen des Ablagebereichs (AU-29), zuverlässige Installation aus der Web-Oberfläche mit Image-Prüfung in einem eigenen Start vor dem WLAN (AU-30) (`03a30cac`, `616850e2`).
 - nRF52-Sync-Word aus einer Quelle, `0x24B4` (upstream #1320, `154014dc`).
+- Upstream #1321 (DH1FR): T114 mit `--display off` und `--msgwake off` bleibt bei Ping, Pong und Pong-Fehler dunkel; jeder Klick startet den 30-s-Timer neu; `SN1` trägt `MWAKE`, `--msgwake on|off` schickt die Knoteneinstellungen ans Telefon (Merge `cd262938`, Schlüsselprüfung in `test_ext_reg` ergänzt, `23347203`).
 - Welle-3-Fixes aus #1316, im Fork bisher in keinem Release: SEC-DUMP-01 (#1291), RAK-ETH-DNS-01 und RAK-NETMODE-01 (#1289), GW-GROUP-01, GW-DM-01, GW-CALL-01 (#1290), WEB-TEMPOFF-01 (#1296), TBEAM1W-PWR-01 (#1301), GPS-AUTOSYM-01..03 und POSINFO-NEXT-01 (#1295), OTA-SAFEBOOT-01 (#1300), DHT-PROBE-01 (#1302), APRS-TXT-01..03 (#1293), TDECK-VOLT-01 (#1312), DISP-PAGE-01..03 und BTN-OFF-01 (#1294), T114-DARK-01 (#1314), POSINFO-LAG-01 (#1315), der echte Fix für `--aprswx` (#1288) (`c22cb3d2`, `1830d8ed`, `45732840`, `57acc7c3`, `40c1c47d`).
 - INA226: Kalibrierung wird auch für übliche Shunt-Werte geschrieben (INA226-CAL-01, `55fe0174`); Web-Etikett vBUS ohne `<` (WEB-INA-01, `2de6142f`); WX-Tabelle zeigt AHT20, SHT21, BMP390 und INA226 (WEB-WX-01, `35ae3418`).
 - Bibliotheks-Patches FORMAL-01 (nur Fork): NimBLE, W5100S, HTTP-Client, mDNS, DHCP-Server, lwIP-MTU, Zertifikatsdatum und TLS 1.2 für Auto Update, DNS über den Netzwerk-Thread, Fixes in UDP-Drain, Extern-UDP-Warteschlange, Netzkonsole und APRS (`9696a3ba`, `6bbca7a2`).
@@ -38,7 +39,7 @@ Inhalt, neu gegenüber `v4.40a.11.22`:
 - 2026-11-24, EXTUDP-Registerabfrage auf DK5EN-92: 16 Register ohne Geheimnis, Begrenzer und Fehlerantwort wirken.
 - 2026-11-24, Fernverwaltung über LoRa von DK5EN-92 an DK5EN-1: `pins`, `gpio`, `txq`, `mbox`, `maxhop` beantwortet, Button-Pin und GPIO ohne Hauptschalter abgelehnt.
 - Produktions-Gateway DK5EN-98: Release-Kandidat per OTA seit 2026-11-24 15:38 (Betreiber-OK für genau diesen einen Flash), Einstellungen unverändert, Server verbunden.
-- 2026-11-25, Leerlauf-Heap DK5EN-92 (T-Beam, Release-Image mit Tag `v4.40a.11.25`): 62.992 B frei, 1.024 B unter der Baseline von 64.016 B, Grenze 3.072 B: bestanden (`tools/bench/runs/harness/heap-idle-v4.40a.11.25.json`).
+- 2026-11-25, Leerlauf-Heap DK5EN-92 (T-Beam, Release-Image mit Tag `v4.40a.11.25`): 64.440 B frei, 424 B über der Baseline von 64.016 B, Grenze 3.072 B darunter: bestanden (`tools/bench/runs/harness/heap-idle-v4.40a.11.25.json`).
 - 2026-11-25, TD-36 auf DK5EN-14 (T-Deck Plus, INSTRUMENT `b6e5557e`): Framebuffer-Aufnahmen im hellen Theme, Segmente und Knöpfe MESH und `No * MSG` ohne graue Kanten.
 - Host-Gate `tools/regression.sh --stage 1,2` auf dem getaggten Stand (25.11.): PASS, 4.237 Unity-Fälle in 129 nativen Envs (einer übersprungen), Golden-Selftest 48 Befehle, fünf Board-Link-Builds, 1.842 pytest-Fälle plus Node-, nbrlog- und Selbsttest-Suiten. Am 24.11. war der erste Lauf rot: zwei Fälle in `tools/tests/test_hmac_connect.py` hingen, weil ein anderer Tool-Test im selben pytest-Worker einen nicht werfenden SIGINT-Handler hinterlassen hatte; die Fixture setzt jetzt den Standard-Handler, mit erzwungenem Leck 10 von 10 grün. Alle 36 Board-Envs gebaut, 35 grün, `esp32-external-radio` scheitert wie upstream an seinem eigenen `#error`.
 
@@ -51,6 +52,7 @@ Inhalt, neu gegenüber `v4.40a.11.22`:
 - Von den Welle-3-Fixes: GW-DM-01 am Telefon, GW-CALL-01, OTA-SAFEBOOT-01, BTN-OFF-01, DISP-PAGE-03, APRS-Frames auf Funk, DHT-PROBE-01, GPS-AUTOSYM-02/03 in Bewegung, TBEAM1W-PWR-01.
 - TD-35 auf Hardware: die Kürzung lässt sich am Bench nicht gezielt auslösen (Heap muss unter die Grenze fallen); nur Host-Test. Die Grenze selbst neu einzustellen ist offen (TD-37).
 - TD-35 und TD-36 sind jünger als die Nacht des Release-Kandidaten; sie ändern nur T-Deck-Code.
+- Upstream #1321 auf einem T114: kein T114 am Bench; nur Builds und Host-Gate. Laut PR auf einem T114 geprüft.
 - Die WX-Tabelle (`35ae3418`) ist jünger als die Bench-Images; Host-Test, Betreiber-Entscheidung: geringes Risiko.
 
 ## Release v4.40a.11.22 (Sonntag, 2026-11-22, geschnitten am 2026-11-21)

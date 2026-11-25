@@ -24,7 +24,7 @@
 
 ### Key facts
 
-- **Base:** the official `v4.40a.11.22` plus upstream `dev` up to #1320 (2026-11-23, `68286e07`), which includes our wave-3 PR [#1316](https://github.com/icssw-org/MeshCom-Firmware/pull/1316) (merged 2026-11-22). Upstream has released #1316 and #1320 in no official release yet.
+- **Base:** the official `v4.40a.11.22` plus upstream `dev` up to #1321 (2026-11-25, `2dcac7d8`), which includes our wave-3 PR [#1316](https://github.com/icssw-org/MeshCom-Firmware/pull/1316) (merged 2026-11-22). Upstream has released #1316, #1320 and #1321 in no official release yet.
 - **Fork-only firmware:** Auto Update memory work (OTA-LOWHEAP-01, AU-29, AU-30), library patches (FORMAL-01), INA226 calibration, everything listed under "New in", the fork-only items of `v4.40a.11.22` and older, and the `dev` Auto Update channel. Not byte-identical to any official release.
 - **How to tell builds apart:** `--info` prints `...AU env=<board> tag=v4.40a.11.25` and `FLASH_VERSION 20261125`; `--id` ends in `:v4.40a.11.25`.
 - **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings are kept.
@@ -65,6 +65,11 @@
 - **T-Deck header battery label follows `--volt`** (TDECK-VOLT-01, #1312).
 - **Display paging and the user button** (#1294): OLED and web show the same messages (DISP-PAGE-01), a browse click is no longer lost when the display turns off right after it (DISP-PAGE-02), the Wireless Paper's first press no longer redraws the newest message (DISP-PAGE-03), and a user button switched off in the web UI stops working at once, not after a reboot (BTN-OFF-01).
 - **Heltec T114 dark theme; `--msgwake` keeps a switched-off display dark** (T114-DARK-01, #1314).
+
+**From upstream #1321** (DH1FR, merged 2026-11-25)
+
+- **Heltec T114: with `--display off` and `--msgwake off`, sending a ping and receiving a pong or a failed pong keep the display dark.** Ping and pong are still sent and received. Every button click restarts the 30 s off-timer while the display is stored off.
+- **The phone app sees `--msgwake`:** the second node-settings frame (`SN1`) carries the new key `MWAKE` (true = a message wakes a switched-off display), and `--msgwake on|off` sends the node settings to the phone. Apps that do not know the key ignore it.
 - **`--aprswx on|off` real fix** for the settings reply to the phone (#1288; replaces the temporary fork fix).
 
 **Sensors and web**
@@ -581,9 +586,9 @@ Since the official `v4.40a.11.14`, unchanged from the previous fork release:
 ### Verification for this release
 
 - **Host suite:** `tools/regression.sh --stage 1,2` PASS on the tagged tree (2026-11-25): 4,237 Unity test cases in 129 native environments (one skipped), the golden selftest (48 commands), five board link builds, 1,842 pytest cases plus the Node, nbrlog and tool self-test suites. The new Auto Update buffer size, the `hmac_connect.py` fixes and the INA226 calibration each have tests that fail on the old code.
-- **Build:** all 36 board environments built from the release candidate on 2026-11-24 (35 green; `esp32-external-radio` needs its own build overlay and is not shipped). CI builds all shipped environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download.
+- **Build:** all 36 board environments built from the release candidate on 2026-11-24 (35 green; `esp32-external-radio` needs its own build overlay and is not shipped); all 33 shipped environments again on 2026-11-25 before the #1321 merge, and after it the five board builds of the host gate. CI builds all shipped environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download.
 - **Auto Update, bench 2026-11-24** (release-candidate images, check and download with staging, never installed): DK5EN-1 Heltec V3, DK5EN-92 T-Beam v1.2, DK5EN-14 T-Deck Plus, numbers under "New in". Night 2026-11-24/25, three runs per board three hours apart (19:26 to 01:49, uptime up to 6.5 hours): 9 of 9 downloads staged, no restart, no refusal. DK5EN-1 10.9 to 11.4 s, lowest free memory after a run 21,260 bytes; DK5EN-92 13.6 to 13.7 s, 11,700 bytes, the image check ran in place on the first run and was moved to the check start at install on runs two and three (AU-30, memory short after the download); DK5EN-14 20.6 to 22.0 s, 23,444 bytes. Production gateway DK5EN-98 on the release candidate: no restart for 15.8 hours (2026-11-24 15:38 to 2026-11-25 07:28), free memory steady at 100 to 104 KB, no failed transmission.
-- **Idle heap on the T-Beam release image (`DK5EN-92`), 2026-11-25:** 62,992 B free at idle, 1,024 B below the baseline of 64,016 B (limit 3,072 B): pass.
+- **Idle heap on the T-Beam release image (`DK5EN-92`), 2026-11-25:** 64,440 B free at idle, 424 B above the baseline of 64,016 B (limit 3,072 B below): pass.
 - **Sync word, bench 2026-11-24:** RAK4631 with the old and the new value against Heltec V3, T-Deck Plus and T-Beam, both directions, at 2 and -9 dBm; TRACK on and off. Result: [`docs/syncword-ab-bench-20261124.md`](docs/syncword-ab-bench-20261124.md).
 - **Gateway and remote management, bench 2026-11-24:** message hold in a simulated server outage on DK5EN-1 (held, replayed once with the same id); Extern-UDP register query on DK5EN-92 (16 registers, no secret, rate limit); RM1 `pins`, `gpio`, `txq`, `mbox`, `maxhop` over LoRa from DK5EN-92 to DK5EN-1, refusals for the button pin and without the GPIO master switch.
 - **Production gateway:** `DK5EN-98` runs the release candidate since 2026-11-24 15:38 (OTA), settings unchanged.
@@ -765,6 +770,7 @@ Since the official `v4.40a.11.14`, unchanged from the previous fork release:
 - **A node can miss the frame that makes its own channel check busy** (CAD-RXLOSS-01, open, found during the sync-word test): a node with frames queued runs CAD before sending; if a frame starts during that check, the node does not decode it and gets it only as a relay copy. Seen mostly on a RAK4631 gateway with ACKs from the server queued. Not new in this release.
 - **Wave-3 fixes not on our bench:** phone path of the gateway rule (GW-DM-01), the `/` hint (GW-CALL-01), the OTA warning on an old Safeboot (OTA-SAFEBOOT-01), the user-button switch (BTN-OFF-01), Wireless Paper paging (DISP-PAGE-03), APRS frames on air, DHT probe, GPS autosymbol in motion, T-Beam 1W PA. Host tests and builds only.
 - **INA226 calibration and the WX table:** host tests only, no sensor on the bench.
+- **Upstream #1321 (T114 ping and pong, `MWAKE`):** no T114 on our bench; builds and host gate only. The PR author tested it on a T114.
 - **T-Deck tabs (TD-35):** the fix has a host test but was not forced on the bench, because the memory must fall below the floor first. Old messages are still trimmed at the current floor; re-tuning it is open (TD-37).
 - **Remote management Queues card:** the three requests of its Read buttons were answered over LoRa; the button click itself was not tried in a browser.
 
@@ -911,7 +917,7 @@ Since the official `v4.40a.11.14`, unchanged from the previous fork release:
 
 ## Upstream
 
-- **In upstream `dev`, not in an official release yet:** our wave-3 PR [#1316](https://github.com/icssw-org/MeshCom-Firmware/pull/1316) (21 issues, merged 2026-11-22, synced here as `dc5ea81c`) and #1320 (nRF52 sync word and `hmac_connect.py`, merged 2026-11-23, synced as `4fe57374`). This release carries all of upstream `dev` as of 2026-11-23.
+- **In upstream `dev`, not in an official release yet:** our wave-3 PR [#1316](https://github.com/icssw-org/MeshCom-Firmware/pull/1316) (21 issues, merged 2026-11-22, synced here as `dc5ea81c`) #1320 (nRF52 sync word and `hmac_connect.py`, merged 2026-11-23, synced as `4fe57374`) and #1321 (T114 display dark on ping and pong, `MWAKE` over BLE, merged 2026-11-25, synced as `cd262938`). This release carries all of upstream `dev` as of 2026-11-25.
 - **Official `v4.40a.11.22`** (upstream tag on `5db0a4f5`) shares only its name with our `v4.40a.11.22`; the two are different builds.
 - **Next upstream PR (planned):** one combined PR with the Auto Update memory work, the small fixes (#1305, #1306, INA226), the gateway hold (#1307), the register query (#1308), the remote-management node side (#1303) and the `hmac_connect.py` fix. The library patches, Safeboot, AppLink and the `dev` channel stay fork-only for now.
 - **In the official release `v4.40a.11.14`** (2026-11-14, `upstream/dev` 70ae124d): our PR [#1277](https://github.com/icssw-org/MeshCom-Firmware/pull/1277) with 20 commits. Merged into this tree as `d4384eac`.
