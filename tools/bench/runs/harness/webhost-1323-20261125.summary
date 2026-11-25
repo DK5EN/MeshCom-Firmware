@@ -1,0 +1,10 @@
+WEBHOST-1323 bench 2026-11-25 (DK5EN-14 T-Deck Plus, 192.168.68.77; identity guard ok, 2 dBm, no RF traffic)
+Image: feat/webhost-1323 430b6254, t_deck_plus, OTA via tools/webflash.py (build 19:08 -> 21:40)
+Before flash: Host dk5en.dyndns.org -> 403 {"ok":false,"err":"forbidden"} (the #1323 report)
+Console: --webhost -> none; 1.2.3.4 and *.dyndns.org -> invalid; DK5EN.DynDNS.org -> stored dk5en.dyndns.org
+200: Host dk5en.dyndns.org; Host DK5EN.DYNDNS.ORG:8080; LAN IP; getparam webhost
+403: evil.dyndns.org; dk5en.dyndns.org.evil.com; x.dk5en.dyndns.org; setparam without X-MC; foreign Origin with X-MC
+Web setter: setparam webhost with matching Origin + X-MC 200; invalid name 422, stored value unchanged
+Reboot (--reboot, uptime 33 s, RESET_REASON SW): value persisted, public Host still 200
+Cleanup: --webhost none -> public Host 403 again (node back to default, still on the feature image)
+Gate: tools/regression.sh --stage 1,2 PASS, 129 envs, 4241 ok; ESP32 and RAK4631 images contain the command (T114/T-Echo: no web server)
