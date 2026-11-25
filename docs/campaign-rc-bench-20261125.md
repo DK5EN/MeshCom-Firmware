@@ -345,7 +345,8 @@ hits are NBRRELAY counters).
 - Second run PASS: 129 Unity envs, 4,235 cases, 0 failed; golden selftest 48 commands; board links t_echo 55.7 %,
   heltec_t114 53.2 %, wiscore_rak4631 83.7 %, heltec_wifi_lora_32_V3 52.9 %, ttgo_tbeam 55.9 %; pytest 1,842
   passed; Node, nbrlog and tool self-tests OK. Log `gate/regression-20261125.log`.
-- The fixture fix belongs in the combined PR together with `hmac_connect.py` and its tests.
+- The fixture fix stays in the fork: `tools/tests/test_hmac_connect.py` is fork-only and not part of the combined PR
+  ([pr-combined-scope-20261125.md](pr-combined-scope-20261125.md), topic 5); the PR carries `hmac_connect.py` only.
 
 ## Step 8: documents (drafts 2026-11-24 evening)
 
@@ -372,13 +373,18 @@ pushed, no PR or issue is filed (operator stop point).
 - Bench nodes stay as they are: DK5EN-1, -92, -14 on the night images (no image staged after the last `unstage`),
   DK5EN-90 on image B, DK5EN-98 on the RC image.
 - Left uncommitted on purpose: the foreign deletion of `docs/research-esp32-wifi-sdr-20261124.md` and the untracked
-  `docs/research-rf-spectrum-20261124.md` (another session).
+  `docs/research-rf-spectrum-20261124.md` (another session); the four RAK bench images of step 4
+  (`images/rc-732238bd-rak4631-A-242b.{hex,zip}`, `-B.{hex,zip}`), kept locally for a re-flash, not committed.
+  Raw logs (`night/trigger-*.log`, `dk5en-98-log/*.log`, `gate/regression-20261125.log`) are gitignored and stay
+  local; the committed summaries are `night/trigger.summary` and `dk5en-98-log/status.txt`.
+- The release commit `c7b8f7f4` carries the same `src/` as the full gate run (only docs changed afterwards,
+  `--changed` PASS). The tag goes on this commit or a later docs-only one.
 
 Waiting for the operator:
 
 1. Go for tag `v4.40a.11.25` (`/release-firmware`; CI builds and publishes 69 assets).
 2. Go for the combined PR and the open scope questions: #1306 QA-RX-07/02, #1307 `--udphold` wording, #1308
-   EXT-PEER-01, #1309 "Refs" only. The fixture fix of `test_hmac_connect.py` goes with `hmac_connect.py`.
+   EXT-PEER-01, #1309 "Refs" only.
 3. Go for the PR-branch build of every env and a short bench run (Heltec V3, T-Beam: download and staging); the PR
    branch has no FORMAL-01 library patches.
 4. Go for the three issue drafts ([upstream-issue-drafts-20261125.md](upstream-issue-drafts-20261125.md)).
