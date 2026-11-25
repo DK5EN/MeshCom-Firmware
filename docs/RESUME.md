@@ -7,6 +7,13 @@ Desktop `upstream-releaseplan-20261125.html` (Fassung 12). Active campaigns:
 
 ## Now (2026-11-25)
 
+- **WEBHOST-1323 on `fork-dev` 2026-11-25 (`430b6254`, `f4d49105`):** upstream issue #1323, a public DynDNS name was
+  refused by the web guard (403). New `--webhost <name>|none`, setup field "Public web host", setting `node_webhost`:
+  one name, exact case-insensitive match, any port, no wildcards; empty keeps the old guard. Gate stage 1,2 PASS
+  (4,241 Unity cases); Opus advisor APPROVED; bench DK5EN-14 PASS
+  (`tools/bench/runs/harness/webhost-1323-20261125.summary`), name cleared afterwards. Next: `/submit-pr`.
+  Found on the way: in a fresh clone `test_arduino_esp32_patch` fails (`text=auto` turns the CRLF in
+  `tools/tests/fixtures/au_http/*.hdr` into LF) and the two heap-timeline test logs are gitignored, so missing.
 - **Released `v4.40a.11.25` (2026-11-25 20:16, Latest, 69 assets) on `fork-dev` `9586d82d`:** Auto Update without the
   low-memory refusal (OTA-LOWHEAP-01, fork issue #3 closed by the release commit), AU-29, AU-30, nRF52 sync word
   `0x24B4` (#1320), wave-3 fixes (#1316), upstream #1321 (synced `cd262938`), TD-35, TD-36. Gate stage 1,2 PASS (4,237
