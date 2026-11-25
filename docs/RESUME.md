@@ -1,13 +1,13 @@
 # RESUME -- pick up here
 
-**Resume here: section "Now" below. Next: the operator pushes `pr/combined` and files the combined upstream PR (commands below, body `docs/pr-combined-body-20261125.md`).** Release plan and working checklist: operator's
+**Resume here: section "Now" below. Next: upstream review of PR #1328 (combined wave-4 PR, filed 2026-11-25); after the merge `/sync-upstream` (merge path) and remove `../MeshCom-PR-next` and `pr/combined`.** Release plan and working checklist: operator's
 Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).
 
 ## Now (2026-11-25)
 
-- **Combined upstream PR ready, not pushed:** branch `pr/combined` in worktree `../MeshCom-PR-next`, 13 commits on
+- **Combined upstream PR filed as [#1328](https://github.com/icssw-org/MeshCom-Firmware/pull/1328) (2026-11-25):** branch `pr/combined` in worktree `../MeshCom-PR-next`, 13 commits on
   `upstream/dev` `2dcac7d8`, 59 files, +5472/-529. Contents: Auto Update (OTA-LOWHEAP-01, AU-29, AU-30, schedule, TLS
   cap), RAM-WSP-01, RX path with QA-RX-07/02, INA226, gateway hold (always on, 0 B on T114/T-Echo), EXTUDP register
   query with EXT-PEER-01, RM pins/gpio, TD-35, TD-36, `--webhost` (#1323), `hmac_connect.py`. Closes #1303, #1305-#1308,
