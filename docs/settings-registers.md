@@ -139,13 +139,14 @@ Gruppennummern); **Hinweis** = Flags aus §3–§6 dieses Dokuments.
 
 ### M. Eigenes Netzwerk (statische IP)
 
-| Key           | Member        | Typ (Größe) | Import-Bereich | Hinweis                                         |
-| ------------- | ------------- | ----------- | -------------- | ----------------------------------------------- |
-| `node_ownip`  | `node_ownip`  | string (20) | —              |                                                 |
-| `node_owngw`  | `node_owngw`  | string (20) | —              |                                                 |
-| `node_ownms`  | `node_ownms`  | string (20) | —              | Netzmaske                                       |
-| `node_name`   | `node_name`   | string (20) | —              | Hostname                                        |
-| `node_webpwd` | `node_webpwd` | string (20) | —              | **Secret, dokumentiert** (§5): Web-GUI-Passwort |
+| Key            | Member         | Typ (Größe) | Import-Bereich | Hinweis                                                                     |
+| -------------- | -------------- | ----------- | -------------- | --------------------------------------------------------------------------- |
+| `node_ownip`   | `node_ownip`   | string (20) | —              |                                                                             |
+| `node_owngw`   | `node_owngw`   | string (20) | —              |                                                                             |
+| `node_ownms`   | `node_ownms`   | string (20) | —              | Netzmaske                                                                   |
+| `node_name`    | `node_name`    | string (20) | —              | Hostname                                                                    |
+| `node_webpwd`  | `node_webpwd`  | string (20) | —              | **Secret, dokumentiert** (§5): Web-GUI-Passwort                             |
+| `node_webhost` | `node_webhost` | string (64) | —              | Öffentlicher Hostname für den Web-Guard (`--webhost`, #1323), leer = keiner |
 
 ### N. Lokales WLAN
 

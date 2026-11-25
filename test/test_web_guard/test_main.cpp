@@ -1035,6 +1035,84 @@ void test_setparam_value_chained_gpio_needs_xmc(void)
     TEST_ASSERT_TRUE(webGuardSetparamAllowed("gpio13", "on", with.c_str(), with.size()));
 }
 
+// ---- #1323 operator-configured public hostname (--webhost) ----
+
+static WebGuardVerdict checkExt(const std::string &hdr, const char *path, const char *ext)
+{
+    return webGuardCheck(hdr.data(), hdr.size(), path, ext);
+}
+
+static void expectExt(WebGuardVerdict want, const std::string &hdr, const char *path, const char *ext, const char *what)
+{
+    WebGuardVerdict got = checkExt(hdr, path, ext);
+    char msg[300];
+    snprintf(msg, sizeof(msg), "%s: want %s got %s", what, vname(want), vname(got));
+    TEST_ASSERT_EQUAL_INT_MESSAGE((int)want, (int)got, msg);
+}
+
+#define EXTHOST "dk5en.dyndns.org"
+
+void test_ext_host_configured_name_accepted(void)
+{
+    expectExt(WG_OK, req("GET / HTTP/1.1", {"Host: dk5en.dyndns.org"}), "/", EXTHOST, "exact name");
+    expectExt(WG_OK, req("GET / HTTP/1.1", {"Host: dk5en.dyndns.org:8080"}), "/", EXTHOST, "name with port");
+    expectExt(WG_OK, req("GET / HTTP/1.1", {"Host: DK5EN.DynDNS.org"}), "/", EXTHOST, "mixed case");
+    expectExt(WG_OK, req("GET / HTTP/1.1", {"Host: dk5en.dyndns.org."}), "/", EXTHOST, "trailing dot");
+    expectExt(WG_OK, req("GET / HTTP/1.1", {"Host: dk5en.dyndns.org"}), "/", "DK5EN.dyndns.ORG", "configured in mixed case");
+    // the local names keep working with a name configured
+    expectExt(WG_OK, req("GET / HTTP/1.1", {"Host: 192.168.68.71"}), "/", EXTHOST, "LAN IP still accepted");
+    expectExt(WG_OK, req("GET / HTTP/1.1", {"Host: dk5en-14.local"}), "/", EXTHOST, ".local still accepted");
+}
+
+void test_ext_host_lookalikes_rejected(void)
+{
+    expectExt(WG_BAD_HOST, req("GET / HTTP/1.1", {"Host: dk5en.dyndns.org.evil.com"}), "/", EXTHOST, "suffix appended");
+    expectExt(WG_BAD_HOST, req("GET / HTTP/1.1", {"Host: evil-dk5en.dyndns.org"}), "/", EXTHOST, "prefix glued");
+    expectExt(WG_BAD_HOST, req("GET / HTTP/1.1", {"Host: x.dk5en.dyndns.org"}), "/", EXTHOST, "subdomain (no wildcard)");
+    expectExt(WG_BAD_HOST, req("GET / HTTP/1.1", {"Host: dyndns.org"}), "/", EXTHOST, "parent domain");
+    expectExt(WG_BAD_HOST, req("GET / HTTP/1.1", {"Host: dk5en.dyndns.or"}), "/", EXTHOST, "one char short");
+    expectExt(WG_BAD_HOST, req("GET / HTTP/1.1", {"Host: dk5en.dyndns.org:99999"}), "/", EXTHOST, "bad port");
+    expectExt(WG_BAD_HOST, req("GET / HTTP/1.1", {"Host: dk5en.dyndns.org", "Host: dk5en.dyndns.org"}), "/", EXTHOST, "duplicate Host");
+    expectExt(WG_BAD_HOST, req("GET / HTTP/1.1", {"Host: other.dyndns.org"}), "/", EXTHOST, "other public name");
+}
+
+void test_ext_host_empty_keeps_old_behaviour(void)
+{
+    // the reporter's case: a public name is refused when nothing is configured
+    expect(WG_BAD_HOST, req("GET / HTTP/1.1", {"Host: dk5en.dyndns.org"}), "/", "3-arg call, public name");
+    expectExt(WG_BAD_HOST, req("GET / HTTP/1.1", {"Host: dk5en.dyndns.org"}), "/", NULL, "NULL name");
+    expectExt(WG_BAD_HOST, req("GET / HTTP/1.1", {"Host: dk5en.dyndns.org"}), "/", "", "empty name");
+    expectExt(WG_OK, req("GET / HTTP/1.1", {"Host: 192.168.68.71"}), "/", "", "empty name, LAN IP");
+}
+
+void test_ext_host_state_change_still_needs_proof(void)
+{
+    const char *H = "Host: dk5en.dyndns.org:8080";
+    expectExt(WG_CROSS_SITE, req("GET /setparam/?manualcommand=--reboot HTTP/1.1", {H}), "/setparam/", EXTHOST, "no X-MC, no Origin");
+    expectExt(WG_OK, req("GET /setparam/?manualcommand=--reboot HTTP/1.1", {H, XMC}), "/setparam/", EXTHOST, "X-MC");
+    expectExt(WG_OK, req("POST /rmsend HTTP/1.1", {H, "Origin: http://dk5en.dyndns.org:8080"}), "/rmsend", EXTHOST, "matching Origin");
+    expectExt(WG_CROSS_SITE, req("POST /rmsend HTTP/1.1", {H, "Origin: http://evil.example", XMC}), "/rmsend", EXTHOST, "foreign Origin even with X-MC");
+    expectExt(WG_CROSS_SITE, req("POST /rmsend HTTP/1.1", {H, "Origin: http://dk5en.dyndns.org", XMC}), "/rmsend", EXTHOST, "Origin without the forwarded port");
+}
+
+void test_ext_host_valid(void)
+{
+    const char *good[] = {"dk5en.dyndns.org", "DK5EN.DynDNS.org", "a.b", "my-node.ddns.net", "x1.y-2.example"};
+    for (const char *g : good)
+        TEST_ASSERT_TRUE_MESSAGE(webGuardExtHostValid(g, strlen(g)), g);
+    const char *bad[] = {"", "localhost", "node", "1.2.3.4", "10.0.0.1", "dk5en.dyndns.org:80", "*.dyndns.org",
+                         "dk5en.dyndns.org.", ".dyndns.org", "a..b", "-a.b", "a-.b", "a.-b", "a b.c", "a_b.c",
+                         "[::1]", "http://a.b", "a.b/", "a.123", "0x7f.0x1", "a.0x", "a.0XFF"};
+    for (const char *b : bad)
+        TEST_ASSERT_FALSE_MESSAGE(webGuardExtHostValid(b, strlen(b)), b);
+    // length: 63 chars accepted, 64 refused (the setting holds 63 + NUL)
+    std::string l63 = std::string(59, 'a') + ".org";
+    std::string l64 = std::string(60, 'a') + ".org";
+    TEST_ASSERT_TRUE(webGuardExtHostValid(l63.c_str(), l63.size()));
+    TEST_ASSERT_FALSE(webGuardExtHostValid(l64.c_str(), l64.size()));
+    TEST_ASSERT_FALSE(webGuardExtHostValid(NULL, 0));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -1100,5 +1178,10 @@ int main(int, char **)
     RUN_TEST(test_setparam_value_chained_gpiocontrol_always_refused);
     RUN_TEST(test_setparam_value_chained_gpio_needs_xmc);
     RUN_TEST(test_setparam_manualcommand_token_at_offset_zero);
+    RUN_TEST(test_ext_host_configured_name_accepted);
+    RUN_TEST(test_ext_host_lookalikes_rejected);
+    RUN_TEST(test_ext_host_empty_keeps_old_behaviour);
+    RUN_TEST(test_ext_host_state_change_still_needs_proof);
+    RUN_TEST(test_ext_host_valid);
     return UNITY_END();
 }

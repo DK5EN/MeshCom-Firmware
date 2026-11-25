@@ -45,6 +45,7 @@
 #include "gw_servers.h"   // GWU: gwCodes(), gwSelectNet() for --setnet / --gateway srv
 #include "radio_units.h"   // RF-01..RF-03 unit conversions
 #include "web_functions/web_auth.h" // WEB-AUTH-01: webAuthReset()
+#include "web_functions/web_guard.h" // #1323: webGuardExtHostValid() for --webhost
 #include "extudp_functions.h"
 #include "ntp_async.h"
 #include "ble_json_frame.h"
@@ -1841,7 +1842,7 @@ void commandAction(char *umsg_text, bool ble)
                 printfdeb("--gateway srv %s  gateway server, reboots\n", _gwl);
                 printdeb("--gateway lab <host[:port]>  lab server (instrumentation), reboots; --gateway srv OE restores\n");
             }
-            printdeb("--setudpcall <call>     UDP callsign\n--setnet auto/inet/hamnet  gateway network (auto: Hamnet if own IP is 44.x)\n--setnet                show network mode\n--sethamnet on/off      deprecated alias of --setnet hamnet/inet\n--setinet on/off        deprecated alias of --setnet inet/hamnet\n--extudp on/off         external UDP\n--extudpip a.b.c.d/none external UDP peer\n--nopmother on/off      no foreign DMs to EXTUDP peer\n--webserver on/off      web server\n--webpwd <pwd>/none     web password\n--webtimer 0            reset web session timer\n");
+            printdeb("--setudpcall <call>     UDP callsign\n--setnet auto/inet/hamnet  gateway network (auto: Hamnet if own IP is 44.x)\n--setnet                show network mode\n--sethamnet on/off      deprecated alias of --setnet hamnet/inet\n--setinet on/off        deprecated alias of --setnet inet/hamnet\n--extudp on/off         external UDP\n--extudpip a.b.c.d/none external UDP peer\n--nopmother on/off      no foreign DMs to EXTUDP peer\n--webserver on/off      web server\n--webpwd <pwd>/none     web password\n--webhost <name>/none   public hostname the web server accepts (DynDNS)\n--webtimer 0            reset web session timer\n");
             #ifndef DISABLE_NET_CONSOLE
             printdeb("--netconsole on/off     console on TCP 2323\n");
             #endif
@@ -3806,6 +3807,43 @@ void commandAction(char *umsg_text, bool ble)
 
         bReturn = true;
         #endif
+    }
+    else
+    if(commandCheck(msg_text+2, (char*)"webhost ") == 0 || commandCheck(msg_text+2, (char*)"webhost") == 0)
+    {
+        // #1323: one public hostname (DynDNS name behind a port forward) the web guard accepts in
+        // the Host header, exact match only. "none" clears it; a bare --webhost shows it.
+        #if defined(NRF52_NO_ETH)
+        printfdeb(NRF52_NO_ETH_MSG);
+        return;
+        #endif
+        cmdArgCopyTrim(_owner_c, sizeof(_owner_c), (strlen(msg_text) > 10) ? msg_text+10 : "");
+        sVar = _owner_c;
+        sVar.trim();
+
+        if(sVar.length() > 0)
+        {
+            if(sVar.equalsIgnoreCase("none"))
+                sVar = "";
+            else if(!webGuardExtHostValid(sVar.c_str(), sVar.length()))
+            {
+                printfdeb("[WEB];webhost;invalid (DNS name, max %d chars, no IP, port or wildcard)\n", WEB_GUARD_EXT_HOST_MAX);
+                return;
+            }
+            sVar.toLowerCase();
+            snprintf(meshcom_settings.node_webhost, sizeof(meshcom_settings.node_webhost), "%s", sVar.c_str());
+
+            if(ble)
+            {
+                addBLECommandBack((char*)msg_text);
+            }
+
+            save_settings();
+        }
+
+        printfdeb("[WEB];webhost;%s\n", meshcom_settings.node_webhost[0] ? meshcom_settings.node_webhost : "none");
+
+        return;
     }
     else
     if(commandCheck(msg_text+2, (char*)"webpwd ") == 0)
