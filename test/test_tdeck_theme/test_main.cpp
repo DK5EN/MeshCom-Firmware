@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <unity.h>
 #include <t-deck/tdeck_palette.h>
+#include <string>
+#include "../support/repo_file.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -239,6 +241,23 @@ void test_link_icon_colour_three_states(void)
     }
 }
 
+// TD-36: LVGL's default light theme gives every button a grey drop shadow (lv_theme_default.c, light
+// mode only). Under the near-white btn_off fill only that shadow showed: grey edges and corners on the
+// unselected segments and buttons. fill_styles() must zero it on both button styles.
+static void test_button_styles_drop_theme_shadow(void)
+{
+    std::string src = repo_slurp("src/t-deck/tdeck_theme.cpp");
+    size_t a = src.find("static void fill_styles(const TdeckPalette& p)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(a != std::string::npos, "fill_styles");
+    size_t b = src.find("\n}\n", a);
+    TEST_ASSERT_TRUE_MESSAGE(b != std::string::npos, "fill_styles end");
+    std::string body = src.substr(a, b - a);
+    TEST_ASSERT_TRUE_MESSAGE(body.find("lv_style_set_shadow_width(&tdeck_style_btn_on, 0);") != std::string::npos,
+                             "btn_on shadow width 0");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("lv_style_set_shadow_width(&tdeck_style_btn_off, 0);") != std::string::npos,
+                             "btn_off shadow width 0");
+}
+
 int main(int, char**)
 {
     UNITY_BEGIN();
@@ -257,5 +276,6 @@ int main(int, char**)
     RUN_TEST(test_parse);
     RUN_TEST(test_name);
     RUN_TEST(test_theme_segments);
+    RUN_TEST(test_button_styles_drop_theme_shadow);
     return UNITY_END();
 }

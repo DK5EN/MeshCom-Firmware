@@ -2,6 +2,8 @@
 #include <unity.h>
 #include <cstdint>
 #include <t-deck/msg_tab_policy.h>
+#include <string>
+#include "../support/repo_file.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -132,6 +134,28 @@ static void test_system_body_keep_from(void)
     TEST_ASSERT_EQUAL_UINT32(976, msg_system_body_keep_from(2000));
 }
 
+// TD-35: source pin -- the heap trim (TD-22) drops bubbles but never a tab. Deleting the tab it had
+// emptied made a conversation vanish while a newer one stayed (T-Deck user report, 11.22). The LVGL
+// side is not host-runnable, so the body of msg_tabs_heap_trim() is checked as text.
+static std::string tabs_func_body(const std::string &src, const char *sig)
+{
+    size_t a = src.find(sig);
+    TEST_ASSERT_TRUE_MESSAGE(a != std::string::npos, sig);
+    size_t b = src.find("\n}\n", a);
+    TEST_ASSERT_TRUE_MESSAGE(b != std::string::npos, "function end");
+    return src.substr(a, b - a);
+}
+
+static void test_heap_trim_never_removes_a_tab(void)
+{
+    std::string body = tabs_func_body(repo_slurp("src/t-deck/lv_obj_functions.cpp"),
+                                      "static void msg_tabs_heap_trim(void)\n{");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("msg_tab_pick_trim(") != std::string::npos, "trim still picks a tab");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("b.erase(b.begin())") != std::string::npos, "trim still drops the oldest bubble");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("msg_tabs_remove_index") == std::string::npos,
+                             "heap trim must not remove a tab (TD-35)");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -153,5 +177,6 @@ int main(int, char **)
     RUN_TEST(test_view_excess_hint_not_counted);
     RUN_TEST(test_system_body_keep_from);
     RUN_TEST(test_utf8_align_skips_continuation);
+    RUN_TEST(test_heap_trim_never_removes_a_tab);
     return UNITY_END();
 }
