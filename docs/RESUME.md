@@ -1,13 +1,23 @@
 # RESUME -- pick up here
 
-**Resume here: section "Now" below. Next: operator go for tag `v4.40a.11.25`, then the combined upstream PR (wave 4,
-planned Fri 2026-11-27) after the PR-branch build and bench run.** Release plan and working checklist: operator's
+**Resume here: section "Now" below. Next: the combined upstream PR (wave 4): decision brief, then the PR branch built and benched, ready to push and file on 2026-11-26.** Release plan and working checklist: operator's
 Desktop `upstream-releaseplan-20261125.html` (Fassung 12). Active campaigns:
 [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).
 
 ## Now (2026-11-25)
 
+- **Released `v4.40a.11.25` (2026-11-25 20:16, Latest, 69 assets) on `fork-dev` `9586d82d`:** Auto Update without the
+  low-memory refusal (OTA-LOWHEAP-01, fork issue #3 closed by the release commit), AU-29, AU-30, nRF52 sync word
+  `0x24B4` (#1320), wave-3 fixes (#1316), upstream #1321 (synced `cd262938`), TD-35, TD-36. Gate stage 1,2 PASS (4,237
+  Unity cases, 1,842 pytest); T-Beam idle heap 64,440 B (+424 B); all 28 `.autoupdate` re-inflate byte-exact; web
+  flasher on 11.25 only (31 boards, 0 mismatches), Pages synced. Bench DK5EN-1, -14, -90, -92 on local builds of the
+  release. DK5EN-98: the operator runs its Auto Update.
+  - Two false starts, both without a published release: the first CI run failed because `release-notes.md` exceeded
+    GitHub's 125,000-character release body (fork releases 10.11 to 10.30 moved to
+    `docs/archive/release-notes-fork-202610.md`); the second was cancelled for the #1321 sync. The tag was moved twice
+    with the operator's consent. Follow-up: a size check for `release-notes.md` in the gate (RELNOTES-SIZE-01).
+  - `test_ext_reg` key audit caught the new BLE key `MWAKE` from #1321 (reviewed public, `23347203`).
 - **T-Deck fixes 2026-11-25 (from a T-Deck user report on 11.22):** TD-35, the heap trim no longer deletes tabs (the
   public tab vanished at runtime); TD-36, no grey light-theme shadow on the toggle and segment buttons. Committed on
   `fork-dev` (stage 1,2: 4,237 Unity cases green, suite inventory regenerated, change gate PASS); TD-36 bench screenshot PASS on DK5EN-14; TD-37 (re-tune the 40 KB heap floor) open in BACKLOG "Implement".
