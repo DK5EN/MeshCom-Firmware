@@ -269,7 +269,7 @@ static void test_all_emitted_keys_audit(void)
         "INA226", "SHUNT", "IMAX", "SAMP", "SHT", "SHTF", "226", "226F", "UV", "UVF", "WIND", "WINDP",
         "SSID", "IP", "GW", "AP", "DNS", "SUB", "OWNIP", "OWNGW", "OWNMS", "OWNDNS", "OWNNTP", "EUDP", "EUDPIP", "TXPOW",
         "WS", "DISP", "BTN", "MSH", "GPS", "TRACK", "UTCOF", "TXP", "MQRG", "MSF", "MCR", "MBW", "GWNPOS", "NOALL", "NOPMOTHER", "BLED", "CHGLED", "GWS",
-        "VIA", "VIACALL", "ASYM", "TZ", "MHOP", "MTU", "VOLT", "NCON", "KISS", "LEDNF",
+        "VIA", "VIACALL", "ASYM", "TZ", "MHOP", "MTU", "VOLT", "MWAKE", "NCON", "KISS", "LEDNF",   // MWAKE: upstream #1321, bool
         "APN", "AFC", "AK", "AFL", "ACK", "ADC", "ADCRAW", "ADCE1", "ADCE2", "ADCSL", "ADCOF", "ADCAT",
         "ATXT", "SYMID", "SYMCD", "NAME"};
     // secrets: must be removed by the filter
