@@ -7,7 +7,7 @@
       "board": "heltec_wifi_lora_32_V3",
       "family": "esp32",
       "usb_serial": "0001",
-      "host": "192.168.68.78",
+      "host": "192.168.68.70",
       "last_ip_verified": "2026-11-22 (identity_guard + start page, OTA-LOWHEAP night run)"
     },
     "t-deck-14": {
@@ -31,7 +31,7 @@
       "board": "wiscore_rak4631",
       "family": "nrf52",
       "usb_serial": "230D6EBB3266D20E",
-      "host": null,
+      "host": "192.168.68.80",
       "last_ip": "192.168.68.80",
       "last_ip_verified": "2026-11-22 (identity_guard over USB; no net console, Ethernet IP)"
     }
