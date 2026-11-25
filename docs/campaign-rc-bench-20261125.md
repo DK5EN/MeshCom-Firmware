@@ -23,8 +23,8 @@ test, `hmac_connect.py` fix, wave-5 bench, one night, release and PR documents. 
 | 4    | sync-word A/B on DK5EN-90                               | done: no side effect on the bench; gaps stated     |
 | 5    | `tools/hmac_connect.py` fixes (HMAC-WIN-01)             | done (`732238bd`)                                  |
 | 6    | wave 5 bench (#1307, #1308, #1303)                      | done: all pass; Read button click not in a browser |
-| 7    | one night: AU check + download x3 per ESP32 node        | running since 19:25                                |
-| 8    | documents (release notes, journal, PR text, issues)     | open                                               |
+| 7    | one night: AU check + download x3 per ESP32 node        | done: 9/9 staged, no reboot, no refusal            |
+| 8    | documents (release notes, journal, PR text, issues)     | done 2026-11-25 (gate PASS, night figures filled)  |
 
 ## Step 1: mbedTLS copy removed
 
@@ -310,6 +310,43 @@ only, compared with DK5EN-98's log). Raw logs: `tools/bench/runs/harness/rc-benc
 - Night attempt 1 (19:26-19:47): all three staged. DK5EN-1 after_min 21,736 B; DK5EN-92 iblk at start 42,996 B,
   after_min 11,700 B; DK5EN-14 after_min 30,728 B (internal). Attempts 2 and 3 at +3 h and +6 h.
 
+### Night result (read 2026-11-25 01:50)
+
+`night/trigger.summary` has all 9 lines, verdict `staged` on each. Uptime rises from attempt to attempt on every node
+(no reboot); the trigger logs have no `[AU];fail`, `refuse`, `TASK_WDT`, `Guru`, `rst:` or backtrace (the `refused`
+hits are NBRRELAY counters).
+
+| Node     | Uptime at attempt 1 / 2 / 3 | Download (bytes, s)         | after_min (lowest free since boot) | AU allocation fails            |
+| -------- | --------------------------- | --------------------------- | ---------------------------------- | ------------------------------ |
+| DK5EN-1  | 517 / 11,382 / 22,248 s     | 1,180,497 in 11.4/10.9/11.1 | 21,736 / 21,736 / 21,260 B         | 0                              |
+| DK5EN-92 | 1,032 / 11,897 / 22,763 s   | 1,240,686 in 13.6/13.7/13.7 | 11,700 / 11,700 / 11,700 B         | 0 / 1 / 1 (inflate dictionary) |
+| DK5EN-14 | 1,564 / 12,441 / 23,318 s   | 1,617,579 in 22.0/20.8/20.6 | 30,728 / 23,444 / 23,444 B         | 0                              |
+
+- **DK5EN-92 attempts 2 and 3:** after the download the dry-run inflate did not get its 11,412 B dictionary
+  (`[AU];dry;nomem;dict;1`), so the record was staged with `[AU];dry;defer;nomem` and `vfy;pending`. This is the
+  AU-30 path for a classic ESP32 without PSRAM (`fwDryDeferOk`, `src/esp32/fw_update_net.cpp:1650`): SHA-256, CRC
+  and length are proven, the inflate check runs on the verify boot at install. Attempt 1 ran the check in place. The
+  night never installs, so the verify boot itself did not run in the night (it passed on 2026-11-24, AU-30 bench).
+- **DK5EN-98** (RC image, read-only log, `dk5en-98-log/`): 122 STAT lines to 01:50, `up` rises from 300 to 36,600 s
+  without a step back (no reboot since the 15:38 flash), logger reconnects 0, heap 99,920 to 104,140 B, `txfail` 0,
+  `fw=40a/20261122`. Final read 2026-11-25 07:30: 190 STAT lines to 07:28, `up` 300 to 57,000 s (15.8 h) without a
+  step back, heap 99,920 to 104,140 B, `txfail` 0, reconnects 0; logger stopped 07:31.
+- Not a stop condition (no failed download, no reboot, no lowheap refusal).
+
+### Host gate for the release (2026-11-24 20:39 and 20:46)
+
+- `FLASH_VERSION` 20261125. First run FAIL, one step: pytest 2 failed / 1840, both in
+  `tools/tests/test_hmac_connect.py` (main thread not woken). Cause: an earlier tool test in the same xdist worker
+  leaves a non-raising SIGINT handler (meshlogger, soak_dm and others install one in `main()`); without
+  `pthread_kill` the script falls back to `_thread.interrupt_main()`, which only calls that handler. Test isolation,
+  not a script defect: `main()` installs its own raising handler. The 30 s window of `a38f6c8c` could not help.
+- Fix: the `restore_signals` fixture sets `signal.default_int_handler` before each test. Regression check: with a
+  plugin that leaks a non-raising handler, 2 failed before the fix, 3 passed after (10 of 10); alone 10 of 10.
+- Second run PASS: 129 Unity envs, 4,235 cases, 0 failed; golden selftest 48 commands; board links t_echo 55.7 %,
+  heltec_t114 53.2 %, wiscore_rak4631 83.7 %, heltec_wifi_lora_32_V3 52.9 %, ttgo_tbeam 55.9 %; pytest 1,842
+  passed; Node, nbrlog and tool self-tests OK. Log `gate/regression-20261125.log`.
+- The fixture fix belongs in the combined PR together with `hmac_connect.py` and its tests.
+
 ## Step 8: documents (drafts 2026-11-24 evening)
 
 - `release-notes.md`: new top section for `v4.40a.11.25` (Action needed: nRF52 sync word), 11.22 folded into the
@@ -322,7 +359,32 @@ only, compared with DK5EN-98's log). Raw logs: `tools/bench/runs/harness/rc-benc
   [upstream-issue-drafts-20261125.md](upstream-issue-drafts-20261125.md).
 - Tag name `v4.40a.11.25` free on origin and upstream (2026-11-24).
 
-## Next (morning 2026-11-25), campaign ends 07:30
+## Close (2026-11-25 07:30)
+
+Campaign closed. The release candidate passed every bench step and the night; nothing is tagged, no PR branch is
+pushed, no PR or issue is filed (operator stop point).
+
+- Committed on `fork-dev` and pushed: `FLASH_VERSION` 20261125, the `test_hmac_connect.py` fixture fix, release notes,
+  journal, PR text, this doc, RESUME, BACKLOG, the release-train pointer, the night and gate summaries.
+- Desktop plan Fassung 12 (`~/Desktop/upstream-releaseplan-20261125.html`, 25.11.2026); Fassung 11 in
+  `~/Documents/MeshCom-Archiv/`.
+- Stopped: DK5EN-98 logger, `caffeinate`. Removed: worktree `../MeshCom-RC-732238bd`.
+- Bench nodes stay as they are: DK5EN-1, -92, -14 on the night images (no image staged after the last `unstage`),
+  DK5EN-90 on image B, DK5EN-98 on the RC image.
+- Left uncommitted on purpose: the foreign deletion of `docs/research-esp32-wifi-sdr-20261124.md` and the untracked
+  `docs/research-rf-spectrum-20261124.md` (another session).
+
+Waiting for the operator:
+
+1. Go for tag `v4.40a.11.25` (`/release-firmware`; CI builds and publishes 69 assets).
+2. Go for the combined PR and the open scope questions: #1306 QA-RX-07/02, #1307 `--udphold` wording, #1308
+   EXT-PEER-01, #1309 "Refs" only. The fixture fix of `test_hmac_connect.py` goes with `hmac_connect.py`.
+3. Go for the PR-branch build of every env and a short bench run (Heltec V3, T-Beam: download and staging); the PR
+   branch has no FORMAL-01 library patches.
+4. Go for the three issue drafts ([upstream-issue-drafts-20261125.md](upstream-issue-drafts-20261125.md)).
+
+<details>
+<summary>Morning work list as handed over 2026-11-24 20:00</summary>
 
 State at handover (2026-11-24 about 20:00): `fork-dev` at `413e0f2d` + this doc commit, pushed. Bench nodes:
 DK5EN-1, -92, -14 on the night images (`MC_AU_TEST=1`, tag 11.21, clean worktree `../MeshCom-RC-732238bd`);
@@ -350,3 +412,5 @@ Detached on the Mac: three `ota_lowheap_trigger.py` runs (end about 02:00), `mes
    go for tag `v4.40a.11.25`; go for the PR plus the open scope questions (#1306 QA-RX-07/02, #1307 `--udphold`
    wording, #1308 EXT-PEER-01, #1309 "Refs" only) and the PR-branch build + bench run (no FORMAL-01 in it); go for
    the three issue drafts.
+
+</details>

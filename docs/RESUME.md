@@ -1,35 +1,34 @@
 # RESUME -- pick up here
 
-**Resume here: section "Now" below. Next date: upstream wave 4 on Fri 2026-11-27, PR A (Auto Update) and PR B (small
-fixes); three operator decisions come first.** Release plan and working checklist: operator's Desktop
-`upstream-releaseplan-20261124.html` (Fassung 11). Active campaigns:
+**Resume here: section "Now" below. Next: operator go for tag `v4.40a.11.25`, then the combined upstream PR (wave 4,
+planned Fri 2026-11-27) after the PR-branch build and bench run.** Release plan and working checklist: operator's
+Desktop `upstream-releaseplan-20261125.html` (Fassung 12). Active campaigns:
 [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).
 
-## Now (2026-11-24)
+## Now (2026-11-25)
 
-- **Campaign RC-BENCH running, ends 2026-11-25 07:30:** [campaign-rc-bench-20261125.md](campaign-rc-bench-20261125.md)
-  is the resume point; its section "Next (morning 2026-11-25)" is the work list. Operator decisions 2026-11-24: no
-  mbedTLS copy, one combined upstream PR (TLS allocation cap travels with AU), one OTA flash of DK5EN-98 (done 15:38),
-  desk commit `35ae3418` (WX table) ships as low-risk host-tested, sensitivity margin not testable on the table; stop
-  before tag, PR branch push, PR and issues.
-  - Done 2026-11-24: mbedTLS copy removed (`5488f0bc`), all 36 envs built (35 green), fleet + DK5EN-98 on `732238bd`,
-    AU staged on V3/T-Beam/T-Deck Plus, sync-word A/B no side effect ([syncword-ab-bench-20261124.md](syncword-ab-bench-20261124.md)),
-    `hmac_connect.py` fix (`732238bd`), wave 5 #1307/#1308/#1303 pass, new row CAD-RXLOSS-01.
-  - Running: night AU runs (3 per ESP32 node, detached, end about 02:00), DK5EN-98 read-only logger (until 09:00).
-  - Drafts with `[morning]` placeholders: `release-notes.md`, `docs/release-journal.md`; PR text
-    [pr-combined-text-20261125.md](pr-combined-text-20261125.md), scope [pr-combined-scope-20261125.md](pr-combined-scope-20261125.md),
-    issues [upstream-issue-drafts-20261125.md](upstream-issue-drafts-20261125.md).
+- **Campaign RC-BENCH closed 2026-11-25 07:30:** [campaign-rc-bench-20261125.md](campaign-rc-bench-20261125.md),
+  section "Close". Release candidate `v4.40a.11.25` ready, not tagged. Night 2026-11-24/25: Auto Update check and
+  download 3x on DK5EN-1 (V3), -92 (T-Beam), -14 (T-Deck Plus), 9/9 staged, no reboot, no refusal; T-Beam deferred the
+  image check to the verify boot twice (AU-30 path). DK5EN-98 on the RC image 15.8 h without reboot. Host gate PASS
+  (4,235 Unity cases in 129 envs, pytest 1,842) after a test-isolation fix in `tools/tests/test_hmac_connect.py`.
+  - **Waiting for the operator:** go for tag `v4.40a.11.25`; go for the combined PR plus its scope questions (#1306
+    QA-RX-07/02, #1307 `--udphold` wording, #1308 EXT-PEER-01, #1309 "Refs" only); PR-branch build of every env and a
+    short bench run (no FORMAL-01 in the branch); go for the three issue drafts.
+  - Documents: `release-notes.md`, `docs/release-journal.md`, PR text
+    [pr-combined-text-20261125.md](pr-combined-text-20261125.md), scope
+    [pr-combined-scope-20261125.md](pr-combined-scope-20261125.md), issues
+    [upstream-issue-drafts-20261125.md](upstream-issue-drafts-20261125.md).
+  - Operator decisions 2026-11-24: no mbedTLS copy, one combined upstream PR (TLS allocation cap travels with AU),
+    desk commit `35ae3418` (WX table) ships host-tested, sensitivity margin not testable on the table.
 - **Upstream sync 2026-11-24:** merged `upstream/dev` `68286e07` (#1320): nRF52 sync word `0x242B` -> `0x24B4` from one
   source (`src/lora_syncword.h`, `154014dc`) and two `tools/hmac_connect.py` commits. No conflicts; macro baseline
   regenerated; host gate stage 1,2 PASS (five board builds, not every env). Code review (Opus, high): sound as code.
-  **Before the next fork release:** the mixed old/new nRF52 bench test (BACKLOG `SYNC-NRF-01`) and a build of every
-  env. `HMAC-WIN-01` (Windows hang in `hmac_connect.py`) is upstream's to fix.
-- **Next upstream PRs (plan Fassung 11):** PR A Auto Update (OTA-LOWHEAP-01 A+B, 32 KB buffer, AU-29, AU-30,
-  schedule + AU-23) and PR B small fixes (RAM-WSP-01 #1305, QA-RX-03 + BL-02 #1306, INA226-CAL-01, WEB-INA-01).
-  Operator decides: AU with or without the vendored mbedTLS override (recommended without; `mc_tls` links only with it
-  today), lift the NIGHTLY-01 condition, one PR or two. Then: decouple, fork release, one night on the bench, T-Deck
-  Plus measured, upstream issue for the heap part.
+  The mixed old/new nRF52 bench test and the build of every env are done (campaign RC-BENCH). `HMAC-WIN-01` (Windows hang in `hmac_connect.py`) is upstream's to fix.
+- **Next upstream PR (plan Fassung 12):** one combined PR, wave 4: Auto Update (OTA-LOWHEAP-01, AU-29, AU-30,
+  AU-23, TLS allocation cap), small fixes (#1305, #1306, INA226), gateway (#1307, #1308), remote management (#1303),
+  `hmac_connect.py`. Still open: the NIGHTLY-01 condition (operator).
 - **TESTGATE-01 closed 2026-11-24:** see "Running campaigns". The FORMAL-01 patches and the formal rework noted below
   as uncommitted are committed (`9696a3ba`, `6bbca7a2`, `8cc67569`); the "likely GitHub-side" download failure below
   was AU-28, the fork's own HTTP client patch, fixed.
@@ -143,7 +142,7 @@ fixes); three operator decisions come first.** Release plan and working checklis
 - **Release train 2026-11-15:** [campaign-release-train-20261115.md](campaign-release-train-20261115.md) -- the active one.
 - **Channel access stabilisation** (ACK-AGE-01, ACK-CANCEL-01, CSMA-04/02, CSMA-03, PWR-01/02, soak): dates and exit
   criteria in the campaign doc, section "Parallel tracks".
-- **Upstream waves 2-7:** the release plan is the operator's Desktop HTML (Fassung 10, 2026-11-22, with the checklist), not a repo file; the
+- **Upstream waves 2-7:** the release plan is the operator's Desktop HTML (Fassung 12, 2026-11-25, with the checklist), not a repo file; the
   repo copy was removed 2026-11-16 (operator: double work, always outdated). Wave list also in the campaign doc.
 - **GPSV4-01, GPIO-01, INA226-HELTEC-01:** field feedback only (BACKLOG "Field").
 

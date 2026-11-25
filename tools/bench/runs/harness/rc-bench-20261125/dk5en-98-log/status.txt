@@ -1,0 +1,12 @@
+pid=31044
+host=192.168.68.65
+lines=22185
+bytes=2290755
+reconnects=0
+disk_low=0
+dropped=0
+status=finished: signal
+end=2026-11-25 07:31:10
+tz=Europe/Berlin
+utc_offset=+01:00
+end_iso=2026-11-25T07:31:10+01:00

@@ -30,6 +30,10 @@ def load():
 def restore_signals():
     sigs = [signal.SIGINT, signal.SIGTERM, signal.SIGHUP]
     saved = {s: signal.getsignal(s) for s in sigs}
+    # Another tool's test in the same xdist worker may have left a non-raising SIGINT handler (meshlogger,
+    # soak_dm, ... install one in main()). interrupt_main() then runs that handler and the main thread is
+    # never woken. Start from the interpreter default, which raises KeyboardInterrupt.
+    signal.signal(signal.SIGINT, signal.default_int_handler)
     yield
     for s, h in saved.items():
         signal.signal(s, h)

@@ -31,13 +31,13 @@ Inhalt, neu gegenüber `v4.40a.11.22`:
 ### Was für dieses Release auf Hardware geprüft wurde
 
 - 2026-11-24, Auto Update mit den Release-Kandidaten (Commit `732238bd`), Prüfung und Download mit Ablage, nie installiert: DK5EN-1 (Heltec V3) 1.180.497 Byte in 11,2 s, niedrigster freier Heap im Lauf 19.564 Byte; DK5EN-92 (T-Beam) 1.240.686 Byte in 13,4 s, 11.332 Byte; DK5EN-14 (T-Deck Plus, PSRAM-Weg) 1.617.579 Byte in 20,7 s. Alle TLS-Puffer im Lauf-Puffer.
-- Nacht 2026-11-24/25, je drei Läufe auf DK5EN-1, -92 und -14: [morgens eintragen].
+- Nacht 2026-11-24/25, je drei Läufe auf DK5EN-1, -92 und -14 im Abstand von drei Stunden (19:26 bis 01:49, Laufzeit bis 6,5 h): 9 von 9 Downloads abgelegt, kein Neustart (Uptime steigt durchgehend), keine Ablehnung. DK5EN-1 10,9 bis 11,4 s, niedrigster freier Heap nach einem Lauf 21.260 Byte; DK5EN-92 13,6 bis 13,7 s, 11.700 Byte; Lauf 1 prüfte das Abbild an Ort und Stelle, Läufe 2 und 3 bekamen die 11.412 Byte für das Wörterbuch nicht und legten mit `vfy;pending` ab (AU-30, Prüfung beim Installieren im Prüfstart; nicht installiert, also nicht ausgeführt); DK5EN-14 20,6 bis 22,0 s, 23.444 Byte. DK5EN-98 (Release-Kandidat, nur Log gelesen): 15,8 h ohne Neustart (24.11. 15:38 bis 25.11. 07:28), Heap 99,9 bis 104,1 KB, `txfail` 0.
 - 2026-11-24, Sync-Word: RAK4631 mit `0x242B` und mit `0x24B4` gegen Heltec V3, T-Deck Plus und T-Beam, beide Richtungen, 2 und -9 dBm; jeder Verlust durch Kanalzugriff oder Kollision erklärt. TRACK ein und aus in Ordnung. Passiv 2 x 60 min gegen DK5EN-98: kein nRF52 aus dem Feld gesendet.
 - 2026-11-24, Halten bei Serverausfall auf DK5EN-1 (Messbuild desselben Commits): eine Nachricht gehalten, nach 149 s einmal mit derselben ID nachgesendet.
 - 2026-11-24, EXTUDP-Registerabfrage auf DK5EN-92: 16 Register ohne Geheimnis, Begrenzer und Fehlerantwort wirken.
 - 2026-11-24, Fernverwaltung über LoRa von DK5EN-92 an DK5EN-1: `pins`, `gpio`, `txq`, `mbox`, `maxhop` beantwortet, Button-Pin und GPIO ohne Hauptschalter abgelehnt.
 - Produktions-Gateway DK5EN-98: Release-Kandidat per OTA seit 2026-11-24 15:38 (Betreiber-OK für genau diesen einen Flash), Einstellungen unverändert, Server verbunden.
-- Host-Gate `tools/regression.sh --stage 1,2` auf dem getaggten Stand: [morgens eintragen]. Alle 36 Board-Envs gebaut, 35 grün, `esp32-external-radio` scheitert wie upstream an seinem eigenen `#error`.
+- Host-Gate `tools/regression.sh --stage 1,2` auf dem getaggten Stand (24.11. abends): PASS, 4.235 Unity-Fälle in 129 nativen Envs, Golden-Selftest 48 Befehle, fünf Board-Link-Builds, 1.842 pytest-Fälle plus Node-, nbrlog- und Selbsttest-Suiten. Der erste Lauf war rot: zwei Fälle in `tools/tests/test_hmac_connect.py` hingen, weil ein anderer Tool-Test im selben pytest-Worker einen nicht werfenden SIGINT-Handler hinterlassen hatte; die Fixture setzt jetzt den Standard-Handler, mit erzwungenem Leck 10 von 10 grün. Alle 36 Board-Envs gebaut, 35 grün, `esp32-external-radio` scheitert wie upstream an seinem eigenen `#error`.
 
 ### Was ausdrücklich NICHT geprüft wurde
 

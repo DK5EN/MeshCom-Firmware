@@ -55,10 +55,14 @@ Closes #<Issue Auto Update Speicher>, Closes #<Issue INA226>
 **Geprüft auf Hardware** (Fork-Images, siehe "Nicht geprüft" zum Unterschied)
 
 - Heltec V3: Prüfung und Download mit Ablage, 1.180.497 Byte in 11,2 s, Löschen 2,7 s, alle TLS-Puffer im
-  Lauf-Puffer (24.11.2026). [Nacht: noch einzutragen]
+  Lauf-Puffer (24.11.2026). Nacht 24./25.11.: drei Läufe im Abstand von drei Stunden, 3 von 3 abgelegt in 10,9 bis
+  11,4 s, kein Neustart.
 - T-Beam v1.2: 10 von 10 Web-Installationen ohne Watchdog (24.11.2026); mit dem Stand dieses PRs Download und
-  Ablage, Löschen 6,0 s, längste Idle-Lücke 362 ms, niedrigster freier Heap im Lauf 11.332 Byte. [Nacht]
-- T-Deck Plus (PSRAM): Download und Ablage, 1.617.579 Byte in 20,7 s (PSRAM-Weg, kein Lauf-Puffer). [Nacht]
+  Ablage, Löschen 6,0 s, längste Idle-Lücke 362 ms, niedrigster freier Heap im Lauf 11.332 Byte. Nacht: 3 von 3 abgelegt in 13,6 bis 13,7 s, kein Neustart; zweimal
+  fehlte nach dem Download der Speicher für die Probe-Entpackung, sie wurde wie vorgesehen auf den Prüfstart beim
+  Installieren verschoben.
+- T-Deck Plus (PSRAM): Download und Ablage, 1.617.579 Byte in 20,7 s (PSRAM-Weg, kein Lauf-Puffer). Nacht: 3 von 3
+  abgelegt in 20,6 bis 22,0 s, kein Neustart.
 
 ### 2. Kleine Korrekturen
 
