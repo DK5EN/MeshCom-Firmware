@@ -11,7 +11,7 @@ Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
 
 ## Release v4.40a.11.25 (Mittwoch, 2026-11-25, vorbereitet am 2026-11-24)
 
-Noch nicht getaggt: Tag und Veröffentlichung warten auf das Go des Betreibers. Gebaut wird von GitHub CI (`MeshCom CI`, Tag `v4.40a.11.25`, `MC_BUILD_TAG` und `MC_AU_DEV_CHANNEL=1` gesetzt), 69 Assets wie `v4.40a.11.22`. Der Tagname ist auf beiden Remotes frei (geprüft 2026-11-24).
+Getaggt am 2026-11-25 auf `fork-dev` nach dem Go des Betreibers, mit den T-Deck-Fixes TD-35 und TD-36, die nach der Nacht des Release-Kandidaten kamen. Gebaut wird von GitHub CI (`MeshCom CI`, Tag `v4.40a.11.25`, `MC_BUILD_TAG` und `MC_AU_DEV_CHANNEL=1` gesetzt), 69 Assets wie `v4.40a.11.22`. Der Tagname ist auf beiden Remotes frei (geprüft 2026-11-24).
 `FLASH_VERSION` 20261125, `FLASH_STRUCT_VERSION` 20260724 unverändert, die Einstellungen bleiben erhalten. Safeboot unverändert seit `v4.40a.11.20`.
 Basis ist `upstream/dev` `68286e07` (#1320, 2026-11-23) mit unserem gemergten Welle-3-PR #1316; upstream hat beides noch nicht released. Das offizielle `v4.40a.11.22` von upstream trägt nur denselben Namen wie unser `v4.40a.11.22`.
 
@@ -25,6 +25,7 @@ Inhalt, neu gegenüber `v4.40a.11.22`:
 - Welle-3-Fixes aus #1316, im Fork bisher in keinem Release: SEC-DUMP-01 (#1291), RAK-ETH-DNS-01 und RAK-NETMODE-01 (#1289), GW-GROUP-01, GW-DM-01, GW-CALL-01 (#1290), WEB-TEMPOFF-01 (#1296), TBEAM1W-PWR-01 (#1301), GPS-AUTOSYM-01..03 und POSINFO-NEXT-01 (#1295), OTA-SAFEBOOT-01 (#1300), DHT-PROBE-01 (#1302), APRS-TXT-01..03 (#1293), TDECK-VOLT-01 (#1312), DISP-PAGE-01..03 und BTN-OFF-01 (#1294), T114-DARK-01 (#1314), POSINFO-LAG-01 (#1315), der echte Fix für `--aprswx` (#1288) (`c22cb3d2`, `1830d8ed`, `45732840`, `57acc7c3`, `40c1c47d`).
 - INA226: Kalibrierung wird auch für übliche Shunt-Werte geschrieben (INA226-CAL-01, `55fe0174`); Web-Etikett vBUS ohne `<` (WEB-INA-01, `2de6142f`); WX-Tabelle zeigt AHT20, SHT21, BMP390 und INA226 (WEB-WX-01, `35ae3418`).
 - Bibliotheks-Patches FORMAL-01 (nur Fork): NimBLE, W5100S, HTTP-Client, mDNS, DHCP-Server, lwIP-MTU, Zertifikatsdatum und TLS 1.2 für Auto Update, DNS über den Netzwerk-Thread, Fixes in UDP-Drain, Extern-UDP-Warteschlange, Netzkonsole und APRS (`9696a3ba`, `6bbca7a2`).
+- T-Deck: Unterhaltungs-Tabs verschwinden nicht mehr beim Eintreffen von Nachrichten (TD-35, Meldung eines T-Deck-Nutzers zu 11.22). Mit WLAN läuft das T-Deck bei 25-41 KB freiem internem Heap, unter der Grenze von 40 KB; die Kürzung löschte einen Tab, den sie leer gekürzt hatte. Jetzt kürzt sie nur Nachrichten, Tabs entfernen nur die 16-Tab-Grenze und der Nutzer. Helles Theme ohne grauen Schatten unter Segmenten und den Knöpfen MESH und `No * MSG` (TD-36) (`b6e5557e`).
 - Werkzeug: `tools/hmac_connect.py` endet sauber, wenn der Knoten die Verbindung schließt, auch ohne `pthread_kill` (HMAC-WIN-01, `732238bd`).
 - Nur Bench-Builds (nicht in Release-Images): `--heapwatch`, `--heapgap`, Heap-Trace (`307591a6`, `799aa238`, `6ebf78ad`).
 
@@ -37,7 +38,9 @@ Inhalt, neu gegenüber `v4.40a.11.22`:
 - 2026-11-24, EXTUDP-Registerabfrage auf DK5EN-92: 16 Register ohne Geheimnis, Begrenzer und Fehlerantwort wirken.
 - 2026-11-24, Fernverwaltung über LoRa von DK5EN-92 an DK5EN-1: `pins`, `gpio`, `txq`, `mbox`, `maxhop` beantwortet, Button-Pin und GPIO ohne Hauptschalter abgelehnt.
 - Produktions-Gateway DK5EN-98: Release-Kandidat per OTA seit 2026-11-24 15:38 (Betreiber-OK für genau diesen einen Flash), Einstellungen unverändert, Server verbunden.
-- Host-Gate `tools/regression.sh --stage 1,2` auf dem getaggten Stand (24.11. abends): PASS, 4.235 Unity-Fälle in 129 nativen Envs, Golden-Selftest 48 Befehle, fünf Board-Link-Builds, 1.842 pytest-Fälle plus Node-, nbrlog- und Selbsttest-Suiten. Der erste Lauf war rot: zwei Fälle in `tools/tests/test_hmac_connect.py` hingen, weil ein anderer Tool-Test im selben pytest-Worker einen nicht werfenden SIGINT-Handler hinterlassen hatte; die Fixture setzt jetzt den Standard-Handler, mit erzwungenem Leck 10 von 10 grün. Alle 36 Board-Envs gebaut, 35 grün, `esp32-external-radio` scheitert wie upstream an seinem eigenen `#error`.
+- 2026-11-25, Leerlauf-Heap DK5EN-92 (T-Beam, Release-Image mit Tag `v4.40a.11.25`): 62.992 B frei, 1.024 B unter der Baseline von 64.016 B, Grenze 3.072 B: bestanden (`tools/bench/runs/harness/heap-idle-v4.40a.11.25.json`).
+- 2026-11-25, TD-36 auf DK5EN-14 (T-Deck Plus, INSTRUMENT `b6e5557e`): Framebuffer-Aufnahmen im hellen Theme, Segmente und Knöpfe MESH und `No * MSG` ohne graue Kanten.
+- Host-Gate `tools/regression.sh --stage 1,2` auf dem getaggten Stand (25.11.): PASS, 4.237 Unity-Fälle in 129 nativen Envs (einer übersprungen), Golden-Selftest 48 Befehle, fünf Board-Link-Builds, 1.842 pytest-Fälle plus Node-, nbrlog- und Selbsttest-Suiten. Am 24.11. war der erste Lauf rot: zwei Fälle in `tools/tests/test_hmac_connect.py` hingen, weil ein anderer Tool-Test im selben pytest-Worker einen nicht werfenden SIGINT-Handler hinterlassen hatte; die Fixture setzt jetzt den Standard-Handler, mit erzwungenem Leck 10 von 10 grün. Alle 36 Board-Envs gebaut, 35 grün, `esp32-external-radio` scheitert wie upstream an seinem eigenen `#error`.
 
 ### Was ausdrücklich NICHT geprüft wurde
 
@@ -46,6 +49,8 @@ Inhalt, neu gegenüber `v4.40a.11.22`:
 - Auto Update auf T-Beam Supreme, Wireless Tracker, E22 und Heltec V4.
 - INA226-Kalibrierung und WX-Tabelle (kein Sensor), der Klick auf den Lesen-Knopf der Queues-Karte im Browser, ein echter Pinwechsel per Jumper.
 - Von den Welle-3-Fixes: GW-DM-01 am Telefon, GW-CALL-01, OTA-SAFEBOOT-01, BTN-OFF-01, DISP-PAGE-03, APRS-Frames auf Funk, DHT-PROBE-01, GPS-AUTOSYM-02/03 in Bewegung, TBEAM1W-PWR-01.
+- TD-35 auf Hardware: die Kürzung lässt sich am Bench nicht gezielt auslösen (Heap muss unter die Grenze fallen); nur Host-Test. Die Grenze selbst neu einzustellen ist offen (TD-37).
+- TD-35 und TD-36 sind jünger als die Nacht des Release-Kandidaten; sie ändern nur T-Deck-Code.
 - Die WX-Tabelle (`35ae3418`) ist jünger als die Bench-Images; Host-Test, Betreiber-Entscheidung: geringes Risiko.
 
 ## Release v4.40a.11.22 (Sonntag, 2026-11-22, geschnitten am 2026-11-21)
