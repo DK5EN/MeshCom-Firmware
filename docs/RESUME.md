@@ -10,7 +10,7 @@ Desktop `upstream-releaseplan-20261125.html` (Fassung 12). Active campaigns:
 
 - **T-Deck fixes 2026-11-25 (from a T-Deck user report on 11.22):** TD-35, the heap trim no longer deletes tabs (the
   public tab vanished at runtime); TD-36, no grey light-theme shadow on the toggle and segment buttons. Committed on
-  `fork-dev` (stage 1,2: 4,237 Unity cases green, suite inventory regenerated, change gate PASS); bench screenshot open; TD-37 (re-tune the 40 KB heap floor) open in BACKLOG "Implement".
+  `fork-dev` (stage 1,2: 4,237 Unity cases green, suite inventory regenerated, change gate PASS); TD-36 bench screenshot PASS on DK5EN-14; TD-37 (re-tune the 40 KB heap floor) open in BACKLOG "Implement".
 - **Campaign RC-BENCH closed 2026-11-25 07:30:** [campaign-rc-bench-20261125.md](campaign-rc-bench-20261125.md),
   section "Close". Release candidate `v4.40a.11.25` ready, not tagged. Night 2026-11-24/25: Auto Update check and
   download 3x on DK5EN-1 (V3), -92 (T-Beam), -14 (T-Deck Plus), 9/9 staged, no reboot, no refusal; T-Beam deferred the
