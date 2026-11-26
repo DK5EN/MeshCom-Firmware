@@ -389,6 +389,10 @@ static inline bool flashLayoutCompatible(int stored)
 #define NBR_FAMILY_CLASSIC                 // MeshCom-5-Topologie: 64 Zeilen, 64-Bit-Masken, docs/meshcom5-topologie 4.2
 #endif
 
+#if defined(BOARD_HELTEC_T114) || defined(BOARD_T_ECHO)
+#undef UDP_HOLD_BYTES
+#define UDP_HOLD_BYTES 0                   // no network interface: never a gateway, no RAM for the outage hold
+#endif
 #ifndef UDP_HOLD_BYTES
 #define UDP_HOLD_BYTES 0                   // 0 = outage hold compiled out (no RAM)
 #endif
