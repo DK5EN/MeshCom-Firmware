@@ -14,7 +14,8 @@ Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
   in the PR branch) and regenerates the macro baseline (also the stale `FLASH_VERSION` 20261122 -> 20261125 from the
   11.25 release). Worktrees `../MeshCom-PR-next`, `../MeshCom-PR-1324`, branches `pr/combined`,
   `pr/gw-server-alive-1324` (local and origin) and the old PR body files in `../` removed. Tag clash
-  `v4.40a.11.22` (see the #1316 entry) unchanged.
+  `v4.40a.11.22` (see the #1316 entry): operator decision 2026-11-26, keep both tags as they are; the fetch
+  rejection of upstream's tag is expected, never force-fetch, move or delete either.
 - **GW-SRV-1324 on `fork-dev` 2026-11-25:** upstream issue #1324 (IS0GQX-12): with the ISP down but WiFi up a gateway kept setting the "already on the server" bit on RF relays, so neighbouring gateways skipped the upload and nodes heard only by it vanished from the map. Fix: `gwLinkServerAlive()` in `gw_link_status` (a real server frame within 65 s) replaces `bGATEWAY && node_hasIPaddress` at the relay flag and at the phone "server reached" ACK. 28 cases in `test_gw_link_status`, two pin the call sites. Gate stage 1,2 PASS; Opus advisor APPROVED; bench DK5EN-14 S1 -> S0 with a silent server, S1 again once it answers (`tools/bench/runs/harness/gw1324-20261125.summary`). `--srvip` is INSTRUMENT-only. Filed upstream as [#1329](https://github.com/icssw-org/MeshCom-Firmware/pull/1329) (2026-11-26): branch `pr/gw-server-alive-1324` in worktree `../MeshCom-PR-1324`, one commit `7ce34c19` on `upstream/dev` `2dcac7d8`, src only, 33/34 board envs build (`esp32-external-radio` needs its overlay).
 - **Combined upstream PR filed as [#1328](https://github.com/icssw-org/MeshCom-Firmware/pull/1328) (2026-11-25):** branch `pr/combined` in worktree `../MeshCom-PR-next`, 13 commits on
   `upstream/dev` `2dcac7d8`, 59 files, +5472/-529. Contents: Auto Update (OTA-LOWHEAP-01, AU-29, AU-30, schedule, TLS
