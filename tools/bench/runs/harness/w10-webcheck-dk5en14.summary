@@ -1,0 +1,27 @@
+== pages
+info        200 3151B 0.100281s
+setup       200 32185B 0.810560s
+messages    200 2142B 0.067597s
+mheard      200 2583B 0.087134s
+neighbours  200 3000B 0.128800s
+path        200 1560B 0.051961s
+position    200 1018B 0.086372s
+wx          200 895B 0.085309s
+pins        200 3209B 0.098251s
+mcp23017    200 5211B 0.177091s
+remote      200 4700B 0.094128s
+rxlog       200 898B 0.072994s
+mailbox     200 2641B 0.093204s
+spectrum    200 568B 0.172386s
+/           200 25796B 0.201157s
+== B1
+GET /nosuchpath          404 32B 0.089444s
+GET /?page=nosuchpage    404 277B 0.135614s
+POST /getparam/          405 41B 0.027774s {"ok":false,"err":"method not allowed"}
+HEAD /                   HTTP/1.1 403 Forbidden 
+== guard
+scan without X-MC        403 32B 0.074287s {"ok":false,"err":"forbidden"}
+== B8 scan
+scan with X-MC           422 27B 1.320541s {"spectrumscan":"failed"}
+spectrum page after      200 596B 0.074094s
+rects:        0  opacity values:        0

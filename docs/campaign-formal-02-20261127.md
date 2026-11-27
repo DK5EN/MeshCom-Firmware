@@ -5,9 +5,10 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-9 committed on `fork-dev`, not pushed (wave 9 closed with the docs commit after `71705b36`). Gate
-`--changed` green after wave 9 (143 envs, 4,484 ok, 1 skipped, 0 failed; board links). Next is wave 10 (big bench test
-incl. the B8/B9 and wave 9 checks, full host gate). Start a fresh session with `/orchestrate-waves` on this doc.
+**State:** waves 1-9 committed on `fork-dev`, not pushed. Full host gate green on `3a60b512` (143 envs, 4,484 ok, 0
+failed, 1 skipped; pytest 1,857). Wave 10 bench part 1 done 2026-11-27 (below); an 18 h soak on DK5EN-98 and DK5EN-14
+runs on rpizero until 2026-11-28 18:00. **Resume:** evaluate the soak (below), then close wave 10. DK5EN-1, -92, -90
+were offline: the V3 scan, classic heap and RAK checks stay open for the next bench session.
 
 - **Wave 8 result:** step 9 moves 9b `3657932e` (`src/nrf52/eth_mss.cpp`), 9c `168ec015` (`mcRandomFill`), 9d `9fbbfccc`
   (`pin_board.cpp`), 9e `8025a723` (`src/esp32/au_web.cpp`), 9f `55f2d728` (mbox in `webFunctionCall`), 9g `5cceb18a`
@@ -16,6 +17,25 @@ incl. the B8/B9 and wave 9 checks, full host gate). Start a fresh session with `
   **Step 10 deferred** (optional `webGuardCheck(const WebReq &)`, no behaviour change, most pinned file; recommendation:
   only together with the `web_guard.h` shared-header split from the carried items). Not moved (not in step 9's list):
   GPS globals, RM handler merge, asset delivery to `web_io.cpp`, REST handlers to `web_api.cpp`, `web_dispatch.cpp`.
+- **Wave 10 bench part 1 (2026-11-27, operator: DK5EN-14 only, plus DK5EN-98 flashed with explicit OK):**
+  - Images of `3a60b512`: DK5EN-14 INSTRUMENT t_deck_plus, DK5EN-98 normal heltec V3 (both OTA, webflash).
+  - Web on DK5EN-14: all 14 pages and `/` 200; `/nosuchpath` and `/?page=nosuchpage` 404; POST `/getparam/` 405;
+    `HEAD /` 403 without `X-MC` (guard: every non-GET method is state-changing, `web_guard.h:766`), 405 `Allow: GET`
+    with it; scan without `X-MC` 403 (`tools/bench/runs/harness/w10-webcheck-dk5en14.summary`).
+  - B8 on T-Deck Plus: scan fails cleanly, 422 and "The scan timed out" after 1.3 s; a diagnostic build with 10 s per
+    step still timed out, so the chip never finishes a step (BACKLOG SPECTRUM-TDECKPLUS-01). After the scans RX
+    decodes (-39 dBm frame) and a group 9999 message from DK5EN-14 at 2 dBm reached DK5EN-98 (-53 dBm, SNR 6).
+  - B9: POST `/config` with the node's own file answered after 0.27 s ("118 fields applied"), web down at +2.3 s, back
+    at +19 s; call, frequency and TX power unchanged.
+  - Wave 9 on DK5EN-98 (gateway): `[GW];hold;state;ok;...;cap;6144`, no `hold;alloc;failed`, server rx/tx running,
+    heap free 97,636 / largest block 86,004 one minute after boot (before: 100,020 / 49,140 after about 50 h).
+  - Heap DK5EN-14: before (old image, long uptime) `--info` 37,344 / blk 22,516; after (4 min uptime) 58,412 / blk
+    49,140. Not comparable across uptimes; the soak gives the same-uptime figure.
+  - Not done: BLE phone session with F3 (needs the operator's phone), web accumulator heap figure, V3 / classic / RAK.
+- **Soak (resume here, 2026-11-28 after 18:00):** `rpizero.local:~/meshlog/dk5en-98-formal02w10-20261127/` and
+  `dk5en-14-formal02w10-20261127/` (meshlogger in screens `w10-98`, `w10-14`; `status.txt` shows running/finished).
+  Check: no reboot (banner/`BOOT RESET_REASON` once), DK5EN-98 `[GW];hold` never `alloc;failed`, gateway traffic all
+  night (`[EXT] Out` / `GWI`), heap trend flat (STAT/`[INSTR-HEAP]` on DK5EN-14), no `spectrum re-init failed`.
 - **Wave 9 result (operator scope 2026-11-27: hold store + F3 on all ESP32):** UDP outage hold store on the heap,
   `udpHoldEnsure()` first on every gateway-on pass (ESP32 ahead of the IP check, nRF52 first in `if(bGATEWAY)`), kept
   until reboot, failed allocation off + logged once + retried every 60 s, `enabled` published release/acquire

@@ -1,6 +1,6 @@
 # RESUME -- pick up here
 
-**Resume here: campaign FORMAL-02, wave 10 (big bench test); waves 1-9 committed, full host gate green. Start a fresh session with `/orchestrate-waves` on [campaign-formal-02-20261127.md](campaign-formal-02-20261127.md), section "Now" (state, dispatch plan for wave 10, run rules). Waves 6 to 9 are committed on `fork-dev`, not pushed; `fork-dev` contains all of `upstream/dev`; no upstream PR open.** Release plan and working checklist: operator's
+**Resume here: campaign FORMAL-02, wave 10: evaluate the 18 h soak on rpizero (from 2026-11-28 18:00), bench part 1 done; waves 1-9 committed, full host gate green. Start a fresh session with `/orchestrate-waves` on [campaign-formal-02-20261127.md](campaign-formal-02-20261127.md), section "Now" (state, dispatch plan for wave 10, run rules). Waves 6 to 9 are committed on `fork-dev`, not pushed; `fork-dev` contains all of `upstream/dev`; no upstream PR open.** Release plan and working checklist: operator's
 Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).
