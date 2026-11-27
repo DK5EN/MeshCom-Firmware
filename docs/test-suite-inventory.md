@@ -232,7 +232,7 @@ proves that a string is present, not that the code behaves.
 | test_web_auth | 30 | native_web_auth | `hmac_sha256.cpp`, `hmac_sha256.h`, `web_functions/web_auth.cpp`, `web_functions/web_auth.h` |  |  |
 | test_web_body | 9 | native_web_body | `web_functions/web_body.h` |  | yes |
 | test_web_coord | 5 | native_web_coord | `web_functions/web_coord.h` |  |  |
-| test_web_diff | 31 | native_web_diff | `backpressure.h`, `charset_filter.cpp`, `charset_filter.h`, `command_dash.h`, `fw_update.h`, `hex_digit.h` and 20 more | yes | yes |
+| test_web_diff | 31 | native_web_diff | `backpressure.h`, `charset_filter.cpp`, `charset_filter.h`, `command_dash.h`, `fw_update.h`, `hex_digit.h` and 21 more | yes | yes |
 | test_web_guard | 68 | native_web_guard | `web_functions/web_guard.h` | yes |  |
 | test_web_query | 6 | native_web_query | `url_decode.cpp`, `web_functions/web_query.h` | yes | yes |
 | test_web_request | 18 | native_web_request | `web_functions/web_request.h` | yes | yes |

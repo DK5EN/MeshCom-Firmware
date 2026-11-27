@@ -26,6 +26,7 @@ RH = "src/web_functions/web_rm_handlers.cpp"
 UD = "src/url_decode.cpp"
 IO = "src/web_functions/web_io.cpp"
 NF = "src/web_functions/web_nodefunctioncalls.cpp"
+WC = "src/web_functions/web_config.cpp"
 RAW = "LIVESRC"
 
 
@@ -104,19 +105,19 @@ def generate():
             out.append(l)
         return "\n".join(out)
 
-    wf, rh, ud, io, nf = read_lines(WF), read_lines(RH), read_lines(UD), read_lines(IO), read_lines(NF)
-    src = {WF: wf, RH: rh, UD: ud, IO: io, NF: nf}
+    wf, rh, ud, io, nf, wc = read_lines(WF), read_lines(RH), read_lines(UD), read_lines(IO), read_lines(NF), read_lines(WC)
+    src = {WF: wf, RH: rh, UD: ud, IO: io, NF: nf, WC: wc}
     segs = {
         "pre": [
             seg_line(WF, wf, r"^static bool web_cors_ok = true;", "web_cors_ok"),
             seg_range(WF, wf, r"^String web_header;", r"^bool bweb_server_running = false;", "web_header + clock globals"),
         ],
     }
-    a = seg_line(WF, wf, r"^static char \*web_cfg_buf = NULL;", "web_cfg_buf")
-    b = seg_func(WF, wf, r"^static int web_read_body\(", "web_read_body")
+    a = seg_line(WC, wc, r"^static char \*web_cfg_buf = NULL;", "web_cfg_buf")  # 9g: web_config.cpp
+    b = seg_func(WC, wc, r"^static int web_read_body\(", "web_read_body")
     segs["pre"].append(seg_func(IO, io, r"^int webReadBody\(", "webReadBody"))  # the shared body reader, before its two callers
     segs["pre"].append(seg_func(IO, io, r"^void webSendFixedHead\(", "webSendFixedHead"))  # the one fixed-length head writer (8a), before its callers
-    segs["pre"].append((WF, "config buffer + web_read_body", a[2], b[3]))
+    segs["pre"].append((WC, "config buffer + web_read_body", a[2], b[3]))
     segs["pre"].append(seg_func(NF, nf, r"^static bool webMsgstoreCall\(", "webMsgstoreCall"))  # the mbox actions of webFunctionCall (9f), before call_function
     segs["rm"] = [
         seg_range(RH, rh, r"^#define RM_BODY_TIMEOUT_MS ", r"^#define RM_BODY_TOTAL_MS ", "rm body deadlines"),
@@ -169,7 +170,7 @@ def generate():
     # includes of the frozen unit, so the live unit adds it next to web_functions.h (outside the namespace)
     if live_pre.count("#include <web_functions.h>") != 1:
         die("plumbing of frozen/extract.sh: expected exactly one #include <web_functions.h>")
-    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>\n#include <web_query.h>\n#include <web_body.h>    // 7b step 7: WB_* codes of webReadBody\n#include <web_io.h>      // 8a: webStatusText (inline), webSendFixedHead declaration\n#include <watchdog_feed.h> // rig stub (stubs/watchdog_feed.h): counts meshcom_wdt_feed() calls\n#include <command_dash.h>\n#include <num_parse.h>   // B5: mboxpurge / mboxdeliver slot\n// the rig does not include msgstore_api.h (its stubs declare msgstorePurge(long)); test_web_diff.cpp asserts this value\n#ifndef MSGSTORE_SLOTS_MAX\n#define MSGSTORE_SLOTS_MAX 50\n#endif")
+    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>\n#include <web_query.h>\n#include <web_body.h>    // 7b step 7: WB_* codes of webReadBody\n#include <web_config.h>  // 9g: WEB_TIMEOUT_TIME (moved with the config glue)\n#include <web_io.h>      // 8a: webStatusText (inline), webSendFixedHead declaration\n#include <watchdog_feed.h> // rig stub (stubs/watchdog_feed.h): counts meshcom_wdt_feed() calls\n#include <command_dash.h>\n#include <num_parse.h>   // B5: mboxpurge / mboxdeliver slot\n// the rig does not include msgstore_api.h (its stubs declare msgstorePurge(long)); test_web_diff.cpp asserts this value\n#ifndef MSGSTORE_SLOTS_MAX\n#define MSGSTORE_SLOTS_MAX 50\n#endif")
     # step 5a: setparam / getparam take the parsed request; the plumbing's forward declarations (read from the frozen unit,
     # which still has the String forms) are replaced here
     for old, new in (("void setparam_live(String web_header);", "void setparam_live(const WebReq &wr, const String &full_header);"),

@@ -1031,8 +1031,8 @@ static void test_prod_lock_import_old_values_are_repaired(void)
     TEST_ASSERT_EQUAL_INT(0, prodLockNormalise(meshcom_settings, false, true));   /* idempotent */
 
     /* the import path calls the normaliser before it persists */
-    const std::string web = read_file("src/web_functions/web_functions.cpp");
-    const size_t up = web.find("static void sub_config_upload(");
+    const std::string web = read_file("src/web_functions/web_config.cpp"); /* 9g: moved out of web_functions.cpp */
+    const size_t up = web.find("void sub_config_upload(");
     TEST_ASSERT_TRUE(up != std::string::npos);
     const size_t imp = web.find("configImportJson(", up);
     const size_t norm = web.find("prodLockNormalise(", imp);

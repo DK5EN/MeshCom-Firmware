@@ -15,6 +15,7 @@
 #include <web_request.h>
 #include <web_query.h>
 #include <web_body.h>    // 7b step 7: WB_* codes of webReadBody
+#include <web_config.h>  // 9g: WEB_TIMEOUT_TIME (moved with the config glue)
 #include <web_io.h>      // 8a: webStatusText (inline), webSendFixedHead declaration
 #include <watchdog_feed.h> // rig stub (stubs/watchdog_feed.h): counts meshcom_wdt_feed() calls
 #include <command_dash.h>
@@ -52,12 +53,12 @@ void setparam_live(const WebReq &wr, const String &full_header);
 void getparam_live(const WebReq &wr);
 size_t urlDecode_live(char *buf, size_t len, uint8_t policy); // own plumbing: the live decoder (url_decode_live.cpp)
 
-// ==== web_cors_ok (web_functions.cpp) lines 80-82 (working tree) ====
+// ==== web_cors_ok (web_functions.cpp) lines 81-83 (working tree) ====
 // RM GUI W1c: set per request by the guard in work_webpage_live(). No CORS headers are emitted any more
 // (the GUI is same-origin and there is no documented cross-origin consumer); kept for the guard plumbing.
 static bool web_cors_ok = true;
 
-// ==== web_header + clock globals (web_functions.cpp) lines 140-148 (working tree) ====
+// ==== web_header + clock globals (web_functions.cpp) lines 141-148 (working tree) ====
 String web_header;
 // FORMAL-02 web step 3: the head accumulator (~2.4 kB) of work_webpage_live(), one heap block for the life of
 // the server, never on the loop stack. Allocated by startWebserver(); web_head_acc_get() retries.
@@ -65,7 +66,6 @@ static WebHeadAcc *web_head_acc = NULL;
 
 unsigned long web_currentTime = millis(); // Current time
 unsigned long web_previousTime = 0;       // Previous time
-#define WEB_TIMEOUT_TIME 2000             // Define timeout time in milliseconds (example: 2000ms = 2s)
 bool bweb_server_running = false;
 
 // ==== webReadBody (web_io.cpp) lines 9-50 (working tree) ====
@@ -137,7 +137,7 @@ void webSendFixedHead_live(uint16_t status, const char *type, size_t len, const 
     web_client.print("Connection: close\r\n\r\n");
 }
 
-// ==== config buffer + web_read_body (web_functions.cpp) lines 388-441 (working tree) ====
+// ==== config buffer + web_read_body (web_config.cpp) lines 17-70 (working tree) ====
 /**
  * ###########################################################################################################################
  * CS-03: config download / upload
@@ -258,7 +258,7 @@ const char *rmReadBody_live(char *buf, size_t cap, long content_length)
 #define WEB_RIG_CFG_BUF web_cfg_buf
 #include "../stubs/web_handler_stubs.h"
 
-// ==== deliver_web_asset (web_functions.cpp) lines 734-775 (working tree) ====
+// ==== deliver_web_asset (web_functions.cpp) lines 551-592 (working tree) ====
 /**
  * ###########################################################################################################################
  * Serves one of the static GUI assets (web_assets.h): gzip blob, own header (send_http_header_live() says no-cache and
@@ -312,7 +312,7 @@ WebHeadAcc *web_head_acc_get(void)
     return web_head_acc;
 }
 
-// ==== web_send_refusal .. webRouteDecide (web_functions.cpp) lines 804-891 (working tree) ====
+// ==== web_send_refusal .. webRouteDecide (web_functions.cpp) lines 621-708 (working tree) ====
 static void web_send_refusal(uint8_t route, uint8_t allow)
 {
     if (route == WRD_NOT_ALLOWED)
@@ -402,7 +402,7 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, W
     return v.route;
 }
 
-// ==== work_webpage (web_functions.cpp) lines 893-1358 (working tree) ====
+// ==== work_webpage (web_functions.cpp) lines 710-1175 (working tree) ====
 void work_webpage_live(void)
 {
     // RAM-Rueckgewinn (2026-09-20): der 1-kB-Sammelpuffer web_header_collect
@@ -870,7 +870,7 @@ void work_webpage_live(void)
     memset(web_acc->line, 0, sizeof(web_acc->line));
 }
 
-// ==== decodeURLPercentCoding (web_functions.cpp) lines 1360-1370 (working tree) ====
+// ==== decodeURLPercentCoding (web_functions.cpp) lines 1177-1187 (working tree) ====
 /**
  * ###########################################################################################################################
  * decodes Percent-Coded Strings (e.g. URLs and its parameters)
@@ -883,7 +883,7 @@ String decodeURLPercentCoding_live(const String &input)
     return String(buf.data());
 }
 
-// ==== webDecodeSpan (web_functions.cpp) lines 1372-1386 (working tree) ====
+// ==== webDecodeSpan (web_functions.cpp) lines 1189-1203 (working tree) ====
 /**
  * The same decode as decodeURLPercentCoding_live() for a span of the parsed request (FORMAL-02 web step 5a): URLD_LEGACY, the
  * result is a String (the handlers keep their setupStruct Strings until B7). The temporary decode buffer is wiped before it
@@ -900,7 +900,7 @@ static String webDecodeSpan(WebSpan s)
     return out;
 }
 
-// ==== webCutAtNul (web_functions.cpp) lines 1388-1401 (working tree) ====
+// ==== webCutAtNul (web_functions.cpp) lines 1205-1218 (working tree) ====
 /**
  * The span ends at the first raw NUL: today's String searches (indexOf = strstr) and c_str() decodes stop there, so the
  * text of a handler does too.
@@ -916,7 +916,7 @@ static WebSpan webCutAtNul(WebSpan w)
     return w;
 }
 
-// ==== webFindLit (web_functions.cpp) lines 1403-1413 (working tree) ====
+// ==== webFindLit (web_functions.cpp) lines 1220-1230 (working tree) ====
 /**
  * Offset of the first occurrence of the literal `lit` in the span, or -1 (indexOf on the cut text).
  */
@@ -929,7 +929,7 @@ static int webFindLit(WebSpan w, const char *lit)
     return -1;
 }
 
-// ==== webParamText (web_functions.cpp) lines 1415-1435 (working tree) ====
+// ==== webParamText (web_functions.cpp) lines 1232-1252 (working tree) ====
 /**
  * The text setparam / getparam / call_function take their name and value from: the query. A request without '?'
  * ("GET /setparam/") has no query; today's header scan then cuts the header from byte 10 ("GET /setparam/" minus 10 =
@@ -952,7 +952,7 @@ static WebSpan webParamText(const WebReq &wr, bool legacyWindow, uint16_t skip =
     return webCutAtNul(w);
 }
 
-// ==== send_http_header (web_functions.cpp) lines 4507-4530 (working tree) ====
+// ==== send_http_header (web_functions.cpp) lines 4324-4347 (working tree) ====
 /**
  * ###########################################################################################################################
  * Sends a valid HTTP header. Takes care of the status code.
@@ -978,7 +978,7 @@ void send_http_header_live(uint16_t http_status_code, uint8_t content_type, cons
     webTxBeginChunked(web_client);                                            // WEB-TX-01: every flush from here on is one chunk
 }
 
-// ==== send_message (web_functions.cpp) lines 4634-4734 (working tree) ====
+// ==== send_message (web_functions.cpp) lines 4451-4551 (working tree) ====
 /**
  * ###########################################################################################################################
  * handles incoming sendmessage request
@@ -1081,7 +1081,7 @@ void send_message_live(const WebReq &wr)
     web_client.println(); // The HTTP response ends with another blank line
 }
 
-// ==== call_function (web_functions.cpp) lines 4753-4813 (working tree) ====
+// ==== call_function (web_functions.cpp) lines 4570-4630 (working tree) ====
 /**
  * ###########################################################################################################################
  * Tries to execute a Web-API function call.
@@ -1144,7 +1144,7 @@ void call_function_live(const WebReq &wr, const String &full_header)
     rm_wipe_string(functionData.functionName);
 }
 
-// ==== webSetparamValueVerdict (web_functions.cpp) lines 4815-4850 (working tree) ====
+// ==== webSetparamValueVerdict (web_functions.cpp) lines 4632-4667 (working tree) ====
 /**
  * B7 (step 5b): may this decoded setparam value reach the setter? 0 = yes, else a refusal (1 too long, 2 "--", 3 leading
  * "&&"). A value over 200 bytes is refused for every name (the setters' own buffers may still cut a value near that
@@ -1182,7 +1182,7 @@ static uint8_t webSetparamValueVerdict(const char *name, const char *value, size
     return dashes ? 2 : 0;
 }
 
-// ==== setparam (web_functions.cpp) lines 4852-4996 (working tree) ====
+// ==== setparam (web_functions.cpp) lines 4669-4813 (working tree) ====
 /**
  * ###########################################################################################################################
  * Set the Value of a parameter (if known)
@@ -1329,7 +1329,7 @@ void setparam_live(const WebReq &wr, const String &full_header)
     rm_wipe_string(setupData.returnValue);
 }
 
-// ==== getparam (web_functions.cpp) lines 4998-5063 (working tree) ====
+// ==== getparam (web_functions.cpp) lines 4815-4880 (working tree) ====
 /**
  * ###########################################################################################################################
  * Get the Value of a parameter (if known)
@@ -1420,7 +1420,6 @@ static WebHeadAcc *web_head_acc = NULL;
 
 unsigned long web_currentTime = millis(); // Current time
 unsigned long web_previousTime = 0;       // Previous time
-#define WEB_TIMEOUT_TIME 2000             // Define timeout time in milliseconds (example: 2000ms = 2s)
 bool bweb_server_running = false;)LIVESRC"},
     {"src/web_functions/web_io.cpp", "webReadBody", R"LIVESRC(/**
  * Reads the request BODY (the head is read by work_webpage()). Bounded by the Content-Length the caller
@@ -1487,7 +1486,7 @@ void webSendFixedHead(uint16_t status, const char *type, size_t len, const char 
     }
     web_client.print("Connection: close\r\n\r\n");
 })LIVESRC"},
-    {"src/web_functions/web_functions.cpp", "config buffer + web_read_body", R"LIVESRC(/**
+    {"src/web_functions/web_config.cpp", "config buffer + web_read_body", R"LIVESRC(/**
  * ###########################################################################################################################
  * CS-03: config download / upload
  *

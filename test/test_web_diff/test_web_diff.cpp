@@ -623,6 +623,7 @@ static const char *const kLiveSources[] = {
     "src/web_functions/web_rm_handlers.cpp",
     "src/web_functions/web_io.cpp",
     "src/web_functions/web_nodefunctioncalls.cpp",
+    "src/web_functions/web_config.cpp",
     "src/url_decode.cpp",
 };
 
@@ -1541,16 +1542,19 @@ static void test_no_hand_built_response_heads(void)
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, wfLiterals, "web_functions.cpp: only send_http_header's format string");
     const std::string wf = repo_slurp("src/web_functions/web_functions.cpp");
     const std::string os = repo_slurp("src/web_functions/web_oled_shot.cpp");
+    const std::string wc = repo_slurp("src/web_functions/web_config.cpp"); // 9g: the config download head moved here
     auto count = [](const std::string &s, const char *needle) {
         int n = 0;
         for (size_t at = 0; (at = s.find(needle, at)) != std::string::npos; at++)
             n++;
         return n;
     };
-    TEST_ASSERT_EQUAL_INT_MESSAGE(8, count(wf, "webSendFixedHead(") + count(os, "webSendFixedHead("), "all 8 heads (asset, rgb565 x2, no-heap, AU busy, oled x2, config download) call webSendFixedHead");
-    TEST_ASSERT_EQUAL_INT(6, count(wf, "webSendFixedHead("));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(8, count(wf, "webSendFixedHead(") + count(os, "webSendFixedHead(") + count(wc, "webSendFixedHead("), "all 8 heads (asset, rgb565 x2, no-heap, AU busy, oled x2, config download) call webSendFixedHead");
+    TEST_ASSERT_EQUAL_INT(5, count(wf, "webSendFixedHead("));
+    TEST_ASSERT_EQUAL_INT(1, count(wc, "webSendFixedHead("));
     TEST_ASSERT_EQUAL_INT(2, count(os, "webSendFixedHead("));
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, count(wf, "Content-Length: "), "web_functions.cpp prints no Content-Length itself");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, count(wc, "Content-Length: "), "web_config.cpp prints no Content-Length itself");
 }
 
 

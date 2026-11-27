@@ -657,7 +657,7 @@ static void test_every_web_error_token_has_a_server_sentence(void)
 // and of the body readers is test/test_web_diff (B10 rows, stalled bodies).
 struct B10Src
 {
-    std::string wf, rh, io;
+    std::string wf, rh, io, wc; // wc: web_config.cpp (config upload, 9g)
 };
 
 static bool has(const std::string &hay, const char *needle) { return hay.find(needle) != std::string::npos; }
@@ -666,9 +666,9 @@ static bool has(const std::string &hay, const char *needle) { return hay.find(ne
 static const char *b10PinsHold(const B10Src &s)
 {
     // sub_config_upload: WB_SHORT -> 408, the other reader codes stay 400, same text and serial line
-    if (!has(s.wf, "send_http_header(n == WB_SHORT ? 408 : 400, RESPONSE_TYPE_TEXT);"))
+    if (!has(s.wc, "send_http_header(n == WB_SHORT ? 408 : 400, RESPONSE_TYPE_TEXT);"))
         return "sub_config_upload: WB_SHORT must answer 408";
-    if (!has(s.wf, "\"incomplete upload\");") || !has(s.wf, "Serial.printf(\"[CONFIG];upload;rc;%d;len;%ld\\n\", n, content_length);"))
+    if (!has(s.wc, "\"incomplete upload\");") || !has(s.wc, "Serial.printf(\"[CONFIG];upload;rc;%d;len;%ld\\n\", n, content_length);"))
         return "sub_config_upload: text and serial line of the upload failure";
     // sub_rm_send / rmAnswer: the token "short" -> 408, every other refusal 422
     if (!has(s.wf, "send_http_header(ok ? 200 : (strcmp(err, \"short\") == 0 ? 408 : 422), RESPONSE_TYPE_JSON);"))
@@ -688,7 +688,7 @@ static const char *b10PinsHold(const B10Src &s)
     if (!has(s.wf, "yield();\n        meshcom_wdt_feed(); // B10: bounded by WEB_TIMEOUT_TIME\n        web_currentTime = millis();"))
         return "work_webpage: the head loop must feed the watchdog";
     // the two body readers are thin wrappers over webReadBody, with their deadlines and the 3-line token mapping
-    if (!has(s.wf, "return webReadBody(web_cfg_buf, CONFIG_JSON_MAX + 1, content_length, WEB_TIMEOUT_TIME, 4000);"))
+    if (!has(s.wc, "return webReadBody(web_cfg_buf, CONFIG_JSON_MAX + 1, content_length, WEB_TIMEOUT_TIME, 4000);"))
         return "web_read_body: wrapper over webReadBody";
     if (!has(s.rh, "const int n = webReadBody(buf, cap, content_length, RM_BODY_TIMEOUT_MS, RM_BODY_TOTAL_MS);\n"
                    "    if (n == WB_NOLEN || n == WB_SIZE)\n        return \"size\";\n    return n == WB_SHORT ? \"short\" : nullptr;"))
@@ -713,7 +713,7 @@ static std::string mutate(const std::string &text, const char *from, const char 
 static B10Src b10Load(void)
 {
     return {repo_slurp("src/web_functions/web_functions.cpp"), repo_slurp("src/web_functions/web_rm_handlers.cpp"),
-            repo_slurp("src/web_functions/web_io.cpp")};
+            repo_slurp("src/web_functions/web_io.cpp"), repo_slurp("src/web_functions/web_config.cpp")};
 }
 
 static void test_b10_sources_answer_408(void)
@@ -728,11 +728,11 @@ static void test_b10_pins_catch_mutations(void)
     TEST_ASSERT_NULL(b10PinsHold(base));
     struct Mut
     {
-        int file; // 0 web_functions.cpp, 1 web_rm_handlers.cpp, 2 web_io.cpp
+        int file; // 0 web_functions.cpp, 1 web_rm_handlers.cpp, 2 web_io.cpp, 3 web_config.cpp
         const char *from, *to;
     };
     static const Mut muts[] = {
-        {0, "n == WB_SHORT ? 408 : 400", "n == WB_SHORT ? 400 : 400"},                             // config upload back to 400
+        {3, "n == WB_SHORT ? 408 : 400", "n == WB_SHORT ? 400 : 400"},                             // config upload back to 400
         {0, "(strcmp(err, \"short\") == 0 ? 408 : 422)", "(strcmp(err, \"short\") == 0 ? 422 : 422)"}, // sub_rm_send back to 422
         {1, "(strcmp(err, \"short\") == 0 ? 408 : 422)", "(strcmp(err, \"short\") == 0 ? 422 : 422)"}, // rmAnswer back to 422
         {0, "webStatusText(http_status_code)", "\"Unknown\""},                                     // own reason text again
@@ -746,7 +746,7 @@ static void test_b10_pins_catch_mutations(void)
     for (const Mut &m : muts)
     {
         B10Src x = base;
-        std::string &t = m.file == 0 ? x.wf : m.file == 1 ? x.rh : x.io;
+        std::string &t = m.file == 0 ? x.wf : m.file == 1 ? x.rh : m.file == 3 ? x.wc : x.io;
         t = mutate(t, m.from, m.to);
         TEST_ASSERT_NOT_NULL_MESSAGE(b10PinsHold(x), m.from);
     }
