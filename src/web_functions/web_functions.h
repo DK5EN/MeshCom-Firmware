@@ -17,6 +17,7 @@ void stopWebserver();
 
 
 // Common functions
+struct WebReq; // web_request.h
 String decodeURLPercentCoding(const String &input);
 void work_webpage(void);
 
@@ -58,8 +59,8 @@ void _create_button_component(bool needConfirm, String confirmText, String onCli
 // WEB REST API
 void send_message(String);                  // send a message to the mesh
 void call_function(String web_header);      // call a node funtion (e.g. sendpos)
-void setparam(String);                      // set a parameter (also used in setup)
-void getparam(String);                      // get a parameter (also used in setup)
+void setparam(const WebReq &, const String &full_header); // set a parameter: name/value from the parsed query, the header text for the X-MC guard
+void getparam(const WebReq &);              // get a parameter: name from the parsed query
 
 //ToDo: get messages as json
 

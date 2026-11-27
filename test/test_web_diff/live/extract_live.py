@@ -127,6 +127,8 @@ def generate():
         route_seg,
         seg_func(WF, wf, r"^void work_webpage\(", "work_webpage"),
         seg_func(WF, wf, r"^String decodeURLPercentCoding\(", "decodeURLPercentCoding"),
+        seg_func(WF, wf, r"^static String webDecodeSpan\(", "webDecodeSpan"),
+        seg_func(WF, wf, r"^static WebSpan webParamText\(", "webParamText"),
         seg_func(WF, wf, r"^void send_http_header\(", "send_http_header"),
         seg_func(WF, wf, r"^void send_message\(", "send_message"),
         seg_func(WF, wf, r"^void call_function\(", "call_function"),
@@ -159,7 +161,14 @@ def generate():
     # includes of the frozen unit, so the live unit adds it next to web_functions.h (outside the namespace)
     if live_pre.count("#include <web_functions.h>") != 1:
         die("plumbing of frozen/extract.sh: expected exactly one #include <web_functions.h>")
-    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>")
+    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>\n#include <web_query.h>")
+    # step 5a: setparam / getparam take the parsed request; the plumbing's forward declarations (read from the frozen unit,
+    # which still has the String forms) are replaced here
+    for old, new in (("void setparam_live(String web_header);", "void setparam_live(const WebReq &wr, const String &full_header);"),
+                     ("void getparam_live(String web_header);", "void getparam_live(const WebReq &wr);")):
+        if live_pre.count(old) != 1:
+            die("plumbing of frozen/extract.sh: expected exactly one '%s'" % old)
+        live_pre = live_pre.replace(old, new)
     # web_route.h reads no build macro (the feature mask is computed in webRouteDecide); it is included after the
     # ESP32 define of the plumbing, as web_functions.cpp includes it with the board flags already set
     if live_pre.count("#define ESP32 1\n") != 1:

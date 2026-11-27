@@ -18,6 +18,7 @@
 #include "gpio_control.h"      // GPIO-01 Part B: state of the free-GPIO control (glue calls ESP32 only)
 #include "web_functions.h"
 #include "web_request.h" // FORMAL-02 web step 3: request-head accumulator of work_webpage()
+#include "web_query.h"   // FORMAL-02 web step 5a: webQueryFirst for setparam / getparam
 #include "web_route.h"   // FORMAL-02 web step 4: route table, computed beside the legacy router
 #include "web_oled_shot.h"
 #include "web_txbuf.h"     // WEB-TX-01: webTxBeginChunked in send_http_header
@@ -27,6 +28,7 @@
 #include <applink.h>      // HAS_APPLINK, bAPPLINK: AppLink switch and info line
 #include <time.h>
 #include <vector>
+#include <ctype.h>
 #include <lora_setchip.h>
 #include <rtc_functions.h>
 #include <time_functions.h>
@@ -1202,6 +1204,7 @@ struct WebRouteVerdict
     bool parsed;
     bool page_shaped;
     uint8_t wrq; // webReqParse's code (WRQ_OK when parsed); webRouteBadRequest(wrq) answers 400 right after the guard
+    WebReq req;  // the parsed request (valid when parsed); its spans point into web_acc->head, which lives to the end of the request block
 };
 
 /**
@@ -1214,10 +1217,10 @@ struct WebRouteVerdict
  */
 static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, const String &web_header, WebRouteVerdict *out)
 {
-    WebRouteVerdict v;
+    WebRouteVerdict &v = *out; // the parse lands in out->req: the router switch reads it, nothing is parsed twice
     v.allow = 0;
     v.page_shaped = false;
-    WebReq wr;
+    WebReq &wr = v.req;
     uint8_t table = WR_NONE;
     v.wrq = webReqParse(acc->head, acc->head_len, (acc->flags & WEB_HF_CUT) != 0, &wr);
     v.parsed = v.wrq == WRQ_OK;
@@ -1250,7 +1253,6 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
     v.route = webRouteDecideCore(v.parsed, table, legacy, v.page_shaped, refusal, built);
     if (table != v.route)
         web_route_disagree++;
-    *out = v;
     return v.route;
 }
 
@@ -1603,11 +1605,11 @@ void work_webpage(void)
                                 break;
                         case WR_SETPARAM: // user requested to set a parameter
                                 // ### !!function will generate a HTML header itself
-                                setparam(web_header);
+                                setparam(web_verdict.req, web_header);
                                 break;
                         case WR_GETPARAM: // user requested to get a parameter
                                 // ### !!function will generate a HTML header itself
-                                getparam(web_header);
+                                getparam(web_verdict.req);
                                 break;
 #if INSTRUMENT_ENABLED && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS))
                         case WR_SCREEN_RGB565: // bench screenshot, tools/bench/tdeck_screenshot.py
@@ -1738,6 +1740,48 @@ String decodeURLPercentCoding(const String &input)
     std::vector<char> buf(input.c_str(), input.c_str() + input.length() + 1);
     urlDecode(buf.data(), input.length(), URLD_LEGACY); // NUL-terminates, drops %00
     return String(buf.data());
+}
+
+/**
+ * The same decode as decodeURLPercentCoding() for a span of the parsed request (FORMAL-02 web step 5a): URLD_LEGACY, the
+ * result is a String (the handlers keep their setupStruct Strings until B7). The temporary decode buffer is wiped before it
+ * is freed: a value can be a password (setpwd).
+ */
+static String webDecodeSpan(WebSpan s)
+{
+    std::vector<char> buf(s.n + 1, 0);
+    if (s.n != 0)
+        memcpy(buf.data(), s.p, s.n);
+    urlDecode(buf.data(), s.n, URLD_LEGACY); // NUL-terminates, drops %00
+    String out(buf.data());
+    rm_wipe(buf.data(), buf.size());
+    return out;
+}
+
+/**
+ * The text setparam / getparam take their name and value from: the query. A request without '?' ("GET /setparam/") has
+ * no query; today's header scan then cuts the header from byte 10 ("GET /setparam/" minus 10 = "ram/") up to the HTTP
+ * version, and the name becomes "ram/" (a 422 answer). That window is kept in step 5a so no answer changes; the
+ * target of such a request is exactly "/setparam/" or "/getparam/" (the route table matches nothing else), 6 bytes
+ * before its end the text starts. TODO(B4, 5b): an absent query is an empty name.
+ */
+static WebSpan webParamText(const WebReq &wr)
+{
+    WebSpan w = wr.query;
+    if (wr.path.n == wr.target.n && wr.target.n > 6)
+    {
+        w = wr.target;
+        w.p += 6;
+        w.n -= 6;
+    }
+    // today's String searches (indexOf = strstr) end at a raw NUL, so the text ends there too
+    for (size_t i = 0; i < w.n; i++)
+        if (w.p[i] == 0)
+        {
+            w.n = i;
+            break;
+        }
+    return w;
 }
 
 #if defined(ESP32)
@@ -5288,13 +5332,20 @@ void call_function(String web_header)
  * Set the Value of a parameter (if known)
  * This will return a JSON containing the result like {"parameterName":"parameterValue"} using a HTTP return code (e.g. 200 or 422)
  */
-void setparam(String web_header)
+void setparam(const WebReq &wr, const String &full_header)
 {
-    const String full_header = web_header; // the X-MC check below needs the header lines
-
-    web_header = web_header.substring(web_header.indexOf("/setparam/?") + 11, web_header.indexOf(" HTTP/1.1"));
-    String param_name = decodeURLPercentCoding(web_header.substring(0, web_header.indexOf("=")));
-    String param_value = decodeURLPercentCoding(web_header.substring(web_header.indexOf("=") + 1));
+    // full_header: the guard below needs the header lines (X-MC); name and value come from the parsed query
+    // name = up to the first '=', value = everything after it (a further '&' stays in the value); no '=': both are the whole query (D2)
+    const WebSpan text = webParamText(wr);
+    WebSpan nspan = text, vspan = text;
+    WebSpan k, v;
+    if (webQueryFirst(text, &k, &v))
+    {
+        nspan = k;
+        vspan = v;
+    }
+    String param_name = webDecodeSpan(nspan);
+    String param_value = webDecodeSpan(vspan);
     param_name.toLowerCase();
 
     // AU web GUI: no setparam name may run an update command for a foreign page (every value lands in a
@@ -5309,6 +5360,7 @@ void setparam(String web_header)
         web_cors_ok = false;
         send_http_header(403, RESPONSE_TYPE_JSON);
         web_client.println("{\"ok\":false,\"err\":\"forbidden\"}");
+        rm_wipe_string(param_value); // WEB-WIPE-COPIES-01: a setpwd value must not stay in freed heap
         return;
     }
 
@@ -5400,6 +5452,10 @@ void setparam(String web_header)
     doc[setupData.paramName] = setupData.returnValue;
     serializeJson(doc, web_client);
     web_client.println();
+    // WEB-WIPE-COPIES-01: the decoded value (a setpwd password) and its copies must not stay in freed heap
+    rm_wipe_string(param_value);
+    rm_wipe_string(setupData.paramValue);
+    rm_wipe_string(setupData.returnValue);
 }
 
 /**
@@ -5407,7 +5463,7 @@ void setparam(String web_header)
  * Get the Value of a parameter (if known)
  * This will return a JSON containing the result like {"parameterName":"parameterValue"} using a HTTP return code (e.g. 200 or 422)
  */
-void getparam(String web_header)
+void getparam(const WebReq &wr)
 {
     // CS-04, zwei Fehler in zwei Zeilen -- beide auf DK5EN-98 nachgestellt:
     //
@@ -5423,15 +5479,23 @@ void getparam(String web_header)
     // Damit war JEDES Lesen ueber die Web-API defekt, waehrend /setparam/
     // funktionierte -- die Web-GUI faellt es nicht auf, weil sie ihre Werte aus
     // den gerenderten Seiten nimmt, nicht ueber /getparam/.
-    web_header = web_header.substring(web_header.indexOf("/getparam/?") + 11, web_header.indexOf(" HTTP/1.1"));
-    if (web_header.indexOf("=") > 0)
+    // FORMAL-02 web step 5a: the name comes from the parsed query (no header scan). Up to the first '=' when that is not
+    // the first byte (maybe there is an unintended "=" or anything more. We only do need the parameter Name), else the
+    // whole query (D2); trimmed like String::trim() before the decode.
+    const WebSpan text = webParamText(wr);
+    WebSpan nspan = text;
+    WebSpan k, v;
+    if (webQueryFirst(text, &k, &v) && k.n > 0)
+        nspan = k;
+    while (nspan.n > 0 && isspace((unsigned char)nspan.p[0]))
     {
-        web_header = web_header.substring(0, web_header.indexOf("=")); // maybe there is an unintended "=" or anything more. We only do need the parameter Name.
+        nspan.p++;
+        nspan.n--;
     }
+    while (nspan.n > 0 && isspace((unsigned char)nspan.p[nspan.n - 1]))
+        nspan.n--;
 
-    web_header.trim();
-
-    String param_name = decodeURLPercentCoding(web_header);
+    String param_name = webDecodeSpan(nspan);
     param_name.toLowerCase();
 
     setupStruct setupData;

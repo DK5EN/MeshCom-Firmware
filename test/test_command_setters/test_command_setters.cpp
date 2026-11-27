@@ -1130,7 +1130,7 @@ static void test_au_web_gate_and_status_wiring_pins()
     const size_t gate = pin_find(wf, "!webGuardCallAllowed(functionData.functionName.c_str()", cf, "call_function does not use webGuardCallAllowed");
     TEST_ASSERT_TRUE_MESSAGE(gate < pin_find(wf, "webFunctionCall(&functionData)", cf, "no webFunctionCall"), "the upd* gate must run before the function call");
     // setparam: manualcommand with an update command goes through webGuardSetparamAllowed before webSetup_setParam
-    const size_t sp = pin_find(wf, "void setparam(String web_header)", 0, "no setparam()");
+    const size_t sp = pin_find(wf, "void setparam(const WebReq &wr, const String &full_header)", 0, "no setparam()");
     const size_t spg = pin_find(wf, "!webGuardSetparamAllowed(param_name.c_str(), param_value.c_str(), full_header.c_str()", sp, "setparam does not use webGuardSetparamAllowed");
     TEST_ASSERT_TRUE_MESSAGE(spg < pin_find(wf, "webSetup_setParam(&setupData)", sp, "no webSetup_setParam call"), "the manualcommand gate must run before the setter");
     // /austatus phone flag and pct come from the shared sources, not from a private copy of the expression
