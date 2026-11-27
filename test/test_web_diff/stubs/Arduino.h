@@ -22,6 +22,7 @@
 #include <cstring>
 #include <string>
 #include <type_traits>
+#include <utility>
 
 typedef uint8_t byte;
 typedef bool boolean;
@@ -41,17 +42,58 @@ inline void yield(void) {}
 inline void delay(unsigned long) {}
 
 // ---- String: the subset of Arduino's WString the request path uses, with WString semantics
+//
+// Leak probe (rig only): a real Arduino String keeps its heap buffer when it is shortened or set to "" (copy() into the
+// existing buffer, only the terminating NUL is written), so the old bytes stay in the buffer until something overwrites
+// them; only a byte-wise overwrite (rm_wipe_string) removes them. resid_ models those bytes past the end, and
+// bufferImage() returns buffer content + resid_ (what a heap dump of the buffer would show). stringDtorProbe is called with
+// that image when a String dies (the buffer is freed unwiped on the device), but only for a String cut out of another one
+// (substring(), and what is copied or moved from it): a temporary built from a literal that happens to equal the request
+// line (wg_path == "/?logout") is not a copy of the request. A move steals the buffer and leaves an empty String behind, as
+// WString's move does, so a temporary does not count as a second copy.
+inline void (*stringDtorProbe)(const std::string &image) = nullptr;
+
 class String
 {
 public:
     String() {}
     String(const char *s) : s_(s ? s : "") {}
     String(const std::string &s) : s_(s) {}
-    String(const String &) = default;
-    String &operator=(const String &) = default;
+    String(const String &o) : s_(o.s_), cut_(o.cut_) {}
+    String(String &&o) noexcept : s_(std::move(o.s_)), resid_(std::move(o.resid_)), cut_(o.cut_)
+    {
+        o.s_.clear();
+        o.resid_.clear();
+    }
+    ~String()
+    {
+        if (cut_ && stringDtorProbe)
+            stringDtorProbe(s_ + resid_);
+    }
+    String &operator=(const String &o)
+    {
+        if (this != &o)
+        {
+            assign_(o.s_);
+            cut_ = cut_ || o.cut_;
+        }
+        return *this;
+    }
+    String &operator=(String &&o) noexcept
+    {
+        if (this != &o)
+        {
+            s_ = std::move(o.s_);
+            resid_ = std::move(o.resid_);
+            cut_ = o.cut_;
+            o.s_.clear();
+            o.resid_.clear();
+        }
+        return *this;
+    }
     String &operator=(const char *s)
     {
-        s_ = s ? s : "";
+        assign_(s ? s : "");
         return *this;
     }
     explicit String(char c) : s_(1, c) {}
@@ -90,17 +132,18 @@ public:
 
     String &operator+=(const String &o)
     {
-        s_ += o.s_;
+        const std::string add = o.s_; // o may be *this
+        append_(add);
         return *this;
     }
     String &operator+=(const char *o)
     {
-        s_ += (o ? o : "");
+        append_(o ? o : "");
         return *this;
     }
     String &operator+=(char c)
     {
-        s_ += c;
+        append_(std::string(1, c));
         return *this;
     }
     friend String operator+(const String &a, const String &b)
@@ -171,6 +214,7 @@ public:
             right = (unsigned int)s_.size();
         String out;
         out.s_.assign(s_, left, right - left);
+        out.cut_ = true;
         return out;
     }
 
@@ -195,7 +239,7 @@ public:
             b++;
         while (e > b && isspace((unsigned char)s_[e - 1]))
             e--;
-        s_ = s_.substr(b, e - b);
+        assign_(s_.substr(b, e - b));
     }
     void toLowerCase()
     {
@@ -209,9 +253,24 @@ public:
     }
     long toInt() const { return atol(c_str()); } // WString.cpp: atol, not atoi
     const std::string &std_str() const { return s_; }
+    // the whole buffer as a heap dump would show it: the content, then the bytes of earlier, longer content (rig probe)
+    std::string bufferImage() const { return s_ + resid_; }
 
 private:
+    void assign_(const std::string &next)
+    {
+        const std::string img = s_ + resid_;
+        s_ = next;
+        resid_ = img.size() > s_.size() ? img.substr(s_.size()) : std::string();
+    }
+    void append_(const std::string &add)
+    {
+        s_ += add;
+        resid_ = resid_.size() > add.size() ? resid_.substr(add.size()) : std::string();
+    }
     std::string s_;
+    std::string resid_; // bytes past the end that a real buffer still holds
+    bool cut_ = false;  // made by substring() (or copied / moved from such a String): a piece of some request
 };
 
 inline String operator+(const char *a, const String &b) { return String(a) + b; }

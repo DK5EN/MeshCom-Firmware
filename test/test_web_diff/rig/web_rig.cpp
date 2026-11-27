@@ -167,6 +167,44 @@ void webRigBegin(const std::string &request, bool peerCloses, const WebProfile &
     r.in = req;
 }
 
+// ---- leak probe
+static std::string g_probePath;
+static size_t g_probeLeaks = 0;
+static void probeOnDeath(const std::string &image)
+{
+    if (!g_probePath.empty() && image.compare(0, g_probePath.size(), g_probePath) == 0)
+        g_probeLeaks++;
+}
+bool webRigProbeArm(const std::string &path)
+{
+    g_probeLeaks = 0;
+    g_probePath = path;
+    if (path.size() < 2 || path.find_first_not_of('x') == std::string::npos)
+    {
+        g_probePath.clear();
+        stringDtorProbe = nullptr;
+        return false;
+    }
+    stringDtorProbe = probeOnDeath;
+    return true;
+}
+void webRigProbeDisarm()
+{
+    stringDtorProbe = nullptr;
+    g_probePath.clear();
+}
+size_t webRigProbeLeaks() { return g_probeLeaks; }
+
+std::string webRigRequestPath(const std::string &request)
+{
+    const std::string head = request.substr(0, strlen(request.c_str())); // the String functions stop at a NUL
+    const size_t a = head.find(' ');
+    const size_t b = (a == std::string::npos) ? std::string::npos : head.find(' ', a + 1);
+    if (a == std::string::npos || b == std::string::npos || b <= a)
+        return "";
+    return head.substr(a + 1, b - a - 1);
+}
+
 std::string webRigRecord()
 {
     WebRigState &r = webRig();

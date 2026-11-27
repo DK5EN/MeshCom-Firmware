@@ -359,48 +359,209 @@ static void test_state_flag_mirrors_the_guard(void)
 
 // ---------------------------------------------------------------------------------- decision core (B2, wave 7b)
 
-// the decision rules of webRouteDecideCore, with every feature built (a route that is not built is the next test)
-static void test_decide_core_b2_rules(void)
+// the decision of a parsed request as webRouteDecide (web_functions.cpp) gathers it: parse, table, page shape, refusal
+struct Dec
 {
-    // the legacy ids continue the table numbering
+    uint8_t route;
+    uint8_t allow;
+    bool page_shaped;
+};
+static Dec decideLine(const std::string &rl, uint8_t built, uint8_t legacy)
+{
+    WebReq rq;
+    const bool parsed = webReqParse(rl.data(), rl.size(), false, &rq) == WRQ_OK;
+    Dec d = {WR_NONE, 0, false};
+    uint8_t table = WR_NONE, refusal = WRD_NOT_FOUND;
+    if (parsed)
+    {
+        table = webRouteMatch(rq.method, rq.path, rq.query);
+        d.page_shaped = webRouteIsPageShaped(rq.method, rq.path, rq.query);
+        refusal = webRouteRefusal(rq.path, rq.query, built, &d.allow);
+    }
+    d.route = webRouteDecideCore(parsed, table, legacy, d.page_shaped, refusal, built);
+    return d;
+}
+static Dec decideOf(const char *method, const char *target, uint8_t built, uint8_t legacy = WR_SCAFFOLD)
+{
+    return decideLine(std::string(method) + " " + target + " HTTP/1.1\r\n\r\n", built, legacy);
+}
+
+// the decision rules of webRouteDecideCore, with every feature built (a route that is not built is the next test)
+static void test_decide_core_b1_rules(void)
+{
+    // the legacy ids continue the table numbering, the decision ids the legacy ones
     TEST_ASSERT_EQUAL_UINT8(WR_COUNT, WRL_RM_SEND_GET);
     TEST_ASSERT_EQUAL_UINT8(WR_COUNT + 1, WRL_PAGE_UNKNOWN);
+    TEST_ASSERT_EQUAL_UINT8(WR_COUNT + 2, WRD_NOT_FOUND);
     // a table route goes to the table, whatever the legacy chain found
-    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, webRouteDecideCore(true, WR_PAGE_INFO, WR_PAGE_SETUP, false, WRB_ALL));
-    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, webRouteDecideCore(true, WR_PAGE_INFO, WR_SCAFFOLD, false, WRB_ALL));
-    TEST_ASSERT_EQUAL_UINT8(WR_RM_SEND, webRouteDecideCore(true, WR_RM_SEND, WRL_PAGE_UNKNOWN, false, WRB_ALL));
-    // a loose legacy match (Referer, query value, longer path) becomes the scaffold
-    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_NONE, WR_SETPARAM, false, WRB_ALL));
-    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_NONE, WR_PAGE_INFO, false, WRB_ALL));
-    // a refused parse keeps the legacy decision
-    TEST_ASSERT_EQUAL_UINT8(WR_SETPARAM, webRouteDecideCore(false, WR_NONE, WR_SETPARAM, false, WRB_ALL));
-    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, webRouteDecideCore(false, WR_NONE, WR_PAGE_INFO, false, WRB_ALL));
-    // an exact row for another method keeps the legacy decision (B1)
-    TEST_ASSERT_EQUAL_UINT8(WR_RM_SEND, webRouteDecideCore(true, WR_NONE, WR_RM_SEND, true, WRB_ALL));
-    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, webRouteDecideCore(true, WR_NONE, WR_PAGE_INFO, true, WRB_ALL));
-    // the legacy fallbacks stay (scaffold, unknown page, GET /rmsend)
-    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_NONE, WR_SCAFFOLD, false, WRB_ALL));
-    TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, webRouteDecideCore(true, WR_NONE, WRL_PAGE_UNKNOWN, false, WRB_ALL));
-    TEST_ASSERT_EQUAL_UINT8(WRL_RM_SEND_GET, webRouteDecideCore(true, WR_NONE, WRL_RM_SEND_GET, false, WRB_ALL));
-    TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, webRouteDecideCore(false, WR_NONE, WRL_PAGE_UNKNOWN, false, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, webRouteDecideCore(true, WR_PAGE_INFO, WR_PAGE_SETUP, true, WRD_NOT_FOUND, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WR_RM_SEND, webRouteDecideCore(true, WR_RM_SEND, WRL_PAGE_UNKNOWN, false, WRD_NOT_FOUND, WRB_ALL));
+    // GET / is the scaffold, GET /?x=1 is a 404 (never the scaffold)
+    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, decideOf("GET", "/", WRB_ALL).route);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, decideOf("GET", "/?x=1", WRB_ALL).route);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, decideOf("GET", "/favicon.ico", WRB_ALL).route);
+    // a loose legacy match (Referer, query value, longer path) is a 404, whatever the legacy id says
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteDecideCore(true, WR_NONE, WR_SETPARAM, false, WRD_NOT_FOUND, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, decideOf("GET", "/setparam/x/1x", WRB_ALL, WR_SETPARAM).route);
+    // page-shaped with an unknown page: the 404 page
+    TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, decideOf("GET", "/?page=nosuch", WRB_ALL).route);
+    TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, decideOf("GET", "/?page=", WRB_ALL).route);
+    TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, decideOf("GET", "/?page", WRB_ALL).route);
+    // an exact row for another method: 405 with the union of the rows' masks (HEAD is in no mask)
+    Dec d = decideOf("GET", "/rmsend", WRB_ALL, WRL_RM_SEND_GET); // not the legacy 405 branch
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, d.route);
+    TEST_ASSERT_EQUAL_UINT8(WRM_POST, d.allow);
+    d = decideOf("POST", "/rmstatus", WRB_ALL);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, d.route);
+    TEST_ASSERT_EQUAL_UINT8(WRM_GET, d.allow);
+    d = decideOf("GET", "/config", WRB_ALL);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, d.route);
+    TEST_ASSERT_EQUAL_UINT8(WRM_POST, d.allow);
+    d = decideOf("HEAD", "/?page=info", WRB_ALL); // not page-shaped (GET only), the page row says GET
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, d.route);
+    TEST_ASSERT_EQUAL_UINT8(WRM_GET, d.allow);
+    d = decideOf("HEAD", "/rmsend", WRB_ALL);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, d.route);
+    TEST_ASSERT_EQUAL_UINT8(WRM_POST, d.allow);
+    d = decideOf("POST", "/", WRB_ALL);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, d.route);
+    TEST_ASSERT_EQUAL_UINT8(WRM_GET, d.allow);
+    d = decideOf("PUT", "/rmnodes", WRB_ALL); // two rows: GET and POST
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, d.route);
+    TEST_ASSERT_EQUAL_UINT8(WRM_GET | WRM_POST, d.allow);
+    d = decideOf("HEAD", "/rmnodes", WRB_ALL);
+    TEST_ASSERT_EQUAL_UINT8(WRM_GET | WRM_POST, d.allow);
+    // an unknown path with another method is a 404, not a 405
+    d = decideOf("POST", "/nosuch", WRB_ALL);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, d.route);
+    TEST_ASSERT_EQUAL_UINT8(0, d.allow);
+    // a refused parse keeps the legacy id exactly, including GET /rmsend
+    TEST_ASSERT_EQUAL_UINT8(WR_SETPARAM, webRouteDecideCore(false, WR_NONE, WR_SETPARAM, false, WRD_NOT_FOUND, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, webRouteDecideCore(false, WR_NONE, WR_PAGE_INFO, false, WRD_NOT_FOUND, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WRL_RM_SEND_GET, webRouteDecideCore(false, WR_NONE, WRL_RM_SEND_GET, false, WRD_NOT_FOUND, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, webRouteDecideCore(false, WR_NONE, WRL_PAGE_UNKNOWN, false, WRD_NOT_FOUND, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(false, WR_NONE, WR_SCAFFOLD, false, WRD_NOT_FOUND, WRB_ALL));
+    // real unparsed requests (no version, bad version): the legacy id stands, whatever the table would say
+    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, decideLine("GET /?page=info\r\n\r\n", WRB_ALL, WR_PAGE_INFO).route);
+    TEST_ASSERT_EQUAL_UINT8(WRL_RM_SEND_GET, decideLine("GET /rmsend\r\n\r\n", WRB_ALL, WRL_RM_SEND_GET).route);
+    TEST_ASSERT_EQUAL_UINT8(WR_SETPARAM, decideLine("GET /nosuch HTTP/9.9\r\n\r\n", WRB_ALL, WR_SETPARAM).route);
 }
 
 // REGRESSION (wave 7b step 2 rework): a table route whose feature is not compiled into the build is answered like
-// WR_NONE (web_route.h), so the legacy fallback of that build stands. This env defines none of the feature macros.
+// WR_NONE (web_route.h). This env defines none of the feature macros.
 #if defined(ESP32) || defined(ENABLE_MSGSTORE) || OLED_SHOT_WEB || INSTRUMENT_ENABLED
 #error "native_web_route must define none of ESP32, ENABLE_MSGSTORE, OLED_SHOT_WEB, INSTRUMENT_ENABLED"
 #endif
 static void test_decide_core_unbuilt_route_is_none(void)
 {
-    // classic ESP32 without ENABLE_MSGSTORE: GET /?page=mailbox was the 404 page (legacy: "/?page=" unknown)
-    TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, webRouteDecideCore(true, WR_PAGE_MAILBOX, WRL_PAGE_UNKNOWN, false, 0));
-    // the other guarded routes: no legacy branch either, the legacy chain fell through to the scaffold
-    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_AU_STATUS, WR_SCAFFOLD, false, 0));
-    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_SCREEN_RGB565, WR_SCAFFOLD, false, 0));
-    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_SCREEN_OLED, WR_SCAFFOLD, false, 0));
-    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_ASSET_AUJS, WR_SCAFFOLD, false, 0));
-    // not built and a loose legacy match: the scaffold, as for any unmatched path
-    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_AU_STATUS, WR_SETPARAM, false, 0));
+    // classic ESP32 without ENABLE_MSGSTORE: GET /?page=mailbox is the 404 page (page-shaped, as before)
+    TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, decideOf("GET", "/?page=mailbox", 0).route);
+    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_MAILBOX, decideOf("GET", "/?page=mailbox", WRB_MSGSTORE).route);
+    // the other guarded routes: no built row at all, so a 404 JSON (also for another method: no row, no 405)
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, decideOf("GET", "/austatus", 0).route);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, decideOf("POST", "/austatus", 0).route);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, decideOf("GET", "/screen.rgb565", 0).route);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, decideOf("GET", "/screen.oled", 0).route);
+    TEST_ASSERT_EQUAL_UINT8(WR_AU_STATUS, decideOf("GET", "/austatus", WRB_ESP32).route);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, decideOf("POST", "/austatus", WRB_ESP32).route);
+    // not built and a loose legacy match: a 404 as for any unmatched path
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteDecideCore(true, WR_AU_STATUS, WR_SETPARAM, false, WRD_NOT_FOUND, 0));
+}
+
+// B1 classifier: 404 vs 405 and the allowed-method mask, built rows only
+static void test_refusal_classifier(void)
+{
+    uint8_t allow = 0xFF;
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteRefusal(sp("/nosuch"), sp(""), WRB_ALL, &allow));
+    TEST_ASSERT_EQUAL_UINT8(0, allow);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteRefusal(sp("/"), sp("x=1"), WRB_ALL, NULL)); // allow may be NULL
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteRefusal(sp("/RMSEND"), sp(""), WRB_ALL, &allow)); // case-sensitive
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, webRouteRefusal(sp("/rmsend"), sp(""), WRB_ALL, &allow));
+    TEST_ASSERT_EQUAL_UINT8(WRM_POST, allow);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, webRouteRefusal(sp("/rmnodes"), sp(""), WRB_ALL, &allow));
+    TEST_ASSERT_EQUAL_UINT8(WRM_GET | WRM_POST, allow);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, webRouteRefusal(sp("/"), sp(""), WRB_ALL, &allow));
+    TEST_ASSERT_EQUAL_UINT8(WRM_GET, allow);
+    // a not built row is no row
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteRefusal(sp("/austatus"), sp(""), 0, &allow));
+    TEST_ASSERT_EQUAL_UINT8(0, allow);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, webRouteRefusal(sp("/austatus"), sp(""), WRB_ESP32, &allow));
+    TEST_ASSERT_EQUAL_UINT8(WRM_GET, allow);
+    // every refusal of a path with a built row agrees with webRouteExactOther
+    TEST_ASSERT_EQUAL(webRouteExactOther(sp("/rmsend"), sp(""), 0), webRouteRefusal(sp("/rmsend"), sp(""), 0, NULL) == WRD_NOT_ALLOWED);
+}
+
+// the Allow header: one method, several, the empty mask, a buffer that is too small (never truncated)
+static void test_format_allow(void)
+{
+    char b[64];
+    memset(b, 'x', sizeof(b));
+    TEST_ASSERT_EQUAL_size_t(11, webRouteFormatAllow(b, sizeof(b), WRM_POST));
+    TEST_ASSERT_EQUAL_STRING("Allow: POST", b);
+    TEST_ASSERT_EQUAL_size_t(10, webRouteFormatAllow(b, sizeof(b), WRM_GET));
+    TEST_ASSERT_EQUAL_STRING("Allow: GET", b);
+    TEST_ASSERT_EQUAL_size_t(16, webRouteFormatAllow(b, sizeof(b), WRM_GET | WRM_POST));
+    TEST_ASSERT_EQUAL_STRING("Allow: GET, POST", b);
+    const uint8_t all = (uint8_t)((1u << WM_GET) | (1u << WM_POST) | (1u << WM_HEAD) | (1u << WM_OPTIONS));
+    TEST_ASSERT_EQUAL_size_t(31, webRouteFormatAllow(b, sizeof(b), all));
+    TEST_ASSERT_EQUAL_STRING("Allow: GET, POST, HEAD, OPTIONS", b);
+    TEST_ASSERT_EQUAL_size_t(0, webRouteFormatAllow(b, sizeof(b), 0));
+    TEST_ASSERT_EQUAL_CHAR(0, b[0]);
+    // exact fit and one byte short
+    TEST_ASSERT_EQUAL_size_t(11, webRouteFormatAllow(b, 12, WRM_POST));
+    TEST_ASSERT_EQUAL_STRING("Allow: POST", b);
+    memset(b, 'x', sizeof(b));
+    TEST_ASSERT_EQUAL_size_t(0, webRouteFormatAllow(b, 11, WRM_POST));
+    TEST_ASSERT_EQUAL_CHAR(0, b[0]);
+    TEST_ASSERT_EQUAL_size_t(0, webRouteFormatAllow(b, 15, WRM_GET | WRM_POST)); // needs 17
+    TEST_ASSERT_EQUAL_CHAR(0, b[0]);
+    TEST_ASSERT_EQUAL_size_t(0, webRouteFormatAllow(b, 1, WRM_GET));
+    TEST_ASSERT_EQUAL_CHAR(0, b[0]);
+    TEST_ASSERT_EQUAL_size_t(0, webRouteFormatAllow(b, 0, WRM_GET));
+    TEST_ASSERT_EQUAL_size_t(0, webRouteFormatAllow(NULL, 8, WRM_GET));
+    // the longest real answer fits the dispatcher's 40-byte buffer
+    char h[40];
+    TEST_ASSERT_EQUAL_size_t(31, webRouteFormatAllow(h, sizeof(h), all));
+}
+
+// no session (a password is set): the gate of a parsed request, every branch (decision (a), B1)
+static void test_no_session_gate(void)
+{
+    const uint8_t B = WRB_ALL;
+    const char *pages[] = {"/?page=info", "/?page=nosuch", "/?page=", "/?page", "/?page=info&x=1", "/?page=mailbox"};
+    for (const char *t : pages) // page-shaped: the login page, known or unknown
+    {
+        const Dec d = decideOf("GET", t, B);
+        TEST_ASSERT_TRUE_MESSAGE(d.page_shaped, t);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(WRD_LOGIN_PAGE, webRouteNoSession(d.page_shaped, d.route), t);
+    }
+    // unbuilt page: still the login page
+    Dec d = decideOf("GET", "/?page=mailbox", 0);
+    TEST_ASSERT_EQUAL_UINT8(WRD_LOGIN_PAGE, webRouteNoSession(d.page_shaped, d.route));
+    // GET /: the login scaffold
+    d = decideOf("GET", "/", B);
+    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteNoSession(d.page_shaped, d.route));
+    // a built table route: 401
+    const char *routes[] = {"/rmstatus", "/pinstatus", "/config.json", "/getparam/?gateway", "/?getmessages", "/setparam/?a=1", "/callfunction/?x=1"};
+    for (const char *t : routes)
+    {
+        d = decideOf("GET", t, B);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(WRD_UNAUTH, webRouteNoSession(d.page_shaped, d.route), t);
+    }
+    d = decideOf("POST", "/rmsend", B);
+    TEST_ASSERT_EQUAL_UINT8(WRD_UNAUTH, webRouteNoSession(d.page_shaped, d.route));
+    // other method of a known path (HEAD included): 405 + Allow; unknown path: 404; unbuilt route: 404
+    d = decideOf("GET", "/rmsend", B);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, webRouteNoSession(d.page_shaped, d.route));
+    d = decideOf("HEAD", "/?page=info", B);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, webRouteNoSession(d.page_shaped, d.route));
+    TEST_ASSERT_EQUAL_UINT8(WRM_GET, d.allow);
+    d = decideOf("GET", "/nosuch", B);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteNoSession(d.page_shaped, d.route));
+    d = decideOf("GET", "/?x=1", B);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteNoSession(d.page_shaped, d.route));
+    d = decideOf("GET", "/austatus", 0);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteNoSession(d.page_shaped, d.route));
 }
 
 // every route is built when every feature is on; each feature switches exactly its routes
@@ -476,7 +637,7 @@ static void test_built_guards_mirror_the_switch(void)
     size_t sw = wf.size(), end = wf.size();
     for (size_t i = 0; i < wf.size(); i++)
     {
-        if (sw == wf.size() && wf[i].find("switch (webRouteDecide(") == 0)
+        if (sw == wf.size() && wf[i].find("switch (web_verdict.route)") == 0)
             sw = i;
         if (sw != wf.size() && i > sw && wf[i].find("default: // WR_SCAFFOLD") == 0)
         {
@@ -781,8 +942,8 @@ static const Delta kDeltas[] = {
     {"cap-033-config", "B2", "page:setup", WR_NONE, "route token in the Referer header (today indexOf over the whole header); target routes the request line only"},
     {"grd-091-x", "B2", "setparam", WR_SCAFFOLD, "route token in the Referer header (today indexOf over the whole header); target routes the request line only"},
     {"grd-093-index-js", "B1", "scaffold", WR_NONE, "unknown path /index.js: today the scaffold, target 404"},
-    {"grd-108-ota-upload", "B1", "scaffold", WR_NONE, "method POST on /ota/upload: today the scaffold, target 405"},
-    {"grd-109-ota-upload", "B1", "scaffold", WR_NONE, "method POST on /ota/upload: today the scaffold, target 405"},
+    {"grd-108-ota-upload", "B1", "scaffold", WR_NONE, "unknown path /ota/upload (no row, whatever the method): today the scaffold, target 404"},
+    {"grd-109-ota-upload", "B1", "scaffold", WR_NONE, "unknown path /ota/upload (no row, whatever the method): today the scaffold, target 404"},
     {"grd-320-img-rmsend-dst-x-cmd-reboot", "B1", "rm_send405", WR_NONE, "GET /rmsend: today its own 405 branch, target the generic 405 (same status)"},
     {"grd-322-img-rmpasswd-pw-x", "B1", "scaffold", WR_NONE, "GET on a POST-only route /rmpasswd: today the scaffold, target 405"},
     {"js-003-tmpl-config", "B1", "scaffold", WR_NONE, "GET on a POST-only route /config: today the scaffold, target 405"},
@@ -1126,8 +1287,11 @@ int main(int, char **)
     RUN_TEST(test_span_edges);
     RUN_TEST(test_flags);
     RUN_TEST(test_state_flag_mirrors_the_guard);
-    RUN_TEST(test_decide_core_b2_rules);
+    RUN_TEST(test_decide_core_b1_rules);
     RUN_TEST(test_decide_core_unbuilt_route_is_none);
+    RUN_TEST(test_refusal_classifier);
+    RUN_TEST(test_format_allow);
+    RUN_TEST(test_no_session_gate);
     RUN_TEST(test_built_for_flags);
     RUN_TEST(test_built_in_this_env);
     RUN_TEST(test_exact_other_ignores_unbuilt_rows);

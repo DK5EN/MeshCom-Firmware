@@ -85,6 +85,17 @@ void webRigTrace(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 // escapes a byte string for a record: printable ASCII as is, \\ \r \n \t, everything else \xNN
 std::string webRigEsc(const std::string &s);
 
+// ---- leak probe (decision (c) of web_route.h: the request line leaves no trace). A real String keeps its buffer
+// bytes when it is set to "" or destroyed (see stubs/Arduino.h); only an overwrite removes them.
+// webRigProbeArm(path): from now on every String that dies while its buffer still begins with `path` counts as a leak
+// (the request line of the run, e.g. wg_path of work_webpage). Disarm after the run; a path that is empty, one byte or made
+// of 'x' only (what rm_wipe_string writes) cannot be told from a wiped buffer and is not armed (returns false).
+bool webRigProbeArm(const std::string &path);
+void webRigProbeDisarm();
+size_t webRigProbeLeaks();
+// the request line's path of a request (the bytes between the first and the second space, up to a NUL)
+std::string webRigRequestPath(const std::string &request);
+
 // prepares one run: loads the request bytes, applies the profile, resets the auth state, the settings
 // and the recorders. `token` replaces SESSION_PLACEHOLDER in the request for a logged-in profile.
 void webRigBegin(const std::string &request, bool peerCloses, const WebProfile &p);

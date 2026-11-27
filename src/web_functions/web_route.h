@@ -1,13 +1,13 @@
 // web_route.h -- the route table of the web server (FORMAL-02 wave 7, docs/web-server-seams-20261127.md 6.3).
 //
-// Header-only, no String, no Arduino, no heap: compiles natively and on ESP32/nRF52. NOT wired into production yet:
-// work_webpage still routes by indexOf()/startsWith() over the whole header (web_functions.cpp:1319-1500); this table
-// is the TARGET rule (7.2 B1, B2):
+// Header-only, no String, no Arduino, no heap: compiles natively and on ESP32/nRF52. Wired into work_webpage for a
+// parsed request (B2 exact match, wave 7b step 2; B1 404/405 instead of the scaffold, step 3); a request the parser
+// refuses (B3/B6) still takes the legacy indexOf()/startsWith() chain (webRouteLegacy) until step 4. The rule (7.2 B1, B2):
 //   - the path equals a table path exactly (byte compare, case-sensitive);
 //   - for the rows with a selector the first query pair decides (page=<name>, sendmessage, getmessages, ...);
 //   - the method must be in the row's mask;
 //   - no other byte of the request is read (no header text, no Referer, no query value beyond the selector).
-// Anything else is WR_NONE (the dispatcher answers 404 / 405, B1). Constant loop bounds, explicit lengths, no
+// Anything else is WR_NONE (the dispatcher answers 404 / 405, B1: webRouteRefusal). Constant loop bounds, explicit lengths, no
 // recursion, no strlen on a span: the shape the ESBMC proof of 6.8 needs.
 //
 // Every row names the branch of today's router it replaces (web_functions.cpp line numbers, state 2026-11-27).
@@ -15,15 +15,18 @@
 // /?page=mailbox ENABLE_MSGSTORE :1454, /screen.rgb565 T-Deck INSTRUMENT :1403, /screen.oled OLED_SHOT_WEB :1409) stays
 // the dispatcher's business: a route whose feature is not built is answered 404 like WR_NONE.
 //
-// DECISIONS FOR THE WIRING WAVE (operator, 2026-11-27; the table itself holds no policy, the dispatcher applies these):
+// DECISIONS FOR THE WIRING WAVE (operator, 2026-11-27; the table itself holds no policy, the dispatcher applies these;
+// (a)-(c) are wired since step 3, (d) is not yet):
 //   (a) No session (a password is set and the cookie is not live): a PAGE-SHAPED request, webRouteIsPageShaped() (GET,
 //       path "/", first query key "page"), gets the login page whether the page name is known or not (as today: the
 //       answer reveals nothing). Every other WR_NONE gets 404 (unknown path or selector) or 405 (known path, wrong
 //       method); no body that tells whether a route exists beyond that.
 //   (b) HEAD is not in any method mask: it gets 405 with an Allow header built from the row's method mask (GET for
 //       pages, POST for /rmsend and POST /config) (B1; today HEAD reaches the handlers).
-//   (c) The dispatcher wipes the request head (web_header) and the request line (wg_path) on EVERY exit, not tied to a
-//       route: a request such as GET /rmsend?pw=x (405) must leave no "pw" behind in any buffer.
+//   (c) The dispatcher wipes the request head (web_header) and the request line (wg_path) on EVERY exit after the head is
+//       complete (guard 403, AU-busy 503, asset, login nonce / login / logout / legacy password, dispatch; one helper,
+//       web_wipe_request), not tied to a route: a request such as GET /rmsend?pw=x (405) must leave no "pw" behind in any
+//       buffer. test_web_diff (test_live_leaves_no_request_bytes) checks both buffers after every corpus request.
 //   (d) "/?nodepassword", "/?nodepassword=" and "/?nodepassword=<pw>" are ONE route, WR_LEGACY_PW; the handler branches
 //       on the value: missing or empty -> logout and cookie clear (today :1268); non-empty -> wipe and 403 plaintext
 //       (today :1277), the value is neither used nor logged. "/?nodepassword&x" (today the scaffold, :1268 compares the
@@ -320,8 +323,8 @@ inline bool webRouteBuiltMask(uint8_t route, uint8_t built)
                             (built & WRB_RGB565) != 0);
 }
 
-// Does the path (with the selector) have an exact row, for any method, whose handler is built? Input of the B2 rule:
-// such a request keeps the legacy decision until its own step (B1). A route that is not built is no row.
+// Does the path (with the selector) have an exact row, for any method, whose handler is built? A route that is not
+// built is no row. (Kept as the predicate form of webRouteRefusal; the dispatcher uses webRouteRefusal.)
 inline bool webRouteExactOther(WebSpan path, WebSpan query, uint8_t built)
 {
     for (uint8_t m = WM_GET; m <= WM_OPTIONS; m++)
@@ -333,22 +336,100 @@ inline bool webRouteExactOther(WebSpan path, WebSpan query, uint8_t built)
     return false;
 }
 
-// B2 decision of the router (wave 7b step 2), pure: the inputs are gathered by webRouteDecide in web_functions.cpp.
-//   parsed             the request head parsed (webReqParse == WRQ_OK)
-//   table              webRouteMatch of the parsed request (WR_NONE when not parsed)
-//   legacy             the id of the legacy chain (webRouteLegacy)
-//   exact_other_method webRouteExactOther: the path has an exact row for another method (B1 keeps the legacy answer)
-//   built              the build's feature mask (WRB_*), computed in web_functions.cpp
-// A table route whose handler is built goes to the table; one that is not built counts as WR_NONE. Otherwise the legacy
-// decision stands when the parse is refused (B3/B6), when the path has an exact row for another method (B1) or when the
-// legacy chain itself fell back (scaffold, unknown page, GET /rmsend); a legacy handler found only by a loose substring
-// match (Referer, query value, longer path) becomes the scaffold.
-inline uint8_t webRouteDecideCore(bool parsed, uint8_t table, uint8_t legacy, bool exact_other_method, uint8_t built)
+// Answers of the dispatcher that are no table route (B1 and the no-session gate); they continue the numbering after
+// the two WRL_* ids, so a decision id never collides with a table id.
+static constexpr uint8_t WRD_NOT_FOUND = WR_COUNT + 2;   // 404, JSON {"ok":false,"err":"not found"}
+static constexpr uint8_t WRD_NOT_ALLOWED = WR_COUNT + 3; // 405 + Allow header, JSON {"ok":false,"err":"method not allowed"}
+static constexpr uint8_t WRD_LOGIN_PAGE = WR_COUNT + 4;  // no session: 200 + the login page (decision (a))
+static constexpr uint8_t WRD_UNAUTH = WR_COUNT + 5;      // no session: 401
+
+// B1 refusal of a parsed request no built table route answers: the path (with the selector) has a built exact row for
+// another method -> WRD_NOT_ALLOWED and *allow = the union of those rows' method masks (HEAD is in no mask); no such
+// row -> WRD_NOT_FOUND and *allow = 0. allow may be NULL.
+inline uint8_t webRouteRefusal(WebSpan path, WebSpan query, uint8_t built, uint8_t *allow)
 {
+    uint8_t n = 0;
+    const WebRouteDef *rows = webRouteRows(&n);
+    uint8_t mask = 0;
+    for (uint8_t i = 0; i < n; i++)
+    {
+        if (!webroute_detail::eq(path.p, path.n, rows[i].path))
+            continue;
+        if (!webroute_detail::selector(query, rows[i].key, rows[i].val))
+            continue;
+        if (!webRouteBuiltMask(rows[i].route, built))
+            continue;
+        mask |= rows[i].methods;
+    }
+    if (allow != NULL)
+        *allow = mask;
+    return mask != 0 ? WRD_NOT_ALLOWED : WRD_NOT_FOUND;
+}
+
+// "Allow: GET, POST" (no CRLF: the extra_header of send_http_header) for a method mask (bit 1 << WebMethod), into
+// buf[cap]. Returns the length written (the NUL excluded); 0 with buf[0] = 0 when the mask holds no method or the
+// text does not fit (never truncated).
+inline size_t webRouteFormatAllow(char *buf, size_t cap, uint8_t mask)
+{
+    static const char *const names[] = {"GET", "POST", "HEAD", "OPTIONS"}; // WM_GET .. WM_OPTIONS
+    if (buf == NULL || cap == 0)
+        return 0;
+    buf[0] = 0;
+    size_t len = 0;
+    bool first = true;
+    for (uint8_t i = 0; i < 4; i++)
+    {
+        if ((mask & (uint8_t)(1u << (WM_GET + i))) == 0)
+            continue;
+        const char *parts[2] = {first ? "Allow: " : ", ", names[i]};
+        for (uint8_t k = 0; k < 2; k++)
+            for (const char *c = parts[k]; *c != 0; c++)
+            {
+                if (len + 1 >= cap)
+                {
+                    buf[0] = 0;
+                    return 0;
+                }
+                buf[len++] = *c;
+            }
+        first = false;
+    }
+    buf[len] = 0;
+    return len;
+}
+
+// Decision of the router for a request (wave 7b step 3, B1), pure; webRouteDecide in web_functions.cpp gathers the inputs.
+//   parsed        the request head parsed (webReqParse == WRQ_OK)
+//   table         webRouteMatch of the parsed request (WR_NONE when not parsed)
+//   legacy        the id of the legacy chain (webRouteLegacy); read only when the parse is refused (B3/B6, step 4)
+//   page_shaped   webRouteIsPageShaped (decision (a)): an unknown or unbuilt page is the 404 page
+//   refusal       webRouteRefusal: WRD_NOT_FOUND or WRD_NOT_ALLOWED
+//   built         the build's feature mask (WRB_*), computed in web_functions.cpp
+// Parsed: a table route whose handler is built goes to the table (one that is not built counts as WR_NONE); a
+// page-shaped request is the 404 page (WRL_PAGE_UNKNOWN); anything else is the refusal. The legacy id never decides a
+// parsed request. A refused parse keeps the legacy id exactly.
+inline uint8_t webRouteDecideCore(bool parsed, uint8_t table, uint8_t legacy, bool page_shaped, uint8_t refusal, uint8_t built)
+{
+    if (!parsed)
+        return legacy;
     if (table != WR_NONE && webRouteBuiltMask(table, built))
         return table;
-    const bool fallback = (legacy == WR_SCAFFOLD || legacy == WRL_PAGE_UNKNOWN || legacy == WRL_RM_SEND_GET);
-    return (!parsed || exact_other_method || fallback) ? legacy : (uint8_t)WR_SCAFFOLD;
+    if (page_shaped)
+        return WRL_PAGE_UNKNOWN;
+    return refusal == WRD_NOT_ALLOWED ? WRD_NOT_ALLOWED : WRD_NOT_FOUND;
+}
+
+// The no-session gate of a PARSED request (a password is set and the cookie is not live); route is webRouteDecideCore's
+// answer. A page-shaped request gets the login page, known or unknown page (a); GET / (WR_SCAFFOLD) the login
+// scaffold; a refusal (404 / 405) stays what it is (no body tells more than that); any other built route is 401.
+// Returns WRD_LOGIN_PAGE, WR_SCAFFOLD, WRD_NOT_FOUND, WRD_NOT_ALLOWED or WRD_UNAUTH.
+inline uint8_t webRouteNoSession(bool page_shaped, uint8_t route)
+{
+    if (page_shaped)
+        return WRD_LOGIN_PAGE;
+    if (route == WR_SCAFFOLD || route == WRD_NOT_FOUND || route == WRD_NOT_ALLOWED)
+        return route;
+    return WRD_UNAUTH;
 }
 
 #endif // WEB_ROUTE_H
