@@ -1,0 +1,18 @@
+JOB=witness_reject_first
+TOOL=esbmc
+# Library under test: the patched NimBLE-Arduino 2.2.3 copy of the ESP32 env used by heltec_wifi_lora_32_V3 (never modified).
+LIB="$ROOT/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src"
+SRV="$LIB/NimBLEServer.cpp"; POR="$LIB/nimble/porting/nimble/include/os"
+[ -f "$SRV" ] || { echo "  NimBLE library missing under .pio/libdeps (run pio run -e heltec_wifi_lora_32_V3)"; TOOL=none; }
+G=gen/$JOB; mkdir -p $G/os   # one gen subdir per job: quoted includes resolve next to the including file
+for H in os_mbuf.h queue.h; do cp "$POR/$H" $G/os/$H; done; cp stubs/os_stub.h $G/os/os.h
+# write case of handleGattEvent: from "case ..._WRITE_DSC:" up to (not including) the next "default:"
+sed -n "/case BLE_GATT_ACCESS_OP_WRITE_DSC:/,/^        default:/p" "$SRV" | sed "\$d" > $G/orig.inc
+[ "$(wc -l < $G/orig.inc)" -gt 15 ] || { echo "  write case extraction failed (anchor changed?)"; TOOL=none; }
+cp $G/orig.inc $G/write_case.inc
+SOURCES="harness.cpp"
+CFLAGS="-I$G -I$G/os -Istubs -DMAXLEN=8 -DCHLEN=10 -DNCH=1 -DMODE_WIT_FIRST"
+FLAGS="--unwind 16"
+EXPECT=fail
+CHECKS="witness: INVALID_ATTR_VALUE_LEN reachable on the first-mbuf check"
+EXPECT_PROP="assertion"

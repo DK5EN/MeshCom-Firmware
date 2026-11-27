@@ -1,9 +1,11 @@
-// FORMAL-01 harness: url_percent_decode() (src/url_decode.cpp) for every input of 0..MAXLEN bytes.
+// FORMAL-01/02 harness: urlDecode() (src/url_decode.cpp; url_percent_decode is its LEGACY wrapper) for every input of 0..MAXLEN bytes.
 // Surface: WebUI query parameters via decodeURLPercentCoding (web_functions.cpp), untrusted bytes.
 // Contract: buf has len+1 bytes (decode in place, NUL slot included).
 // Proves: no write/read outside buf[0..len], ret <= len, buf[ret] == 0. A raw NUL byte in the input is copied through (only %00 is dropped); not a defect, callers pass C strings.
 // Modes:
 //   (default)       the memory-safety + termination property over fully nondet content (malformed %, %4, %zz, %00 included)
+//                   and a symbolic policy (URLD_LEGACY or URLD_STRICT). LEGACY: ret <= len, buf[ret] == 0. STRICT: ret == (size_t)-1 (reject)
+//                   or ret <= len, buf[ret] == 0 and no control byte or DEL in buf[0..ret)
 //   -DFUNC          input is exactly "%XX" with XX a nondet valid hex pair (either case), printable result: ret == 1, buf[0] == value
 //   -DMUT_CAP       buffer holds len bytes only (capacity one smaller than the contract) -> write of the NUL must be caught
 //   -DWITNESS_DECODE  as FUNC, but asserts the escape is NOT decoded -> must fail
@@ -49,9 +51,23 @@ int main()
     char *buf = new char[len + 1];
 #endif
     for (size_t i = 0; i < len; i++) buf[i] = (char)nondet_uchar();
-    size_t r = url_percent_decode(buf, len);
+#ifdef POL
+    const unsigned char pol = POL;   // one job per policy (pass, pass_strict): a symbolic policy timed out at len 24
+#else
+    unsigned char pol = nondet_uchar();
+    __ESBMC_assume(pol == URLD_LEGACY || pol == URLD_STRICT);
+#endif
+    size_t r = urlDecode(buf, len, pol);
+    if (pol == URLD_STRICT && r == (size_t)-1)
+    {
+        delete[] buf;
+        return 0;   // reject: buffer content unspecified
+    }
     assert(r <= len);
     assert(buf[r] == 0);
+    if (pol == URLD_STRICT)
+        for (size_t i = 0; i < r; i++)
+            assert((unsigned char)buf[i] >= 0x20 && (unsigned char)buf[i] != 0x7F);
 #endif
     delete[] buf;
     return 0;

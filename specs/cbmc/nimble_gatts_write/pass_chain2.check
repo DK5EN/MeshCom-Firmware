@@ -1,0 +1,17 @@
+JOB=pass_chain2
+TOOL=esbmc
+# Library under test: the patched NimBLE-Arduino 2.2.3 copy of the ESP32 env used by heltec_wifi_lora_32_V3 (never modified).
+LIB="$ROOT/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src"
+SRV="$LIB/NimBLEServer.cpp"; POR="$LIB/nimble/porting/nimble/include/os"
+[ -f "$SRV" ] || { echo "  NimBLE library missing under .pio/libdeps (run pio run -e heltec_wifi_lora_32_V3)"; TOOL=none; }
+G=gen/$JOB; mkdir -p $G/os   # one gen subdir per job: quoted includes resolve next to the including file
+for H in os_mbuf.h queue.h; do cp "$POR/$H" $G/os/$H; done; cp stubs/os_stub.h $G/os/os.h
+# write case of handleGattEvent: from "case ..._WRITE_DSC:" up to (not including) the next "default:"
+sed -n "/case BLE_GATT_ACCESS_OP_WRITE_DSC:/,/^        default:/p" "$SRV" | sed "\$d" > $G/orig.inc
+[ "$(wc -l < $G/orig.inc)" -gt 15 ] || { echo "  write case extraction failed (anchor changed?)"; TOOL=none; }
+cp $G/orig.inc $G/write_case.inc
+SOURCES="harness.cpp"
+CFLAGS="-I$G -I$G/os -Istubs -DMAXLEN=8 -DCHLEN=10 -DNCH=2 -DMODE_PASS"
+FLAGS="--unwind 16 --z3"
+EXPECT=pass
+CHECKS="write case, 2-mbuf chain (each 0..10 B), max 8: error iff first mbuf or chain total > max, else one writeEvent with the concatenated bytes in order, no buf overflow; max shrunk from 300 (see report)"

@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp $ROOT/src/url_decode.cpp"
+CFLAGS="-I$ROOT/src -DPOL=URLD_STRICT -DMAXLEN=20"
+FLAGS="--unwind 22"
+EXPECT=pass
+CHECKS="STRICT policy: memory safety, reject or (ret<=len, NUL at buf[ret], no control byte or DEL in the result); len 0..20 (113 s; 24 was over 900 s), buffer len+1, any bytes"
