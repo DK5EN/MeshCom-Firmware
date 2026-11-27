@@ -122,8 +122,9 @@ def cfg_tokens(text: str) -> tuple[dict[str, str], list[str], list[str]]:
         if t in KW:
             cur = t
         elif cur.startswith("CONSTANT"):
-            if i + 2 < len(toks) and toks[i + 1] == "=":
-                consts[t] = toks[i + 2]
+            # `C = value` sets a constant; `C <- Def` substitutes a module definition (TLC model override)
+            if i + 2 < len(toks) and toks[i + 1] in ("=", "<-"):
+                consts[t] = toks[i + 2] if toks[i + 1] == "=" else "<-" + toks[i + 2]
                 i += 2
         elif cur.startswith("INVARIANT"):
             inv.append(t)
@@ -151,6 +152,9 @@ def lint_cfg(path: pathlib.Path) -> list[str]:
     for c in got:
         if c not in consts:
             out.append(f"{path.name}: sets unknown constant {c}")
+    for c, v in got.items():
+        if v.startswith("<-") and v[2:] not in defs:
+            out.append(f"{path.name}: substitutes {c} by undefined {v[2:]}")
     for p in inv + prop:
         if p not in defs:
             out.append(f"{path.name}: checks undefined {p}")

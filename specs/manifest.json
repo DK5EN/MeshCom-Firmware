@@ -229,10 +229,49 @@
         "src/esp32/esp32_main.cpp::bleSessionResetAll": "440e55c2923b5c6f",
         "src/nrf52/nrf52_ble.cpp::connect_callback": "9b18680f5ac156e9",
         "src/nrf52/nrf52_ble.cpp::disconnect_callback": "c79ec83925a014d4",
-        "src/nrf52/nrf52_ble.cpp::bleuart_rx_callback": "2bba87a290588c11"
+        "src/nrf52/nrf52_ble.cpp::bleuart_rx_callback": "d7ad775d0c0b47da"
       },
       "reviewed": "2026-11-27",
       "review_depth": "model written from the code 2026-11-27 (FORMAL-02 wave 3), fixes BLE-QDROP-01 and BLE-STALE-01 applied and re-checked"
+    },
+    {
+      "id": "meshrelay",
+      "spec": "specs/tla/meshrelay.tla",
+      "status": "active",
+      "not_hashed": "relay guard, enqueue and ACK forward are inline in the LoRa RX path of src/lora_functions.cpp (no function boundary); NBR case A/B is not modelled",
+      "sources": [
+        {
+          "file": "src/dedup_functions.cpp",
+          "functions": [
+            "is_new_packet"
+          ]
+        },
+        {
+          "file": "src/txring_functions.cpp",
+          "functions": [
+            "getNextTxSlot"
+          ]
+        },
+        {
+          "file": "src/csma_timing.h",
+          "functions": [
+            "csmaSlotsForPrio",
+            "csmaTimeoutPrio",
+            "csmaRearm",
+            "csmaShouldRearm"
+          ]
+        }
+      ],
+      "hashes": {
+        "src/dedup_functions.cpp::is_new_packet": "20727684034c1aa6",
+        "src/txring_functions.cpp::getNextTxSlot": "87deeb7b03380a42",
+        "src/csma_timing.h::csmaSlotsForPrio": "de0794b7ddcdf268",
+        "src/csma_timing.h::csmaTimeoutPrio": "7de5c02ac85b304a",
+        "src/csma_timing.h::csmaRearm": "49de83fbb82bcd2b",
+        "src/csma_timing.h::csmaShouldRearm": "1e660d2f4e4f6f3e"
+      },
+      "reviewed": "2026-11-27",
+      "review_depth": "model written from the code 2026-11-27 (FORMAL-02 wave 5): today's rules fail DeafNotFirst and RedundantRelayBound for a loud-but-deaf node; candidate rule (noise-scaled hold plus cancel on a heard copy) holds both; operator decision open (RELAY-ORDER-01)"
     }
   ]
 }
