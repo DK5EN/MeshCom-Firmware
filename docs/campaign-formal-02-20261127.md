@@ -3,6 +3,24 @@
 Resume point of the campaign. Current state, next wave and open questions only; finished waves move to the
 archive section at the end with one line each.
 
+## Now (2026-11-27, resume here)
+
+- **Committed:** waves 1, 1b, 2, 3, 4a (`3139a4d6` .. `acc07d31`), web corpus and T-Deck measurement (`3b1ce88f`).
+- **In the working tree, not committed (green host tests, gate and advisor pending):**
+  - Web wave A steps 1-2: `src/hex_digit.h` (one hex decoder, 9 call sites incl. `web_guard.h`), `urlDecode(buf, len,
+policy)` in `src/url_decode.*`, `rm_form_decode` removed; spectrum leak fix + pin.
+  - Web wave A step 0: differential rig `test/test_web_diff/` (frozen request path, 1,247 requests, golden in 4
+    profiles), `tools/web_corpus.py`, env `native_web_diff`.
+  - Wave 5 mesh model `specs/tla/meshrelay.tla` + 15 cfgs.
+  - `specs/cbmc/nimble_gatts_write/` (5 jobs, written, not yet run to a verdict).
+- **Running (orchestrator, one task):** all 15 meshrelay cfgs, 5 url_decode jobs, 5 nimble_gatts_write jobs in a row
+  (`/tmp/formal02/run_all.txt`); gate `--changed` for web wave A.
+- **Next:** read the run results; advisor on web wave A steps 0-2; commits (web wave A, mesh model, nimble_gatts_write);
+  register meshrelay in `specs/manifest.json`; then web wave A step 3 (`web_request.h` head parser, live wiring of the
+  rig), `nimble_att_write`, operator decision on the relay candidate rule (RELAY-ORDER-01).
+- **Rule since 2026-11-27 (operator):** agents write code and proof/model files only; every ESBMC/TLC run is started by
+  the orchestrator, one at a time, no wait loops (agents spawned 30+ polling loops twice).
+
 ## Operator decisions (2026-11-27)
 
 - Order: FORMAL01-SEAMS (parsers verifiable) and settings round trip first, then BLE task vs main loop, then NimBLE and
@@ -22,14 +40,14 @@ archive section at the end with one line each.
 
 ## Waves
 
-| Wave | Content                                                                                                                                                                                                              | State   |
-| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| 1    | Seams: `handleACK` core, `readPhoneCommand` with explicit length, settings round trip + migration; UDP twin analysis, web_functions map                                                                              | done    |
-| 1b   | UDP receive consolidated into `src/udp_frame.cpp` (part 1 `f4f541d5`; part 2 applies operator decisions D1/D2/D3/D5)                                                                                                 | done    |
-| 2    | Bounded proofs: ACK core, phone frame (`ce013112`), UDP parse core (`5b692faa`); differential strips tightened                                                                                                       | done    |
-| 3    | BLE host task vs main loop model `specs/tla/bletask.tla`; fixed BLE-QDROP-01 and BLE-STALE-01 (wave 3b)                                                                                                              | done    |
-| 4    | 4a NimBLE boundary fixes F1/F2/F6/F10 + proofs `specs/cbmc/nimble_attvalue` (done); web server seams (analysis done, operator accepted B1-B10; corpus capture on DK5EN-14 next); NimBLE ATT/GATT library proofs next | running |
-| 5    | Mesh model: relay, dedup ring, ACK and retries across nodes                                                                                                                                                          | open    |
+| Wave | Content                                                                                                                                                                                 | State   |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1    | Seams: `handleACK` core, `readPhoneCommand` with explicit length, settings round trip + migration; UDP twin analysis, web_functions map                                                 | done    |
+| 1b   | UDP receive consolidated into `src/udp_frame.cpp` (part 1 `f4f541d5`; part 2 applies operator decisions D1/D2/D3/D5)                                                                    | done    |
+| 2    | Bounded proofs: ACK core, phone frame (`ce013112`), UDP parse core (`5b692faa`); differential strips tightened                                                                          | done    |
+| 3    | BLE host task vs main loop model `specs/tla/bletask.tla`; fixed BLE-QDROP-01 and BLE-STALE-01 (wave 3b)                                                                                 | done    |
+| 4    | 4a NimBLE fixes F1/F2/F6/F10 + `nimble_attvalue` (done, `acc07d31`); web server: analysis, B1-B10 accepted, corpus captured, wave A steps 0-2 in the tree; `nimble_gatts_write` written | running |
+| 5    | Mesh model `specs/tla/meshrelay.tla` (asymmetric nodes, co-located pair, dedup, ACK TTL): today fails DeafNotFirst/RedundantRelayBound, candidate rule holds; in the tree               | running |
 
 ## Wave 5 input: asymmetric nodes (operator 2026-11-27)
 

@@ -1,9 +1,23 @@
 # RESUME -- pick up here
 
-**Resume here: section "Now" below. Next: no upstream PR open; #1328 and #1329 merged and synced 2026-11-26.** Release plan and working checklist: operator's
+**Resume here: campaign FORMAL-02, section "Now" of [campaign-formal-02-20261127.md](campaign-formal-02-20261127.md). No upstream PR open; #1328 and #1329 merged and synced 2026-11-26.** Release plan and working checklist: operator's
 Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).
+
+## Now (2026-11-27)
+
+- **Campaign FORMAL-02 (resume point `docs/campaign-formal-02-20261127.md`, section "Now"):** committed waves 1 to 4a
+  (`3139a4d6` .. `acc07d31`): verifiable ACK and phone-frame parsers, settings migration, one UDP receive handler for
+  ESP32 and nRF52 (operator decisions D1/D2/D3/D5), BLE queue fixes from the TLA+ model, NimBLE boundary fixes F1/F2/F6/
+  F10, bounded proofs for all new cores. In the tree: web wave A steps 0-2 (differential rig, shared hex and percent
+  decoders, spectrum leak fix), mesh model with asymmetric nodes, `nimble_gatts_write` jobs; runs and gate in progress.
+- **Bench 2026-11-27:** DK5EN-14 runs the INSTRUMENT image of `acc07d31` (USB flash; the earlier OTA attempt failed
+  because the node was in WiFi AP mode). Web request corpus captured (`tools/bench/runs/harness/webcap-dk5en14-20261127.jsonl`).
+  T-Deck lag measured: the web server blocks the main loop 2.8-8 s on a weak WiFi link (BACKLOG TDECK-LAG-01).
+- **Upstream issues filed 2026-11-27:** #1342 (APRS position exponent), #1343 (mobile app text length byte wraps).
+- **Deferred by the operator:** power loss during an update, safeboot web proofs; NimBLE F3 (pre-allocated attribute
+  values) waits for heap work (phone rings dynamic on S3, UDP hold store).
 
 ## Now (2026-11-26)
 
