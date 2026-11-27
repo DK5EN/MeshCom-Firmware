@@ -5,22 +5,49 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-- **Committed:** waves 1, 1b, 2, 3, 4a (`3139a4d6` .. `acc07d31`), web corpus and T-Deck measurement (`3b1ce88f`),
-  wave 5 mesh model (`4f6ab492`), web wave A steps 0-2 (`28eb83bf`, CRLF fix of the corpus `1a6c3c63`), NimBLE GATT
-  write proofs and per-policy URL decode proofs (`d8aa2576`). Working tree clean.
-- **Results:** meshrelay 15 of 15 cfgs as expected (today fails DeafNotFirst and RedundantRelayBound, the candidate
-  rule holds both). `nimble_gatts_write` 7 of 7 (chain length fixed per job; symbolic chain and data hit 6 GB).
-  `url_decode` LEGACY 24 B in 3 s, STRICT 20 B in 113 s (24 B with a symbolic policy was over 900 s). Gate
-  `--changed` green (4,360 of 4,362 cases, 2 skipped; board links, ruff, pytest, formal self-test). Advisor on web
-  wave A: ship; rework applied (counted whitelist in the rig, zeroed spectral scan buffer, test comments).
-- **Rig status:** `test/test_web_diff` is a baseline snapshot of the frozen request path until step 3 wires the live
-  entry; decoder equivalence rests on `test_url_decode`, `test_rm_web_parse`, `test_hex_digit` (frozen copies).
-- **Next:** web wave A step 3 (`web_request.h` head parser, live entry of the rig), `nimble_att_write`, operator
-  decision on the relay candidate rule (RELAY-ORDER-01), then web waves B and C (route table, REST handlers,
-  non-blocking send for TDECK-LAG-01, step-wise spectrum sweep B8 and its shading bug), heap work for NimBLE F3,
-  the large bench test at the end.
-- **Rule since 2026-11-27 (operator):** agents write code and proof/model files only; every ESBMC/TLC run is started by
-  the orchestrator, one at a time, no wait loops (agents spawned 30+ polling loops twice).
+**State:** waves 1-5 committed and pushed (`fork-dev`, last code commit `d8aa2576`), working tree clean, `fork-dev`
+contains all of `upstream/dev` (checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc;
+the next wave is 6.
+
+- **Results so far:** meshrelay 15 of 15 cfgs as expected (today fails DeafNotFirst and RedundantRelayBound, the
+  candidate rule holds both). `nimble_gatts_write` 7 of 7, `nimble_attvalue` 6 of 6. `url_decode` LEGACY 24 B (3 s),
+  STRICT 20 B (113 s). Last gate `--changed`: 4,360 of 4,362 cases, 2 skipped, board links, ruff, pytest, formal
+  self-test green. Advisor on web wave A: ship, rework applied.
+- **Rig status:** `test/test_web_diff` is a baseline snapshot of the frozen request path (`frozen/`, sha256 in
+  `SHA256SUMS`) until wave 6 wires the live entry (TODO `web-diff-live` at the top of `test_web_diff.cpp`). Decoder
+  equivalence rests on `test_url_decode`, `test_rm_web_parse`, `test_hex_digit`. Corpus files keep CRLF
+  (`.gitattributes`).
+- **Waiting on the operator:** relay candidate rule (RELAY-ORDER-01): firmware change only after a yes.
+
+### Next waves (dispatch plan)
+
+Plan source for the web steps: `docs/web-server-seams-20261127.md` 6.2-6.8 (design) and 7.3 (steps). B1-B10 are
+accepted (operator 2026-11-27); each B change gets its own commit and a counted `kWhitelist` row in the rig.
+
+| Wave | Content                                                                                                                                                                                                                                                                                                                            | Owner files (writer)                                                                                                                                   | Parallel with                                  |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| 6a   | Web step 3: `web_request.h` (`WebHeadAcc`, `webHeadPush`, `webReqParse`, explicit lengths, constant loop bounds, allocated once at server start, not on the loop stack); `work_webpage` head loop uses it; router and guard unchanged; live entry of the rig wired, frozen vs live must agree on all 1,247 requests (no whitelist) | `src/web_functions/web_request.h` (+ `.cpp`), `src/web_functions/web_functions.cpp`, `test/test_web_request/`, `test/test_web_diff/` (live entry only) | 6b                                             |
+| 6b   | `nimble_att_write`: prepare/execute write queue of `ble_att_svr.c` (NimBLE 2.2.3 patched copy), same pattern as `nimble_gatts_write` (text extraction into `gen/`, chain length fixed per job, data as a position pattern)                                                                                                         | `specs/cbmc/nimble_att_write/`                                                                                                                         | 6a                                             |
+| 6c   | Proof group `specs/cbmc/web_request` for the head parser (orchestrator runs it after 6a)                                                                                                                                                                                                                                           | `specs/cbmc/web_request/`                                                                                                                              | after 6a                                       |
+| 7    | Web wave B, steps 4-8: route table, REST handlers on `WebReq`, `num_parse.h`, body reader with WDT feed and 408, fixed response heads; B1-B7, B10. B1 needs the `mcau.js` change first (scaffold-as-liveness, seams doc 7.4)                                                                                                       | `web_functions.cpp` is the hotspot: one writer at a time, or carve out new modules (`web_route.h`, `web_query.h`, `num_parse.h`, `web_body.h`)         | full host gate after step 5                    |
+| 8    | Web wave C, steps 9-11: spectrum sweep one step per loop pass on explicit action (B8) plus the shading bug, config upload reboot from the loop (B9), relocations, non-blocking send for TDECK-LAG-01, docs                                                                                                                         | per relocation, one commit each                                                                                                                        | re-measure TDECK-LAG-01 on DK5EN-14 afterwards |
+| 9    | Heap work for NimBLE F3 (+600 B): candidates phone rings dynamic on S3 (~6 KB), UDP hold store only during outages (6 KB), raw LoRa log 20 to 10 slots (~2.6 KB); then F3                                                                                                                                                          | to be mapped                                                                                                                                           |                                                |
+| 10   | Large bench test (operator: at the end), full host gate, `regression.sh --formal` on request                                                                                                                                                                                                                                       | orchestrator                                                                                                                                           |                                                |
+
+### How to run (rules for every wave)
+
+- Agents write code and proof/model files only. Every ESBMC/TLC run is started by the orchestrator, one at a time, in
+  the foreground or as one background task, never as polling loops (agents spawned 30+ loops twice). Budget 6 GB
+  quick, up to 15 GB; a job over that means refactor the code or the harness (fixed lengths per job, data patterns
+  where the code does not branch on the data).
+- Lock wrappers in the scratch dir `/tmp/formal02/` (recreate after a reboot): `piolock.sh` (mkdir lock around `pio`,
+  exports `MC_AU_DEV_CHANNEL=1`), `esbmclock.sh <group>/<job>.check` (mkdir lock, runs `specs/cbmc/run_cbmc.sh` from the
+  repo root with `MEM_MB=6000`).
+- Gate per wave: `python3 tools/suite_map.py --write`; `python3 test/golden/variant_ini_effective.py --generate` after
+  env changes; `tools/regression.sh --changed`; `specs/selftest.sh` and `specs/drift.py --check` when specs change
+  (`drift.py --accept <model>` only after reading the source diff). Advisor (Opus, fresh agent) before each commit.
+- Bench: DK5EN-14 (T-Deck Plus, USB serial E0:72:A1:AD:65:E0) runs the INSTRUMENT image of `acc07d31` in WiFi STA
+  mode; load `/bench` first; 2 dBm, test traffic only to group 9999.
 
 ## Operator decisions (2026-11-27)
 
@@ -41,14 +68,15 @@ archive section at the end with one line each.
 
 ## Waves
 
-| Wave | Content                                                                                                                                                                                 | State   |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| 1    | Seams: `handleACK` core, `readPhoneCommand` with explicit length, settings round trip + migration; UDP twin analysis, web_functions map                                                 | done    |
-| 1b   | UDP receive consolidated into `src/udp_frame.cpp` (part 1 `f4f541d5`; part 2 applies operator decisions D1/D2/D3/D5)                                                                    | done    |
-| 2    | Bounded proofs: ACK core, phone frame (`ce013112`), UDP parse core (`5b692faa`); differential strips tightened                                                                          | done    |
-| 3    | BLE host task vs main loop model `specs/tla/bletask.tla`; fixed BLE-QDROP-01 and BLE-STALE-01 (wave 3b)                                                                                 | done    |
-| 4    | 4a NimBLE fixes F1/F2/F6/F10 + `nimble_attvalue` (done, `acc07d31`); web server: analysis, B1-B10 accepted, corpus captured, wave A steps 0-2 in the tree; `nimble_gatts_write` written | running |
-| 5    | Mesh model `specs/tla/meshrelay.tla` (asymmetric nodes, co-located pair, dedup, ACK TTL): today fails DeafNotFirst/RedundantRelayBound, candidate rule holds; in the tree               | running |
+| Wave | Content                                                                                                                                                                                                         | State   |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1    | Seams: `handleACK` core, `readPhoneCommand` with explicit length, settings round trip + migration; UDP twin analysis, web_functions map                                                                         | done    |
+| 1b   | UDP receive consolidated into `src/udp_frame.cpp` (part 1 `f4f541d5`; part 2 applies operator decisions D1/D2/D3/D5)                                                                                            | done    |
+| 2    | Bounded proofs: ACK core, phone frame (`ce013112`), UDP parse core (`5b692faa`); differential strips tightened                                                                                                  | done    |
+| 3    | BLE host task vs main loop model `specs/tla/bletask.tla`; fixed BLE-QDROP-01 and BLE-STALE-01 (wave 3b)                                                                                                         | done    |
+| 4    | 4a NimBLE fixes F1/F2/F6/F10 + `nimble_attvalue` (`acc07d31`); web server: analysis, B1-B10 accepted, corpus captured, wave A steps 0-2 (`28eb83bf`, `1a6c3c63`); `nimble_gatts_write` 7 of 7 (`d8aa2576`)      | done    |
+| 5    | Mesh model `specs/tla/meshrelay.tla` (asymmetric nodes, co-located pair, dedup, ACK TTL): today fails DeafNotFirst/RedundantRelayBound, candidate rule holds (`4f6ab492`); firmware rule waits for the operator | done    |
+| 6-10 | See "Next waves" under Now: web step 3 + `nimble_att_write`, web waves B and C, heap for F3, large bench test                                                                                                   | planned |
 
 ## Wave 5 input: asymmetric nodes (operator 2026-11-27)
 

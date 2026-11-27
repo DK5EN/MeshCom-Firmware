@@ -1,6 +1,6 @@
 # RESUME -- pick up here
 
-**Resume here: campaign FORMAL-02, section "Now" of [campaign-formal-02-20261127.md](campaign-formal-02-20261127.md). No upstream PR open; #1328 and #1329 merged and synced 2026-11-26.** Release plan and working checklist: operator's
+**Resume here: campaign FORMAL-02, wave 6. Start a fresh session with `/orchestrate-waves` on [campaign-formal-02-20261127.md](campaign-formal-02-20261127.md), section "Now" (state, dispatch plan for waves 6-10, run rules). `fork-dev` is pushed and clean and contains all of `upstream/dev`; no upstream PR open.** Release plan and working checklist: operator's
 Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).
@@ -13,7 +13,8 @@ Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
   F10, bounded proofs for all new cores. Since then committed: mesh relay model with loud-but-deaf nodes (`4f6ab492`;
   candidate relay rule awaits an operator decision), web wave A steps 0-2 (`28eb83bf`, `1a6c3c63`: shared hex and URL
   decoders, spectrum leak and uninitialised scan buffer fixed, request rig as baseline snapshot), NimBLE GATT write
-  proofs (`d8aa2576`). Tree clean; next is web wave A step 3.
+  proofs (`d8aa2576`). Pushed, tree clean. Next: wave 6 = web step 3 (head parser `web_request.h`, live entry of the
+  request rig) in parallel with the `nimble_att_write` proofs; then web waves B and C, heap work for F3, bench test.
 - **Bench 2026-11-27:** DK5EN-14 runs the INSTRUMENT image of `acc07d31` (USB flash; the earlier OTA attempt failed
   because the node was in WiFi AP mode). Web request corpus captured (`tools/bench/runs/harness/webcap-dk5en14-20261127.jsonl`).
   T-Deck lag measured: the web server blocks the main loop 2.8-8 s on a weak WiFi link (BACKLOG TDECK-LAG-01).
