@@ -712,6 +712,107 @@ static void test_status_line_copies_under_one_lock(void)
     TEST_ASSERT_EQUAL_INT(19, (int)strlen(small));
 }
 
+// ---- lazy heap attach (udpHoldAttachHeap) ----
+static int s_allocs;
+static bool s_allocFail;
+static uint8_t s_heapStore[512];
+static void *fakeAlloc(size_t n)
+{
+    s_allocs++;
+    return (s_allocFail || n > sizeof(s_heapStore)) ? NULL : (void *)s_heapStore;
+}
+static void heap_reset(void)
+{
+    memset(&udpHoldRt(), 0, sizeof(UdpHoldRt));
+    s_sent = s_logs = s_lock = s_unlock = 0;
+    s_logbuf[0] = 0;
+    s_allocs = 0;
+    s_allocFail = false;
+}
+static void ensure(uint16_t cap, uint32_t now)
+{
+    udpHoldAttachHeap(cap, now, fakeAlloc, sink, logf_, lk, ulk);
+}
+
+static void test_heap_attach_allocates_once_and_enables(void)
+{
+    heap_reset();
+    TEST_ASSERT_FALSE(udpHoldRt().enabled);
+    ensure(512, 1000);
+    TEST_ASSERT_EQUAL_INT(1, s_allocs);
+    TEST_ASSERT_TRUE(udpHoldRt().enabled);
+    ensure(512, 500000);
+    TEST_ASSERT_EQUAL_INT(1, s_allocs);
+    TEST_ASSERT_EQUAL_INT(0, s_logs);
+}
+
+static void test_heap_attach_cap_zero_never_allocates(void)
+{
+    heap_reset();
+    ensure(0, 0);
+    ensure(0, 100000);
+    TEST_ASSERT_EQUAL_INT(0, s_allocs);
+    TEST_ASSERT_FALSE(udpHoldRt().enabled);
+}
+
+static void test_heap_attach_failure_stays_off_and_logs_once(void)
+{
+    uint8_t f[300];
+    heap_reset();
+    s_allocFail = true;
+    ensure(512, 1000);
+    TEST_ASSERT_EQUAL_INT(1, s_allocs);
+    TEST_ASSERT_FALSE(udpHoldRt().enabled);
+    TEST_ASSERT_EQUAL_INT(1, s_logs);
+    TEST_ASSERT_NOT_NULL(strstr(s_logbuf, "[GW];hold;alloc;failed;512"));
+    uint16_t n = mk(f, 1);
+    TEST_ASSERT_FALSE(udpHoldCapture(f, n, 2000));
+    char st[200];
+    udpHoldStatusLine(st, sizeof(st));
+    TEST_ASSERT_NOT_NULL(strstr(st, "[GW];hold;state;off"));
+    ensure(512, 61000);                         // second failure: no second log line
+    TEST_ASSERT_EQUAL_INT(2, s_allocs);
+    TEST_ASSERT_EQUAL_INT(1, s_logs);
+}
+
+static void test_heap_attach_retry_spacing_and_success_log(void)
+{
+    heap_reset();
+    s_allocFail = true;
+    ensure(512, 1000);
+    ensure(512, 60999);                         // 59999 ms later: no retry
+    TEST_ASSERT_EQUAL_INT(1, s_allocs);
+    s_allocFail = false;
+    ensure(512, 60999);
+    TEST_ASSERT_EQUAL_INT(1, s_allocs);
+    TEST_ASSERT_FALSE(udpHoldRt().enabled);
+    ensure(512, 61000);                         // exactly 60 s: retry
+    TEST_ASSERT_EQUAL_INT(2, s_allocs);
+    TEST_ASSERT_TRUE(udpHoldRt().enabled);
+    TEST_ASSERT_NOT_NULL(strstr(s_logbuf, "[GW];hold;alloc;ok;512"));
+    TEST_ASSERT_EQUAL_INT(2, s_logs);           // failed + ok, once each
+    ensure(512, 200000);
+    TEST_ASSERT_EQUAL_INT(2, s_allocs);
+    TEST_ASSERT_EQUAL_INT(2, s_logs);
+}
+
+static void test_heap_attach_capture_is_held_after_lazy_attach(void)
+{
+    uint8_t f[300];
+    heap_reset();
+    ensure(512, 1000);
+    // The attach itself takes the lock exactly once around init + enable.
+    TEST_ASSERT_EQUAL_INT(1, s_lock);
+    TEST_ASSERT_EQUAL_INT(1, s_unlock);
+    uint16_t n = mk(f, 1);
+    TEST_ASSERT_TRUE(udpHoldCapture(f, n, 2000));
+    char st[200];
+    udpHoldStatusLine(st, sizeof(st));
+    TEST_ASSERT_NOT_NULL(strstr(st, "held;1;"));
+    TEST_ASSERT_TRUE(s_lock > 0);
+    TEST_ASSERT_EQUAL_INT(s_lock, s_unlock);
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -747,5 +848,10 @@ int main(int, char **)
     RUN_TEST(test_glue_synthetic_write_masks_the_replay_start);
     RUN_TEST(test_nrf_eth_synthetic_timer_writes_are_masked);
     RUN_TEST(test_status_line_copies_under_one_lock);
+    RUN_TEST(test_heap_attach_allocates_once_and_enables);
+    RUN_TEST(test_heap_attach_cap_zero_never_allocates);
+    RUN_TEST(test_heap_attach_failure_stays_off_and_logs_once);
+    RUN_TEST(test_heap_attach_retry_spacing_and_success_log);
+    RUN_TEST(test_heap_attach_capture_is_held_after_lazy_attach);
     return UNITY_END();
 }

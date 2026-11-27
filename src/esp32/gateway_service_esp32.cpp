@@ -18,6 +18,11 @@ void gatewayService_esp32(void)
 {
 ////////////////////////////////////////////////
 // WIFI Gateway functions
+// Outage hold store: heap, attached on the first pass with the gateway on, also before the
+// first IP address (msgstore_glue.cpp holds text on a gateway without one).
+if(bGATEWAY)
+    udpHoldEnsure(millis());
+
 if(bGATEWAY && meshcom_settings.node_hasIPaddress)
 {
     { INSTR_SECTION("udp"); getMeshComUDP(); sendMeshComUDP(); }

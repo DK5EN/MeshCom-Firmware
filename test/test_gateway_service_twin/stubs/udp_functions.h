@@ -33,3 +33,8 @@ void sendMeshComHeartbeat();
 void resetMeshComUDP();
 void ntpHarvestUDP();
 void wifiDnsRefreshServer();
+// Outage-hold lazy attach (FORMAL-02 wave 9): both gateway services call it first
+// thing with bGATEWAY on, with or without an IP address. The line below is the
+// real header's, verbatim (twin_stub_lint.py).
+#include <stdint.h>
+void udpHoldEnsure(uint32_t now);   // gateway tick: lazy heap attach of the outage hold (no-op when UDP_HOLD_BYTES == 0)

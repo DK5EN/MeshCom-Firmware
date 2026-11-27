@@ -1446,12 +1446,10 @@ void resetMeshComUDP()
 ///////////////////////////////////////////////////////////////////////////////
 // ESP32 & RAK
 
-// Outage hold (src/udp_hold.h): static RAM, no heap. The hold is filled in
+// Outage hold (src/udp_hold.h): store malloc'ed on first gateway tick (udpHoldEnsure), never freed. The hold is filled in
 // addNodeData() (not here), so a replay through addUdpOutBuffer() never
 // re-enters it and keeps its frame bytes and message ID.
 #if UDP_HOLD_BYTES > 0
-static uint8_t s_udpHoldStore[UDP_HOLD_BYTES];
-
 #if defined(NRF52_SERIES)
 #include <FreeRTOS.h>
 #include <task.h>
@@ -1467,17 +1465,14 @@ static void udpHoldUnlock() { portEXIT_CRITICAL(&s_udpHoldMux); }
 static void udpHoldSink(uint8_t *b, uint16_t n) { addUdpOutBuffer(b, n); }
 static void udpHoldLog(const char *l) { Serial.print(l); }
 
-namespace {
-struct UdpHoldBoot
+static void *udpHoldAlloc(size_t n) { return malloc(n); }
+
+void udpHoldEnsure(uint32_t now)
 {
-    UdpHoldBoot()
-    {
-        udpHoldAttach(s_udpHoldStore, sizeof(s_udpHoldStore), udpHoldSink, udpHoldLog,
-                      udpHoldLock, udpHoldUnlock);
-    }
-};
-UdpHoldBoot s_udpHoldBoot;
+    udpHoldAttachHeap(UDP_HOLD_BYTES, now, udpHoldAlloc, udpHoldSink, udpHoldLog, udpHoldLock, udpHoldUnlock);
 }
+#else
+void udpHoldEnsure(uint32_t) {}
 #endif
 
 void addUdpOutBuffer(uint8_t* buffer, uint16_t len)

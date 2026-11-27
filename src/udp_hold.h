@@ -384,12 +384,27 @@ struct UdpHoldRt
     void (*logfn)(const char *);
     void (*lockfn)(void);
     void (*unlockfn)(void);
+    bool allocTried;                // heap attach: at least one allocation attempt made
+    bool allocFailed;               // heap attach: last attempt failed (success logs once)
+    uint32_t allocLastTry;          // heap attach: millis() of the last attempt
 };
+
+// Minimum spacing of heap allocation retries after a failure.
+static const uint32_t UDP_HOLD_ALLOC_RETRY_MS = 60000;
 
 inline UdpHoldRt &udpHoldRt()
 {
     static UdpHoldRt r;     // zero-initialised: not enabled
     return r;
+}
+
+// `enabled` is published by the attach (any task) and read without the lock by
+// the capture/tick/status sites on other tasks. Release on the store, acquire on
+// the unlocked loads: a reader that sees true also sees the fn pointers and the
+// initialised store the attach wrote before it. GCC builtins: host, xtensa, arm.
+inline bool udpHoldEnabled(const UdpHoldRt &r)
+{
+    return __atomic_load_n(&r.enabled, __ATOMIC_ACQUIRE);
 }
 
 inline void udpHoldAttach(uint8_t *buf, uint16_t cap, void (*sink)(uint8_t *, uint16_t),
@@ -401,7 +416,52 @@ inline void udpHoldAttach(uint8_t *buf, uint16_t cap, void (*sink)(uint8_t *, ui
     r.logfn = logfn;
     r.lockfn = lockfn;
     r.unlockfn = unlockfn;
-    r.enabled = buf && cap > 0;
+    __atomic_store_n(&r.enabled, buf && cap > 0, __ATOMIC_RELEASE);
+}
+
+// Lazy heap attach (udpHoldEnsure), called first on every gateway-on pass of the
+// gateway service, with or without an IP address.
+// Allocates cap bytes on first call (cap 0: never), retries a failed allocation
+// at most once per UDP_HOLD_ALLOC_RETRY_MS, never frees. sink/log/lock fns and
+// the store are set first; enabled goes up last, init+enable under the lock, so
+// a capture on another task sees either "off" or a complete hold.
+inline void udpHoldAttachHeap(uint16_t cap, uint32_t now, void *(*alloc)(size_t),
+                              void (*sink)(uint8_t *, uint16_t), void (*logfn)(const char *),
+                              void (*lockfn)(void), void (*unlockfn)(void))
+{
+    UdpHoldRt &r = udpHoldRt();
+    if (udpHoldEnabled(r) || cap == 0 || !alloc)
+        return;
+    if (r.allocTried && (uint32_t)(now - r.allocLastTry) < UDP_HOLD_ALLOC_RETRY_MS)
+        return;
+    r.allocTried = true;
+    r.allocLastTry = now;
+    char line[64];
+    uint8_t *buf = (uint8_t *)alloc(cap);
+    if (!buf)
+    {
+        if (!r.allocFailed && logfn)
+        {
+            snprintf(line, sizeof(line), "[GW];hold;alloc;failed;%u\n", (unsigned)cap);
+            logfn(line);
+        }
+        r.allocFailed = true;
+        return;
+    }
+    r.sink = sink;
+    r.logfn = logfn;
+    r.lockfn = lockfn;
+    r.unlockfn = unlockfn;
+    if (lockfn) lockfn();
+    r.hold.init(buf, cap);
+    __atomic_store_n(&r.enabled, true, __ATOMIC_RELEASE);
+    if (unlockfn) unlockfn();
+    if (r.allocFailed && logfn)
+    {
+        snprintf(line, sizeof(line), "[GW];hold;alloc;ok;%u\n", (unsigned)cap);
+        logfn(line);
+    }
+    r.allocFailed = false;
 }
 
 // True while the bench outage is simulated: the drains drop frames to the
@@ -417,7 +477,7 @@ inline bool udpHoldBenchOutage() { return udpHoldRt().benchOutage; }
 inline bool udpHoldCapture(const uint8_t *f, uint16_t len, uint32_t now, bool sent = true)
 {
     UdpHoldRt &r = udpHoldRt();
-    if (!r.enabled || !UdpHold::isHoldable(f, len))
+    if (!udpHoldEnabled(r) || !UdpHold::isHoldable(f, len))
         return false;
     if (r.lockfn) r.lockfn();
     r.hold.push(f, len, now, sent);
@@ -430,7 +490,7 @@ inline bool udpHoldCapture(const uint8_t *f, uint16_t len, uint32_t now, bool se
 // would keep is worth the call. False when the hold is not attached.
 inline bool udpHoldLoraHoldable(const uint8_t *lora, uint16_t len)
 {
-    return udpHoldRt().enabled && UdpHold::loraHoldable(lora, len);
+    return udpHoldEnabled(udpHoldRt()) && UdpHold::loraHoldable(lora, len);
 }
 
 // The watchdogs and the ETH bring-up rewrite last_upd_timer without a server
@@ -438,14 +498,14 @@ inline bool udpHoldLoraHoldable(const uint8_t *lora, uint16_t len)
 inline void udpHoldNoteSynthetic(uint32_t timerVal)
 {
     UdpHoldRt &r = udpHoldRt();
-    if (r.enabled) r.seenTimer = timerVal;
+    if (udpHoldEnabled(r)) r.seenTimer = timerVal;
 }
 
 inline void udpHoldStatusLine(char *out, size_t n)
 {
     if (!out || n == 0) return;
     UdpHoldRt &r = udpHoldRt();
-    if (!r.enabled)
+    if (!udpHoldEnabled(r))
     {
         snprintf(out, n, "[GW];hold;state;off");
         return;
@@ -477,7 +537,7 @@ inline void udpHoldStatusLine(char *out, size_t n)
 inline void udpHoldTick(uint32_t timerVal, uint32_t now, bool ipUp = true)
 {
     UdpHoldRt &r = udpHoldRt();
-    if (!r.enabled)
+    if (!udpHoldEnabled(r))
         return;
     uint8_t fr[UdpHold::MAX_FRAME + 1];
     uint16_t flen = 0;

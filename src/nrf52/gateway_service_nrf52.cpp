@@ -9,6 +9,7 @@
 #include "printfdeb_functions.h"
 #include "instrument.h"
 #include "udp_hold.h"
+#include "udp_functions.h"   // udpHoldEnsure()
 
 // C4 carve-out of the gateway service block out of nrf52_main.cpp; see
 // gateway_service.h for why it is carved but not unified. Moved unchanged.
@@ -24,6 +25,10 @@ void gatewayService_nrf52(void)
 // get UDP & send UDP message from ringBufferOut if there is one to tx
 if(bGATEWAY)
 {
+    // Outage hold store: heap, attached on the first pass with the gateway on (also without
+    // an IP address: msgstore_glue.cpp holds text then).
+    udpHoldEnsure(millis());
+
     INSTR_SECTION("gateway");
     int bUDPReceived = false;
 

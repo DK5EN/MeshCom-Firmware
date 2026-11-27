@@ -30,7 +30,7 @@ void udpHoldBenchCommand(const char *args)
 
     if (strncmp(args, "outage on", 9) == 0 || strncmp(args, "outage off", 10) == 0)
     {
-        if (!r.enabled)
+        if (!udpHoldEnabled(r))
         {
             Serial.printf("[GW];hold;bench;n/a;note;hold not compiled in or gateway RAM off\n");
             return;

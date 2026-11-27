@@ -140,6 +140,9 @@ void sendMeshComHeartbeat() { record("esp_sendMeshComHeartbeat"); }
 void resetMeshComUDP() { record("esp_resetMeshComUDP"); }
 void ntpHarvestUDP() { record("esp_ntpHarvestUDP"); }
 void wifiDnsRefreshServer() { record("esp_wifiDnsRefreshServer"); }
+// Shared by both platforms (one symbol, declared in stubs/udp_functions.h).
+static uint32_t g_hold_ensure_now = 0;
+void udpHoldEnsure(uint32_t now) { g_hold_ensure_now = now; record("udpHoldEnsure"); }
 
 wl_status_t WiFiClass::status()
 {
@@ -176,6 +179,7 @@ static void recorder_reset()
     g_counts.clear();
     g_mock_getUDP_return = 1;
     g_spi_active_during_getUDP = false;
+    g_hold_ensure_now = 0;
 
     hb_warn_logged = false;
     last_upd_timer = 0;
@@ -619,6 +623,70 @@ static void test_dr03_both_platforms_warn_at_the_same_age(void)
         "age. nrf52 was silent for the whole 65 s until 2026-09-17");
 }
 
+// FORMAL-02 wave 9: the outage hold attaches lazily from the gateway tick.
+// msgstore_glue.cpp holds text on a gateway that has no IP address yet, so the
+// ensure call sits ahead of the IP condition: once per pass with bGATEWAY on,
+// with or without an IP, never with bGATEWAY off.
+static void test_hold_ensure_called_once_per_gateway_pass_on_both(void)
+{
+    // ESP32, gateway on, IP present.
+    bGATEWAY = true;
+    meshcom_settings.node_hasIPaddress = true;
+    mc_test_set_millis(1234);
+    gatewayService_esp32();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, count_of("udpHoldEnsure"),
+        "esp32: gateway on + IP must call udpHoldEnsure() exactly once");
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(1234, g_hold_ensure_now,
+        "esp32: udpHoldEnsure() must get millis()");
+
+    // ESP32, gateway on, no IP.
+    recorder_reset();
+    bGATEWAY = true;
+    meshcom_settings.node_hasIPaddress = false;
+    gatewayService_esp32();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, count_of("udpHoldEnsure"),
+        "esp32: gateway on without an IP must still call udpHoldEnsure() exactly once");
+
+    // ESP32, gateway off (with and without IP).
+    recorder_reset();
+    bGATEWAY = false;
+    meshcom_settings.node_hasIPaddress = true;
+    gatewayService_esp32();
+    meshcom_settings.node_hasIPaddress = false;
+    gatewayService_esp32();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, count_of("udpHoldEnsure"),
+        "esp32: gateway off must never call udpHoldEnsure()");
+
+    // nRF52, gateway on, IP present.
+    recorder_reset();
+    bGATEWAY = true;
+    neth.hasIPaddress = true;
+    mc_test_set_millis(4321);
+    gatewayService_nrf52();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, count_of("udpHoldEnsure"),
+        "nrf52: gateway on + IP must call udpHoldEnsure() exactly once");
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(4321, g_hold_ensure_now,
+        "nrf52: udpHoldEnsure() must get millis()");
+
+    // nRF52, gateway on, no IP.
+    recorder_reset();
+    bGATEWAY = true;
+    neth.hasIPaddress = false;
+    gatewayService_nrf52();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, count_of("udpHoldEnsure"),
+        "nrf52: gateway on without an IP must still call udpHoldEnsure() exactly once");
+
+    // nRF52, gateway off (with and without IP).
+    recorder_reset();
+    bGATEWAY = false;
+    neth.hasIPaddress = true;
+    gatewayService_nrf52();
+    neth.hasIPaddress = false;
+    gatewayService_nrf52();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, count_of("udpHoldEnsure"),
+        "nrf52: gateway off must never call udpHoldEnsure()");
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -638,6 +706,8 @@ int main(int, char **)
 
     RUN_TEST(test_agreement_bgateway_off_only_harvests_ntp_on_both);
     RUN_TEST(test_drift_esp32_heartbeat_interval_gate_nrf52_has_none);
+
+    RUN_TEST(test_hold_ensure_called_once_per_gateway_pass_on_both);
 
     return UNITY_END();
 }
