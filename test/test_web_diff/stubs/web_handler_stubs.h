@@ -90,6 +90,7 @@ static const char *web_remote_ip(char *buf, size_t n)
     return buf;
 }
 static bool web_auth_rng(uint8_t *out, size_t n) { return webRigRng(out, n); }
+static bool mcRandomFill(uint8_t *out, size_t n) { return webRigRng(out, n); }   // live copy (hw_random.h)
 
 static const uint8_t web_mc_css_gz[] = {'C', 'S', 'S', 0, 'G', 'Z', 1};
 static const uint8_t web_mc_js_gz[] = {'J', 'S', 0, 'G', 'Z', 2, 2};

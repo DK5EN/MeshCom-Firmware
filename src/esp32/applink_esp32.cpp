@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <esp_random.h>
+#include "hw_random.h"      // mcRandomFill (hardware TRNG)
 
 #include <loop_functions.h>   // configuration_global.h before the extern header (MAX_RING, UDP_TX_BUF_SIZE)
 #include <loop_functions_extern.h>
@@ -319,7 +319,7 @@ static void acceptClients()
         makeIo(slot, &io);
         alConnInit(&s_mem->conn[slot], &io);   // reset state
         uint8_t nonce[16];
-        esp_fill_random(nonce, sizeof(nonce));
+        mcRandomFill(nonce, sizeof(nonce));
         alConnOpen(&s_mem->conn[slot], nonce, millis());
     }
 }

@@ -255,61 +255,8 @@ WebHeadAcc *web_head_acc_get(void)
 #include "nrf52/eth_mss.h"   // ethApplyWebServerMss (W5100S MSS glue, #1183)
 #endif
 
-// WEB-AUTH-01: platform random source for login nonces and session tokens (web_auth.h WebAuthRng)
-#if defined(ESP32)
-#include <esp_random.h>
-static bool web_auth_rng(uint8_t *out, size_t n)
-{
-    esp_fill_random(out, n); // hardware TRNG
-    return true;
-}
-#elif defined(NRF52_SERIES)
-#include <nrf_soc.h>
-#include <nrf_sdm.h>
-static bool web_auth_rng(uint8_t *out, size_t n)
-{
-    // via the SoftDevice when it is enabled (NRF_RNG is owned by it then), else the peripheral directly
-    uint8_t sd_en = 0;
-    sd_softdevice_is_enabled(&sd_en);
-    size_t i = 0;
-    uint32_t t0 = millis();
-    if (sd_en)
-    {
-        while (i < n && (uint32_t)(millis() - t0) < 200)
-        {
-            uint8_t avail = 0;
-            sd_rand_application_bytes_available_get(&avail);
-            size_t want = n - i;
-            if (avail > 0 && want > avail)
-                want = avail;
-            if (avail > 0 && sd_rand_application_vector_get(out + i, (uint8_t)want) == NRF_SUCCESS)
-                i += want;
-            else
-                delay(1);
-        }
-    }
-    else
-    {
-        NRF_RNG->EVENTS_VALRDY = 0;
-        NRF_RNG->TASKS_START = 1;
-        while (i < n)
-        {
-            uint32_t t1 = millis();
-            while (!NRF_RNG->EVENTS_VALRDY && (uint32_t)(millis() - t1) < 50)
-                ;
-            if (!NRF_RNG->EVENTS_VALRDY)
-                break;
-            out[i++] = (uint8_t)NRF_RNG->VALUE;
-            NRF_RNG->EVENTS_VALRDY = 0;
-        }
-        NRF_RNG->TASKS_STOP = 1;
-    }
-    // the hardware RNG did not answer in time (should never happen): no nonce, no session
-    return i == n;
-}
-#else
-#error "web_auth_rng: no random source for this platform"
-#endif
+// WEB-AUTH-01: login nonces and session tokens draw from mcRandomFill (hw_random.h, WebAuthRng signature)
+#include "hw_random.h"
 
 // WEB-AUTH-01: client address for the serial log lines (IPAddress::toString() does not exist on nRF52)
 static const char *web_remote_ip(char *buf, size_t n)
@@ -1211,7 +1158,7 @@ void work_webpage(void)
                     if (wg_path.startsWith("/?loginnonce"))
                     {
                         char nonce[33];
-                        if (webAuthIssueNonce(millis(), web_auth_rng, nonce))
+                        if (webAuthIssueNonce(millis(), mcRandomFill, nonce))
                         {
                             send_http_header(200, RESPONSE_TYPE_TEXT);
                             web_client.print(nonce);
@@ -1234,7 +1181,7 @@ void work_webpage(void)
                         char token[33];
                         char wa_ip[20];
                         WebAuthResult war = webAuthLogin(wa_arg.c_str(), wa_arg.length(), meshcom_settings.node_webpwd, millis(),
-                                                         web_auth_rng, token);
+                                                         mcRandomFill, token);
                         if (war == WA_OK)
                         {
                             char hdr[96];

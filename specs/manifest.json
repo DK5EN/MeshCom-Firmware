@@ -160,7 +160,7 @@
         }
       ],
       "hashes": {
-        "src/net_console.cpp::authTask": "ddb19a4ec9fa9617",
+        "src/net_console.cpp::authTask": "2286b4a85b2244ee",
         "src/net_console.cpp::teardownClient": "849a42f558508b15",
         "src/net_console.cpp::teardownIfCurrent": "ed40165d85667378",
         "src/net_console.cpp::loopNetConsole": "40705d4f745a22ad",
@@ -172,7 +172,7 @@
         "src/net_console_slot.h::netConsoleSlotMark": "db53b36c848cece1",
         "src/net_console_slot.h::netConsoleSlotMayFree": "1a4658d5d692e704"
       },
-      "reviewed": "2026-11-26",
+      "reviewed": "2026-11-27",
       "review_depth": "model rewritten from a full read of the listed functions; MarkGuard fix (FORMAL-NETCON-MARK, #1339) reviewed 2026-11-26"
     },
     {

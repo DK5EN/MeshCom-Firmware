@@ -25,7 +25,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <mbedtls/md.h>     // HMAC-SHA256 — already in ESP-IDF (see net_console)
-#include <esp_random.h>     // hardware TRNG
+#include "hw_random.h"      // mcRandomFill (hardware TRNG)
 
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
@@ -516,7 +516,7 @@ static void kissDropClient(const char *why)
 
 static void kissBeginAuth()
 {
-    esp_fill_random(s_auth_nonce, sizeof(s_auth_nonce));
+    mcRandomFill(s_auth_nonce, sizeof(s_auth_nonce));
     char line[48];
     strcpy(line, "NONCE: ");
     bytesToHex(s_auth_nonce, sizeof(s_auth_nonce), line + 7);

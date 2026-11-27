@@ -34,7 +34,7 @@
 #include <sys/socket.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <esp_random.h>     // hardware TRNG
+#include "hw_random.h"      // mcRandomFill (hardware TRNG)
 
 // Capture real Serial reference — must happen before the #define Serial MSerial.
 // Using auto& so the compiler deduces the exact type on each board:
@@ -188,7 +188,7 @@ static void authTask(void* arg)
     {
         // 1. Generate 16-byte nonce via hardware TRNG
         uint8_t nonce[16];
-        esp_fill_random(nonce, sizeof(nonce));
+        mcRandomFill(nonce, sizeof(nonce));
 
         // 2. Send challenge: "NONCE: <32 hex chars>\r\n"
         char chalBuf[48];
