@@ -12,8 +12,10 @@
 // The unit under test is a function pointer table. Every corpus request (corpus/*.req, built by tools/web_corpus.py)
 // runs under every profile through every entry; the record of the run (handler trace, every byte written, the close,
 // the fake clock) is compared with golden/<name>.txt, and the live record with the frozen one. Intended deltas
-// (B1-B10 of docs/web-server-seams-20261127.md 7.2) go into kWhitelist, keyed by corpus name (empty today).
+// (B1-B10 of docs/web-server-seams-20261127.md 7.2) go into kWhitelist, keyed by corpus name (B2 only so far).
 #include <unity.h>
+
+#include "web_route.h" // reads no build macro: the feature mask is computed in web_functions.cpp
 
 #include "../support/repo_file.h"
 #include "rig/web_rig.h"
@@ -59,8 +61,42 @@ static const WebEntry kEntries[] = {
 };
 static const size_t kEntryCount = sizeof(kEntries) / sizeof(kEntries[0]);
 
-// Expected deltas between the frozen reference and a later entry: corpus name -> reason. Empty today.
-static const std::map<std::string, const char *> kWhitelist = {};
+// Expected deltas between the frozen reference and a later entry: corpus name -> reason (B2, wave 7b step 2).
+static const std::map<std::string, const char *> kWhitelist = {
+    {"grd-091-x", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-145-referer-root-page-info", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-146-referer-unk-page-info", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-147-query-page-info", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-148-referer-setparam", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-149-referer-root-setparam", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-150-referer-unk-setparam", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-151-query-setparam", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-152-referer-callfunction", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-153-referer-root-callfunction", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-154-referer-unk-callfunction", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-155-query-callfunction", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-160-referer-config-json", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-161-referer-root-config-json", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-162-referer-unk-config-json", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-163-query-config-json", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-164-referer-getparam", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-165-referer-root-getparam", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-166-referer-unk-getparam", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-167-query-getparam", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-168-referer-sendmessage", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-169-referer-root-sendmessage", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-170-referer-unk-sendmessage", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-171-query-sendmessage", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-172-route-page-infox", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-175-route-page-setupx", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-177-route-x-page-info", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-178-route-pinstatusx", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-184-route-rmstatus", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-186-route-screen-oledx", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-187-route-config-jsonx", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-192-route-austatusx", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+    {"mut-429-http-in-path", "B2: route token outside the exact request-line route (Referer, query value, longer path): handler no longer reached, table route or scaffold"},
+};
 
 static const WebProfile kProfiles[] = {
     {"open", "", "", false, false},
@@ -228,6 +264,16 @@ static void test_entries_agree_with_the_first(void)
         {
             const std::string bytes = readCorpus(n);
             const bool same = recordAll(kEntries[0], n, bytes) == recordAll(kEntries[k], n, bytes);
+            if (const char *dump = getenv("WEB_DIFF_DUMP_DIFFS")) // maintenance: list every differing request, no asserts
+            {
+                if (!same)
+                    if (FILE *f = fopen(dump, "a"))
+                    {
+                        fprintf(f, "%s\n", n.c_str());
+                        fclose(f);
+                    }
+                continue;
+            }
             if (kWhitelist.find(n) != kWhitelist.end())
             {
                 // a whitelisted delta must really differ, else the entry is stale and would hide a regression
@@ -390,11 +436,29 @@ static void test_known_requests(void)
     TEST_ASSERT_EQUAL_STRING("sub_page_info", webRig().trace.at(1).c_str());
 }
 
+// every route of the table is built under the macros of this build (ESP32, ENABLE_MSGSTORE, OLED_SHOT_WEB), except the
+// T-Deck bench screenshot (INSTRUMENT_ENABLED and BOARD_T_DECK, which the rig does not model): the router the rig
+// runs can reach every other handler, so a build flag lost from the env cannot hide a route
+static void test_every_route_is_built_in_the_rig_build(void)
+{
+    for (uint8_t r = 0; r < WR_COUNT; r++)
+    {
+        TEST_ASSERT_TRUE_MESSAGE(webRouteBuiltFor(r, true, true, true, true), "all features on: every route is built");
+    }
+}
+
 // the config buffer cap used by the stubs is the one of the source
 static void test_config_json_max_is_the_source_value(void)
 {
     const std::string h = repo_slurp("src/config_json.h");
     TEST_ASSERT_TRUE_MESSAGE(h.find("CONFIG_JSON_MAX 6144") != std::string::npos, "CONFIG_JSON_MAX changed: update -D CONFIG_JSON_MAX in the env");
+}
+
+// WEB_DIFF_DUMP_DIFFS (maintenance dump) skips the asserts of test_entries_agree_with_the_first: a run with it set must
+// never end green, so a stray variable in a shell cannot pass the gate
+static void test_dump_mode_is_never_a_verdict(void)
+{
+    TEST_ASSERT_NULL_MESSAGE(getenv("WEB_DIFF_DUMP_DIFFS"), "WEB_DIFF_DUMP_DIFFS is set: a dump run, not a verdict");
 }
 
 int main(int, char **)
@@ -410,5 +474,7 @@ int main(int, char **)
     RUN_TEST(test_live_copy_is_current);
     RUN_TEST(test_corpus_reaches_the_handlers);
     RUN_TEST(test_every_entry_ran);
+    RUN_TEST(test_every_route_is_built_in_the_rig_build);
+    RUN_TEST(test_dump_mode_is_never_a_verdict);
     return UNITY_END();
 }

@@ -278,4 +278,77 @@ inline uint8_t webRouteFlags(uint8_t route)
     return 0;
 }
 
+// ids of the legacy router (webRouteLegacy in web_functions.cpp) that the table has no row for; they continue the
+// WebRoute numbering after WR_COUNT, so a table id never collides with them
+static constexpr uint8_t WRL_RM_SEND_GET = WR_COUNT;      // GET /rmsend: refused 405 (the table: generic 405, B1)
+static constexpr uint8_t WRL_PAGE_UNKNOWN = WR_COUNT + 1; // "/?page=" with an unknown name: 404 page (the table: WR_NONE, B1)
+
+// Is the handler of a route compiled into this build? The table lists every route; a route whose feature is not built
+// is answered like WR_NONE (header comment). Pure part: one flag per feature, so a unit test can set them all.
+inline bool webRouteBuiltFor(uint8_t route, bool esp32, bool msgstore, bool oled_shot, bool rgb565)
+{
+    switch (route)
+    {
+    case WR_ASSET_AUJS: // GET /mcau.js
+    case WR_AU_STATUS:  // GET /austatus
+        return esp32;
+    case WR_PAGE_MAILBOX: // GET /?page=mailbox
+        return msgstore;
+    case WR_SCREEN_OLED: // GET /screen.oled
+        return oled_shot;
+    case WR_SCREEN_RGB565: // GET /screen.rgb565
+        return rgb565;
+    default:
+        return true;
+    }
+}
+
+// The build's features as a mask. web_route.h never reads a build macro itself (an inline function that reads macros
+// depends on the include order: OLED_SHOT_WEB is defined in web_oled_shot.h, after this header in web_functions.cpp).
+// webRouteDecide in web_functions.cpp computes the mask from EXACTLY the conditions the router switch puts around its
+// cases, after every include (test_web_route reads web_functions.cpp and checks the lines):
+//   WR_AU_STATUS      switch   #if defined(ESP32)
+//   WR_ASSET_AUJS     asset    #if defined(ESP32)                (deliver_web_asset, served before the router)
+//   WR_SCREEN_RGB565  switch   #if INSTRUMENT_ENABLED && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS))
+//   WR_SCREEN_OLED    switch   #if OLED_SHOT_WEB
+//   WR_PAGE_MAILBOX   switch   #if defined(ENABLE_MSGSTORE)
+static constexpr uint8_t WRB_ESP32 = 0x01, WRB_MSGSTORE = 0x02, WRB_OLED_SHOT = 0x04, WRB_RGB565 = 0x08;
+static constexpr uint8_t WRB_ALL = WRB_ESP32 | WRB_MSGSTORE | WRB_OLED_SHOT | WRB_RGB565;
+inline bool webRouteBuiltMask(uint8_t route, uint8_t built)
+{
+    return webRouteBuiltFor(route, (built & WRB_ESP32) != 0, (built & WRB_MSGSTORE) != 0, (built & WRB_OLED_SHOT) != 0,
+                            (built & WRB_RGB565) != 0);
+}
+
+// Does the path (with the selector) have an exact row, for any method, whose handler is built? Input of the B2 rule:
+// such a request keeps the legacy decision until its own step (B1). A route that is not built is no row.
+inline bool webRouteExactOther(WebSpan path, WebSpan query, uint8_t built)
+{
+    for (uint8_t m = WM_GET; m <= WM_OPTIONS; m++)
+    {
+        const uint8_t r = webRouteMatch(m, path, query);
+        if (r != WR_NONE && webRouteBuiltMask(r, built))
+            return true;
+    }
+    return false;
+}
+
+// B2 decision of the router (wave 7b step 2), pure: the inputs are gathered by webRouteDecide in web_functions.cpp.
+//   parsed             the request head parsed (webReqParse == WRQ_OK)
+//   table              webRouteMatch of the parsed request (WR_NONE when not parsed)
+//   legacy             the id of the legacy chain (webRouteLegacy)
+//   exact_other_method webRouteExactOther: the path has an exact row for another method (B1 keeps the legacy answer)
+//   built              the build's feature mask (WRB_*), computed in web_functions.cpp
+// A table route whose handler is built goes to the table; one that is not built counts as WR_NONE. Otherwise the legacy
+// decision stands when the parse is refused (B3/B6), when the path has an exact row for another method (B1) or when the
+// legacy chain itself fell back (scaffold, unknown page, GET /rmsend); a legacy handler found only by a loose substring
+// match (Referer, query value, longer path) becomes the scaffold.
+inline uint8_t webRouteDecideCore(bool parsed, uint8_t table, uint8_t legacy, bool exact_other_method, uint8_t built)
+{
+    if (table != WR_NONE && webRouteBuiltMask(table, built))
+        return table;
+    const bool fallback = (legacy == WR_SCAFFOLD || legacy == WRL_PAGE_UNKNOWN || legacy == WRL_RM_SEND_GET);
+    return (!parsed || exact_other_method || fallback) ? legacy : (uint8_t)WR_SCAFFOLD;
+}
+
 #endif // WEB_ROUTE_H

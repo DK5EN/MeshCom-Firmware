@@ -13,7 +13,6 @@
 
 #include <web_functions.h>
 #include <web_request.h>
-#include <web_route.h>
 #include <web_setup.h>
 #include <web_nodefunctioncalls.h>
 #include <web_guard.h>
@@ -30,6 +29,7 @@ void setMsgOrigin(MsgOrigin o); // loop_functions_extern.h in the original (reco
 // the request path was written for the ESP32 build (AU gate, /austatus, /mcau.js): switch it on only now,
 // after the real headers above (hmac_sha256.h would pull mbedtls in with ESP32 defined)
 #define ESP32 1
+#include <web_route.h>
 
 namespace web_live
 {
@@ -252,9 +252,7 @@ WebHeadAcc *web_head_acc_get(void)
     return web_head_acc;
 }
 
-// ==== webRouteLegacy + webRouteDecide (web_functions.cpp) lines 1067-1174 (working tree) ====
-#define WRL_RM_SEND_GET WR_COUNT      // GET /rmsend: refused 405 (the table: generic 405, B1)
-#define WRL_PAGE_UNKNOWN (WR_COUNT + 1) // "/?page=" with an unknown name: 404 page (the table: WR_NONE, B1)
+// ==== webRouteLegacy + webRouteDecide (web_functions.cpp) lines 1067-1195 (working tree) ====
 static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header)
 {
     if (web_header.startsWith("POST /rmsend"))
@@ -347,22 +345,45 @@ static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header
 uint32_t web_route_disagree = 0;
 
 /**
- * The route of the request in the window: the legacy chain decides, the table is computed beside it and a
- * difference is only counted (also when the window does not parse).
+ * The route of the request in the window (B2, exact match): a parsed request the table matches goes to the table's
+ * route when its handler is built into this board (feature mask below); otherwise the legacy chain's fallback stands
+ * (scaffold, unknown page, GET /rmsend); a handler the legacy chain found by a loose substring match (Referer, query
+ * value, longer path) gives the scaffold, as any unmatched path does. The rules are webRouteDecideCore (web_route.h,
+ * unit-tested); this function only gathers the inputs. A difference between the decision and the table is still
+ * counted (the later steps drop it).
  */
 static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, const String &web_header)
 {
     const uint8_t legacy = webRouteLegacy(web_header);
     WebReq wr;
     uint8_t table = WR_NONE;
-    if (webReqParse(acc->head, acc->head_len, (acc->flags & WEB_HF_CUT) != 0, &wr) == WRQ_OK)
+    const bool parsed = webReqParse(acc->head, acc->head_len, (acc->flags & WEB_HF_CUT) != 0, &wr) == WRQ_OK;
+    if (parsed)
         table = webRouteMatch(wr.method, wr.path, wr.query);
-    if (table != legacy)
+    // the build's features: the same conditions as the guarded cases of the router switch (and deliver_web_asset for
+    // /mcau.js), read here, after every include (OLED_SHOT_WEB comes from web_oled_shot.h)
+    static constexpr uint8_t built = 0
+#if defined(ESP32)
+                                     | WRB_ESP32
+#endif
+#if defined(ENABLE_MSGSTORE)
+                                     | WRB_MSGSTORE
+#endif
+#if OLED_SHOT_WEB
+                                     | WRB_OLED_SHOT
+#endif
+#if INSTRUMENT_ENABLED && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS))
+                                     | WRB_RGB565
+#endif
+        ;
+    const bool exact_other_method = parsed && webRouteExactOther(wr.path, wr.query, built);
+    const uint8_t route = webRouteDecideCore(parsed, table, legacy, exact_other_method, built);
+    if (table != route)
         web_route_disagree++;
-    return legacy;
+    return route;
 }
 
-// ==== work_webpage (web_functions.cpp) lines 1176-1614 (working tree) ====
+// ==== work_webpage (web_functions.cpp) lines 1197-1635 (working tree) ====
 void work_webpage_live(void)
 {
     // RAM-Rueckgewinn (2026-09-20): der 1-kB-Sammelpuffer web_header_collect
@@ -803,7 +824,7 @@ void work_webpage_live(void)
     memset(web_acc->line, 0, sizeof(web_acc->line));
 }
 
-// ==== decodeURLPercentCoding (web_functions.cpp) lines 1616-1626 (working tree) ====
+// ==== decodeURLPercentCoding (web_functions.cpp) lines 1637-1647 (working tree) ====
 /**
  * ###########################################################################################################################
  * decodes Percent-Coded Strings (e.g. URLs and its parameters)
@@ -816,7 +837,7 @@ String decodeURLPercentCoding_live(const String &input)
     return String(buf.data());
 }
 
-// ==== send_http_header (web_functions.cpp) lines 4783-4837 (working tree) ====
+// ==== send_http_header (web_functions.cpp) lines 4804-4858 (working tree) ====
 /**
  * ###########################################################################################################################
  * Sends a valid HTTP header. Takes care of the status code.
@@ -873,7 +894,7 @@ void send_http_header_live(uint16_t http_status_code, uint8_t content_type, cons
     webTxBeginChunked(web_client);                                            // WEB-TX-01: every flush from here on is one chunk
 }
 
-// ==== send_message (web_functions.cpp) lines 4941-5023 (working tree) ====
+// ==== send_message (web_functions.cpp) lines 4962-5044 (working tree) ====
 /**
  * ###########################################################################################################################
  * handles incoming sendmessage request
@@ -958,7 +979,7 @@ void send_message_live(String web_header)
     web_client.println(); // The HTTP response ends with another blank line
 }
 
-// ==== call_function (web_functions.cpp) lines 5097-5169 (working tree) ====
+// ==== call_function (web_functions.cpp) lines 5118-5190 (working tree) ====
 /**
  * ###########################################################################################################################
  * Tries to execute a Web-API function call.
@@ -1033,7 +1054,7 @@ void call_function_live(String web_header)
     web_client.println();
 }
 
-// ==== setparam (web_functions.cpp) lines 5171-5288 (working tree) ====
+// ==== setparam (web_functions.cpp) lines 5192-5309 (working tree) ====
 /**
  * ###########################################################################################################################
  * Set the Value of a parameter (if known)
@@ -1153,7 +1174,7 @@ void setparam_live(String web_header)
     web_client.println();
 }
 
-// ==== getparam (web_functions.cpp) lines 5290-5347 (working tree) ====
+// ==== getparam (web_functions.cpp) lines 5311-5368 (working tree) ====
 /**
  * ###########################################################################################################################
  * Get the Value of a parameter (if known)
@@ -1413,9 +1434,7 @@ WebHeadAcc *web_head_acc_get(void)
         web_head_acc = (WebHeadAcc *)malloc(sizeof(WebHeadAcc));
     return web_head_acc;
 })LIVESRC"},
-    {"src/web_functions/web_functions.cpp", "webRouteLegacy + webRouteDecide", R"LIVESRC(#define WRL_RM_SEND_GET WR_COUNT      // GET /rmsend: refused 405 (the table: generic 405, B1)
-#define WRL_PAGE_UNKNOWN (WR_COUNT + 1) // "/?page=" with an unknown name: 404 page (the table: WR_NONE, B1)
-static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header)
+    {"src/web_functions/web_functions.cpp", "webRouteLegacy + webRouteDecide", R"LIVESRC(static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header)
 {
     if (web_header.startsWith("POST /rmsend"))
         return WR_RM_SEND;
@@ -1507,19 +1526,42 @@ static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header
 uint32_t web_route_disagree = 0;
 
 /**
- * The route of the request in the window: the legacy chain decides, the table is computed beside it and a
- * difference is only counted (also when the window does not parse).
+ * The route of the request in the window (B2, exact match): a parsed request the table matches goes to the table's
+ * route when its handler is built into this board (feature mask below); otherwise the legacy chain's fallback stands
+ * (scaffold, unknown page, GET /rmsend); a handler the legacy chain found by a loose substring match (Referer, query
+ * value, longer path) gives the scaffold, as any unmatched path does. The rules are webRouteDecideCore (web_route.h,
+ * unit-tested); this function only gathers the inputs. A difference between the decision and the table is still
+ * counted (the later steps drop it).
  */
 static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, const String &web_header)
 {
     const uint8_t legacy = webRouteLegacy(web_header);
     WebReq wr;
     uint8_t table = WR_NONE;
-    if (webReqParse(acc->head, acc->head_len, (acc->flags & WEB_HF_CUT) != 0, &wr) == WRQ_OK)
+    const bool parsed = webReqParse(acc->head, acc->head_len, (acc->flags & WEB_HF_CUT) != 0, &wr) == WRQ_OK;
+    if (parsed)
         table = webRouteMatch(wr.method, wr.path, wr.query);
-    if (table != legacy)
+    // the build's features: the same conditions as the guarded cases of the router switch (and deliver_web_asset for
+    // /mcau.js), read here, after every include (OLED_SHOT_WEB comes from web_oled_shot.h)
+    static constexpr uint8_t built = 0
+#if defined(ESP32)
+                                     | WRB_ESP32
+#endif
+#if defined(ENABLE_MSGSTORE)
+                                     | WRB_MSGSTORE
+#endif
+#if OLED_SHOT_WEB
+                                     | WRB_OLED_SHOT
+#endif
+#if INSTRUMENT_ENABLED && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS))
+                                     | WRB_RGB565
+#endif
+        ;
+    const bool exact_other_method = parsed && webRouteExactOther(wr.path, wr.query, built);
+    const uint8_t route = webRouteDecideCore(parsed, table, legacy, exact_other_method, built);
+    if (table != route)
         web_route_disagree++;
-    return legacy;
+    return route;
 })LIVESRC"},
     {"src/web_functions/web_functions.cpp", "work_webpage", R"LIVESRC(void work_webpage(void)
 {

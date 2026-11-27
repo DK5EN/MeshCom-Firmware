@@ -118,8 +118,8 @@ def generate():
         seg_func(RH, rh, r"^const char \*rmReadBody\(", "rmReadBody"),
     ]
     segs["asset"] = [seg_func(WF, wf, r"^static bool deliver_web_asset\(", "deliver_web_asset")]
-    # router of work_webpage: the WRL_* ids, webRouteLegacy, the disagreement counter and webRouteDecide, one block
-    r0 = only(wf, r"^#define WRL_RM_SEND_GET ", "webRoute block start")
+    # router of work_webpage: webRouteLegacy (the WRL_* ids and the decision rules live in web_route.h), the disagreement counter and webRouteDecide, one block
+    r0 = only(wf, r"^static uint8_t __attribute__\(\(noinline\)\) webRouteLegacy\(", "webRoute block start")
     rd = only(wf, r"^static uint8_t __attribute__\(\(noinline\)\) webRouteDecide\(", "webRouteDecide")
     route_seg = (WF, "webRouteLegacy + webRouteDecide", r0, end_brace(wf, rd, "webRouteDecide"))
     segs["rest"] = [
@@ -159,7 +159,12 @@ def generate():
     # includes of the frozen unit, so the live unit adds it next to web_functions.h (outside the namespace)
     if live_pre.count("#include <web_functions.h>") != 1:
         die("plumbing of frozen/extract.sh: expected exactly one #include <web_functions.h>")
-    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>\n#include <web_route.h>")
+    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>")
+    # web_route.h reads no build macro (the feature mask is computed in webRouteDecide); it is included after the
+    # ESP32 define of the plumbing, as web_functions.cpp includes it with the board flags already set
+    if live_pre.count("#define ESP32 1\n") != 1:
+        die("plumbing of frozen/extract.sh: expected exactly one '#define ESP32 1'")
+    live_pre = live_pre.replace("#define ESP32 1\n", "#define ESP32 1\n#include <web_route.h>\n")
     body.append(ren(live_pre) + "\n")
     body.append("size_t urlDecode_live(char *buf, size_t len, uint8_t policy); // own plumbing: the live decoder (url_decode_live.cpp)\n")
     for s in segs["pre"]:

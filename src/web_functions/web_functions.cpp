@@ -1060,12 +1060,10 @@ static void sub_screen_rgb565(void)
 /**
  * FORMAL-02 web step 4: the router of today, moved out of work_webpage() unchanged in behaviour. It decides the
  * handler from the head window (web_header) after the guard and the auth gate and returns a WebRoute id (web_route.h);
- * the two ids WRL_* are branches the table has no row for. A feature that is not built is not named here, so the
+ * the two ids WRL_* (web_route.h) are branches the table has no row for. A feature that is not built is not named here, so the
  * request falls through to the next branch exactly as before. noinline: its String temporaries stay out of
  * work_webpage's frame.
  */
-#define WRL_RM_SEND_GET WR_COUNT      // GET /rmsend: refused 405 (the table: generic 405, B1)
-#define WRL_PAGE_UNKNOWN (WR_COUNT + 1) // "/?page=" with an unknown name: 404 page (the table: WR_NONE, B1)
 static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header)
 {
     if (web_header.startsWith("POST /rmsend"))
@@ -1158,19 +1156,42 @@ static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header
 uint32_t web_route_disagree = 0;
 
 /**
- * The route of the request in the window: the legacy chain decides, the table is computed beside it and a
- * difference is only counted (also when the window does not parse).
+ * The route of the request in the window (B2, exact match): a parsed request the table matches goes to the table's
+ * route when its handler is built into this board (feature mask below); otherwise the legacy chain's fallback stands
+ * (scaffold, unknown page, GET /rmsend); a handler the legacy chain found by a loose substring match (Referer, query
+ * value, longer path) gives the scaffold, as any unmatched path does. The rules are webRouteDecideCore (web_route.h,
+ * unit-tested); this function only gathers the inputs. A difference between the decision and the table is still
+ * counted (the later steps drop it).
  */
 static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, const String &web_header)
 {
     const uint8_t legacy = webRouteLegacy(web_header);
     WebReq wr;
     uint8_t table = WR_NONE;
-    if (webReqParse(acc->head, acc->head_len, (acc->flags & WEB_HF_CUT) != 0, &wr) == WRQ_OK)
+    const bool parsed = webReqParse(acc->head, acc->head_len, (acc->flags & WEB_HF_CUT) != 0, &wr) == WRQ_OK;
+    if (parsed)
         table = webRouteMatch(wr.method, wr.path, wr.query);
-    if (table != legacy)
+    // the build's features: the same conditions as the guarded cases of the router switch (and deliver_web_asset for
+    // /mcau.js), read here, after every include (OLED_SHOT_WEB comes from web_oled_shot.h)
+    static constexpr uint8_t built = 0
+#if defined(ESP32)
+                                     | WRB_ESP32
+#endif
+#if defined(ENABLE_MSGSTORE)
+                                     | WRB_MSGSTORE
+#endif
+#if OLED_SHOT_WEB
+                                     | WRB_OLED_SHOT
+#endif
+#if INSTRUMENT_ENABLED && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS))
+                                     | WRB_RGB565
+#endif
+        ;
+    const bool exact_other_method = parsed && webRouteExactOther(wr.path, wr.query, built);
+    const uint8_t route = webRouteDecideCore(parsed, table, legacy, exact_other_method, built);
+    if (table != route)
         web_route_disagree++;
-    return legacy;
+    return route;
 }
 
 void work_webpage(void)

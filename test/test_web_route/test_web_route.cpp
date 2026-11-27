@@ -357,6 +357,182 @@ static void test_state_flag_mirrors_the_guard(void)
     }
 }
 
+// ---------------------------------------------------------------------------------- decision core (B2, wave 7b)
+
+// the decision rules of webRouteDecideCore, with every feature built (a route that is not built is the next test)
+static void test_decide_core_b2_rules(void)
+{
+    // the legacy ids continue the table numbering
+    TEST_ASSERT_EQUAL_UINT8(WR_COUNT, WRL_RM_SEND_GET);
+    TEST_ASSERT_EQUAL_UINT8(WR_COUNT + 1, WRL_PAGE_UNKNOWN);
+    // a table route goes to the table, whatever the legacy chain found
+    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, webRouteDecideCore(true, WR_PAGE_INFO, WR_PAGE_SETUP, false, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, webRouteDecideCore(true, WR_PAGE_INFO, WR_SCAFFOLD, false, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WR_RM_SEND, webRouteDecideCore(true, WR_RM_SEND, WRL_PAGE_UNKNOWN, false, WRB_ALL));
+    // a loose legacy match (Referer, query value, longer path) becomes the scaffold
+    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_NONE, WR_SETPARAM, false, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_NONE, WR_PAGE_INFO, false, WRB_ALL));
+    // a refused parse keeps the legacy decision
+    TEST_ASSERT_EQUAL_UINT8(WR_SETPARAM, webRouteDecideCore(false, WR_NONE, WR_SETPARAM, false, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, webRouteDecideCore(false, WR_NONE, WR_PAGE_INFO, false, WRB_ALL));
+    // an exact row for another method keeps the legacy decision (B1)
+    TEST_ASSERT_EQUAL_UINT8(WR_RM_SEND, webRouteDecideCore(true, WR_NONE, WR_RM_SEND, true, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, webRouteDecideCore(true, WR_NONE, WR_PAGE_INFO, true, WRB_ALL));
+    // the legacy fallbacks stay (scaffold, unknown page, GET /rmsend)
+    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_NONE, WR_SCAFFOLD, false, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, webRouteDecideCore(true, WR_NONE, WRL_PAGE_UNKNOWN, false, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WRL_RM_SEND_GET, webRouteDecideCore(true, WR_NONE, WRL_RM_SEND_GET, false, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, webRouteDecideCore(false, WR_NONE, WRL_PAGE_UNKNOWN, false, WRB_ALL));
+}
+
+// REGRESSION (wave 7b step 2 rework): a table route whose feature is not compiled into the build is answered like
+// WR_NONE (web_route.h), so the legacy fallback of that build stands. This env defines none of the feature macros.
+#if defined(ESP32) || defined(ENABLE_MSGSTORE) || OLED_SHOT_WEB || INSTRUMENT_ENABLED
+#error "native_web_route must define none of ESP32, ENABLE_MSGSTORE, OLED_SHOT_WEB, INSTRUMENT_ENABLED"
+#endif
+static void test_decide_core_unbuilt_route_is_none(void)
+{
+    // classic ESP32 without ENABLE_MSGSTORE: GET /?page=mailbox was the 404 page (legacy: "/?page=" unknown)
+    TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, webRouteDecideCore(true, WR_PAGE_MAILBOX, WRL_PAGE_UNKNOWN, false, 0));
+    // the other guarded routes: no legacy branch either, the legacy chain fell through to the scaffold
+    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_AU_STATUS, WR_SCAFFOLD, false, 0));
+    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_SCREEN_RGB565, WR_SCAFFOLD, false, 0));
+    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_SCREEN_OLED, WR_SCAFFOLD, false, 0));
+    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_ASSET_AUJS, WR_SCAFFOLD, false, 0));
+    // not built and a loose legacy match: the scaffold, as for any unmatched path
+    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(true, WR_AU_STATUS, WR_SETPARAM, false, 0));
+}
+
+// every route is built when every feature is on; each feature switches exactly its routes
+static void test_built_for_flags(void)
+{
+    for (uint8_t r = 0; r < WR_COUNT; r++)
+        TEST_ASSERT_TRUE_MESSAGE(webRouteBuiltFor(r, true, true, true, true), "all features on");
+    for (uint8_t r = 0; r < WR_COUNT; r++)
+    {
+        const bool esp32 = (r == WR_ASSET_AUJS || r == WR_AU_STATUS);
+        TEST_ASSERT_EQUAL_MESSAGE(esp32 ? 1 : 0, webRouteBuiltFor(r, false, true, true, true) ? 0 : 1, "esp32 off");
+        TEST_ASSERT_EQUAL_MESSAGE(r == WR_PAGE_MAILBOX ? 1 : 0, webRouteBuiltFor(r, true, false, true, true) ? 0 : 1, "msgstore off");
+        TEST_ASSERT_EQUAL_MESSAGE(r == WR_SCREEN_OLED ? 1 : 0, webRouteBuiltFor(r, true, true, false, true) ? 0 : 1, "oled off");
+        TEST_ASSERT_EQUAL_MESSAGE(r == WR_SCREEN_RGB565 ? 1 : 0, webRouteBuiltFor(r, true, true, true, false) ? 0 : 1, "rgb565 off");
+    }
+}
+
+// an empty feature mask: exactly the five guarded routes are not built
+static void test_built_in_this_env(void)
+{
+    for (uint8_t r = 0; r < WR_COUNT; r++)
+    {
+        const bool guarded = (r == WR_ASSET_AUJS || r == WR_AU_STATUS || r == WR_PAGE_MAILBOX || r == WR_SCREEN_OLED ||
+                              r == WR_SCREEN_RGB565);
+        TEST_ASSERT_EQUAL_MESSAGE(guarded ? 0 : 1, webRouteBuiltMask(r, 0) ? 1 : 0, "built with no feature in the mask");
+        TEST_ASSERT_TRUE_MESSAGE(webRouteBuiltMask(r, WRB_ALL), "built with every feature in the mask");
+    }
+}
+
+// an exact row of another method only counts when its handler is built
+static void test_exact_other_ignores_unbuilt_rows(void)
+{
+    TEST_ASSERT_TRUE(webRouteExactOther(sp("/rmnodes"), sp(""), 0));            // GET and POST rows, both built
+    TEST_ASSERT_TRUE(webRouteExactOther(sp("/"), sp("page=info"), 0));          // GET row
+    TEST_ASSERT_FALSE(webRouteExactOther(sp("/nosuch"), sp(""), 0));            // no row at all
+    TEST_ASSERT_FALSE(webRouteExactOther(sp("/austatus"), sp(""), 0));          // the only row is WR_AU_STATUS, not built here
+    TEST_ASSERT_FALSE(webRouteExactOther(sp("/"), sp("page=mailbox"), 0));      // WR_PAGE_MAILBOX, not built here
+    TEST_ASSERT_FALSE(webRouteExactOther(sp("/screen.oled"), sp(""), 0));       // WR_SCREEN_OLED, not built here
+}
+
+// The feature mask of webRouteDecide mirrors the #if lines of the router switch (and of deliver_web_asset): read
+// web_functions.cpp, check that each guarded case sits right behind its guard line, that the switch carries no other guard,
+// and that web_route.h spells every guard line.
+static std::vector<std::string> linesOf(const std::string &text)
+{
+    std::vector<std::string> v;
+    std::istringstream in(text);
+    std::string l;
+    while (std::getline(in, l))
+    {
+        const size_t a = l.find_first_not_of(" \t");
+        const size_t b = l.find_last_not_of(" \t\r");
+        v.push_back(a == std::string::npos ? std::string() : l.substr(a, b - a + 1));
+    }
+    return v;
+}
+static void test_built_guards_mirror_the_switch(void)
+{
+    const std::vector<std::string> wf = linesOf(repo_slurp("src/web_functions/web_functions.cpp"));
+    const std::string route_h = repo_slurp("src/web_functions/web_route.h");
+    struct G2
+    {
+        const char *case_line;
+        const char *guard;
+        const char *bit; // the mask line right after the guard in webRouteDecide
+    };
+    static const G2 guarded[] = {
+        {"case WR_AU_STATUS:", "#if defined(ESP32)", "| WRB_ESP32"},
+        {"case WR_SCREEN_RGB565:", "#if INSTRUMENT_ENABLED && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS))", "| WRB_RGB565"},
+        {"case WR_SCREEN_OLED:", "#if OLED_SHOT_WEB", "| WRB_OLED_SHOT"},
+        {"case WR_PAGE_MAILBOX:", "#if defined(ENABLE_MSGSTORE)", "| WRB_MSGSTORE"},
+    };
+    size_t sw = wf.size(), end = wf.size();
+    for (size_t i = 0; i < wf.size(); i++)
+    {
+        if (sw == wf.size() && wf[i].find("switch (webRouteDecide(") == 0)
+            sw = i;
+        if (sw != wf.size() && i > sw && wf[i].find("default: // WR_SCAFFOLD") == 0)
+        {
+            end = i;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(end < wf.size(), "router switch not found in web_functions.cpp");
+    size_t mask_at = wf.size(), mask_end = wf.size();
+    for (size_t i = 0; i < wf.size(); i++)
+        if (wf[i].find("static constexpr uint8_t built = 0") == 0)
+        {
+            mask_at = i;
+            for (size_t j = i; j < wf.size(); j++)
+                if (wf[j] == ";")
+                {
+                    mask_end = j;
+                    break;
+                }
+            break;
+        }
+    TEST_ASSERT_TRUE_MESSAGE(mask_end < wf.size(), "feature mask of webRouteDecide not found");
+    // web_route.h must not read a build macro (include-order trap)
+    for (const std::string &l : linesOf(route_h))
+        if (l.compare(0, 3, "#if") == 0 || l.compare(0, 5, "#elif") == 0)
+            TEST_ASSERT_TRUE_MESSAGE(l.find("ESP32") == std::string::npos && l.find("OLED_SHOT_WEB") == std::string::npos &&
+                                         l.find("ENABLE_MSGSTORE") == std::string::npos && l.find("INSTRUMENT_ENABLED") == std::string::npos,
+                                     (std::string("web_route.h reads a feature macro: ") + l).c_str());
+    size_t guards = 0;
+    for (size_t i = sw; i < end; i++)
+        if (wf[i].find("#if") == 0)
+            guards++;
+    TEST_ASSERT_EQUAL_MESSAGE((int)(sizeof(guarded) / sizeof(guarded[0])), (int)guards, "router switch: a guard the feature mask does not know");
+    for (const G2 &g : guarded)
+    {
+        size_t at = wf.size();
+        for (size_t i = sw; i < end; i++)
+            if (wf[i].find(g.case_line) == 0)
+                at = i;
+        TEST_ASSERT_TRUE_MESSAGE(at < wf.size(), g.case_line);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(g.guard, wf[at - 1].c_str(), g.case_line);
+        // the same guard feeds the feature mask in webRouteDecide (after every include of web_functions.cpp)
+        bool in_mask = false;
+        for (size_t i = mask_at; i + 1 < mask_end; i++)
+            in_mask = in_mask || (wf[i] == g.guard && wf[i + 1] == g.bit); // the guard sets its own bit
+        TEST_ASSERT_TRUE_MESSAGE(in_mask, (std::string("feature mask in webRouteDecide lacks: ") + g.guard).c_str());
+    }
+    // /mcau.js: the asset branch of deliver_web_asset
+    size_t au = wf.size();
+    for (size_t i = 0; i < wf.size(); i++)
+        if (wf[i].find("else if (req.startsWith(\"GET /mcau.js\"))") == 0)
+            au = i;
+    TEST_ASSERT_TRUE_MESSAGE(au < wf.size() && au > 0, "GET /mcau.js asset branch not found");
+    TEST_ASSERT_EQUAL_STRING("#if defined(ESP32)", wf[au - 1].c_str());
+}
+
 // ---------------------------------------------------------------------------------------- 2. corpus equivalence
 
 static const char *const kCorpusDir = "test/test_web_diff/corpus/";
@@ -950,6 +1126,12 @@ int main(int, char **)
     RUN_TEST(test_span_edges);
     RUN_TEST(test_flags);
     RUN_TEST(test_state_flag_mirrors_the_guard);
+    RUN_TEST(test_decide_core_b2_rules);
+    RUN_TEST(test_decide_core_unbuilt_route_is_none);
+    RUN_TEST(test_built_for_flags);
+    RUN_TEST(test_built_in_this_env);
+    RUN_TEST(test_exact_other_ignores_unbuilt_rows);
+    RUN_TEST(test_built_guards_mirror_the_switch);
     RUN_TEST(test_corpus_equals_todays_router_except_listed_deltas);
     RUN_TEST(test_corpus_refused_requests_are_listed);
     RUN_TEST(test_corpus_reaches_every_route);
