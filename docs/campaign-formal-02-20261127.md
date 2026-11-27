@@ -5,23 +5,19 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-6, 7a and 7b steps 1-3 committed on `fork-dev`, not pushed. `fork-dev` contains all of
-`upstream/dev` (checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; next is 7b step 4
-(B3 + B6: 400 on a refused parse).
+**State:** waves 1-6, 7a and 7b steps 1-4 committed on `fork-dev`, not pushed. `fork-dev` contains all of
+`upstream/dev` (checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; next is 7b step 5
+(REST handlers on `web_query.h`: B4, B7, B11, one commit each; the full host gate is due after step 5).
 
-- **Step 4 recon (scout, 2026-11-27):** `webReqParse` returns `WRQ_BAD_REQUEST_LINE` / `WRQ_BAD_VERSION` (B3) and
-  `WRQ_BAD_CONTENT_LENGTH` (B6, from `strictCl()`, cap `WEB_CL_MAX` 65535; flag `WEB_HF_CL_BAD`,
-  `webHeadBadContentLength()`); its only caller is `webRouteDecide`. Nothing answers 400 yet: a refused parse takes the
-  legacy chain and the legacy no-session gate (`indexOf("/?page=")`, `indexOf("HTTP/1.1")`). `web_content_length` is
-  the lenient `webHeadContentLength()`. The refused corpus requests are `kRefused` in `test_web_route.cpp` (~:925:
-  B3 19, B6 20, CORPUS 1); they become `kWhitelist` rows per profile in the rig (rows now name their differing
-  profiles, `test_whitelist_rows_differ_exactly_where_listed`). Once a refused parse answers 400, `webRouteLegacy`,
-  `WRL_RM_SEND_GET` and the legacy gate branch lose their last caller (drop them in step 4 or with step 8).
+- **Step 5 inputs:** see "Step 5 recon" below. Every refused parse is a 400 since step 4, so the handlers only ever see
+  a parsed `WebReq`; they still take `String web_header` by value today (BACKLOG WEB-WIPE-COPIES-01 is fixed by
+  moving them to spans). B4/B7/B11 have no corpus rows: build the requests in the rig like
+  `test_b6_content_length_past_the_window`.
 - **Wave 7b plan (serial, `web_functions.cpp` is the hotspot, one writer per step, gate + advisor + commit each):**
   step 1 router as classifier + switch, table alongside (`ccdf9260`, done); step 2 B2 exact match (`34fb0a3b`, done,
-  33 rig whitelist rows); step 3 B1 (done); step 4 B3 + B6 (400 on a refused parse, one commit each); step 5 web_query.h in
-  setparam/callfunction/getparam/send_message (B4, B7; B11 only after the operator's yes, else today's swapped-order
-  behaviour stays); step 6 num_parse.h at the 9 sites (B5, trim first, `mcFormatDec3`); step 7 web_body.h + body reader
+  33 rig whitelist rows); step 3 B1 (done); step 4 B3 + B6 (done); step 5 web_query.h in
+  setparam/callfunction/getparam/send_message (B4, B7, B11 -- B11 accepted by the operator 2026-11-27, own
+  commit); step 6 num_parse.h at the 9 sites (B5, trim first, `mcFormatDec3`); step 7 web_body.h + body reader
   with WDT feed and 408 (B10); step 8 fixed response heads; then drop `webRouteLegacy` and the disagreement counter.
 - **Wave 7b mechanics:** `webRouteDecide` (web_functions.cpp) gathers inputs, `webRouteDecideCore` (web_route.h, pure)
   decides; the feature mask `built` (WRB_*) mirrors the switch guards and is pinned by `test_web_route`. Rig whitelist
@@ -39,9 +35,15 @@ archive section at the end with one line each.
   gets the login page whether the page exists or not; HEAD gets 405 with `Allow` built from the row's method mask; the
   dispatcher wipes head and line on every exit; `/?nodepassword` is one route, the handler branches on the value; the
   setparam wiring trims space/tab before `mcParse*`; windcal/tempoff format back with `mcFormatDec3`.
-- **Waiting on the operator:** B11 (proposed, seams 7.2): `send_message` reads `tocall` by name, so a hand-made URL with
-  `&message=` before `&tocall=` goes to the named station instead of a garbage destination. Relay candidate rule
-  (RELAY-ORDER-01).
+- **B11 accepted (operator 2026-11-27):** `send_message` reads `tocall` by name, so a hand-made URL with `&message=`
+  before `&tocall=` goes to the named station instead of a garbage destination; own commit in step 5.
+- **Waiting on the operator:** relay candidate rule (RELAY-ORDER-01).
+- **Step 5 recon (scout, 2026-11-27):** `web_query.h` API: `webQueryFirst/Get/Tail/Until` (bool, `WebSpan` out) and
+  `webFieldDecode(in, out, cap, policy)` (0 empty, NOFIT when too long). Handlers take `String web_header` by value
+  (`send_message`, `call_function`, `setparam`, `getparam`; setters `webSetup_setParam` / `webSetup_getParam` in
+  `web_setup.cpp`); `manualcommand` rewrites a leading `&&` to `--` (`web_setup.cpp` ~:284). Today's guard
+  (`webGuardSetparamAllowed`, `web_guard.h` ~:941) only demands X-MC for update/gpio values with `--`/`&&`, so B7 is a
+  real change. No corpus row is tagged B4/B7/B11: step 5 adds its own requests.
 - **Wave 6 result:** `src/web_functions/web_request.h` (head accumulator and request-line parser, `d528d071`) and
   `work_webpage` running on it (`d787c11b`, accumulator one heap block from `startWebserver()`, 503 when the heap is
   exhausted). The request rig has a live entry (`test/test_web_diff/live/`, cut from the working tree by function
@@ -233,6 +235,14 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 ## Open questions
 
 ## Archive
+
+- Wave 7b step 4 (2026-11-27): B3 (`d090c380`) and B6 answer 400 `{"ok":false,"err":"bad request"}` right after the
+  guard 403, before AU-busy 503, assets, login and every route, with or without a session; the router decides once,
+  before that check. B6 uses both judgements: the parser's (window) and the accumulator's `webHeadBadContentLength`
+  (every head line, also past the 1023-byte window; advisor finding, regression test
+  `test_b6_content_length_past_the_window`). Rig: B3 57 rows, B6 20 rows, all four profiles, 400. The `js-*-pageq`
+  corpus rows are relative-URL generator artifacts (a browser sends `/?page=`). The legacy chain still runs for a
+  refused parse but routes nothing; removal with the step-8 cleanup. B11 accepted by the operator.
 
 - Wave 7b step 3 (2026-11-27): B1 wired. A parsed request with no built route gets 404 (JSON) or 405 with `Allow`
   from the rows' method masks; an unknown page 404 + the unknown page; no session: page-shaped -> login page, `GET /`
