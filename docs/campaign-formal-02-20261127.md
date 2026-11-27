@@ -37,15 +37,17 @@ wave 10. DK5EN-1 is offline: the V3 scan comparison stays open.
     DK5EN-14; spectrum "not supported" on both (SX1276; nRF52), scan call 422 at once
     (`tools/bench/runs/harness/w10-webcheck-dk5en92-dk5en90.summary`). Heap DK5EN-92 one minute after boot: free
     61,072 / blk 57,332.
-  - Not done: BLE phone session with F3 (needs the operator's phone), web accumulator heap figure, V3 scan comparison
-    (DK5EN-1 offline).
+  - BLE with F3: the operator's phone (McMap) is connected to DK5EN-98 for the whole soak, next to the gateway UDP
+    traffic (`...BLE: con=1`, MTU 255, at logger start).
+  - Not done: web accumulator heap figure, V3 scan comparison (DK5EN-1 offline).
 - **Soak (resume here, 2026-11-28 after 18:00):** `rpizero.local:~/meshlog/dk5en-98-formal02w10-20261127/` and
   `dk5en-14-formal02w10-20261127/`, `dk5en-92-formal02w10-20261127/` (meshlogger in screens `w10-98`, `w10-14`,
   `w10-92`; `status.txt` shows running/finished); DK5EN-90 has no net console: USB serial capture on the Mac, screen
   `w10-90`, `tools/bench/runs/harness/w10-soak-dk5en90.log` (raw, gitignored). T-Beam: compare the idle STAT heap
   against `tools/heap_baseline.json` (board ttgo_tbeam).
   Check: no reboot (banner/`BOOT RESET_REASON` once), DK5EN-98 `[GW];hold` never `alloc;failed`, gateway traffic all
-  night (`[EXT] Out` / `GWI`), heap trend flat (STAT/`[INSTR-HEAP]` on DK5EN-14), no `spectrum re-init failed`.
+  night (`[EXT] Out` / `GWI`), DK5EN-98 `--info` after the logger ends: `BLE: con=1 dis=0` still (no drop overnight),
+  the `...BLE :` counters (tx/r/d/t/e) without errors, heap trend flat (STAT/`[INSTR-HEAP]` on DK5EN-14), no `spectrum re-init failed`.
 - **Wave 9 result (operator scope 2026-11-27: hold store + F3 on all ESP32):** UDP outage hold store on the heap,
   `udpHoldEnsure()` first on every gateway-on pass (ESP32 ahead of the IP check, nRF52 first in `if(bGATEWAY)`), kept
   until reboot, failed allocation off + logged once + retried every 60 s, `enabled` published release/acquire
