@@ -10,7 +10,7 @@
 //
 // Writers: the server-selection sites (udp_functions.cpp startMeshComUDP(),
 // nrf_eth.cpp startUDP()/startFIXUDP()) and the server-frame parsers
-// (udp_frame_esp32.cpp, udp_frame_nrf52.cpp). Readers: web_functions.cpp,
+// (udp_frame.cpp). Readers: web_functions.cpp,
 // command_functions.cpp. Platform-neutral on purpose: compiled into the
 // native suite; the caller passes millis().
 #pragma once

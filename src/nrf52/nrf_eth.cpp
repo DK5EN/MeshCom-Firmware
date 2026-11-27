@@ -8,6 +8,7 @@
 #include <RAK13800_W5100S.h> // Click to install library: http://librarymanager/All#RAK13800_W5100S
 #include <Arduino.h>
 #include <nrf_eth.h>
+#include "udp_frame_platform.h"   // handleUdpFrame()
 #include <debugconf.h>
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
@@ -540,7 +541,7 @@ int NrfETH::getUDP()
       return 0;
     }
 
-    if(handleUdpFrame_nrf52(inc_udp_buffer, packetSize, remote_ip) == 0)
+    if(handleUdpFrame(inc_udp_buffer, packetSize, remote_ip) == 0)
     {
       // zero out the inc buffer
       memset(inc_udp_buffer, 0, UDP_TX_BUF_SIZE);

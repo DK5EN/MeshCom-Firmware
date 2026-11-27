@@ -41,7 +41,7 @@ bool updateRetransmissionStatus(void);
 // eigenen Meldung. Vergleicht msg_id ueber pnRetryCore() (Wiederholungsbits
 // 10-11 ausmaskiert), damit ein :ackNNN auch einen Slot stoppt, der schon auf
 // eine Retry-Variante umgeschrieben wurde. Auch vom Server-ACK-Pfad
-// (udp_frame_esp32.cpp, udp_frame_nrf52.cpp) aufgerufen. Slot oder -1.
+// (udp_frame.cpp) aufgerufen. Slot oder -1.
 int findAndStopRingSlot(uint32_t msgId);
 // As above, but skips an own RM1 command slot (binary/DM/server ACKs must not stop it).
 int findAndStopRingSlotNoRm1(uint32_t msgId);

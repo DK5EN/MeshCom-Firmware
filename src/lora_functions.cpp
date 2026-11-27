@@ -410,8 +410,7 @@ static bool extTxqAckInvalidateIfOwned(int slot)
  * ein ACK auf die urspruengliche msg-id auch einen auf Retry-Variante
  * umgeschriebenen Slot stoppt (nur eigene pending Slots im Scope).
  *
- * Non-static: auch vom Server-ACK-Pfad gerufen (udp_frame_esp32.cpp,
- * udp_frame_nrf52.cpp), der auf nRF52 im Loop-Task laeuft, waehrend
+ * Non-static: auch vom Server-ACK-Pfad gerufen (udp_frame.cpp), der auf nRF52 im Loop-Task laeuft, waehrend
  * OnRxDone() im LORA-Task laeuft -- Scan und Status-Schreiben deshalb auf
  * RAK4631 unter derselben Ring-Sperre wie anderswo in dieser Datei
  * (queueDisplayText() etc.).
@@ -1877,7 +1876,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
                         // AA0AAA-99,...,99999
                         // AA0AAA-99,...,XX0XXX-99
 
-                        char destination_call[MC_CALL_LEN_Z];   // R2-04: war 20, siehe udp_frame_esp32.cpp
+                        char destination_call[MC_CALL_LEN_Z];   // R2-04: war 20, siehe udp_frame.cpp
                         snprintf(destination_call, sizeof(destination_call), "%s", aprsmsg.msg_destination_call);
 
                         bool bMeshDestination = true;

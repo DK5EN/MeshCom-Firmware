@@ -23,8 +23,13 @@ Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
   a mesh model; all refactors go upstream. Wave 1 committed: `handleACK` core (`src/ack_rx_core.h`), shared id lookups
   (`src/id_table_find.h`), `readPhoneCommand(buf, len)` with `src/phone_frame.h` (drops frames whose header claims more
   than received; checked against the app source), settings migration over 25 release fixtures, nan/inf settings values
-  rejected. App bug filed as #1343. Next: wave 1b UDP receive consolidation after the operator's decisions D1-D5
-  (`docs/udp-consolidation-20261127.md`).
+  rejected. App bug filed as #1343. Wave 2: bounded proofs for the ACK core and the phone frame decoder (`ce013112`).
+  Wave 1b: the UDP receive handlers are one file `src/udp_frame.cpp` with operator decisions D1/D2/D3/D5 (nRF gateways
+  show server text, server positions enter the dedup ring at once, every GATE frame stamps liveness, short datagrams
+  are OTHER). Wave 3: TLA+ model `specs/tla/bletask.tla` found and the wave fixed BLE-QDROP-01 (silent queue-full
+  drop) and BLE-STALE-01 (item of the previous connection applied). Next: UDP parse core proofs, wave 4 (NimBLE
+  boundary, production web server; analyses `docs/nimble-boundary-20261127.md`, `docs/web-server-seams-20261127.md`
+  in progress), wave 5 mesh model with asymmetric 1-2 W nodes (HB9ZG-49 measurements).
 - **FORMAL01-RUN done 2026-11-27, committed `96cd34be` on `fork-dev`:** TLC `--all` 56/56 as expected, BMC `--all --heavy`
   74/74 with 0 unexpected results or tool errors (`specs/tla/RESULTS.md`, `specs/cbmc/RESULTS.md`; local, one runner
   at a time, 15 GB budget, peak 11.3 GB). Every job that ran over 15 GB or into its time limit passes after a

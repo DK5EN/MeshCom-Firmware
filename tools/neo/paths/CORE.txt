@@ -47,7 +47,6 @@ src/esp32/gateway_service_esp32.cpp
 src/esp32/loop_actions_esp32.cpp
 src/esp32/serial_command_esp32.cpp
 src/esp32/udp_drain_esp32.cpp
-src/esp32/udp_frame_esp32.cpp
 src/extern_msg_json.h
 src/extudp_functions.cpp
 src/extudp_functions.h
@@ -106,7 +105,6 @@ src/nrf52/serial_command_nrf52.cpp
 src/nrf52/settings_store_nrf52.cpp
 src/nrf52/settings_store_nrf52.h
 src/nrf52/udp_drain_nrf52.cpp
-src/nrf52/udp_frame_nrf52.cpp
 src/onebutton_functions.cpp
 src/onewire_functions.cpp
 src/phone_commands.cpp
@@ -150,6 +148,7 @@ src/topo_ui.h
 src/txring_functions.cpp
 src/txring_functions.h
 src/udp_drain.h
+src/udp_frame.cpp
 src/udp_frame.h
 src/udp_functions.cpp
 src/udp_functions.h

@@ -1,10 +1,10 @@
 // Shadow of src/nrf52/nrf_eth.h for the U1 twin (test plan 4.3).
 //
 // The real header declares a 40-member NrfETH whose definition drags in the
-// W5100S driver, DHCP and NTP. handleUdpFrame_nrf52() touches four of them
-// (last_upd_timer, lora_tx_msg_len, udp_dest_addr, had_initial_udp_conn) plus
-// its own declaration. Each declaration line below is copied verbatim from
-// the real class body / the real free-function declaration -- same
+// W5100S driver, DHCP and NTP. The nRF52 platform hooks of the frame handler
+// touch three of them (last_upd_timer, udp_dest_addr, had_initial_udp_conn).
+// Each declaration line below is copied verbatim from the real class body --
+// same
 // discipline as test/test_udp_send_twin/stubs/nrf_eth.h and checked the same
 // way against src/nrf52/nrf_eth.h by test/golden/twin_stub_lint.py, whose
 // PAIRS list carries this file too. A handler reaching for a fifth member
@@ -18,14 +18,9 @@
 #include <Arduino.h>
 #include <configuration.h>
 
-// C1 carve-out (DRY unification U1): verbatim from src/nrf52/nrf_eth.h.
-int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddress remote_ip);
-
 class NrfETH {
 
     public:
-
-    int lora_tx_msg_len;
 
     IPAddress udp_dest_addr;
 

@@ -6,6 +6,7 @@
 
 #include <udp_functions.h>
 #include "gw_reg_runtime.h"
+#include "udp_frame_platform.h"   // handleUdpFrame()
 #include <extudp_functions.h>
 #include <debugconf.h>
 #include <batt_functions.h>
@@ -102,10 +103,8 @@ NtpAsync timeClient(Udp);   // TM-35: non-blocking, reply harvested in getMeshCo
 
 unsigned char incomingPacket[UDP_TX_BUF_SIZE];  // buffer for incoming packets
 int packetSize=0;
-uint8_t convBuffer[UDP_TX_BUF_SIZE + 50]; // we need an extra buffer for udp tx, as we add other stuff (ID, RSSI, SNR, MODE)
 
 bool udp_is_busy = false;
-uint16_t lora_tx_msg_len = 0;
 
 unsigned long last_upd_timer = 0; // last time we got a HB
 extern bool hb_warn_logged;
@@ -228,7 +227,7 @@ void getMeshComUDP()
       // the too-many-zeros verdict (1) instead of resetting the socket
       // itself. This caller performs the reset, mirroring NrfETH::getUDP()
       // (nrf52/nrf_eth.cpp:442-453), which resets DHCP on the same verdict
-      // from handleUdpFrame_nrf52(). Losing this call would silently stop
+      // from handleUdpFrame() on nRF52. Losing this call would silently stop
       // re-arming the UDP socket on every too-many-zeros datagram -- a real
       // gateway regression, not just a caller-decides refactor. The verdict
       // no longer always tears WiFi down (see H6-01 below).
@@ -244,7 +243,7 @@ void getMeshComUDP()
       // frame class (before: the GATE branch only); nothing reads the buffer
       // after the handler returns.
       udp_is_busy = true;
-      const int udpVerdict = handleUdpFrame_esp32(incomingPacket, len, remote_ip);
+      const int udpVerdict = handleUdpFrame(incomingPacket, len, remote_ip);
       memset(incomingPacket, 0, UDP_TX_BUF_SIZE);
       udp_is_busy = false;
       if(udpVerdict != 0)

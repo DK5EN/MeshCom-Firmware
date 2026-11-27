@@ -2,9 +2,8 @@
 //
 // The real header turns queueKiss() into an inline no-op whenever ESP32 is
 // not defined -- and this native build never defines ESP32. With the real
-// header the KISS/TCP server-relay tap in handleUdpFrame_esp32()
-// (udp_frame_esp32.cpp, upstream f070ad50, re-anchored after the C1/U1
-// carve in the 2026-09-25 upstream merge) would compile to nothing here and
+// header the KISS/TCP server-relay tap of handleUdpFrame()
+// (src/udp_frame.cpp, upstream f070ad50) would compile to nothing here and
 // no test could see whether it fires. This stub declares queueKiss() as a
 // plain function instead; test_udp_frame_twin.cpp defines it and records
 // every call. The other KISS entry points are not called by either frame

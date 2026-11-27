@@ -1,12 +1,13 @@
-// FORMAL-02 differential: the live UDP frame handlers against their frozen
-// copies (docs/udp-consolidation-20261127.md section 5.4, steps 0-3).
+// FORMAL-02 differential: the live UDP frame handler against its frozen
+// copies (docs/udp-consolidation-20261127.md section 5.4).
 //
 //   /tmp/formal02/piolock.sh test -e native_udp_frame_diff
 //
-// frozen/udp_frame_{esp32,nrf52}.frozen.cpp are byte copies of the two handler
-// files at fork-dev 3139a4d6 with only the entry points renamed (README.md has
-// the sha256). The live files are src/esp32/udp_frame_esp32.cpp and
-// src/nrf52/udp_frame_nrf52.cpp, which the consolidation edits step by step.
+// frozen/udp_frame_{esp32,nrf52}.frozen.cpp are byte copies of the two
+// per-platform handler files at fork-dev 3139a4d6 (before the consolidation)
+// with only the entry points renamed (README.md has the sha256). The live side
+// is the ONE handler src/udp_frame.cpp, run once as the ESP32 and once as the
+// nRF52 board (the platform hooks switch on the side, see the twin test).
 // Every datagram goes to the frozen and the live handler of one platform from
 // the same freshly reset world; everything observable is compared:
 //   - the ordered sink log of test_udp_frame_twin (display, TX ring inserts,
@@ -15,22 +16,38 @@
 //   - Serial output, the dedup ring, the TX ring, the own-tx table, the RM
 //     queue, the server-liveness stamps, the link status text, settings
 // Excluded on purpose, because the consolidation moves them to the callers or
-// replaces them (steps 2/3): udp_is_busy, lora_tx_msg_len, convBuffer,
-// RcvBuffer and the contents of the caller's receive buffer after the call.
+// replaces them: udp_is_busy, lora_tx_msg_len, convBuffer, RcvBuffer and the
+// contents of the caller's receive buffer after the call.
 //
 // The twin test is reused, not copied: its recorders, fakes, corpus reader and
 // frame builders are static symbols of that file, so it is #included with its
 // main() renamed. Its own cases are compiled but not run here.
 //
-// Whitelist (counted, asserted, reported by the last test):
-//   D4        nRF52 store-node hook order (classify before / after the {NNN cut)
-//   REORDER   nRF52 only: the PRINT sink (printBuffer_aprs, C7) moved relative to the other sinks;
-//             all other sinks, their order and all state are equal
+// Whitelist (every class is counted, asserted exercised, reported by the last
+// test; a pair may carry several classes, which are then stripped one by one and
+// everything left must be equal):
+//   D1       ESP32: a GATE frame of unknown type / without type stamps server liveness now
+//   D2       nRF52: a new server position (0x21) is in the dedup ring after the call even when
+//            vetoed (NOPOS, unconfigured source, known own tx): ring slot + stat_newid +1, the id
+//            present in the ring only on the live side
+//   D3       nRF52: one more DISPLAYTEXT sink call (the `!bGATEWAY` guard is gone), text GATE
+//   D4       nRF52 store-node hook order (classify before / after the {NNN cut)
+//   D5       a datagram shorter than 4 bytes / a 4-byte GATE no longer depends on the slab behind
+//            it: scenarios with a stale tail; the live handler must give the same result for the
+//            stale and for a zeroed tail, and the reference is the frozen handler on the zeroed
+//            tail (counted: pairs in which the frozen handler did read the stale bytes; the frozen
+//            nRF52 handler crashes on a "GAT" + stale "E", so those pairs are counted unrun)
+//   C7       nRF52: the RX-UDP debug line (PRINT sink) prints the reset destination path
+//   REORDER  nRF52: the PRINT sink moved relative to the other sinks
 // Anything else differing fails the case with the first differing line.
 
 #define main udp_twin_main_not_run
 #include "../test_udp_frame_twin/test_udp_frame_twin.cpp"
 #undef main
+
+// Globals only the frozen handlers use (the consolidation removed them from the firmware).
+uint16_t lora_tx_msg_len = 0;                  // frozen ESP32 handler (was in udp_functions.cpp)
+uint8_t convBuffer[UDP_TX_BUF_SIZE + 50];      // frozen ESP32 handler (now private to udp_drain_esp32.cpp)
 
 #include <map>
 #include <set>
@@ -65,6 +82,8 @@ struct Scenario
     std::vector<uint8_t> bytes;
     uint32_t msg_id = 0;
     bool known_id = false;      // the id above is a real frame id (dup / icheck need it)
+    std::vector<uint8_t> tail;  // D5: bytes left in the slab behind the datagram (empty = zero)
+    bool has_tail = false;
     Cfg cfg;
     std::string label;
 };
@@ -95,6 +114,8 @@ static Cfg cfg_from_bits(unsigned bits)
 struct Obs
 {
     int ret = -99;
+    uint32_t newid = 0;                             // stat_newid after the call
+    int ring_hit = -1;                              // slots of the dedup ring holding the scenario's id (-1: id unknown)
     std::vector<std::string> sinks;                 // ordered sink log "SINK\tdetail"
     std::map<std::string, std::string> state;       // section -> text
 };
@@ -241,13 +262,15 @@ static Obs observe(int ret)
 
 typedef int (*HandlerFn)(unsigned char *, int, IPAddress);
 
-static Obs run_handler(const Scenario &sc, int side, bool frozen)
+static Obs run_handler(const Scenario &sc, int side, bool frozen, bool with_tail = false)
 {
     world_for(sc, side);
     uint8_t buf[BUF_CAP];
     memset(buf, 0, sizeof(buf));
     size_t n = sc.bytes.size() <= UDP_TX_BUF_SIZE ? sc.bytes.size() : UDP_TX_BUF_SIZE;
     if (n) memcpy(buf, sc.bytes.data(), n);
+    if (with_tail && !sc.tail.empty())
+        memcpy(buf + n, sc.tail.data(), sc.tail.size() <= UDP_TX_BUF_SIZE - n ? sc.tail.size() : UDP_TX_BUF_SIZE - n);
     g_udp_hook_side = side;
     IPAddress ip = src_ip_for(sc);
     int ret;
@@ -255,7 +278,10 @@ static Obs run_handler(const Scenario &sc, int side, bool frozen)
         ret = side ? handleUdpFrame_nrf52_frozen(buf, (int)n, ip) : handleUdpFrame_esp32_frozen(buf, (int)n, ip);
     else
         ret = side ? handleUdpFrame_nrf52(buf, (int)n, ip) : handleUdpFrame_esp32(buf, (int)n, ip);
-    return observe(ret);
+    Obs o = observe(ret);
+    o.newid = stat_newid.load();
+    o.ring_hit = sc.known_id ? dedup_ring_entries(sc.msg_id) : -1;
+    return o;
 }
 
 // ---------------------------------------------------------------------------
@@ -266,8 +292,8 @@ struct Tally
 {
     int pairs = 0;
     int identical = 0;
-    int d4 = 0;
-    int reorder = 0;
+    int d1 = 0, d2 = 0, d3 = 0, d4 = 0, d5 = 0, c7 = 0, reorder = 0;   // pairs carrying the class
+    int d5_pairs = 0;                                                   // stale-slab pairs run
     long sinks_compared = 0;
     long sections_compared = 0;
     int failures = 0;
@@ -284,64 +310,163 @@ static Tally T;
 
 static std::string sink_name(const std::string &line) { return line.substr(0, line.find('\t')); }
 
-// Returns "" when identical, "D4" / "REORDER" when the difference is whitelisted, else a description
-static std::string compare_obs(const Obs &a, const Obs &b, int side, const Scenario &sc)
+struct Tags { bool d1 = false, d2 = false, d3 = false, d4 = false, c7 = false, reorder = false; };
+
+static bool starts_gate(const Scenario &sc)
 {
-    std::set<std::string> state_diff;
-    for (const auto &kv : a.state)
-    {
-        auto it = b.state.find(kv.first);
-        if (it == b.state.end() || it->second != kv.second) state_diff.insert(kv.first);
-    }
-    const bool sinks_equal = a.sinks == b.sinks;
-    if (a.ret == b.ret && sinks_equal && state_diff.empty())
+    return sc.bytes.size() >= 4 && memcmp(sc.bytes.data(), "GATE", 4) == 0;
+}
+static bool gate_type_is(const Scenario &sc, uint8_t t) { return starts_gate(sc) && sc.bytes.size() >= 5 && sc.bytes[4] == t; }
+static bool gate_type_unknown_or_none(const Scenario &sc)
+{
+    if (!starts_gate(sc)) return false;
+    if (sc.bytes.size() < 5) return true;
+    const uint8_t t = sc.bytes[4];
+    return t != 0x3A && t != 0x21 && t != 0x40;
+}
+
+static int count_sink(const std::vector<std::string> &v, const char *name)
+{
+    int n = 0;
+    for (const auto &l : v) if (sink_name(l) == name) n++;
+    return n;
+}
+static std::vector<std::string> sinks_without(const std::vector<std::string> &v, const char *name)
+{
+    std::vector<std::string> out;
+    for (const auto &l : v) if (sink_name(l) != name) out.push_back(l);
+    return out;
+}
+static std::vector<size_t> sink_positions(const std::vector<std::string> &v, const char *name)
+{
+    std::vector<size_t> out;
+    for (size_t i = 0; i < v.size(); i++) if (sink_name(v[i]) == name) out.push_back(i);
+    return out;
+}
+// text between two markers of a PRINT sink line ("... dst=X dst_path=Y tail=Z")
+static std::string between(const std::string &l, const char *from, const char *to)
+{
+    size_t a = l.find(from);
+    if (a == std::string::npos) return "";
+    a += strlen(from);
+    size_t b = l.find(to, a);
+    return l.substr(a, b == std::string::npos ? std::string::npos : b - a);
+}
+static std::string print_masked(const std::string &l)   // the PRINT line without its dst_path field
+{
+    size_t a = l.find(" dst_path="), b = l.find(" tail=");
+    if (a == std::string::npos || b == std::string::npos || b < a) return l;
+    return l.substr(0, a) + l.substr(b);
+}
+
+static bool obs_equal(const Obs &a, const Obs &b)
+{
+    return a.ret == b.ret && a.sinks == b.sinks && a.state == b.state && a.newid == b.newid && a.ring_hit == b.ring_hit;
+}
+
+// `a` = reference (the frozen handler), `b` = live. Returns "" when equal up to the whitelisted
+// classes, which are then reported in `tg`; otherwise a description of the first difference.
+static std::string compare_obs(const Obs &fa, const Obs &fb, int side, const Scenario &sc, Tags &tg)
+{
+    if (obs_equal(fa, fb))
         return "";
 
+    Obs a = fa, b = fb;
+    if (a.ret != b.ret)
+        goto fail;   // the return value is never whitelisted
+
+    // D1 (ESP32): unknown-type / typeless GATE frame, live stamps liveness, frozen did not
+    if (side == 0 && gate_type_unknown_or_none(sc) && a.state["esp32_state"] == "0|0" && b.state["esp32_state"] != "0|0")
+    {
+        tg.d1 = true;
+        for (const char *k : {"esp32_state", "hb_warn_logged", "gw_link"}) { a.state.erase(k); b.state.erase(k); }
+    }
+
+    // D2 (nRF52): a new server position is in the ring on the live side only; one slot, one count
+    if (side == 1 && gate_type_is(sc, 0x21) && b.newid == a.newid + 1 &&
+        (!sc.known_id || (b.ring_hit == 1 && a.ring_hit == 0)))
+    {
+        tg.d2 = true;
+        for (const char *k : {"dedup_ring", "stat_newid"}) { a.state.erase(k); b.state.erase(k); }
+        a.newid = b.newid = 0;
+        a.ring_hit = b.ring_hit = -1;
+    }
+
+    // D3 (nRF52): exactly one more display call for a text GATE frame
+    if (side == 1 && gate_type_is(sc, 0x3A) &&
+        count_sink(b.sinks, "DISPLAYTEXT") == count_sink(a.sinks, "DISPLAYTEXT") + 1)
+    {
+        tg.d3 = true;
+        a.sinks = sinks_without(a.sinks, "DISPLAYTEXT");
+        b.sinks = sinks_without(b.sinks, "DISPLAYTEXT");
+        for (const char *k : {"display_text", "display_dest_path"}) { a.state.erase(k); b.state.erase(k); }
+    }
+
+    // D4 (nRF52): only the store-node hook sees a different payload
+    if (side == 1 && (a.state["ms_store"] != b.state["ms_store"] || a.state["ms_ack"] != b.state["ms_ack"]))
+    {
+        tg.d4 = true;
+        for (const char *k : {"ms_store", "ms_ack"}) { a.state.erase(k); b.state.erase(k); }
+    }
+
+    // C7 / REORDER (nRF52): only PRINT sink lines differ, in place and/or in the destination path
+    if (side == 1 && a.sinks != b.sinks && sinks_without(a.sinks, "PRINT") == sinks_without(b.sinks, "PRINT"))
+    {
+        std::vector<std::string> pa, pb;
+        for (const auto &l : a.sinks) if (sink_name(l) == "PRINT") pa.push_back(l);
+        for (const auto &l : b.sinks) if (sink_name(l) == "PRINT") pb.push_back(l);
+        bool masked_equal = pa.size() == pb.size();
+        for (size_t i = 0; masked_equal && i < pa.size(); i++)
+            masked_equal = print_masked(pa[i]) == print_masked(pb[i]);
+        if (masked_equal)
+        {
+            if (pa != pb)
+            {
+                // the live line prints the destination path reset to the destination call
+                for (const auto &l : pb)
+                    if (between(l, " dst_path=", " tail=") != between(l, " dst=", " dst_path="))
+                        goto fail;
+                tg.c7 = true;
+            }
+            if (sink_positions(a.sinks, "PRINT") != sink_positions(b.sinks, "PRINT"))
+                tg.reorder = true;
+            a.sinks = sinks_without(a.sinks, "PRINT");
+            b.sinks = sinks_without(b.sinks, "PRINT");
+        }
+    }
+
+    if (a.sinks == b.sinks && a.state == b.state && a.newid == b.newid && a.ring_hit == b.ring_hit)
+        return "";
+
+fail:
     std::string why;
-    if (a.ret != b.ret) why += "ret " + std::to_string(a.ret) + "!=" + std::to_string(b.ret) + "; ";
-
-    // D4: only the store-node hook sees a different payload; nothing else may differ
-    if (a.ret == b.ret && sinks_equal && side == 1)
-    {
-        bool only_ms = true;
-        for (const auto &k : state_diff) if (k != "ms_store" && k != "ms_ack") only_ms = false;
-        if (only_ms) return "D4";
-    }
-
-    // REORDER (C7): only the PRINT sink (printBuffer_aprs) moved relative to the other sinks, on the
-    // nRF52 side, everything else equal in content and order
-    if (a.ret == b.ret && !sinks_equal && state_diff.empty() && side == 1)
-    {
-        std::vector<std::string> fa, fb, pa, pb;
-        for (const auto &l : a.sinks) (sink_name(l) == "PRINT" ? pa : fa).push_back(l);
-        for (const auto &l : b.sinks) (sink_name(l) == "PRINT" ? pb : fb).push_back(l);
-        if (fa == fb && pa == pb) return "REORDER";
-    }
-
-    if (!sinks_equal)
+    if (fa.ret != fb.ret) why += "ret " + std::to_string(fa.ret) + "!=" + std::to_string(fb.ret) + "; ";
+    if (a.sinks != b.sinks)
     {
         size_t i = 0;
         while (i < a.sinks.size() && i < b.sinks.size() && a.sinks[i] == b.sinks[i]) i++;
         why += "sink#" + std::to_string(i) + " frozen=<" + (i < a.sinks.size() ? a.sinks[i] : "end") +
                "> live=<" + (i < b.sinks.size() ? b.sinks[i] : "end") + ">; ";
     }
-    for (const auto &k : state_diff)
+    for (const auto &kv : a.state)
     {
-        std::string av = a.state.count(k) ? a.state.at(k) : "-", bv = b.state.count(k) ? b.state.at(k) : "-";
+        auto it = b.state.find(kv.first);
+        if (it != b.state.end() && it->second == kv.second) continue;
+        std::string av = kv.second, bv = it == b.state.end() ? "-" : it->second;
         if (av.size() > 160) av = av.substr(0, 160) + "...";
         if (bv.size() > 160) bv = bv.substr(0, 160) + "...";
-        why += "state[" + k + "] frozen=<" + av + "> live=<" + bv + ">; ";
+        why += "state[" + kv.first + "] frozen=<" + av + "> live=<" + bv + ">; ";
     }
+    if (a.newid != b.newid || a.ring_hit != b.ring_hit)
+        why += "newid " + std::to_string(a.newid) + "/" + std::to_string(b.newid) + " ring_hit " +
+               std::to_string(a.ring_hit) + "/" + std::to_string(b.ring_hit) + "; ";
     char head[160];
     snprintf(head, sizeof(head), "side=%d len=%zu cfg_gw=%d ", side, sc.bytes.size(), (int)sc.cfg.gateway);
     return std::string(head) + sc.label + ": " + why;
 }
 
-static void run_pair(const Scenario &sc, int side)
+static void tally_pair(const Obs &lv, int side)
 {
-    Obs fz = run_handler(sc, side, true);
-    Obs lv = run_handler(sc, side, false);
-
     T.pairs++;
     T.per_side[side]++;
     T.sinks_compared += (long)lv.sinks.size();
@@ -352,25 +477,73 @@ static void run_pair(const Scenario &sc, int side)
         for (const auto &l : lv.sinks) seen.insert(sink_name(l));
         for (const auto &k : seen) T.sink_kinds[k]++;
     }
-    if (lv.state["tx_ring"] != "" && lv.state["tx_ring"].find("|0") == std::string::npos) T.relayed++;
-    if (lv.state["rm_queue"].compare(0, 2, "1:") == 0) T.with_rm++;
-    if (lv.state["settings_call"] != "DK5EN-1|DK5E1") T.with_settings++;
-    if (lv.state["esp32_state"] != "0|0" || lv.state["nrf52_state"] != "0|0") T.with_server_stamp++;
+    std::map<std::string, std::string> st = lv.state;
+    if (st["tx_ring"] != "" && st["tx_ring"].find("|0") == std::string::npos) T.relayed++;
+    if (st["rm_queue"].compare(0, 2, "1:") == 0) T.with_rm++;
+    if (st["settings_call"] != "DK5EN-1|DK5E1") T.with_settings++;
+    if (st["esp32_state"] != "0|0" || st["nrf52_state"] != "0|0") T.with_server_stamp++;
+}
 
-    std::string r = compare_obs(fz, lv, side, sc);
-    if (r.empty()) T.identical++;
-    else if (r == "D4") T.d4++;
-    else if (r == "REORDER") T.reorder++;
-    else
+static void tally_result(const std::string &r, const Tags &tg)
+{
+    if (!r.empty())
     {
         T.failures++;
         if (T.first_failure.empty()) T.first_failure = r;
         if (T.failures <= 5) printf("DIFF %s\n", r.c_str());
+        return;
     }
+    if (!(tg.d1 || tg.d2 || tg.d3 || tg.d4 || tg.c7 || tg.reorder)) T.identical++;
+    T.d1 += tg.d1; T.d2 += tg.d2; T.d3 += tg.d3; T.d4 += tg.d4; T.c7 += tg.c7; T.reorder += tg.reorder;
+}
+
+static void run_pair(const Scenario &sc, int side)
+{
+    Obs fz = run_handler(sc, side, true);
+    Obs lv = run_handler(sc, side, false);
+    tally_pair(lv, side);
+    Tags tg;
+    tally_result(compare_obs(fz, lv, side, sc, tg), tg);
+}
+
+// D5: the scenario has bytes left in the slab behind the datagram. The live handler must not care
+// (stale == zeroed tail); the reference is the frozen handler on the zeroed tail, which is what
+// the callers guarantee; the pair counts for D5 when the frozen handler did read the stale bytes.
+static void run_pair_stale(const Scenario &sc, int side)
+{
+    // The frozen nRF52 handler, fed a GATE frame the slab completes behind a datagram under 4 bytes,
+    // computes a negative length (packetSize - 4) and memcpy()s it: it crashes (SIGBUS). That is the
+    // D5 hazard itself, so such a pair is counted without running the frozen handler on the stale slab.
+    std::vector<uint8_t> whole = sc.bytes;
+    whole.insert(whole.end(), sc.tail.begin(), sc.tail.end());
+    const bool frozen_crashes = side == 1 && sc.bytes.size() < 4 && whole.size() >= 4 && memcmp(whole.data(), "GATE", 4) == 0;
+    Obs fz_zero  = run_handler(sc, side, true, false);
+    Obs fz_stale = frozen_crashes ? Obs() : run_handler(sc, side, true, true);
+    Obs lv_stale = run_handler(sc, side, false, true);
+    Obs lv_zero  = run_handler(sc, side, false, false);
+    tally_pair(lv_stale, side);
+    T.d5_pairs++;
+    if (!obs_equal(lv_stale, lv_zero))
+    {
+        T.failures++;
+        std::string r = "D5: live handler depends on the slab behind the datagram: " + sc.label;
+        if (T.first_failure.empty()) T.first_failure = r;
+        if (T.failures <= 5) printf("DIFF %s\n", r.c_str());
+        return;
+    }
+    Tags tg;
+    tally_result(compare_obs(fz_zero, lv_stale, side, sc, tg), tg);
+    if (frozen_crashes || !obs_equal(fz_stale, fz_zero)) T.d5++;
 }
 
 static void run_both(const Scenario &sc)
 {
+    if (sc.has_tail)
+    {
+        run_pair_stale(sc, 0);
+        run_pair_stale(sc, 1);
+        return;
+    }
     run_pair(sc, 0);
     run_pair(sc, 1);
 }
@@ -452,7 +625,8 @@ struct Shape { const char *src; const char *dest; char type; const char *payload
 static void test_diff_generated_frames(void)
 {
     static const char *SRC[] = {"DK5EN-2", "XX0XXX-1", "DK5EN-1", "DK5EN-8", "DK5EN-2,DK5EN-1", "DK5EN-3,DK5EN-8", "DK5EN-2,DK5EN-3"};
-    static const char *DEST[] = {"DK5EN-1", "*", "9", "262", "DK5EN-7", "DK5EN-4"};
+    // the last two carry a destination path in front of the call (C7: the path is reset to the call)
+    static const char *DEST[] = {"DK5EN-1", "*", "9", "262", "DK5EN-7", "DK5EN-4", "DK5EN-3,DK5EN-7", "DK5EN-3,DK5EN-1"};
     static const char *PAY[] = {
         "hello{12", "x:ack3", "x:rej4", "{SET}abc", "{CET}2026-11-27 12:00:00", "{ping}", "{pong}", "{MCP}secret",
         "RM1 1791300000 status 0123456789abcdef", "RM1 1791300000 ok v=4.40a up=1 0123456789abcdef",
@@ -593,10 +767,44 @@ static void test_diff_mutated_real_frames(void)
     TEST_ASSERT_EQUAL_INT(0, T.failures);
 }
 
+// D5: real frames cut to a datagram of 0..5 bytes with the rest of the frame still in the slab.
+static void test_diff_d5_stale_slab_behind_short_datagrams(void)
+{
+    int before = T.pairs;
+    unsigned salt = 3000;
+    std::vector<std::pair<std::string, std::vector<uint8_t>>> fulls;
+    auto add = [&](const char *name, const uint8_t *b, size_t n) { fulls.push_back({name, std::vector<uint8_t>(b, b + n)}); };
+    uint8_t buf[BUF_CAP];
+    uint16_t n;
+    memset(buf, 0, sizeof(buf)); n = build_gate_datagram(buf, "DK5EN-2", "DK5EN-1", ':', "hello{12", 0x6101); add("text", buf, n);
+    memset(buf, 0, sizeof(buf)); n = build_gate_datagram(buf, "DK5EN-2", "9", '!', "pos", 0x6102);           add("pos", buf, n);
+    memset(buf, 0, sizeof(buf)); n = build_gate_datagram(buf, "DK5EN-2", "*", '@', "hey", 0x6103);           add("hey", buf, n);
+    memset(buf, 0, sizeof(buf)); n = build_conf_datagram(buf, "DK5EN-12", "SHRT");                          add("conf", buf, n);
+    memset(buf, 0, sizeof(buf)); n = build_beat_datagram(buf);                                              add("beat", buf, n);
+    for (const auto &f : fulls)
+        for (size_t cut = 0; cut <= 5 && cut <= f.second.size(); cut++)
+        {
+            Scenario base = make_sc(f.second.data(), cut, 0x6101, false, 0, f.first + " cut " + std::to_string(cut));
+            base.tail.assign(f.second.begin() + cut, f.second.end());
+            base.has_tail = true;
+            for (int k = 0; k < 12; k++)
+            {
+                Scenario sc = base;
+                sc.cfg = cfg_from_bits(k == 0 ? 0u : (salt * 2654435761u + (unsigned)k * 40503u) % (1u << 13));
+                run_both(sc);
+            }
+            salt++;
+        }
+    TEST_ASSERT_TRUE(T.pairs - before >= 5 * 6 * 12 * 2 - 40);
+    TEST_ASSERT_EQUAL_INT(0, T.failures);
+}
+
 static void test_diff_totals_and_coverage(void)
 {
-    printf("DIFF-SUMMARY pairs=%d identical=%d d4=%d reorder=%d failures=%d sinks_compared=%ld sections_compared=%ld\n",
-           T.pairs, T.identical, T.d4, T.reorder, T.failures, T.sinks_compared, T.sections_compared);
+    printf("DIFF-SUMMARY pairs=%d identical=%d failures=%d sinks_compared=%ld sections_compared=%ld\n",
+           T.pairs, T.identical, T.failures, T.sinks_compared, T.sections_compared);
+    printf("DIFF-SUMMARY whitelist d1=%d d2=%d d3=%d d4=%d d5=%d (stale pairs %d) c7=%d reorder=%d\n",
+           T.d1, T.d2, T.d3, T.d4, T.d5, T.d5_pairs, T.c7, T.reorder);
     printf("DIFF-SUMMARY per_side esp32=%d nrf52=%d zero_rejects=%d relayed=%d rm_queued=%d settings_changed=%d server_stamp=%d\n",
            T.per_side[0], T.per_side[1], T.rejected_zeros, T.relayed, T.with_rm, T.with_settings, T.with_server_stamp);
     for (const auto &kv : T.sink_kinds) printf("DIFF-SUMMARY sink %s in %d pairs\n", kv.first.c_str(), kv.second);
@@ -614,7 +822,12 @@ static void test_diff_totals_and_coverage(void)
     TEST_ASSERT_TRUE(T.with_settings >= 20);
     TEST_ASSERT_TRUE(T.with_server_stamp >= 5000);
     // the whitelist must stay exercised, or it could hide nothing and prove nothing
+    TEST_ASSERT_TRUE_MESSAGE(T.d1 >= 100, "D1 whitelist not exercised");
+    TEST_ASSERT_TRUE_MESSAGE(T.d2 >= 100, "D2 whitelist not exercised");
+    TEST_ASSERT_TRUE_MESSAGE(T.d3 >= 100, "D3 whitelist not exercised");
     TEST_ASSERT_TRUE_MESSAGE(T.d4 >= 50, "D4 whitelist not exercised");
+    TEST_ASSERT_TRUE_MESSAGE(T.d5 >= 20, "D5 whitelist not exercised");
+    TEST_ASSERT_TRUE_MESSAGE(T.c7 >= 100, "C7 whitelist not exercised");
     TEST_ASSERT_TRUE_MESSAGE(T.reorder >= 500, "REORDER whitelist not exercised");
 }
 
@@ -626,6 +839,7 @@ int main(int, char **)
     RUN_TEST(test_diff_conf_beat_other);
     RUN_TEST(test_diff_every_length_random_bytes);
     RUN_TEST(test_diff_mutated_real_frames);
+    RUN_TEST(test_diff_d5_stale_slab_behind_short_datagrams);
     RUN_TEST(test_diff_totals_and_coverage);
     return UNITY_END();
 }

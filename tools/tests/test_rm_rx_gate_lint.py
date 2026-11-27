@@ -48,7 +48,8 @@ def test_lora_hook_does_not_gate_on_the_server_flag() -> None:
 
 
 def test_both_server_ingress_handlers_call_the_gate() -> None:
-    for rel in ("esp32/udp_frame_esp32.cpp", "nrf52/udp_frame_nrf52.cpp"):
+    # FORMAL-02 wave 1b: the two platform copies are merged into one handler
+    for rel in ("udp_frame.cpp",):
         code = _code((SRC / rel).read_text())
         assert code.count("rmRxTryQueue(") == 1, rel
         # the command must stay off the display and the phone

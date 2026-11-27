@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Check that every `extern` in a carved TU matches its real definition.
 
-Four translation units in this tree exist only because a function had to be
+Translation units in this tree exist only because a function had to be
 moved out of a file that never compiles on a host (C1/U1, C2/U2, C3/U3). Each
 of them re-declares, by hand, the file-scope state its function reads:
 
-  src/esp32/udp_drain_esp32.cpp     src/esp32/udp_frame_esp32.cpp
-  src/nrf52/udp_drain_nrf52.cpp     src/nrf52/udp_frame_nrf52.cpp
+  src/esp32/udp_drain_esp32.cpp     src/udp_frame.cpp (one handler, both platforms)
+  src/nrf52/udp_drain_nrf52.cpp
 
 That hand-copying is the hazard this script exists for, and it is worse than
 the stub-header one twin_stub_lint.py covers. A stub header with a drifted
@@ -44,8 +44,7 @@ CARVED = [
     # The four carved TUs this check was originally written for.
     "src/esp32/udp_drain_esp32.cpp",
     "src/nrf52/udp_drain_nrf52.cpp",
-    "src/esp32/udp_frame_esp32.cpp",
-    "src/nrf52/udp_frame_nrf52.cpp",
+    "src/udp_frame.cpp",   # FORMAL-02: the one UDP receive handler (was a per-platform pair)
     # FORMAL-02: the platform seam files re-declare the same hand-written externs
     "src/esp32/udp_frame_platform_esp32.cpp",
     "src/nrf52/udp_frame_platform_nrf52.cpp",

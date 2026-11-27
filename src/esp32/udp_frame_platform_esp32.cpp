@@ -1,6 +1,7 @@
 #include "udp_frame_platform.h"
 #include <configuration.h>            // UDP_TX_BUF_SIZE etc. for the extern header
 #include <loop_functions_extern.h>   // rebootAuto, bLED_ORANGE
+#include <kiss_functions.h>          // queueKiss(): inline no-op under DISABLE_KISS_TCP
 
 // FORMAL-02 platform seam, ESP32 side (see udp_frame_platform.h). The state
 // lives in udp_functions.cpp and is not declared in a header, so it is
@@ -36,4 +37,9 @@ void udpPlatformScheduleConfReboot(unsigned long delay_ms)
 #else
     (void)delay_ms;
 #endif
+}
+
+void udpPlatformKissTap(uint8_t *buf, uint16_t len, int16_t rssi, int8_t snr)
+{
+    queueKiss(buf, len, rssi, snr);
 }

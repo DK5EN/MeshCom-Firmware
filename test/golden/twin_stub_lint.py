@@ -49,7 +49,7 @@ PAIRS: List[Tuple[str, str]] = [
     ("test/test_gateway_service_twin/stubs/udp_functions.h", "src/udp_functions.h"),
     ("test/test_gateway_service_twin/stubs/nrf_eth.h", "src/nrf52/nrf_eth.h"),
     # 2026-09-25 upstream merge: the U1 twin shadows kiss_functions.h so the
-    # KISS server-relay tap in handleUdpFrame_esp32() becomes observable. Its
+    # KISS server-relay tap of handleUdpFrame() becomes observable. Its
     # queueKiss() is the real header's ESP32 declaration and its no-ops are the
     # real header's #else lines, so every stub line has a verbatim original.
     ("test/test_udp_frame_twin/stubs/kiss_functions.h", "src/kiss_functions.h"),

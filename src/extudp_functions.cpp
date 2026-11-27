@@ -837,7 +837,7 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
   // Reentranz geprueft: alle fuenf Aufrufer von sendExtern() (hier unten in
   // flushExternQueue(), sendMessage() und sendPosition() in
   // loop_functions.cpp (4297 bzw. 4903), je ein
-  // Aufruf in udp_frame_esp32.cpp/udp_frame_nrf52.cpp) laufen auf beiden
+  // Aufruf in udp_frame.cpp) laufen auf beiden
   // Plattformen ausschliesslich im Loop-Task -- NimBLE liefert per Queue an
   // den Loop-Task zu (esp32_main.cpp: "BLE Queue: process data from NimBLE
   // task in Main Loop context"), der Webserver ist ein synchron gepolltes

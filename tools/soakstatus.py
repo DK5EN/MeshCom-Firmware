@@ -145,15 +145,14 @@ RE_WIFI_DOWN = re.compile(r"\[WIFI\];\w+;down;")
 RE_GW_KEEP = re.compile(r"\[GW\];keep;tx;ok;")
 
 # [RETX]/[RX]/[MC-DBG] markers from the PN-XOR retry ladder
-# (src/lora_functions.cpp, src/nrf52/udp_frame_nrf52.cpp,
-# src/esp32/udp_frame_esp32.cpp). All gated by bDisplayRetx (--loradebug on
+# (src/lora_functions.cpp, src/udp_frame.cpp). All gated by bDisplayRetx (--loradebug on
 # also sets this) except PNREPEAT, which is bDisplayInfo.
 RE_PNRETRY = re.compile(r"\[RETX\] PNRETRY k=(?P<k>\d+) msg-id:(?P<msgid>[0-9A-Fa-f]{8})")
 RE_PN_ECHO_RESTART = re.compile(r"\[RETX\] PN echo, wait restarted retid:\d+")
 RE_PN_ALREADY_ACKED = re.compile(
     r"\[RETX\] PN already acked, stop retid:(?P<retid>\d+) msg-id:(?P<msgid>[0-9A-Fa-f]{8})"
 )
-# Server/UDP-path ack: src/nrf52/udp_frame_nrf52.cpp + src/esp32/udp_frame_esp32.cpp.
+# Server/UDP-path ack: src/udp_frame.cpp.
 RE_SERVER_ACK = re.compile(
     r"\[RETX\] server ACK for retid:(?P<retid>\d+) stop retransmit msg-id:(?P<msgid>[0-9A-Fa-f]{8})"
 )

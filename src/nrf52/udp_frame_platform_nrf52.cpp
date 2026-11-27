@@ -27,4 +27,9 @@ void udpPlatformScheduleConfReboot(unsigned long delay_ms)
 {
     rebootAuto = millis() + delay_ms;   // the T-Deck defines are never set on nRF52
 }
+
+void udpPlatformKissTap(uint8_t *, uint16_t, int16_t, int8_t)
+{
+    // no KISS server on nRF52
+}
 #endif

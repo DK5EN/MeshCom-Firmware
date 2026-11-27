@@ -31,7 +31,7 @@ void sendUDP()
     // to parity). ESP32 refuses to drain while the resolved gateway server
     // address is unset (udp_drain_esp32.cpp, node_hostip == 0); this is
     // nRF52's own equivalent concept, neth.udp_dest_addr (already read by
-    // udp_frame_nrf52.cpp's CONF guard, DR-08). ESP32's other two
+    // udp_frame.cpp's CONF guard, DR-08). ESP32's other two
     // preconditions do NOT port: hasIPaddress is already the sole caller's
     // gate (gateway_service_nrf52.cpp:28-34) and nRF52 has no AP mode, so
     // porting them would be vacuous or wrong, not just extra.

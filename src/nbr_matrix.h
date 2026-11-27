@@ -421,7 +421,7 @@ uint16_t nbrRowAgeMin(const NbrMatrix &m, int row, uint16_t now_min);
 // Kanten) und keine Zeile fuer irgendein Pfad-Token ausser dem letzten Hop;
 // die CUT-Zeile (sie beschreibt das 2-Hop-Fenster) entfaellt fuer Text
 // ebenfalls. Restrisiko: das setzt voraus, dass der Server ausschliesslich
-// Text nach unten schickt -- udp_frame_esp32.cpp nimmt weiterhin '!'/'@'
+// Text nach unten schickt -- udp_frame.cpp nimmt weiterhin '!'/'@'
 // von UDP an. Bewusster Verlust: auch das Echo meines eigenen Textes
 // ("<ich>,X") traegt kein "X hoert mich" (cells[0][X]) mehr ein, und ein
 // echter Funk-Relay eines Textes ("A,M") keine Kante A->M -- ein anderes

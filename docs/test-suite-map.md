@@ -117,6 +117,13 @@ Added 2026-11-24 (WEB-WX-01, telegram P-0394): pytest site pin `tools/tests/test
 WX table has a row for BMP390, AHT20, SHT21 and INA226 (each under its `ENABLE_` define, on and found flags), and
 the temperature rows name their source (I2C, 1-Wire).
 
+Added 2026-11-27 (FORMAL-02 wave 1b, UDP receive handler consolidation, `docs/udp-consolidation-20261127.md`): the two
+per-platform handlers are one (`src/udp_frame.cpp`), so `test_udp_frame_twin` no longer compares two implementations: it
+runs the one handler as the ESP32 and as the nRF52 board (platform hooks switched per side) and pins the hooks, and
+`test_udp_frame_diff` (env `native_udp_frame_diff`, 6 -> 7 cases, about 110k datagram pairs) compares it with byte-frozen
+copies of the two old handlers; the only differences allowed are the counted classes D1, D2, D3, D4, D5, C7 and REORDER.
+`test_udp_frame_twin` +6 (D1, D2, D3, D5 core, D5 handler, C7), `test_regression_udp04_..._on_esp32` is now `_on_both`.
+
 The per-suite sums were recomputed from the tree on 2026-10-04 (every
 `RUN_TEST` under `test/test_*`). The totals before that date were stale: the
 old header said 96 suites / 1563 cases, while the table below already listed

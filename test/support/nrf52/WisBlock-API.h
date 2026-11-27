@@ -62,9 +62,9 @@ extern s_meshcom_settings meshcom_settings;
 //   nrf52/WisBlock-API.h:614    bool save_settings(void);
 // The C++ mangled name ignores the return type, so both spell _Z13save_settingsv
 // and nothing diagnoses the mismatch. This shim is the nRF52 one, so it carries
-// the nRF52 signature. The U1 twin compiles BOTH frame handlers into one binary
-// against this single declaration; that is sound only because neither call site
-// uses the return value (esp32/udp_frame_esp32.cpp:428,
-// nrf52/udp_frame_nrf52.cpp:416). If either ever does, this shim stops being
-// able to serve both sides and the drift has to be resolved for real.
+// the nRF52 signature. The U1 twin builds the merged frame handler for both
+// platform views against this single declaration; that is sound only because
+// the call site does not use the return value (udp_frame.cpp:746). If it ever
+// does, this shim stops being able to serve both sides and the drift has to be
+// resolved for real.
 bool save_settings(void);

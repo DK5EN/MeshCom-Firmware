@@ -41,12 +41,8 @@ void ethLinkHeartbeat();     // [ETH];link every 60 s
 void ethStat();              // --ethstat
 void ethDrop(bool forceHwReset = false);   // --ethdrop [hw]: recovery path, timed; hw forces the W5100S reset path (ETH-06)
 
-// C1 carve-out (DRY unification U1): the frame handler is the body that runs
-// once a datagram is in the buffer -- no socket, no NTP, no DHCP. Returns 0
-// when the frame was handled, 1 when it carried more than MAX_ZEROS zero
-// bytes. Same signature as handleUdpFrame_esp32() in udp_functions.h so both
-// sides can be linked into one native binary and fed the same corpus.
-int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddress remote_ip);
+// The frame handler (handleUdpFrame(), src/udp_frame.cpp, declared in
+// udp_frame_platform.h) is shared with ESP32; this class only calls it.
 
 // C2 carve-out (DRY unification U2): the socket primitives of the datagram
 // write, paired with udpWriteRaw_esp32()/udpEndRaw_esp32() in udp_functions.h.
@@ -101,8 +97,6 @@ class NrfETH {
     void harvestNTP();
 
     void fillUDP_RING_BUFFER(uint8_t buffer [UDP_TX_BUF_SIZE], uint16_t rx_buf_size);
-
-    int lora_tx_msg_len;
 
     uint8_t lora_tx_buffer_eth [UDP_TX_BUF_SIZE];
 

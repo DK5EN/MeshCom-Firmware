@@ -4,9 +4,8 @@
 // udp-consolidation-20261127.md section 5.3). Header-only, no Arduino, no
 // String, no IPAddress, no globals: an explicit buffer plus length in, a small
 // struct out, so a bounded model checker can take it without the rest of the
-// handler. Both handleUdpFrame_esp32() and handleUdpFrame_nrf52() call it for
-// the zero scan, the indicator class and the GATE payload span, so those
-// decisions exist once.
+// handler. handleUdpFrame() (src/udp_frame.cpp) calls it for the zero scan,
+// the indicator class and the GATE payload span, so those decisions exist once.
 //
 // Precondition for both functions: len <= UDP_TX_BUF_SIZE (callers bound it:
 // ESP32 reads at most UDP_TX_BUF_SIZE-1, nRF52 accepts packetSize <=
@@ -16,15 +15,12 @@
 #include <stddef.h>
 #include "configuration_global.h"   // UDP_TX_BUF_SIZE, UDP_CONF_BUFF_SIZE, UDP_MSG_INDICATOR_LEN, MAX_ZEROS
 
-// D5 switch (operator decision 2026-11-27, applied in part 2 of the
-// consolidation): 0 = today's behaviour, the four indicator bytes and buf[4]
-// are read whatever len is (the slab is NUL-terminated / wiped by the
-// callers, so a datagram shorter than 4 bytes never matches in practice);
-// 1 = a datagram under 4 bytes is class OTHER and a 4-byte GATE carries no
-// type (gate_kind UDPG_NONE, msg_type 0), independent of the slab contents.
-#ifndef UDP_FRAME_D5_FIXED
-#define UDP_FRAME_D5_FIXED 0
-#endif
+// D5 (operator decision 2026-11-27): the verdict depends on the first len bytes
+// only, never on what the slab holds behind them. A datagram under 4 bytes is
+// class OTHER, and a 4-byte GATE carries no type (gate_kind UDPG_NONE,
+// msg_type 0); buf[4] is not read when len == 4. Before, the four indicator
+// bytes and buf[4] were read whatever len was and the callers' NUL wipe was
+// the only thing keeping a short datagram from matching.
 
 enum UdpFrameClass { UDPF_REJECT_ZEROS = 0, UDPF_GATE, UDPF_CONF, UDPF_BEAT, UDPF_OTHER };
 enum UdpGateKind   { UDPG_NONE = 0, UDPG_TEXT /*0x3A*/, UDPG_POS /*0x21*/, UDPG_HEY /*0x40*/, UDPG_UNKNOWN };
@@ -72,10 +68,8 @@ static inline void udpFrameClassify(const uint8_t *buf, size_t len, UdpFrameInfo
         return;
     }
 
-#if UDP_FRAME_D5_FIXED
     if (len < UDP_MSG_INDICATOR_LEN)
-        return;   // class OTHER
-#endif
+        return;   // D5: class OTHER
 
     const bool isGate = buf[0] == 'G' && buf[1] == 'A' && buf[2] == 'T' && buf[3] == 'E';
     const bool isConf = buf[0] == 'C' && buf[1] == 'O' && buf[2] == 'N' && buf[3] == 'F';
@@ -85,16 +79,13 @@ static inline void udpFrameClassify(const uint8_t *buf, size_t len, UdpFrameInfo
     {
         out->cls = UDPF_GATE;
 
-        // today's wrap: packetSize - 4 into a uint16_t, then the clamp
-        uint16_t gl = (uint16_t)(len - UDP_MSG_INDICATOR_LEN);
+        uint16_t gl = (uint16_t)(len - UDP_MSG_INDICATOR_LEN);   // len >= 4 here (D5)
         if (gl > UDP_TX_BUF_SIZE)
             gl = UDP_TX_BUF_SIZE;   // for safety; unreachable for len <= UDP_TX_BUF_SIZE
         out->gate_len = gl;
 
-#if UDP_FRAME_D5_FIXED
         if (out->gate_len == 0)
-            return;   // 4-byte GATE: no type byte, gate_kind stays UDPG_NONE
-#endif
+            return;   // D5: 4-byte GATE, no type byte, gate_kind stays UDPG_NONE
         out->msg_type = buf[UDP_MSG_INDICATOR_LEN];
         switch (out->msg_type)
         {

@@ -2,27 +2,24 @@
 // audit rows C1/U1). "the same datagram fed to both platform copies must
 // produce the same (or a DELIBERATELY pinned different) observable effect."
 //
-// ONE binary, like the U2 drain twin (test/test_udp_send_twin), not two: the
-// handlers are named differently -- handleUdpFrame_esp32() / handleUdpFrame_
-// nrf52() -- so both translation units link together and the comparison is a
-// real differential, not two runs compared through files. See
-// src/udp_frame.h for why the two bodies moved out unchanged and why they
-// are deliberately NOT merged: which of them is right is a drift-matrix
-// decision, not this test's -- this test's job is to make every difference
-// explicit and failing-on-change.
+// ONE binary, like the U2 drain twin (test/test_udp_send_twin), not two. Since
+// the FORMAL-02 consolidation both "platforms" run the same handler,
+// handleUdpFrame() (src/udp_frame.cpp); the twin's two sides differ only in the
+// platform hooks (src/udp_frame_platform.h), which this file defines once and
+// switches on the side the wrapper below announced. What stays a platform
+// difference (the KISS tap, the LED flag, the T-Deck-free reboot hook) is
+// pinned as such; everything else is an agreement test. The pre-consolidation
+// handlers live on as frozen copies in test/test_udp_frame_diff.
 //
 //   pio test -e native_udp_frame_twin -f test_udp_frame_twin
 //
 // WHAT IS STUBBED AND WHY, at a glance (see the stub headers themselves for
 // the full reasoning):
-//   stubs/udp_functions.h        real one gates bUDPLOG/handleUdpFrame_esp32
-//                                 behind #if defined(ESP32), which this
-//                                 native build never sets
-//   stubs/nrf_eth.h               real NrfETH drags the W5100S driver; four
-//                                 members + handleUdpFrame_nrf52() declared
-//   stubs/SPI.h,
-//   stubs/RAK13800_W5100S.h        empty shims, nothing in the frame handler
-//                                 touches them
+//   stubs/udp_functions.h        real one gates bUDPLOG behind
+//                                 #if defined(ESP32), which this native
+//                                 build never sets
+//   stubs/nrf_eth.h               real NrfETH drags the W5100S driver; three
+//                                 members the nRF52 hooks touch are declared
 //
 // The shared settings shim test/support/nrf52/WisBlock-API.h carries the
 // fields this env needs: node_short (both handlers write it in the CONF
@@ -76,7 +73,9 @@
 #include <own_msg_status.h>  // web GUI tick fix: late server ACK reaches the durable status row
 #include <msgstore_api.h>    // SNF-GW-04: store-node hooks both handlers call on server ingress (faked below)
 #include <lora_functions.h>  // SNF-GW-04: pnRxIsRepeat() declaration (faked below)
-#include "../../src/udp_frame_platform.h"   // FORMAL-02 hook seam (the hooks are defined below, one set switching on the side)
+#include "../../src/udp_frame_platform.h"   // FORMAL-02 hook seam + handleUdpFrame() (the hooks are defined below, one set switching on the side)
+#include "../../src/udp_frame_parse.h"      // FORMAL-02: the pure core, tested directly (D5)
+#include <kiss_functions.h>                 // stub: queueKiss() is a plain function here (the KISS tap hook calls it)
 
 // ---------------------------------------------------------------------------
 // File-scope state the two handlers extern. Types/values copied verbatim
@@ -84,20 +83,17 @@
 // linker-invisible bug, same discipline test_udp_send_twin.cpp uses.
 // ---------------------------------------------------------------------------
 
-// esp32/udp_frame_esp32.cpp:30-38
+// udp_functions.cpp / loop_functions.cpp / extudp_functions.cpp (ESP32 side)
 bool udp_is_busy = false;
-uint16_t lora_tx_msg_len = 0;
 unsigned long last_upd_timer = 0;
 bool hb_warn_logged = false;
-uint8_t convBuffer[UDP_TX_BUF_SIZE + 50];
 bool hasExternIPaddress = false;
 String strSource_call;
 bool had_initial_udp_conn = false;
 IPAddress node_hostip(44, 143, 8, 143);
 
-// nrf52/udp_frame_nrf52.cpp:28-33 (strSource_call shared with the block
-// above -- both handlers really do read/write one global on their own
-// firmware image; sharing it here is the twin's whole point).
+// nrf_eth.cpp (nRF52 side); strSource_call is shared with the block above --
+// each firmware image has exactly one, sharing it here is the twin's whole point.
 NrfETH neth;
 bool bUDPLOG = false;
 
@@ -162,18 +158,23 @@ void udpPlatformScheduleConfReboot(unsigned long delay_ms)
     rebootAuto = millis() + delay_ms;   // the board files differ only by the T-Deck exception, no native define
 }
 
+void udpPlatformKissTap(uint8_t *buf, uint16_t len, int16_t rssi, int8_t snr)
+{
+    if (g_udp_hook_side == 0)
+        queueKiss(buf, len, rssi, snr);   // nRF52 has no KISS server: empty hook
+}
+
 // Every call site below (about 130) goes through these two wrappers so the
-// hooks see the right side; the macros come after the wrappers because they
-// call the real names.
+// hooks see the right side: the one handler, run as the ESP32 or the nRF52 board.
 static int twinFeedEsp32(unsigned char *buf, int n, IPAddress ip)
 {
     g_udp_hook_side = 0;
-    return handleUdpFrame_esp32(buf, n, ip);
+    return handleUdpFrame(buf, n, ip);
 }
 static int twinFeedNrf52(unsigned char *buf, int n, IPAddress ip)
 {
     g_udp_hook_side = 1;
-    return handleUdpFrame_nrf52(buf, n, ip);
+    return handleUdpFrame(buf, n, ip);
 }
 #define handleUdpFrame_esp32(...) twinFeedEsp32(__VA_ARGS__)
 #define handleUdpFrame_nrf52(...) twinFeedNrf52(__VA_ARGS__)
@@ -235,6 +236,9 @@ struct PrintedAprs
 {
     std::string source;
     std::string tail;
+    std::string src_path;
+    std::string dst_path;
+    std::string dst_call;
 };
 static std::vector<PrintedAprs> g_printed;
 static std::vector<std::string> g_dropped;            // logRxDropUnconfigured
@@ -304,7 +308,7 @@ static std::vector<uint32_t> g_insert_calls;
 
 // findAndStopRingSlotNoRm1() (src/lora_functions.h/.cpp; skips RM1 command slots): a server-ack for an id
 // checkOwnTx() knows also stops the waiting TX-ring slot (PN retry, see the
-// call site in udp_frame_esp32.cpp/udp_frame_nrf52.cpp). lora_functions.cpp
+// call site in udp_frame.cpp). lora_functions.cpp
 // is not in this env's build_src_filter, so faked here exactly like
 // checkOwnTx() above: a pure recorder, kept out of g_sink_log so it cannot
 // perturb the U1 corpus dump or the committed twin-diff baseline. Returns -1
@@ -498,8 +502,14 @@ void printBuffer_aprs(char *msg_source, struct aprsMessage &aprsMessage, const c
     p.source = aprsMessage.msg_source_call;
     p.tail = tail ? tail : "";
     (void)msg_source;
+    // C7: the RX-UDP debug line prints the source/destination path as they are at this point;
+    // the destination path is reset to the destination call before it (MeshCom 5, Stufe 3).
+    p.src_path = aprsMessage.msg_source_path;
+    p.dst_path = aprsMessage.msg_destination_path;
+    p.dst_call = aprsMessage.msg_destination_call;
     g_printed.push_back(p);
-    record_sink("PRINT", "source=" + p.source + " tail=" + p.tail);
+    record_sink("PRINT", "source=" + p.source + " src_path=" + p.src_path + " dst=" + p.dst_call +
+                         " dst_path=" + p.dst_path + " tail=" + p.tail);
 }
 
 void addBLEOutBuffer(uint8_t *buffer, uint16_t len)
@@ -738,10 +748,8 @@ static void recorder_reset()
     g_ms_pn_repeat = false;
 
     udp_is_busy = false;
-    lora_tx_msg_len = 0;
     last_upd_timer = 0;
     hb_warn_logged = false;
-    memset(convBuffer, 0, sizeof(convBuffer));
     hasExternIPaddress = false;
     strSource_call = "";
     had_initial_udp_conn = false;
@@ -1061,23 +1069,9 @@ static void test_regression_server_reflection_of_own_source_not_queued_on_both(v
     }
 }
 
-static void test_regression_udp04_duplicate_server_position_no_second_ring_slot_on_esp32(void)
+// Slots of the dedup ring that hold this message id (the ring is cleared by recorder_reset()).
+static int dedup_ring_entries(uint32_t id)
 {
-    // UDP-04: a repeated server position (0x21) must not write a second dedup-ring
-    // slot nor count stat_newid again (the early insert is gated on bUdpMsgIsNew).
-    const uint32_t id = 0x3A04;
-    uint8_t tmpl[BUF_CAP];
-    memset(tmpl, 0, sizeof(tmpl));
-    uint16_t len = build_gate_datagram(tmpl, "DK5EN-2", "9", '!', "4700.00N/01300.00E-test", id);
-
-    recorder_reset();
-    uint8_t buf[BUF_CAP];
-    for (int k = 0; k < 2; k++)
-    {
-        copy_into(buf, tmpl, len);
-        handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
-    }
-
     int entries = 0;
     for (int i = 0; i < MAX_DEDUP_RING; i++)
     {
@@ -1085,8 +1079,87 @@ static void test_regression_udp04_duplicate_server_position_no_second_ring_slot_
                        ((uint32_t)ringBufferLoraRX[i][2] << 16) | ((uint32_t)ringBufferLoraRX[i][3] << 24);
         if (rid == id) entries++;
     }
-    TEST_ASSERT_EQUAL_INT_MESSAGE(1, entries, "UDP-04: duplicate 0x21 dedup-ring entries for its id");
-    TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, stat_newid.load(), "UDP-04: duplicate 0x21 stat_newid");
+    return entries;
+}
+
+static void test_regression_udp04_duplicate_server_position_no_second_ring_slot_on_both(void)
+{
+    // UDP-04: a repeated server position (0x21) must not write a second dedup-ring
+    // slot nor count stat_newid again (the early insert is gated on bUdpMsgIsNew).
+    // D2 (2026-11-27): the same on the nRF52 side, which inserts on receipt now too.
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[128];
+        const uint32_t id = 0x3A04 + (uint32_t)side;
+        uint8_t tmpl[BUF_CAP];
+        memset(tmpl, 0, sizeof(tmpl));
+        uint16_t len = build_gate_datagram(tmpl, "DK5EN-2", "9", '!', "4700.00N/01300.00E-test", id);
+
+        recorder_reset();
+        uint8_t buf[BUF_CAP];
+        for (int k = 0; k < 2; k++)
+        {
+            copy_into(buf, tmpl, len);
+            if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+            else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+        }
+
+        snprintf(msg, sizeof(msg), "%s UDP-04: duplicate 0x21 dedup-ring entries for its id", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, dedup_ring_entries(id), msg);
+        snprintf(msg, sizeof(msg), "%s UDP-04: duplicate 0x21 stat_newid", name);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, stat_newid.load(), msg);
+    }
+}
+
+// D2 (operator decision 2026-11-27, option A): a new server position (0x21) enters the dedup
+// ring at once on receipt, on both platforms -- also when it is then NOT relayed (the veto
+// cases), so the RF copy via another relay is a duplicate. Before, only ESP32 did; the nRF52
+// inserted at the relay decision alone and left a vetoed position out. Exactly one slot and one
+// stat_newid per id in every case (no second insert from the relay / reflect branches).
+static void test_regression_d2_server_position_enters_dedup_ring_on_receipt_on_both(void)
+{
+    struct Case { const char *name; const char *src; bool nopos; bool own_tx; bool relays; };
+    static const Case cases[] = {
+        {"relayed",              "DK5EN-2",   false, false, true },
+        {"bGATEWAY_NOPOS veto",  "DK5EN-2",   true,  false, false},
+        {"unconfigured source",  "XX0XXX-00", false, false, false},
+        {"own tx known",         "DK5EN-2",   false, true,  false},
+        {"own call reflected",   "DK5EN-1",   false, false, false},
+    };
+    for (int side = 0; side < 2; side++)
+        for (size_t k = 0; k < sizeof(cases) / sizeof(cases[0]); k++)
+        {
+            const Case &c = cases[k];
+            char msg[128];
+            snprintf(msg, sizeof(msg), "%s / %s", side ? "nrf52" : "esp32", c.name);
+            const uint32_t id = 0x7A00 + (uint32_t)side * 16 + (uint32_t)k;
+
+            recorder_reset();
+            bGATEWAY_NOPOS = c.nopos;
+            if (c.own_tx) g_own_tx_known.push_back(id);
+
+            uint8_t buf[BUF_CAP];
+            memset(buf, 0, sizeof(buf));
+            uint16_t len = build_gate_datagram(buf, c.src, "9", '!', "4700.00N/01300.00E-test", id);
+            const int depth0 = txRingDepth();
+            if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+            else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+            TEST_ASSERT_EQUAL_INT_MESSAGE(1, dedup_ring_entries(id), msg);
+            TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, stat_newid.load(), msg);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(depth0 + (c.relays ? 1 : 0), txRingDepth(), msg);
+
+            // the repeat is a duplicate: no second slot, no relay
+            memset(buf, 0, sizeof(buf));
+            len = build_gate_datagram(buf, c.src, "9", '!', "4700.00N/01300.00E-test", id);
+            if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+            else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+            TEST_ASSERT_EQUAL_INT_MESSAGE(1, dedup_ring_entries(id), msg);
+            TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, stat_newid.load(), msg);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(depth0 + (c.relays ? 1 : 0), txRingDepth(), msg);
+        }
+    bGATEWAY_NOPOS = false;
 }
 
 // TXP-02: a DM to the gateway's own call received over UDP is handled locally (never relayed to
@@ -1560,7 +1633,7 @@ static void test_agreement_zero_scan_bound_matches_on_odd_length(void)
     // packetSize; i += 2)` never had this: it stops after (4,5), the third
     // and last IN-BOUNDS pair. Fixed on ESP32 by commit cd88ae12
     // (SEC-05/SEC-06/BUG-12); the same fix now applied to nRF52
-    // (src/nrf52/udp_frame_nrf52.cpp:53) -- this test used to live in the
+    // (udp_frame.cpp) -- this test used to live in the
     // DRIFT block, pinning the disagreement the bug caused. See
     // test_regression_zero_scan_oob_byte_flips_verdict_before_fix() below
     // for a case where the extra byte does not just change zerocount's
@@ -1660,7 +1733,7 @@ static void test_agreement_extudp_requires_hasExternIPaddress_on_both(void)
     // extudp_functions.cpp:455-458, so there was never an observable hole;
     // this pins the call SITE now reading alike): both handlers gate the
     // EXTUDP forward on `hasExternIPaddress && bEXTUDP`. Landed together with
-    // DR-18 and DR-19 (one lifted call site, udp_frame_nrf52.cpp:128-135).
+    // DR-18 and DR-19 (one lifted call site, udp_frame.cpp).
     uint8_t tmpl[BUF_CAP];
     memset(tmpl, 0, sizeof(tmpl));
     uint16_t len = build_gate_datagram(tmpl, "DK5EN-2", "9", ':', "extudp", 0x3003);
@@ -1687,7 +1760,7 @@ static void test_agreement_extudp_forwards_one_decodable_frame_per_type_and_reje
     // set; TEST clause added 2026-09-17 wave W6): ESP32's shape wins --
     // EXTUDP is forwarded only for the recognised msg_type_b set
     // (0x3A/0x21/0x40), now as its own explicit type test on BOTH platforms
-    // (udp_frame_esp32.cpp, udp_frame_nrf52.cpp), lifted out of (nRF52) /
+    // (udp_frame.cpp), lifted out of (nRF52) /
     // alongside (ESP32) the relay branch.
     //
     // Replaces a single 0xFF-garbage/undecodable case that used to be this
@@ -1766,13 +1839,13 @@ static void test_agreement_extudp_length_arg_matches_after_cast_removed(void)
     // DR-19 (2026-09-12 decided esp32-correct, class corrected cosmetic ->
     // bug-one-side (latent): inert and harmless are not the same thing):
     // nRF52's redundant (uint8_t) cast on the EXTUDP length argument
-    // (previously udp_frame_nrf52.cpp:99) is REMOVED, not just left as a
+    // (previously udp_frame.cpp) is REMOVED, not just left as a
     // documented no-op -- MAX_APRS_FRAME_SIZE (340) vs. UDP_TX_BUF_SIZE
     // (255) is an open lead (src/aprs_functions.cpp:10,
     // configuration_global.h:169); any work that resolves it by raising
     // UDP_TX_BUF_SIZE past 255 would have made this cast start silently
     // truncating on nRF52 only. Landed together with DR-18/DR-07 (one
-    // lifted call site, udp_frame_nrf52.cpp:128-135).
+    // lifted call site, udp_frame.cpp).
     //
     // MEASURED LIMIT, recorded so nobody re-derives it: BOTH handlers clamp
     // lora_tx_msg_len to UDP_TX_BUF_SIZE (255) BEFORE the sendExtern() call
@@ -1821,7 +1894,7 @@ static void test_agreement_dedup_gate_position_and_gateway_nopos_on_both(void)
     // on either side any more, so it is not independently observable here.
     //
     // DR-04 (2026-09-12 decided esp32-correct): bGATEWAY_NOPOS is now also
-    // honoured on nRF52 (udp_frame_nrf52.cpp:225-231, landing after DR-06's
+    // honoured on nRF52 (udp_frame.cpp landing after DR-06's
     // decode gate and DR-05's sendDisplayPosition() port in the same
     // block) -- previously nRF52 never referenced the flag at all, so a
     // position frame relayed regardless of it.
@@ -1842,12 +1915,16 @@ static void test_agreement_dedup_gate_position_and_gateway_nopos_on_both(void)
         char msg[96];
         snprintf(msg, sizeof(msg), "%s: fresh position frame must relay", name);
         TEST_ASSERT_EQUAL_INT_MESSAGE(depth0 + 1, txRingDepth(), msg);
+        snprintf(msg, sizeof(msg), "%s: fresh position frame holds exactly one dedup-ring slot", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, dedup_ring_entries(0x4004), msg);
 
         copy_into(buf, tmpl, len);
         if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
         else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
         snprintf(msg, sizeof(msg), "%s: repeated position frame must not relay again", name);
         TEST_ASSERT_EQUAL_INT_MESSAGE(depth0 + 1, txRingDepth(), msg);
+        snprintf(msg, sizeof(msg), "%s: repeated position frame writes no second ring slot", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, dedup_ring_entries(0x4004), msg);
     }
 
     // Second agreement half: bGATEWAY_NOPOS vetoes the relay on both, fresh
@@ -1867,6 +1944,10 @@ static void test_agreement_dedup_gate_position_and_gateway_nopos_on_both(void)
         char msg[96];
         snprintf(msg, sizeof(msg), "%s relayed a position frame despite bGATEWAY_NOPOS", name);
         TEST_ASSERT_EQUAL_INT_MESSAGE(depth0, txRingDepth(), msg);
+        // D2: the vetoed position is in the dedup ring all the same (on both platforms)
+        snprintf(msg, sizeof(msg), "%s: bGATEWAY_NOPOS position frame must still enter the dedup ring", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, dedup_ring_entries(side ? 0x4006 : 0x4005), msg);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, stat_newid.load(), msg);
     }
 }
 
@@ -1874,7 +1955,7 @@ static void test_agreement_senddisplayposition_on_both(void)
 {
     // DR-05 (2026-09-12 decided esp32-correct): sendDisplayPosition() is now
     // called for a position frame on both platforms
-    // (udp_frame_nrf52.cpp:227, landing after DR-06's decode gate) --
+    // (udp_frame.cpp landing after DR-06's decode gate) --
     // previously nRF52 never called it at all (only sendDisplayText()).
     uint8_t tmpl[BUF_CAP];
     memset(tmpl, 0, sizeof(tmpl));
@@ -1899,7 +1980,7 @@ static void test_agreement_rx01_unconfigured_guard_on_both(void)
     // RX-01 (BACKLOG 3.8k), second door: a GATE frame whose APRS source is
     // still the factory callsign is counted and refused relay. DR-02
     // (2026-09-12 decided esp32-correct): now on both platforms
-    // (udp_frame_nrf52.cpp:164-168) -- previously nRF52 had no such check
+    // (udp_frame.cpp) -- previously nRF52 had no such check
     // and relayed the frame like any other. The factory callsign is used
     // here ONLY as the SOURCE of an inbound frame under test, never as a
     // transmitting identity (never used as an outbound sender elsewhere in
@@ -2081,8 +2162,8 @@ static void test_agreement_decodeaprs_reject_suppresses_processing_on_both(void)
     // display-call/ring-insert gap): decodeAPRS() returns 0x00
     // (aprs_functions.cpp) for a GATE frame whose logical body is shorter
     // than 16 bytes. Both platforms now capture the return value and gate
-    // ALL further processing on it (udp_frame_esp32.cpp:145-147,
-    // udp_frame_nrf52.cpp:144-146) -- previously ESP32 discarded it and
+    // ALL further processing on it (udp_frame.cpp
+    // udp_frame.cpp) -- previously ESP32 discarded it and
     // kept dispatching on the RAW msg_type_b byte read straight off the
     // wire, so a rejected 0x21 ('!' position) frame still ran
     // sendDisplayPosition() and unconditionally inserted msg_id 0 into the
@@ -2127,8 +2208,8 @@ static void test_agreement_conf_zero_address_guard_on_both(void)
     // DR-08 (2026-09-12 decided esp32-correct): both platforms now reject a
     // CONF frame when the source doesn't match the resolved gateway OR the
     // resolved gateway address is still unresolved (0.0.0.0) -- an
-    // explicit, independent check (udp_frame_esp32.cpp:387,
-    // udp_frame_nrf52.cpp:438). Previously nRF52 checked only equality, so
+    // explicit, independent check (udp_frame.cpp
+    // udp_frame.cpp). Previously nRF52 checked only equality, so
     // a CONF datagram whose OWN source happened to read 0.0.0.0 slipped
     // through while udp_dest_addr was itself still unresolved
     // (0.0.0.0 before DHCP/pre-resolve).
@@ -2170,8 +2251,8 @@ static void test_agreement_ack_phone_frame_attribution_on_both(void)
     // carries a ":ack"/":rej" payload. Both platforms now build it via the
     // shared buildAckPhoneFrame() (src/ack_attribution.h), which appends
     // the acknowledging callsign as a variable-length suffix and forwards
-    // the real length (udp_frame_esp32.cpp:283,288,
-    // udp_frame_nrf52.cpp:293,301). Previously nRF52 hand-rolled the same
+    // the real length (udp_frame.cpp
+    // udp_frame.cpp). Previously nRF52 hand-rolled the same
     // 7-byte base frame inline and always called addBLEOutBuffer(print_buff,
     // 7) -- no attribution suffix was ever attached (the status byte itself
     // was already brought in line earlier by DRY-21).
@@ -2216,7 +2297,7 @@ static void test_agreement_ack_phone_frame_attribution_on_both(void)
 // arriving over the SERVER/UDP ingress must stop the waiting TX-ring slot
 // too, exactly when checkOwnTx() recognizes the acked id as one of our own --
 // findAndStopRingSlotNoRm1(msg_counter) and stoHolderClear(msg_counter) at the
-// call site in udp_frame_esp32.cpp/udp_frame_nrf52.cpp. This replaces
+// call site in udp_frame.cpp. This replaces
 // test_regression_server_ack_stops_outbox_ladder_on_both (the stage 1 outbox
 // it exercised is gone); the own-DM branch of the server-ack path was
 // otherwise uncovered by any twin test.
@@ -2292,7 +2373,7 @@ static void test_regression_server_ack_own_dm_stops_ring_on_both(void)
 // feed the ack=/rtt= counters -- once per DM, RTT taken at the FIRST ack. The
 // gateway path used to skip dmStatNoteAck()/dmstat_peer_ack entirely, so a DM
 // acked only via the server showed ack=0 and no RTT sample. Red without the
-// hook in udp_frame_esp32.cpp/udp_frame_nrf52.cpp (peer_ack stays 0).
+// hook in udp_frame.cpp (peer_ack stays 0).
 // The LoRa path (lora_functions.cpp) is not built in this env; its half of
 // "a later ack for the same NNN counts nothing" is the dmStatNoteAck() == false
 // contract, pinned in test_dm_stats, which both call sites gate on.
@@ -2378,7 +2459,7 @@ static void test_regression_server_ack_own_dm_counts_ack_and_rtt_once_on_both(vo
 // takes the id from a fixed offset (iAckPos+4, which is 3 for a :rej), so the
 // head "abc" puts the digit 7 at that offset and the branch reads NNN 7 on both
 // the current offset and a corrected one. Red without the `iAckPos > 0` gate in
-// udp_frame_esp32.cpp/udp_frame_nrf52.cpp (peer_ack 1 and rtt[0] 1 after the
+// udp_frame.cpp (peer_ack 1 and rtt[0] 1 after the
 // :rej). The LoRa call site (lora_functions.cpp) is not built in this env and
 // carries the same gate.
 // Web GUI tick fix (docs/webgui-ack-ticks-verdict-20261004.md, advisor
@@ -3600,6 +3681,197 @@ static void test_agreement_gw_foreign_group_is_still_acked_and_relayed_on_both(v
     memset(meshcom_settings.node_gcb, 0, sizeof(meshcom_settings.node_gcb));
 }
 
+// D1 (operator decision 2026-11-27): every GATE frame from the server is a sign of life on both
+// platforms (the nRF52 rule), whatever its type byte is and also when it carries none (a 4-byte
+// GATE). Before, ESP32 stamped only for 0x3A / 0x21 / 0x40. The OTHER bucket stays out (UDP-03).
+static void test_regression_d1_every_gate_frame_stamps_server_liveness_on_both(void)
+{
+    struct Case { const char *name; uint16_t len; uint8_t type; bool stamps; };
+    static const Case cases[] = {
+        {"type 0x41 (unknown)",  10, 0x41, true },
+        {"type 0x00",            10, 0x00, true },
+        {"type 0xFF",            10, 0xFF, true },
+        {"4-byte GATE, no type",  4, 0x00, true },
+        {"type 0x3A (control)",  10, 0x3A, true },
+        {"ZZZZ (OTHER, control)", 10, 0x00, false},
+    };
+    const unsigned long stale = 1000, now = 65000;
+    for (int side = 0; side < 2; side++)
+        for (size_t k = 0; k < sizeof(cases) / sizeof(cases[0]); k++)
+        {
+            const Case &c = cases[k];
+            char msg[128];
+            snprintf(msg, sizeof(msg), "D1: %s on %s", c.name, side ? "nrf52" : "esp32");
+            recorder_reset();
+            mc_test_set_millis(now);
+            last_upd_timer = stale;
+            neth.last_upd_timer = stale;
+            hb_warn_logged = true;
+            gwLinkSetDest("hamnet", "44.143.8.143");
+
+            uint8_t buf[BUF_CAP];
+            memset(buf, 0, sizeof(buf));
+            uint16_t len = c.len;
+            if (c.name[0] == 'Z') { memcpy(buf, "ZZZZ", 4); memset(buf + 4, 0xAB, 6); }
+            else if (c.len == 4)  { memcpy(buf, "GATE", 4); }
+            else                  { len = build_gate_raw(buf, c.type, 0x55, (uint16_t)(c.len - 5)); }
+            if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+            else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+
+            const unsigned long timer = side ? neth.last_upd_timer : last_upd_timer;
+            TEST_ASSERT_EQUAL_UINT32_MESSAGE(c.stamps ? now : stale, timer, msg);
+            TEST_ASSERT_EQUAL_MESSAGE(!c.stamps, hb_warn_logged, msg);
+            char line[96];
+            gwLinkFormat(line, sizeof(line), true, true, millis());
+            TEST_ASSERT_EQUAL_STRING_MESSAGE(c.stamps ? "Hamnet 44.143.8.143, connected (last rx 0 s)"
+                                                      : "Hamnet 44.143.8.143, no response yet", line, msg);
+        }
+}
+
+// D3 (operator decision 2026-11-27): an nRF52 gateway shows server-delivered DM, group and `*`
+// text on the display exactly like ESP32 (the `!bGATEWAY` guard is gone), which is also what
+// lets {pong} and the password-checked {MCP} reach sendDisplayText(). The twin used to run with
+// bGATEWAY=false only, where the guard let the text through; it runs with the gateway on here.
+static void test_regression_d3_gateway_nrf_shows_server_text_like_esp32(void)
+{
+    struct Case { const char *name; const char *dest; const char *payload; int shown; };
+    static const Case cases[] = {
+        {"DM to own call",      "DK5EN-1", "hello{044",   1},
+        {"DM {pong}",           "DK5EN-1", "{pong}",      1},
+        {"DM {MCP}",            "DK5EN-1", "{MCP}secret", 1},
+        {"own group 262",       "262",     "grp text{045", 1},
+        {"star text",           "*",       "all text",    1},
+        {"DM ack (control)",    "DK5EN-1", "x:ack3",      0},
+    };
+    for (int gw = 0; gw < 2; gw++)
+        for (int side = 0; side < 2; side++)
+            for (size_t k = 0; k < sizeof(cases) / sizeof(cases[0]); k++)
+            {
+                const Case &c = cases[k];
+                char msg[128];
+                snprintf(msg, sizeof(msg), "D3: %s on %s, bGATEWAY=%d", c.name, side ? "nrf52" : "esp32", gw);
+                recorder_reset();
+                bGATEWAY = gw != 0;
+                meshcom_settings.node_gcb[0] = 262;
+                feed_gw(side, c.dest, ':', c.payload, 0x7C00 + (uint32_t)(gw * 64 + side * 16) + (uint32_t)k);
+                TEST_ASSERT_EQUAL_INT_MESSAGE(c.shown, g_sendDisplayText_calls, msg);
+            }
+    memset(meshcom_settings.node_gcb, 0, sizeof(meshcom_settings.node_gcb));
+}
+
+// D5 (operator decision 2026-11-27), the pure core: the verdict depends on the first len bytes
+// only. A slab that holds a complete "GATE:..." behind a short datagram changes nothing.
+static void test_regression_d5_core_verdict_ignores_the_slab_behind_len(void)
+{
+    uint8_t slab[UDP_TX_BUF_SIZE];
+    memset(slab, 0, sizeof(slab));
+    memcpy(slab, "GATE", 4);
+    slab[4] = 0x3A;
+    memset(slab + 5, 'x', 20);
+
+    UdpFrameInfo f;
+    for (size_t len = 0; len < 4; len++)
+    {
+        udpFrameClassify(slab, len, &f);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(UDPF_OTHER, f.cls, "len < 4 is class OTHER");
+        TEST_ASSERT_EQUAL_UINT8(UDPG_NONE, f.gate_kind);
+        TEST_ASSERT_EQUAL_UINT8(0, f.msg_type);
+        TEST_ASSERT_EQUAL_UINT16(0, f.gate_len);
+        TEST_ASSERT_EQUAL_UINT8(0, f.conf_size_ok);
+    }
+    udpFrameClassify(slab, 4, &f);   // a 4-byte GATE: class GATE, no type, buf[4] not read
+    TEST_ASSERT_EQUAL_UINT8(UDPF_GATE, f.cls);
+    TEST_ASSERT_EQUAL_UINT8(UDPG_NONE, f.gate_kind);
+    TEST_ASSERT_EQUAL_UINT8(0, f.msg_type);
+    TEST_ASSERT_EQUAL_UINT16(0, f.gate_len);
+    udpFrameClassify(slab, 5, &f);
+    TEST_ASSERT_EQUAL_UINT8(UDPF_GATE, f.cls);
+    TEST_ASSERT_EQUAL_UINT8(UDPG_TEXT, f.gate_kind);
+    TEST_ASSERT_EQUAL_UINT16(1, f.gate_len);
+
+    memcpy(slab, "CONF", 4);
+    udpFrameClassify(slab, 3, &f);
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(UDPF_OTHER, f.cls, "CONF under 4 bytes is OTHER");
+    TEST_ASSERT_EQUAL_UINT8(0, f.conf_size_ok);
+    memcpy(slab, "BEAT", 4);
+    udpFrameClassify(slab, 2, &f);
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(UDPF_OTHER, f.cls, "BEAT under 4 bytes is OTHER");
+}
+
+// D5, the handler: a short datagram is an OTHER frame and a 4-byte GATE carries no type, whatever
+// the slab behind the datagram holds (the callers wipe it, the verdict does not rely on it).
+static void test_regression_d5_short_datagram_is_other_and_4_byte_gate_has_no_type_on_both(void)
+{
+    const unsigned long stale = 1000, now = 65000;
+    for (int side = 0; side < 2; side++)
+    {
+        const char *name = side ? "nrf52" : "esp32";
+        char msg[128];
+
+        // "GAT" announced as 3 bytes, the slab behind it completes it to a text GATE frame
+        recorder_reset();
+        mc_test_set_millis(now);
+        last_upd_timer = stale;
+        neth.last_upd_timer = stale;
+        hb_warn_logged = true;
+        bEXTUDP = true;
+        hasExternIPaddress = true;
+        uint8_t buf[BUF_CAP];
+        memset(buf, 0, sizeof(buf));
+        uint16_t full = build_gate_datagram(buf, "DK5EN-2", "9", ':', "stale tail text{012", 0x7D01);
+        TEST_ASSERT_TRUE(full > 8);
+        int rc = side ? handleUdpFrame_nrf52(buf, 3, IPAddress(1, 2, 3, 4)) : handleUdpFrame_esp32(buf, 3, IPAddress(1, 2, 3, 4));
+        snprintf(msg, sizeof(msg), "D5: 3-byte datagram on %s", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, rc, msg);
+        TEST_ASSERT_NOT_NULL_MESSAGE(strstr(Serial.captured().c_str(), "type;OTHER"), msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_sink_log.size(), msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_extern.size(), msg);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(stale, side ? neth.last_upd_timer : last_upd_timer, msg);
+        TEST_ASSERT_TRUE_MESSAGE(hb_warn_logged, msg);
+
+        // 4-byte GATE with a plausible type byte behind it: sign of life, nothing decoded or relayed
+        recorder_reset();
+        mc_test_set_millis(now);
+        last_upd_timer = stale;
+        neth.last_upd_timer = stale;
+        bEXTUDP = true;
+        hasExternIPaddress = true;
+        memset(buf, 0, sizeof(buf));
+        full = build_gate_datagram(buf, "DK5EN-2", "9", ':', "stale tail text{013", 0x7D02);
+        TEST_ASSERT_TRUE(full > 8);
+        const int depth0 = txRingDepth();
+        rc = side ? handleUdpFrame_nrf52(buf, 4, IPAddress(1, 2, 3, 4)) : handleUdpFrame_esp32(buf, 4, IPAddress(1, 2, 3, 4));
+        snprintf(msg, sizeof(msg), "D5: 4-byte GATE on %s", name);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, rc, msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_sink_log.size(), msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, (int)g_extern.size(), msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(depth0, txRingDepth(), msg);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(now, side ? neth.last_upd_timer : last_upd_timer, msg);
+    }
+}
+
+// C7: the nRF52 RX-UDP debug line now prints after the destination path was reset to the
+// destination call (ESP32's order); the twin's PRINT recorder keeps both paths to show it.
+static void test_regression_c7_rx_udp_print_sees_reset_destination_path_on_both(void)
+{
+    for (int side = 0; side < 2; side++)
+    {
+        char msg[128];
+        snprintf(msg, sizeof(msg), "C7 on %s", side ? "nrf52" : "esp32");
+        recorder_reset();
+        bDisplayInfo = true;
+        uint8_t buf[BUF_CAP];
+        memset(buf, 0, sizeof(buf));
+        uint16_t len = build_gate_datagram(buf, "DK5EN-2", "DK5EN-3,DK5EN-7", ':', "print me{021", 0x7E01 + (uint32_t)side);
+        if (side) handleUdpFrame_nrf52(buf, len, IPAddress(1, 2, 3, 4));
+        else      handleUdpFrame_esp32(buf, len, IPAddress(1, 2, 3, 4));
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, (int)g_printed.size(), msg);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN-7", g_printed[0].dst_call.c_str(), msg);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN-7", g_printed[0].dst_path.c_str(), msg);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("DK5EN-2", g_printed[0].src_path.c_str(), msg);
+    }
+}
+
 int main(int, char **)
 {
 
@@ -3609,7 +3881,8 @@ int main(int, char **)
     RUN_TEST(test_gwrx01_server_text_queues_as_nbr_relay_on_both);
     RUN_TEST(test_agreement_dedup_blocks_repeat_relay_on_both);
     RUN_TEST(test_regression_txp02_udp_own_call_dm_enters_dedup_ring_on_both);
-    RUN_TEST(test_regression_udp04_duplicate_server_position_no_second_ring_slot_on_esp32);
+    RUN_TEST(test_regression_udp04_duplicate_server_position_no_second_ring_slot_on_both);
+    RUN_TEST(test_regression_d2_server_position_enters_dedup_ring_on_receipt_on_both);
     RUN_TEST(test_agreement_extudp_forward_ahead_of_dedup_gate_on_both);
     RUN_TEST(test_regression_dm_dedup_reacks_without_redisplay_on_both);
     RUN_TEST(test_agreement_blk01_blocked_call_not_relayed_on_both);
@@ -3668,6 +3941,12 @@ int main(int, char **)
     RUN_TEST(test_agreement_gw_third_party_dm_not_handed_to_phone_on_both);
     RUN_TEST(test_agreement_gw_star_respects_nomsgall_on_both);
     RUN_TEST(test_agreement_gw_position_and_set_cet_still_reach_phone_on_both);
+
+    RUN_TEST(test_regression_d1_every_gate_frame_stamps_server_liveness_on_both);
+    RUN_TEST(test_regression_d3_gateway_nrf_shows_server_text_like_esp32);
+    RUN_TEST(test_regression_d5_core_verdict_ignores_the_slab_behind_len);
+    RUN_TEST(test_regression_d5_short_datagram_is_other_and_4_byte_gate_has_no_type_on_both);
+    RUN_TEST(test_regression_c7_rx_udp_print_sees_reset_destination_path_on_both);
 
     RUN_TEST(test_u1_corpus_ordered_sink_dump_both_platforms);
 

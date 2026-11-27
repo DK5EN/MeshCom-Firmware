@@ -19,7 +19,8 @@ extern bool hasIPaddress;
 extern IPAddress node_hostip;
 extern bool udp_is_busy;
 extern uint8_t err_cnt_udp_tx;
-extern uint8_t convBuffer[];
+// Re-decode scratch of the drain; its only user (was a global of udp_functions.cpp).
+static uint8_t convBuffer[UDP_TX_BUF_SIZE + 50];
 // DR-25: the outbound leak logger (lora_functions.cpp, alongside
 // logRxDropUnconfigured()) -- this call site no longer uses
 // logRxDropUnconfigured() itself, see the call below.

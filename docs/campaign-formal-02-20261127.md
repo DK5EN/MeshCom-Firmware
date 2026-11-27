@@ -22,14 +22,29 @@ archive section at the end with one line each.
 
 ## Waves
 
-| Wave | Content                                                                                                                                 | State   |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| 1    | Seams: `handleACK` core, `readPhoneCommand` with explicit length, settings round trip + migration; UDP twin analysis, web_functions map | done    |
-| 1b   | UDP receive consolidation into one module (`docs/udp-consolidation-20261127.md`)                                                        | running |
-| 2    | Bounded proofs for the new cores (ACK, phone frame, UDP RX), mutations, witnesses                                                       | open    |
-| 3    | BLE host task vs main loop model (ESP32 queue, nRF52 flag), fixes                                                                       | open    |
-| 4    | NimBLE boundary and library; production web server seams and proofs                                                                     | open    |
-| 5    | Mesh model: relay, dedup ring, ACK and retries across nodes                                                                             | open    |
+| Wave | Content                                                                                                                                 | State       |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| 1    | Seams: `handleACK` core, `readPhoneCommand` with explicit length, settings round trip + migration; UDP twin analysis, web_functions map | done        |
+| 1b   | UDP receive consolidated into `src/udp_frame.cpp` (part 1 `f4f541d5`; part 2 applies operator decisions D1/D2/D3/D5)                    | done        |
+| 2    | Bounded proofs: ACK core and phone frame done (`ce013112`); UDP parse core after 1b part 2                                              | partly done |
+| 3    | BLE host task vs main loop model `specs/tla/bletask.tla`; fixed BLE-QDROP-01 and BLE-STALE-01 (wave 3b)                                 | done        |
+| 4    | NimBLE boundary and library; production web server seams and proofs                                                                     | open        |
+| 5    | Mesh model: relay, dedup ring, ACK and retries across nodes                                                                             | open        |
+
+## Wave 5 input: asymmetric nodes (operator 2026-11-27)
+
+- Model the node that "talks a lot, is heard a lot, but is nearly deaf": a 1 W or 2 W PA (E22) on a long, thin coax,
+  so what it hears is 10 to 20 dB weaker than what the other side hears from it. Such nodes are rough and must not
+  become super nodes that relay first and fast. Measurement documents (a German node, an HB node) are the input;
+  Found: HB9ZG-49 (`docs/log-reports/2026-11-01-24h/HB9ZG-49-Empfangspruefung.html`, verification `verify/hb9zg49.md`):
+  heard by 24 stations, hears 9; partners reach it at -105..-119 dBm (SNR -0.4..-8 dB), it reaches them at -125..-127
+  dBm (SNR -12.6..-20 dB); gap 12..15 dB on the strong links, control pairs 0.2..5.9 dB (median 3.7). German side:
+  only the Freising pairs (`docs/archive/verdict-auto-via-routing-20260916.de.md` section 3.2, 5..12 dB, no PA); the
+  German 1-2 W node document is not in the repo yet (asked the operator). Related design note: mheard measures who I
+  hear, not who hears me (`docs/adr-nc-importance-backoff.md`).
+- The mesh model (relay, dedup, ACK and retries across nodes) therefore needs asymmetric links (A hears B, B does not
+  hear A, or only with a large margin loss) and must show what such a node does to relay choice, ACK delivery and
+  retries, and which firmware rule keeps it from dominating.
 
 ## Rules for this campaign
 
@@ -62,19 +77,18 @@ archive section at the end with one line each.
 - D5: datagrams under 4 bytes are class OTHER; a 4-byte GATE frame carries no type.
 - Not asked, taken: UDP gets its own receive buffer (no shared LoRa `RcvBuffer`, D6); entry points renamed at once.
 
-## Carry into wave 1b part 2
+## Carried items (from the advisor passes)
 
-- Advisor 2026-11-27 (part 1 APPROVED): the C7 move makes the nRF "RX-UDP" debug line print the reset destination
-  path (like ESP32), a content change the differential cannot see (the twin `printBuffer_aprs` stub records only
-  source and tail). Record `msg_source_path`/`msg_destination_path` in the PRINT stub and whitelist the case.
-- Orphans to remove: `lora_tx_msg_len` (`udp_functions.cpp`), `neth.lora_tx_msg_len` (`nrf_eth.h`, stub follows via
-  `twin_stub_lint`); ESP32 `convBuffer` is now used only by `udp_drain_esp32.cpp`.
-- Unverified by the differential (printfdeb is a no-op natively): C10 log text, nRF `bDEBUG` traces, the ESP32 caller
-  busy flag and wider wipe (board build only).
+- UDP differential: narrow the D4 strip (only a text GATE frame to a group or `*` with `:ack` and `{`) and the D3
+  strip (only the one extra display call, keep comparing `display_dest_path`) in `test/test_udp_frame_diff`.
+- UDP: printfdeb is a no-op natively, so trace changes (C10, C13, new `bDEBUG` lines on ESP32) are checked by reading
+  only.
+- BLE: on nRF52 with an exhausted heap Bluefruit runs the write callback inline and could overtake a queued connect
+  callback (false stale drop); not reproduced. `test_ble_queue_sites.py` checks that the generation bump is called,
+  not that it is the first statement.
+- Old nRF52 UDP handler crashed (negative memcpy length) on "GAT" plus a stale byte; fixed by D5 in the merge.
 
 ## Open questions
-
-- Not yet run: ESBMC `settings_decode/roundtrip_*`, `ack_rx/*`, `phone_frame/*` (orchestrator, wave 2 gate).
 
 ## Archive
 

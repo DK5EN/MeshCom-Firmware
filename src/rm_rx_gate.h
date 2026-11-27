@@ -1,7 +1,7 @@
 // rm_rx_gate.h -- the one receive hook for remote-management DMs ("RM1 <ctr> ...", RM-04, #1189).
 //
 // Called for a DM to the exact own call, with the "{NNN" suffix already stripped, from every ingress:
-// OnRxDone (LoRa) and the server ingress of a gateway node (udp_frame_esp32.cpp / udp_frame_nrf52.cpp).
+// OnRxDone (LoRa) and the server ingress of a gateway node (udp_frame.cpp).
 //
 // Since 2026-10-06 (RM-GWRELAY, operator decision) a COMMAND is accepted from either path, like a reply
 // always was: the HMAC tag and the counter authenticate it wherever it travelled. The former "LoRa only"
