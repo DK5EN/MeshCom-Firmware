@@ -406,6 +406,51 @@ static bool closedVariant(const std::string &name)
     return name.size() > suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
+// D14 (7b step 8b): send_http_header's status line was "HTTP/1.1 200 OK \n" and is "HTTP/1.1 200 OK\r\n" now. frozen/ and the golden
+// files keep the old form, so every live-vs-frozen/golden comparison runs the frozen/golden side through d14Norm (live is compared raw): it rewrites the FIRST out line of a
+// record (the line after "out:") when it is an old-form status line, nothing else. Both forms are 2 bytes, so sizes, close offsets and the
+// clock do not change. `changed` counts the rewritten records. The frozen-vs-golden comparison (k == 0) stays raw.
+static std::string d14Norm(const std::string &rec, size_t *changed = NULL)
+{
+    std::string s;
+    bool afterOut = false;
+    size_t i = 0;
+    while (i < rec.size())
+    {
+        const size_t nl = rec.find('\n', i);
+        const size_t end = (nl == std::string::npos) ? rec.size() : nl + 1;
+        std::string line = rec.substr(i, end - i);
+        i = end;
+        if (afterOut)
+        {
+            afterOut = false;
+            static const char kTail[] = " \\n\n"; // the escaped " \n" and the record's newline
+            const size_t tl = sizeof(kTail) - 1;
+            if (line.compare(0, 11, "| HTTP/1.1 ") == 0 && line.size() > 11 + 4 + tl && line.size() >= tl &&
+                line.compare(line.size() - tl, tl, kTail) == 0 && line[11] >= '0' && line[11] <= '9' && line[12] >= '0' && line[12] <= '9' &&
+                line[13] >= '0' && line[13] <= '9' && line[14] == ' ')
+            {
+                line = line.substr(0, line.size() - tl) + "\\r\\n\n";
+                if (changed)
+                    (*changed)++;
+            }
+        }
+        if (line.compare(0, 4, "out:") == 0)
+            afterOut = true;
+        s += line;
+    }
+    return s;
+}
+
+// the same for raw answer bytes (first line "HTTP/1.1 ddd reason \n" -> "HTTP/1.1 ddd reason\r\n")
+static std::string d14NormOut(const std::string &out)
+{
+    const size_t nl = out.find('\n');
+    if (out.compare(0, 9, "HTTP/1.1 ") == 0 && nl != std::string::npos && nl >= 1 && out[nl - 1] == ' ')
+        return out.substr(0, nl - 1) + "\r\n" + out.substr(nl + 1);
+    return out;
+}
+
 // one corpus request under every profile, through one entry point
 static size_t gRuns[sizeof(kEntries) / sizeof(kEntries[0])]; // runs per entry through recordAll (proof the entry ran)
 
@@ -507,8 +552,9 @@ static void test_entries_match_golden(void)
                 continue;
             }
             const std::string want = repo_slurp(path.c_str());
-            // the frozen entry must match its golden byte for byte; the whitelist only covers later entries
-            if (want != got && (k == 0 || !isWhitelisted(n)))
+            // the frozen entry must match its golden byte for byte; the whitelist only covers later entries (D14: only the golden side
+            // is normalised, so a live answer in the old form fails)
+            if ((k == 0 ? want != got : d14Norm(want) != got) && (k == 0 || !isWhitelisted(n)))
             {
                 if (bad++ == 0)
                 {
@@ -544,7 +590,7 @@ static void test_entries_agree_with_the_first(void)
         for (const std::string &n : names)
         {
             const std::string bytes = readCorpus(n);
-            const bool same = recordAll(kEntries[0], n, bytes) == recordAll(kEntries[k], n, bytes);
+            const bool same = d14Norm(recordAll(kEntries[0], n, bytes)) == recordAll(kEntries[k], n, bytes);
             if (const char *dump = getenv("WEB_DIFF_DUMP_DIFFS")) // maintenance: list every differing request, no asserts
             {
                 if (!same)
@@ -714,7 +760,7 @@ static std::set<std::string> differingProfiles(const std::string &name, std::map
         const std::string frozen = webRigRecord();
         webRigBegin(bytes, closedVariant(name), kProfiles[p]);
         kEntries[1].run();
-        if (frozen != webRigRecord())
+        if (d14Norm(frozen) != webRigRecord()) // D14: frozen side only
             d.insert(kProfiles[p].name);
         if (liveOut)
             (*liveOut)[kProfiles[p].name] = webRig().out;
@@ -885,7 +931,7 @@ static void test_b10_rows_answer_408_in_every_profile(void)
             if (answer.empty())
             {
                 answer = webRig().out;
-                TEST_ASSERT_TRUE_MESSAGE(answer.compare(0, 29, "HTTP/1.1 408 Request Timeout ") == 0, am.c_str());
+                TEST_ASSERT_TRUE_MESSAGE(answer.compare(0, 30, "HTTP/1.1 408 Request Timeout\r\n") == 0, am.c_str());
                 TEST_ASSERT_TRUE_MESSAGE(answer.find("{\"ok\":false,\"err\":\"timeout\"}") != std::string::npos, am.c_str());
             }
             TEST_ASSERT_TRUE_MESSAGE(webRig().out == answer, am.c_str());
@@ -1030,7 +1076,7 @@ static void test_known_requests(void)
     kEntries[0].run();
     const WebRigState &r = webRig();
     TEST_ASSERT_EQUAL_STRING("webSetup_setParam name='atxt' value='a bc'", r.trace.at(0).c_str());
-    TEST_ASSERT_TRUE(r.out.find("HTTP/1.1 200 OK \n") == 0);
+    TEST_ASSERT_TRUE(r.out.find("HTTP/1.1 200 OK \n") == 0); // frozen entry: the old form (D14)
     TEST_ASSERT_TRUE(r.out.find("{\"returncode\":0,\"atxt\":\"a bc\"}") != std::string::npos);
     TEST_ASSERT_EQUAL_INT(1, r.stopCalls);
 
@@ -1082,7 +1128,7 @@ static void test_known_requests(void)
     // wrong Host: 403 before any routing
     webRigBegin("GET /?page=info HTTP/1.1\r\nHost: evil.com\r\n\r\n", false, open);
     kEntries[0].run();
-    TEST_ASSERT_TRUE(webRig().out.find("HTTP/1.1 403 Forbidden \n") == 0);
+    TEST_ASSERT_TRUE(webRig().out.find("HTTP/1.1 403 Forbidden \n") == 0); // frozen entry: the old form (D14)
     TEST_ASSERT_TRUE(webRig().trace.size() == 1 && webRig().trace[0] == "webTxBeginChunked");
 
     // password set, no session: the login page; with the session of the rig: the page
@@ -1189,7 +1235,7 @@ static void checkSameAsFrozen(const std::string &req, const char *prefix, const 
         const std::string m = std::string(kEntries[e].name) + ": " + why + ": " + webRigEsc(out[e].substr(0, 200));
         TEST_ASSERT_EQUAL_STRING_MESSAGE(want, traceWithPrefix(prefix).c_str(), m.c_str());
     }
-    TEST_ASSERT_TRUE_MESSAGE(out[0] == out[1], (std::string("frozen and live answer differ: ") + why).c_str());
+    TEST_ASSERT_TRUE_MESSAGE(d14NormOut(out[0]) == out[1], (std::string("frozen and live answer differ: ") + why).c_str());
 }
 // step 5c, the three requests where frozen and live differ on purpose (advisor 5c; none is in the corpus):
 //   B2: send_message reads &tocall= / &message= from the query only, never from a header line (a Referer); today a
@@ -1483,7 +1529,7 @@ static void test_no_hand_built_response_heads(void)
         while ((at = src.find("\"HTTP/1.1 ", at)) != std::string::npos)
         {
             const std::string line = src.substr(at, src.find('\n', at) - at);
-            const bool ok = f == "web_io.cpp" || (f == "web_functions.cpp" && line.find("\"HTTP/1.1 %i %s \\n\"") == 0);
+            const bool ok = f == "web_io.cpp" || (f == "web_functions.cpp" && line.find("\"HTTP/1.1 %u %s\\r\\n\"") == 0);
             TEST_ASSERT_TRUE_MESSAGE(ok, (rel + ": hand-built response head: " + line).c_str());
             n++;
             at++;
@@ -1504,6 +1550,47 @@ static void test_no_hand_built_response_heads(void)
     TEST_ASSERT_EQUAL_INT(6, count(wf, "webSendFixedHead("));
     TEST_ASSERT_EQUAL_INT(2, count(os, "webSendFixedHead("));
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, count(wf, "Content-Length: "), "web_functions.cpp prints no Content-Length itself");
+}
+
+
+// D14 narrowness: over the whole corpus x all profiles (a) no live answer carries the old status line (" \n" after the reason phrase),
+// (b) every live answer that starts with "HTTP/1.1 " has a first line that ends in CR LF without a space before it, (c) d14Norm rewrites
+// exactly the records whose frozen status line has the old form (counted from the raw bytes) and none of the live records
+static void test_d14_norm_is_narrow(void)
+{
+    size_t frozenOld = 0, normChanged = 0, liveChanged = 0, liveHeads = 0;
+    for (const std::string &n : corpusNames())
+    {
+        const std::string bytes = readCorpus(n);
+        for (size_t p = 0; p < kProfileCount; p++)
+        {
+            webRigBegin(bytes, closedVariant(n), kProfiles[p]);
+            kEntries[0].run();
+            const std::string &fo = webRig().out;
+            const size_t fnl = fo.find('\n');
+            if (fo.compare(0, 9, "HTTP/1.1 ") == 0 && fnl != std::string::npos && fnl >= 1 && fo[fnl - 1] == ' ')
+                frozenOld++;
+            d14Norm(webRigRecord(), &normChanged);
+
+            webRigBegin(bytes, closedVariant(n), kProfiles[p]);
+            kEntries[1].run();
+            const std::string &lo = webRig().out;
+            d14Norm(webRigRecord(), &liveChanged);
+            if (lo.compare(0, 9, "HTTP/1.1 ") == 0)
+            {
+                liveHeads++;
+                const size_t nl = lo.find('\n');
+                const std::string m = n + " [" + kProfiles[p].name + "]: " + webRigEsc(lo.substr(0, 60));
+                TEST_ASSERT_TRUE_MESSAGE(nl != std::string::npos && nl >= 2 && lo[nl - 1] == '\r' && lo[nl - 2] != ' ', m.c_str()); // (a) and (b)
+            }
+        }
+    }
+    char m[160];
+    snprintf(m, sizeof(m), "d14Norm changed %zu records, the frozen answers with the old status line are %zu (live heads %zu, live changed %zu)", normChanged, frozenOld, liveHeads, liveChanged);
+    TEST_ASSERT_TRUE_MESSAGE(frozenOld > 1000, m);
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(frozenOld, normChanged, m);
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(0, liveChanged, m);
+    printf("d14Norm: %s\n", m);
 }
 
 // every route of the table is built under the macros of this build (ESP32, ENABLE_MSGSTORE, OLED_SHOT_WEB), except the
@@ -1539,6 +1626,7 @@ int main(int, char **)
     RUN_TEST(test_status_text_table);
     RUN_TEST(test_fixed_head_equals_the_old_site_bytes);
     RUN_TEST(test_no_hand_built_response_heads);
+    RUN_TEST(test_d14_norm_is_narrow);
     RUN_TEST(test_known_requests);
     RUN_TEST(test_param_extraction_live_equals_frozen);
     RUN_TEST(test_call_and_send_extraction_live_equals_frozen);

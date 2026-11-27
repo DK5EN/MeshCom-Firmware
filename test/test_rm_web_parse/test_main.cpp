@@ -678,7 +678,7 @@ static const char *b10PinsHold(const B10Src &s)
     // send_http_header knows the status
     // step 8a: the reason phrase comes from webStatusText (web_io.h); its 408 row is checked at runtime by
     // test_web_diff test_status_text_table
-    if (!has(s.wf, "web_client.printf(\"HTTP/1.1 %i %s \\n\", http_status_code, webStatusText(http_status_code));"))
+    if (!has(s.wf, "web_client.printf(\"HTTP/1.1 %u %s\\r\\n\", (unsigned)http_status_code, webStatusText(http_status_code));"))
         return "send_http_header: reason phrase from webStatusText";
     // work_webpage: head that never ends, at least one byte, still connected after the deadline
     if (!has(s.wf, "if (web_head_bytes && web_client.connected() && (web_currentTime - web_previousTime) > WEB_TIMEOUT_TIME)\n"

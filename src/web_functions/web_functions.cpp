@@ -4917,12 +4917,12 @@ static void __attribute__((noinline)) sub_pin_status()
 /**
  * ###########################################################################################################################
  * Sends a valid HTTP header. Takes care of the status code.
- * We may need to set more status_text cases once we need them.
+ * The reason phrases are webStatusText() (web_io.h); the status line ends in CRLF like every other line (D14).
  */
 void send_http_header(uint16_t http_status_code, uint8_t content_type, const char *extra_header)
 {
     // Serial.println("STATUS_TEXT="+status_text);
-    web_client.printf("HTTP/1.1 %i %s \n", http_status_code, webStatusText(http_status_code));
+    web_client.printf("HTTP/1.1 %u %s\r\n", (unsigned)http_status_code, webStatusText(http_status_code)); // D14: CRLF, no space before it
     if (content_type == RESPONSE_TYPE_JSON)
         web_client.println("Content-type:application/json");
     else
