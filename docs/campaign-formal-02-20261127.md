@@ -5,11 +5,12 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-7 committed on `fork-dev`, not pushed. Wave 8 in progress: 9b `3657932e` (W5100S MSS glue to
-`src/nrf52/eth_mss.cpp`), 9c `168ec015` (`mcRandomFill`, `src/hw_random.h`; nRF52 seed and AppLink nonce stay separate,
-they differ), B8 `e4b8bcd6` (spectrum scan on "Scan now", radio restored as setup left it) committed. 9d (pin rows to
-`pin_board.cpp`) in flight; then 9e `au_web.cpp`, 9f mbox actions, 9g `web_config.cpp` + B9, then steps 10-11. Start a
-fresh session with `/orchestrate-waves` on this doc.
+**State:** waves 1-7 committed on `fork-dev`, not pushed. Wave 8 step 9 committed so far: 9b `3657932e` (MSS glue to
+`src/nrf52/eth_mss.cpp`), 9c `168ec015` (`mcRandomFill`), B8 `e4b8bcd6` (spectrum on "Scan now"), 9d `9fbbfccc` (pin rows
+to `pin_board.cpp`), 9e `8025a723` (`src/esp32/au_web.cpp`), 9f `55f2d728` (mbox actions in `webFunctionCall`), 9g
+`5cceb18a` (`web_config.cpp`). In flight: 9h = B9 (shared `src/reboot_defer.{h,cpp}`, config upload reboots 500 ms later
+from the loop; RM keeps its own 8 s deferred reboot for now). Then steps 10 (guard on `WebReq`, optional) and 11 (docs),
+full host gate, wave 8 closes. Start a fresh session with `/orchestrate-waves` on this doc.
 
 - **B8 decision (operator 2026-11-27):** "Scan now" button (`/callfunction/?spectrumscan`, guarded like every
   callfunction), ONE blocking run (not stepped across loop passes: that would need a radio fence in the ESP32 loop),
