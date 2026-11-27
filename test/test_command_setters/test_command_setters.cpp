@@ -1150,14 +1150,14 @@ static void test_web_b5_console_line_after_the_parse()
 static void test_web_b5_sites_use_the_strict_parser()
 {
     const std::string web = read_repo_file("src/web_functions/web_setup.cpp");
-    const std::string wf = read_repo_file("src/web_functions/web_functions.cpp");
+    const std::string wf = read_repo_file("src/web_functions/web_nodefunctioncalls.cpp"); // mboxpurge / mboxdeliver moved here from call_function (9f)
     const B5Site ints[] = {
         {"paramName.equals(\"windpin\")", "paramName.equals(\"windcal\")", "mcParseInt", 0, 48},
         {"paramName.equals(\"storetime\")", "paramName.equals(\"storeslots\")", "mcParseInt", 1, 168},
         {"paramName.equals(\"storeslots\")", "paramName.equals(\"storenotice\")", "mcParseInt", 1, 50},
         {"GPIO<N> (GPIO-01 Part B)", "###### MCPOUT", "mcParseInt", 0, 999},
         {"functionName.equals(\"mboxpurge\")", "functionName.equals(\"mboxdeliver\")", "mcParseInt", 0, 49},
-        {"functionName.equals(\"mboxdeliver\")", "webFunctionCall(&functionData)", "mcParseInt", 0, 49},
+        {"functionName.equals(\"mboxdeliver\")", "        return false;", "mcParseInt", 0, 49},
     };
     for (const B5Site &st : ints)
     {

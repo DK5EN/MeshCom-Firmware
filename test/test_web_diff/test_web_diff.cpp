@@ -622,6 +622,7 @@ static const char *const kLiveSources[] = {
     "src/web_functions/web_functions.cpp",
     "src/web_functions/web_rm_handlers.cpp",
     "src/web_functions/web_io.cpp",
+    "src/web_functions/web_nodefunctioncalls.cpp",
     "src/url_decode.cpp",
 };
 

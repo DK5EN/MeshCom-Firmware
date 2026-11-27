@@ -4796,41 +4796,7 @@ void call_function(const WebReq &wr, const String &full_header)
         return;
     }
 
-#if defined(ENABLE_MSGSTORE)
-    // Stage 3 store node operator actions (docs/dm-stage3-wave-plan-20260914.md). Handled here
-    // rather than in webFunctionCall() (web_nodefunctioncalls.cpp, out of this file's exclusive
-    // set) -- both keep the same WF_RETURNCODE_OKAY/FAIL convention call_function() already
-    // serialises below, so the mailbox page's callfunction() calls need no special handling.
-    if (functionData.functionName.equals("mboxpurge"))
-    {
-        if (functionData.functionParameter.equals("all"))
-        {
-            msgstorePurgeAll();
-            functionData.returnCode = WF_RETURNCODE_OKAY;
-        }
-        else
-        {
-            // B5: space/tab trimmed, then a whole number 0..MSGSTORE_SLOTS_MAX-1; "abc", "", "1x", "+1" are refused (were slot 0 / 1)
-            const char *ps = functionData.functionParameter.c_str();
-            size_t pn = functionData.functionParameter.length();
-            mcTrimSpan(&ps, &pn);
-            int32_t slot = 0;
-            functionData.returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstorePurge(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
-        }
-    }
-    else if (functionData.functionName.equals("mboxdeliver"))
-    {
-        const char *ps = functionData.functionParameter.c_str();
-        size_t pn = functionData.functionParameter.length();
-        mcTrimSpan(&ps, &pn);
-        int32_t slot = 0;
-        functionData.returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstoreDeliverNow(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
-    }
-    else
-#endif
-    {
-        webFunctionCall(&functionData); // try to execute that command
-    }
+    webFunctionCall(&functionData); // try to execute that command (the mailbox actions mboxpurge / mboxdeliver included)
 
     send_http_header(functionData.returnCode == WF_RETURNCODE_OKAY ? 200 : 422, RESPONSE_TYPE_JSON); // send header, either 200 if command was executed or 422 if not
 

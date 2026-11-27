@@ -25,6 +25,7 @@ WF = "src/web_functions/web_functions.cpp"
 RH = "src/web_functions/web_rm_handlers.cpp"
 UD = "src/url_decode.cpp"
 IO = "src/web_functions/web_io.cpp"
+NF = "src/web_functions/web_nodefunctioncalls.cpp"
 RAW = "LIVESRC"
 
 
@@ -93,7 +94,7 @@ def parse_frozen():
 def generate():
     """returns {file name: text} of the two generated files"""
     names, pre, mid = parse_frozen()
-    names = names + ["urlDecode", "webReadBody", "webSendFixedHead"]  # urlDecode: the live decoder copy defines it next to url_percent_decode; webReadBody / webSendFixedHead: web_io.cpp (7b step 7, 8a)
+    names = names + ["urlDecode", "webReadBody", "webSendFixedHead", "webMsgstoreCall", "webFunctionCall"]  # webMsgstoreCall: web_nodefunctioncalls.cpp (9f); webFunctionCall: the live call_function reaches the rig stub through webFunctionCall_live (plumbing below);  urlDecode: the live decoder copy defines it next to url_percent_decode; webReadBody / webSendFixedHead: web_io.cpp (7b step 7, 8a)
 
     def ren(text):
         out = []
@@ -103,8 +104,8 @@ def generate():
             out.append(l)
         return "\n".join(out)
 
-    wf, rh, ud, io = read_lines(WF), read_lines(RH), read_lines(UD), read_lines(IO)
-    src = {WF: wf, RH: rh, UD: ud, IO: io}
+    wf, rh, ud, io, nf = read_lines(WF), read_lines(RH), read_lines(UD), read_lines(IO), read_lines(NF)
+    src = {WF: wf, RH: rh, UD: ud, IO: io, NF: nf}
     segs = {
         "pre": [
             seg_line(WF, wf, r"^static bool web_cors_ok = true;", "web_cors_ok"),
@@ -116,6 +117,7 @@ def generate():
     segs["pre"].append(seg_func(IO, io, r"^int webReadBody\(", "webReadBody"))  # the shared body reader, before its two callers
     segs["pre"].append(seg_func(IO, io, r"^void webSendFixedHead\(", "webSendFixedHead"))  # the one fixed-length head writer (8a), before its callers
     segs["pre"].append((WF, "config buffer + web_read_body", a[2], b[3]))
+    segs["pre"].append(seg_func(NF, nf, r"^static bool webMsgstoreCall\(", "webMsgstoreCall"))  # the mbox actions of webFunctionCall (9f), before call_function
     segs["rm"] = [
         seg_range(RH, rh, r"^#define RM_BODY_TIMEOUT_MS ", r"^#define RM_BODY_TOTAL_MS ", "rm body deadlines"),
         seg_func(RH, rh, r"^const char \*rmReadBody\(", "rmReadBody"),
@@ -186,6 +188,8 @@ def generate():
     body.append("size_t urlDecode_live(char *buf, size_t len, uint8_t policy); // own plumbing: the live decoder (url_decode_live.cpp)\n")
     for s in segs["pre"]:
         body.append(seg(s))
+    # 9f: production webFunctionCall() = mbox actions first, then the rest; the rest is the rig stub (rig/web_stubs.cpp)
+    body.append("\nstatic void webFunctionCall_live(funCallStruct *d)\n{\n    if (webMsgstoreCall_live(d))\n        return;\n    ::webFunctionCall(d);\n}\n")
     body.append(seg(segs["rm"][0]))
     body.append(seg(segs["rm"][1]))
     body.append("\n" + mid.replace("_frozen", "_live") + "\n")

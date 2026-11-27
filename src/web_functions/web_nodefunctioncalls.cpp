@@ -3,12 +3,16 @@
 This file contains all web-based remotely callable functions
 */
 #include "web_nodefunctioncalls.h"
+#include "num_parse.h"   // mcTrimSpan / mcParseInt: strict slot number of mboxpurge / mboxdeliver (B5)
 #include <command_functions.h>
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include <batt_functions.h> // QA-AU-09: battHardwarePresent
 #include <string> 
 #include <spectral_sweep.h> // B8: spectrumscan
+#if defined(ENABLE_MSGSTORE)
+#include <msgstore_api.h> // msgstorePurge / msgstorePurgeAll / msgstoreDeliverNow, MSGSTORE_SLOTS_MAX
+#endif
 #ifdef ESP32
 #include <esp_partition.h> // updapply: Safeboot partition present
 #include "esp32/fw_update_net.h" // AU-09 (#1187): FwNetStatus for the update callfunctions
@@ -20,7 +24,48 @@ This file contains all web-based remotely callable functions
 #define AU_BLE_COOLDOWN_MS 300000u // "Pause Bluetooth and check": 5 min between guarded checks
 #endif
 
+#if defined(ENABLE_MSGSTORE)
+// Stage 3 store node operator actions (docs/dm-stage3-wave-plan-20260914.md), moved here from call_function() (FORMAL-02 9f):
+// the same WF_RETURNCODE_OKAY/FAIL convention, so the mailbox page's callfunction() calls need no special handling.
+// true = handled (returnCode set). Static: test/test_web_diff/live/extract_live.py cuts this function out by name.
+static bool webMsgstoreCall(funCallStruct *functionData)
+{
+    if (functionData->functionName.equals("mboxpurge"))
+    {
+        if (functionData->functionParameter.equals("all"))
+        {
+            msgstorePurgeAll();
+            functionData->returnCode = WF_RETURNCODE_OKAY;
+        }
+        else
+        {
+            // B5: space/tab trimmed, then a whole number 0..MSGSTORE_SLOTS_MAX-1; "abc", "", "1x", "+1" are refused (were slot 0 / 1)
+            const char *ps = functionData->functionParameter.c_str();
+            size_t pn = functionData->functionParameter.length();
+            mcTrimSpan(&ps, &pn);
+            int32_t slot = 0;
+            functionData->returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstorePurge(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+        }
+    }
+    else if (functionData->functionName.equals("mboxdeliver"))
+    {
+        const char *ps = functionData->functionParameter.c_str();
+        size_t pn = functionData->functionParameter.length();
+        mcTrimSpan(&ps, &pn);
+        int32_t slot = 0;
+        functionData->returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstoreDeliverNow(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+    }
+    else
+        return false;
+    return true;
+}
+#endif
+
 void webFunctionCall(funCallStruct* functionData) {
+#if defined(ENABLE_MSGSTORE)
+    if (webMsgstoreCall(functionData))
+        return;
+#endif
     bool bPhoneReady = (isPhoneReady == 1);
 
     //Serial.printf("##### Executing: %s with param: %s\n", functionData->functionName, functionData->functionParameter);

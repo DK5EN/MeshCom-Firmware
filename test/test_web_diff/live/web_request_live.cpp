@@ -193,6 +193,49 @@ static int web_read_body_live(long content_length)
     return webReadBody_live(web_cfg_buf, CONFIG_JSON_MAX + 1, content_length, WEB_TIMEOUT_TIME, 4000);
 }
 
+// ==== webMsgstoreCall (web_nodefunctioncalls.cpp) lines 28-61 (working tree) ====
+// Stage 3 store node operator actions (docs/dm-stage3-wave-plan-20260914.md), moved here from call_function_live() (FORMAL-02 9f):
+// the same WF_RETURNCODE_OKAY/FAIL convention, so the mailbox page's callfunction() calls need no special handling.
+// true = handled (returnCode set). Static: test/test_web_diff/live/extract_live.py cuts this function out by name.
+static bool webMsgstoreCall_live(funCallStruct *functionData)
+{
+    if (functionData->functionName.equals("mboxpurge"))
+    {
+        if (functionData->functionParameter.equals("all"))
+        {
+            msgstorePurgeAll();
+            functionData->returnCode = WF_RETURNCODE_OKAY;
+        }
+        else
+        {
+            // B5: space/tab trimmed, then a whole number 0..MSGSTORE_SLOTS_MAX-1; "abc", "", "1x", "+1" are refused (were slot 0 / 1)
+            const char *ps = functionData->functionParameter.c_str();
+            size_t pn = functionData->functionParameter.length();
+            mcTrimSpan(&ps, &pn);
+            int32_t slot = 0;
+            functionData->returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstorePurge(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+        }
+    }
+    else if (functionData->functionName.equals("mboxdeliver"))
+    {
+        const char *ps = functionData->functionParameter.c_str();
+        size_t pn = functionData->functionParameter.length();
+        mcTrimSpan(&ps, &pn);
+        int32_t slot = 0;
+        functionData->returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstoreDeliverNow(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+    }
+    else
+        return false;
+    return true;
+}
+
+static void webFunctionCall_live(funCallStruct *d)
+{
+    if (webMsgstoreCall_live(d))
+        return;
+    ::webFunctionCall(d);
+}
+
 // ==== rm body deadlines (web_rm_handlers.cpp) lines 40-41 (working tree) ====
 #define RM_BODY_TIMEOUT_MS 2000UL    // no byte for this long
 #define RM_BODY_TOTAL_MS 3000UL      // absolute deadline for the whole body
@@ -1038,7 +1081,7 @@ void send_message_live(const WebReq &wr)
     web_client.println(); // The HTTP response ends with another blank line
 }
 
-// ==== call_function (web_functions.cpp) lines 4753-4847 (working tree) ====
+// ==== call_function (web_functions.cpp) lines 4753-4813 (working tree) ====
 /**
  * ###########################################################################################################################
  * Tries to execute a Web-API function call.
@@ -1085,41 +1128,7 @@ void call_function_live(const WebReq &wr, const String &full_header)
         return;
     }
 
-#if defined(ENABLE_MSGSTORE)
-    // Stage 3 store node operator actions (docs/dm-stage3-wave-plan-20260914.md). Handled here
-    // rather than in webFunctionCall() (web_nodefunctioncalls.cpp, out of this file's exclusive
-    // set) -- both keep the same WF_RETURNCODE_OKAY/FAIL convention call_function_live() already
-    // serialises below, so the mailbox page's callfunction() calls need no special handling.
-    if (functionData.functionName.equals("mboxpurge"))
-    {
-        if (functionData.functionParameter.equals("all"))
-        {
-            msgstorePurgeAll();
-            functionData.returnCode = WF_RETURNCODE_OKAY;
-        }
-        else
-        {
-            // B5: space/tab trimmed, then a whole number 0..MSGSTORE_SLOTS_MAX-1; "abc", "", "1x", "+1" are refused (were slot 0 / 1)
-            const char *ps = functionData.functionParameter.c_str();
-            size_t pn = functionData.functionParameter.length();
-            mcTrimSpan(&ps, &pn);
-            int32_t slot = 0;
-            functionData.returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstorePurge(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
-        }
-    }
-    else if (functionData.functionName.equals("mboxdeliver"))
-    {
-        const char *ps = functionData.functionParameter.c_str();
-        size_t pn = functionData.functionParameter.length();
-        mcTrimSpan(&ps, &pn);
-        int32_t slot = 0;
-        functionData.returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstoreDeliverNow(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
-    }
-    else
-#endif
-    {
-        webFunctionCall(&functionData); // try to execute that command
-    }
+    webFunctionCall_live(&functionData); // try to execute that command (the mailbox actions mboxpurge / mboxdeliver included)
 
     send_http_header_live(functionData.returnCode == WF_RETURNCODE_OKAY ? 200 : 422, RESPONSE_TYPE_JSON); // send header, either 200 if command was executed or 422 if not
 
@@ -1135,7 +1144,7 @@ void call_function_live(const WebReq &wr, const String &full_header)
     rm_wipe_string(functionData.functionName);
 }
 
-// ==== webSetparamValueVerdict (web_functions.cpp) lines 4849-4884 (working tree) ====
+// ==== webSetparamValueVerdict (web_functions.cpp) lines 4815-4850 (working tree) ====
 /**
  * B7 (step 5b): may this decoded setparam value reach the setter? 0 = yes, else a refusal (1 too long, 2 "--", 3 leading
  * "&&"). A value over 200 bytes is refused for every name (the setters' own buffers may still cut a value near that
@@ -1173,7 +1182,7 @@ static uint8_t webSetparamValueVerdict(const char *name, const char *value, size
     return dashes ? 2 : 0;
 }
 
-// ==== setparam (web_functions.cpp) lines 4886-5030 (working tree) ====
+// ==== setparam (web_functions.cpp) lines 4852-4996 (working tree) ====
 /**
  * ###########################################################################################################################
  * Set the Value of a parameter (if known)
@@ -1320,7 +1329,7 @@ void setparam_live(const WebReq &wr, const String &full_header)
     rm_wipe_string(setupData.returnValue);
 }
 
-// ==== getparam (web_functions.cpp) lines 5032-5097 (working tree) ====
+// ==== getparam (web_functions.cpp) lines 4998-5063 (working tree) ====
 /**
  * ###########################################################################################################################
  * Get the Value of a parameter (if known)
@@ -1531,6 +1540,40 @@ static int web_read_body(long content_length)
 {
     // the I/O loop (idle WEB_TIMEOUT_TIME, total 4 s, WDT feed) is web_io.cpp; WB_NOLEN/SIZE/SHORT are -1/-2/-3
     return webReadBody(web_cfg_buf, CONFIG_JSON_MAX + 1, content_length, WEB_TIMEOUT_TIME, 4000);
+})LIVESRC"},
+    {"src/web_functions/web_nodefunctioncalls.cpp", "webMsgstoreCall", R"LIVESRC(// Stage 3 store node operator actions (docs/dm-stage3-wave-plan-20260914.md), moved here from call_function() (FORMAL-02 9f):
+// the same WF_RETURNCODE_OKAY/FAIL convention, so the mailbox page's callfunction() calls need no special handling.
+// true = handled (returnCode set). Static: test/test_web_diff/live/extract_live.py cuts this function out by name.
+static bool webMsgstoreCall(funCallStruct *functionData)
+{
+    if (functionData->functionName.equals("mboxpurge"))
+    {
+        if (functionData->functionParameter.equals("all"))
+        {
+            msgstorePurgeAll();
+            functionData->returnCode = WF_RETURNCODE_OKAY;
+        }
+        else
+        {
+            // B5: space/tab trimmed, then a whole number 0..MSGSTORE_SLOTS_MAX-1; "abc", "", "1x", "+1" are refused (were slot 0 / 1)
+            const char *ps = functionData->functionParameter.c_str();
+            size_t pn = functionData->functionParameter.length();
+            mcTrimSpan(&ps, &pn);
+            int32_t slot = 0;
+            functionData->returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstorePurge(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+        }
+    }
+    else if (functionData->functionName.equals("mboxdeliver"))
+    {
+        const char *ps = functionData->functionParameter.c_str();
+        size_t pn = functionData->functionParameter.length();
+        mcTrimSpan(&ps, &pn);
+        int32_t slot = 0;
+        functionData->returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstoreDeliverNow(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+    }
+    else
+        return false;
+    return true;
 })LIVESRC"},
     {"src/web_functions/web_rm_handlers.cpp", "rm body deadlines", R"LIVESRC(#define RM_BODY_TIMEOUT_MS 2000UL    // no byte for this long
 #define RM_BODY_TOTAL_MS 3000UL      // absolute deadline for the whole body)LIVESRC"},
@@ -2388,41 +2431,7 @@ void call_function(const WebReq &wr, const String &full_header)
         return;
     }
 
-#if defined(ENABLE_MSGSTORE)
-    // Stage 3 store node operator actions (docs/dm-stage3-wave-plan-20260914.md). Handled here
-    // rather than in webFunctionCall() (web_nodefunctioncalls.cpp, out of this file's exclusive
-    // set) -- both keep the same WF_RETURNCODE_OKAY/FAIL convention call_function() already
-    // serialises below, so the mailbox page's callfunction() calls need no special handling.
-    if (functionData.functionName.equals("mboxpurge"))
-    {
-        if (functionData.functionParameter.equals("all"))
-        {
-            msgstorePurgeAll();
-            functionData.returnCode = WF_RETURNCODE_OKAY;
-        }
-        else
-        {
-            // B5: space/tab trimmed, then a whole number 0..MSGSTORE_SLOTS_MAX-1; "abc", "", "1x", "+1" are refused (were slot 0 / 1)
-            const char *ps = functionData.functionParameter.c_str();
-            size_t pn = functionData.functionParameter.length();
-            mcTrimSpan(&ps, &pn);
-            int32_t slot = 0;
-            functionData.returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstorePurge(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
-        }
-    }
-    else if (functionData.functionName.equals("mboxdeliver"))
-    {
-        const char *ps = functionData.functionParameter.c_str();
-        size_t pn = functionData.functionParameter.length();
-        mcTrimSpan(&ps, &pn);
-        int32_t slot = 0;
-        functionData.returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstoreDeliverNow(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
-    }
-    else
-#endif
-    {
-        webFunctionCall(&functionData); // try to execute that command
-    }
+    webFunctionCall(&functionData); // try to execute that command (the mailbox actions mboxpurge / mboxdeliver included)
 
     send_http_header(functionData.returnCode == WF_RETURNCODE_OKAY ? 200 : 422, RESPONSE_TYPE_JSON); // send header, either 200 if command was executed or 422 if not
 
