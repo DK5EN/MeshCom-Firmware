@@ -5,26 +5,26 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-6, 7a and 7b steps 1-5 committed on `fork-dev`, not pushed; full host gate after step 5 green
-(141 envs, 4,448 ok, 1 skipped). `fork-dev` contains all of `upstream/dev` (checked 2026-11-27). Start a fresh
-session with `/orchestrate-waves` on this doc; next is 7b step 6 (`num_parse.h` at the 9 sites, B5).
+**State:** waves 1-6, 7a and 7b steps 1-6 committed on `fork-dev`, not pushed; last full host gate green after
+step 6 (141 envs, 4,450 ok, 1 skipped). `fork-dev` contains all of `upstream/dev` (checked 2026-11-27). Start a fresh
+session with `/orchestrate-waves` on this doc; next is 7b step 7 (one body reader with WDT feed and 408, B10).
 
-- **Step 6 inputs:** `src/num_parse.h` (wave 7a: strict int and 3-digit fixed point, `mcTrimSpan`, `mcFormatDec3`; B5
-  table against today's site parsers in its suite). Sites: `web_setup.cpp` `sscanf`/`atoi`/`toInt` rungs and
-  `mboxpurge`/`mboxdeliver` in `call_function` (seams 7.3 step 6: `tools/webgui_settings_test.js` and
-  `test_command_setters` pin source text of these rungs). Decision from 7a: trim space/tab before `mcParse*`;
-  windcal/tempoff format back with `mcFormatDec3`. B5 answers 422 through the existing setparam answer shape.
-
-- **5c recon (scout, 2026-11-27):** `call_function` cuts at `"HTTP/1.1"` (not `" HTTP/1.1"`) and trims, splits on the
-  first `=` (no `=`: name = whole, value empty), guard `webGuardCallAllowed(name, header, len)`, mbox actions inline
-  under `ENABLE_MSGSTORE`, then `webFunctionCall(funCallStruct*)` (`web_nodefunctioncalls.cpp:22`). `send_message`:
-  needs both `&tocall=` and `&message=`; tocall = up to `&message` (no `=`), message = everything after `&message=`,
-  decoded, trimmed, tocall upper-cased, `":{TOCALL}msg"` cut to 150 (UTF-8 safe), answers `sendmessage
-ok|refused|dropped|invalid`; an empty message still answers `ok`. HTTP/1.0 rows: `mut-039/040` (callfunction),
-  `mut-048/049` (sendmessage).
+- **Step 7 inputs (scout, 2026-11-27):** `src/web_functions/web_body.h` is the pure accumulator (`webBodyBegin` /
+  `webBodyPush` / `webBodyEnd`, codes `WB_NOLEN -1`, `WB_SIZE -2`, `WB_SHORT -3`); its comment names the glue
+  `int webReadBody(char *buf, size_t cap, long content_length, uint32_t idle_ms, uint32_t total_ms)` in a new
+  `web_io.cpp` (not written). Readers to replace: `web_read_body` (`web_functions.cpp` ~:643, 2 s idle / 4 s total,
+  caller `sub_config_upload` answers 400 "file too large" / "no Content-Length" / "incomplete upload") and `rmReadBody`
+  (`web_rm_handlers.cpp` ~:44, declared in `web_rm_handlers.h:27`, 2 s / 3 s, returns nullptr / "size" / "short";
+  callers `sub_rm_send` and three in `web_rm_handlers.cpp`). Neither feeds the WDT (only `yield()`); the feed helper is
+  `meshcom_wdt_feed()` (`src/watchdog_feed.h`, empty on nRF52). Head timeout: the `work_webpage` head loop leaves
+  silently after `WEB_TIMEOUT_TIME` 2 s (pinned by `test_web_diff` ~:967 "no output, stopCalls 0"); B10 makes it 408.
+  Tests: `test/test_web_body` (accumulator vs reference copies of both readers), `test/test_rm_web_parse` (wipe
+  contract, "size"/"short" tokens), rig stubs call both readers (`stubs/web_handler_stubs.h`), the rig clock adds 1 ms
+  per empty poll; `frozen/extract.sh` renames the frozen readers. `rmReadBody` is exported: keep a one-line wrapper or
+  rename both files at once.
 - **Wave 7b plan (serial, `web_functions.cpp` is the hotspot, one writer per step, gate + advisor + commit each):**
   step 1 router as classifier + switch, table alongside (`ccdf9260`, done); step 2 B2 exact match (`34fb0a3b`, done,
-  33 rig whitelist rows); step 3 B1 (done); step 4 B3 + B6 (done); step 5 (done); step 6 num_parse.h at the 9 sites (B5, trim first, `mcFormatDec3`); step 7 web_body.h + body reader
+  33 rig whitelist rows); step 3 B1 (done); step 4 B3 + B6 (done); step 5 (done); step 6 (done); step 7 web_body.h + body reader
   with WDT feed and 408 (B10); step 8 fixed response heads; then drop `webRouteLegacy` and the disagreement counter.
 - **Wave 7b mechanics:** `webRouteDecide` (web_functions.cpp) gathers inputs, `webRouteDecideCore` (web_route.h, pure)
   decides; the feature mask `built` (WRB_*) mirrors the switch guards and is pinned by `test_web_route`. Rig whitelist
@@ -242,6 +242,11 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 ## Open questions
 
 ## Archive
+
+- Wave 7b step 6 (2026-11-27, `56e99fe7`): B5, `num_parse.h` at the 9 sites (trim, strict whole input, site ranges;
+  windcal/tempoff back through `mcFormatDec3`; no console line on a refusal). web_setup.cpp rungs checked by the real
+  parser over their extracted ranges and source pins (console line from the parsed value inside the parse guard,
+  mutation-checked); the mbox sites by rig runtime pins. Full gate green.
 
 - Wave 7b step 5 (2026-11-27): the four API handlers read the parsed `WebReq` (`3199d5f2` setparam/getparam, `77b655be`
   callfunction/sendmessage; identical except B3 HTTP/1.0 values, `HTTP/1.1` inside a query, header-line `&tocall=` /
