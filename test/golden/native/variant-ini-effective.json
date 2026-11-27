@@ -6219,6 +6219,35 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_web_request": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-I src/web_functions",
+   "-I test/support",
+   "-Wall",
+   "-Wextra",
+   "-g",
+   "-fsanitize=address,undefined",
+   "-fno-omit-frame-pointer"
+  ],
+  "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_web_request"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_web_txbuf": {
   "build_flags": [
    "-std=gnu++17",

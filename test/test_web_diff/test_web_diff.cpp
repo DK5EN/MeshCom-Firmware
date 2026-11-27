@@ -3,24 +3,16 @@
 //   pio test -e native_web_diff            compare every entry point against test/test_web_diff/golden
 //   WEB_DIFF_UPDATE=1 pio test -e native_web_diff   rewrite the golden from the frozen path (review the diff!)
 //
-// Today this is a baseline snapshot, not yet a differential: the new decoders are proven by test_url_decode,
-// test_rm_web_parse and test_hex_digit against frozen copies. The rig compares old against new once the live
-// entry below is wired (web wave A step 3).
-// The unit under test is a function pointer table. Today it holds the frozen copy of the request path
-// (frozen/web_request_frozen.cpp: work_webpage_frozen, entry of the head loop, the guard, the router, the
-// body readers and the setparam/getparam/callfunction/sendmessage handlers, handlers stubbed). Every corpus
-// request (corpus/*.req, built by tools/web_corpus.py) runs under every profile; the record of the run
-// (handler trace, every byte written, the close, the fake clock) is compared with golden/<name>.txt.
-//
-// TODO(web-diff-live): wire the live request path as a second entry of kEntries ("live"):
-//   1. the refactored code must be natively compilable: a TU with `void work_webpage(void)` (or its
-//      replacement) that reads the global `web_client` (rig/web_rig.h) and calls its collaborators by the
-//      names in stubs/web_handler_stubs.h;
-//   2. that TU #includes stubs/web_handler_stubs.h inside its own namespace with the WEB_RIG_* macros
-//      bound to its body readers (see the MID block of frozen/extract.sh), so the traces are identical;
-//   3. add its sources to build_src_filter / the suite directory and list it here. The golden check and the
-//      frozen-vs-live check below then run for it with no other change. Intended deltas (B1-B10 of
-//      docs/web-server-seams-20261127.md 7.2) go into kWhitelist, keyed by corpus name.
+// The rig is a differential: entry "frozen" is the reference copy of the request path (frozen/), entry "live" is the
+// working-tree source cut out by name (live/web_request_live.cpp, generated; the checks below run for both).
+// After every edit of an extracted function of src/web_functions/web_functions.cpp, web_rm_handlers.cpp or
+// src/url_decode.cpp regenerate the live copy from the repository root:
+//     python3 test/test_web_diff/live/extract_live.py
+// test_live_copy_is_current goes red when an extracted segment of the source is no longer verbatim in the working tree.
+// The unit under test is a function pointer table. Every corpus request (corpus/*.req, built by tools/web_corpus.py)
+// runs under every profile through every entry; the record of the run (handler trace, every byte written, the close,
+// the fake clock) is compared with golden/<name>.txt, and the live record with the frozen one. Intended deltas
+// (B1-B10 of docs/web-server-seams-20261127.md 7.2) go into kWhitelist, keyed by corpus name (empty today).
 #include <unity.h>
 
 #include "../support/repo_file.h"
@@ -39,6 +31,19 @@ namespace web_frozen
 void work_webpage_frozen(void);
 }
 
+namespace web_live
+{
+void work_webpage_live(void);
+struct LiveSrc // generated table in live/web_request_live.cpp: verbatim source text of every extracted segment
+{
+    const char *file;
+    const char *what;
+    const char *text;
+};
+extern const LiveSrc kLiveSrc[];
+extern const unsigned long kLiveSrcCount;
+}
+
 void setUp(void) {}
 void tearDown(void) {}
 
@@ -50,7 +55,7 @@ struct WebEntry
 
 static const WebEntry kEntries[] = {
     {"frozen", web_frozen::work_webpage_frozen},
-    // TODO(web-diff-live): {"live", <live request entry>},
+    {"live", web_live::work_webpage_live},
 };
 static const size_t kEntryCount = sizeof(kEntries) / sizeof(kEntries[0]);
 
@@ -85,12 +90,15 @@ static bool closedVariant(const std::string &name)
 }
 
 // one corpus request under every profile, through one entry point
+static size_t gRuns[sizeof(kEntries) / sizeof(kEntries[0])]; // runs per entry through recordAll (proof the entry ran)
+
 static std::string recordAll(const WebEntry &e, const std::string &name, const std::string &bytes)
 {
     std::string all;
     for (size_t p = 0; p < kProfileCount; p++)
     {
         webRigBegin(bytes, closedVariant(name), kProfiles[p]);
+        gRuns[&e - kEntries]++;
         e.run();
         all += std::string("== profile ") + kProfiles[p].name + "\n" + webRigRecord();
     }
@@ -211,8 +219,7 @@ static void test_entries_match_golden(void)
 // a second entry must equal the first one on every request (frozen vs live), except whitelisted names
 static void test_entries_agree_with_the_first(void)
 {
-    if (kEntryCount < 2)
-        TEST_IGNORE_MESSAGE("only the frozen entry is wired (TODO web-diff-live)");
+    TEST_ASSERT_TRUE_MESSAGE(kEntryCount >= 2, "the live entry must stay wired");
     const std::vector<std::string> names = corpusNames();
     for (size_t k = 1; k < kEntryCount; k++)
     {
@@ -231,6 +238,48 @@ static void test_entries_agree_with_the_first(void)
             TEST_ASSERT_TRUE_MESSAGE(same, n.c_str());
         }
         TEST_ASSERT_EQUAL_size_t_MESSAGE(kWhitelist.size(), whitelisted, "every whitelist entry must be a corpus request");
+    }
+}
+
+// staleness: the generated live copy must still match the source it was cut from. Every extracted segment is
+// stored verbatim in web_live::kLiveSrc; it has to occur exactly once in its file of the working tree.
+// kLiveSources names those files as literals in this suite, so tools/regression_select.py (which follows the
+// string literals of a suite that reads files) runs native_web_diff when one of them changes.
+static const char *const kLiveSources[] = {
+    "src/web_functions/web_functions.cpp",
+    "src/web_functions/web_rm_handlers.cpp",
+    "src/url_decode.cpp",
+};
+
+static void test_live_copy_is_current(void)
+{
+    TEST_ASSERT_GREATER_THAN_UINT(10, web_live::kLiveSrcCount);
+    for (unsigned long i = 0; i < web_live::kLiveSrcCount; i++)
+    {
+        const web_live::LiveSrc &l = web_live::kLiveSrc[i];
+        bool listed = false;
+        for (const char *s : kLiveSources)
+            listed = listed || std::string(s) == l.file;
+        TEST_ASSERT_TRUE_MESSAGE(listed, (std::string("live source not in kLiveSources: ") + l.file).c_str());
+        const std::string file = repo_slurp(l.file);
+        const std::string text = l.text;
+        const std::string msg = std::string("stale live copy, regenerate with python3 test/test_web_diff/live/extract_live.py: ") + l.what;
+        const size_t at = file.find(text);
+        TEST_ASSERT_TRUE_MESSAGE(at != std::string::npos, msg.c_str());
+        TEST_ASSERT_TRUE_MESSAGE(file.find(text, at + 1) == std::string::npos, msg.c_str());
+    }
+}
+
+// every entry really ran: runs per entry = corpus requests x profiles (printed)
+static void test_every_entry_ran(void)
+{
+    const size_t want = corpusNames().size() * kProfileCount;
+    for (size_t k = 0; k < kEntryCount; k++)
+    {
+        char m[120];
+        snprintf(m, sizeof(m), "entry %s: %zu runs (want at least %zu)", kEntries[k].name, gRuns[k], want);
+        TEST_MESSAGE(m);
+        TEST_ASSERT_GREATER_OR_EQUAL_size_t_MESSAGE(want, gRuns[k], m);
     }
 }
 
@@ -358,6 +407,8 @@ int main(int, char **)
     RUN_TEST(test_golden_set_is_complete);
     RUN_TEST(test_entries_agree_with_the_first);
     RUN_TEST(test_whitelist_names_corpus_requests);
+    RUN_TEST(test_live_copy_is_current);
     RUN_TEST(test_corpus_reaches_the_handlers);
+    RUN_TEST(test_every_entry_ran);
     return UNITY_END();
 }
