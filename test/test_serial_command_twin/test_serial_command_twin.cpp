@@ -322,8 +322,16 @@ static std::vector<Scenario> scenarios()
         {"embedded_nul",     std::string(":a\0b\r", 5), false},
         {"backspace_edit",   "::9 helllo\x08\x08o\r", false},
         {"capacity_boundary",capacity_cmd, false},
+        // SER-JUNK-01: supply-spike noise that starts like a message or a command must not go out / run
+        {"junk_colon",       "::\x8f\x13zz\r", false},
+        {"junk_dash",        "--\x01reboot\r", false},
+        {"junk_esc",         "::9 \x1b[Atext\r", false},
+        {"utf8_umlaut_sends","::9 Gr\xc3\xbc\xc3\x9f" "e\r", false},
     };
 }
+
+// SER-JUNK-01: the ESP32 reader asks whether LoRa transmits; the twin feeds bytes with the radio idle.
+bool serialLoraTxBusy(void) { return false; }
 
 void setUp(void) {}
 void tearDown(void) {}

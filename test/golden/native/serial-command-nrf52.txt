@@ -17,3 +17,7 @@ lf_only_ending       echo=7    action=CMD      buf="--info" iphone=7 rxFromPhone
 embedded_nul         echo=4    action=WRONG    msg="\n...wrong command :ab\n"
 backspace_edit       echo=14   action=SEND     buf="::9 hello" len=9
 capacity_boundary    echo=599  action=CMD      buf=len=598 prefix="--AAAAAAAAAA" suffix="AAAAAAAAAAAA" iphone=7 rxFromPhone=0
+junk_colon           echo=7    action=DISCARD  msgs=[\n...input dropped: control or invalid bytes\n]
+junk_dash            echo=10   action=DISCARD  msgs=[\n...input dropped: control or invalid bytes\n]
+junk_esc             echo=12   action=DISCARD  msgs=[\n...input dropped: control or invalid bytes\n]
+utf8_umlaut_sends    echo=12   action=SEND     buf="::9 Grüße" len=11

@@ -386,6 +386,75 @@ static void test_ueberlange_nutzlast_sprengt_den_zwischenpuffer_nicht(void)
                              "die Nutzlast-Schleife hat ueber cConcat1 hinaus geschrieben");
 }
 
+// B-APRS-PATH-01: CheckGroup(const char *) sums its digits instead of calling atoi(). Reference = the former
+// body (strnlen, digit check, atoi); compared on every digit string of 0..7 characters and on strings with a
+// non-digit at each position.
+static int checkGroupRef(const char *callsign)
+{
+    size_t len = callsign ? strnlen(callsign, 7) : 0;
+    if (len < 1 || len > 6)
+        return 0;
+    for (size_t ic = 0; ic < len; ic++)
+        if (callsign[ic] < 0x30 || callsign[ic] > 0x39)
+            return 0;
+    int ig = atoi(callsign);
+    if (ig == 100001)
+        return ig;
+    if (ig < 1 || ig > 99999)
+        return 0;
+    return ig;
+}
+
+static void test_checkgroup_wie_atoi(void)
+{
+    char s[9];
+    unsigned long n = 0;
+    for (int len = 0; len <= 7; len++)
+    {
+        long total = 1;
+        for (int i = 0; i < len; i++) total *= 10;
+        for (long v = 0; v < total; v++)
+        {
+            long x = v;
+            for (int i = len - 1; i >= 0; i--) { s[i] = (char)('0' + x % 10); x /= 10; }
+            s[len] = 0;
+            TEST_ASSERT_EQUAL_INT_MESSAGE(checkGroupRef(s), CheckGroup((const char *)s), s);
+            n++;
+            if (len >= 1 && v % 997 == 0)   // a non-digit at every position
+                for (int p = 0; p < len; p++)
+                {
+                    const char keep = s[p];
+                    s[p] = (p % 3 == 0) ? ' ' : (p % 3 == 1) ? '-' : 'A';
+                    TEST_ASSERT_EQUAL_INT_MESSAGE(checkGroupRef(s), CheckGroup((const char *)s), s);
+                    s[p] = keep;
+                }
+        }
+    }
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, CheckGroup((const char *)nullptr), "nullptr");
+    TEST_ASSERT_GREATER_THAN_UINT32(11000000, (uint32_t)n);
+}
+
+// APRS-POS-RANGE-01 (found by the bounded model checker, specs/cbmc/aprs/pos_pass, 2026-11-26): sscanf("%lf") also
+// reads an exponent, "inf" and "nan", so a lat/lon field such as "1e99" gave a value whose (int)(x / 100.0) is
+// undefined behaviour. Such a position is rejected now, like an 11-digit overrun; an 11-digit field without exponent
+// (at most 99999999999) still decodes as before.
+static void test_lat_lon_ausserhalb_des_int_bereichs_wird_abgelehnt(void)
+{
+    static const char *const bad[] = {"4800.00N/1e99E>", "1e99N/01147.19E-", "4800.00N/-1e99E>", "nanN/01147.19E-",
+                                      "4800.00N/infE>", "4800.00N/-infW>", "9e11N/01147.19E-", "4800.00N/2.2e11E>"};
+    for (const char *p : bad)
+    {
+        struct aprsPosition pos;
+        TEST_ASSERT_EQUAL_UINT16_MESSAGE(0x00, decodeAPRSPOS(p, pos), p);
+    }
+    struct aprsPosition pos;
+    TEST_ASSERT_EQUAL_UINT16(0x01, decodeAPRSPOS("99999999999N/99999999999E>", pos));
+    TEST_ASSERT_TRUE(pos.lat == 99999999999.0 && pos.lon == 99999999999.0);
+    TEST_ASSERT_EQUAL_UINT16(0x01, decodeAPRSPOS("4825.35N/01147.19E-", pos));
+    TEST_ASSERT_TRUE(pos.lat_d > 48.4224 && pos.lat_d < 48.4226); // 48 + 25.35 / 60
+    TEST_ASSERT_TRUE(pos.lon_d > 11.7864 && pos.lon_d < 11.7866); // 11 + 47.19 / 60
+}
+
 int main(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -404,5 +473,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_d_tags_leiten_keine_basis_ab);
     RUN_TEST(test_alle_tags_in_encoder_reihenfolge);
     RUN_TEST(test_ueberlange_nutzlast_sprengt_den_zwischenpuffer_nicht);
+    RUN_TEST(test_checkgroup_wie_atoi);
+    RUN_TEST(test_lat_lon_ausserhalb_des_int_bereichs_wird_abgelehnt);
     return UNITY_END();
 }

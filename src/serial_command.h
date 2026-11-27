@@ -24,3 +24,7 @@
 //   - nRF52 holds the 600 B msg_buffer in BSS (N-22, a loop-task stack fix);
 //     ESP32 still has it on the stack
 void checkSerialCommand(void);
+
+// SER-JUNK-01: true while the node transmits on LoRa (ESP32: esp32_main.cpp). The serial reader holds UART input
+// during TX and discards it afterwards (supply spikes of 1-2 W PAs put noise on the UART).
+bool serialLoraTxBusy(void);

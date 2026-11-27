@@ -1,0 +1,12 @@
+TOOL=esbmc
+# code mutation: rmCheck() builds the canonical text with dst and src swapped. The CANON_CONTRACT claim of the AUTH
+# proof (the builder is called with this frame's dst/src) must catch it; without the claim the job passed vacuously.
+mkdir -p gen && sed 's/const size_t cl = rmCanonical(c, dst, src, canon, sizeof(canon));/const size_t cl = rmCanonical(c, src, dst, canon, sizeof(canon));/' "$ROOT/src/remote_cmd.cpp" > gen/remote_cmd_swap.cpp
+cmp -s "$ROOT/src/remote_cmd.cpp" gen/remote_cmd_swap.cpp && { echo "  mutation did not apply to remote_cmd.cpp (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp hmac_model.cpp gen/remote_cmd_swap.cpp"
+CFLAGS="-I$ROOT/src -Ishim -DNATIVE_BUILD=1 -DDIRECT -DRM_CANONICAL_EXTERNAL -DCANON_CONTRACT"
+FLAGS="--unwind 110"
+EXPECT=fail
+CHECKS="code mutation: rmCheck builds the canonical text with dst/src swapped -> the AUTH claim must fail"
+EXPECT_PROP='g_canon.dst == dst|g_canon.src == src'
+TIMEOUT=2400

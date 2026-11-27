@@ -1085,6 +1085,12 @@ unsigned long inoReceiveTimeOutTime = 0;
 std::atomic<bool> transmittedFlag{false};
 std::atomic<bool> bEnableInterruptTransmit{false};
 
+// SER-JUNK-01: the node is transmitting on LoRa (same flags as loraRxParkService's txBusy). serial_command.h.
+bool serialLoraTxBusy(void)
+{
+    return bEnableInterruptTransmit || tx_is_active || transmittedFlag;
+}
+
 // flag to indicate one second
 unsigned long retransmit_timer = 0;
 

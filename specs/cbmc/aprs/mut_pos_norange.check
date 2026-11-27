@@ -1,0 +1,14 @@
+TOOL=esbmc
+# code mutation: the APRS-POS-RANGE-01 check is removed from a copy of the decoder, so a lat/lon such as "1e99" reaches
+# (int)(x / 100.0) again; the position proof must find the out-of-range conversion (shows the check is load-bearing
+# and the sscanf model produces such values).
+mkdir -p gen && sed 's/if (!aprsPosRawInRange(raw))/if (0)/' "$ROOT/src/aprs_functions.cpp" > gen/aprs_functions.cpp
+cmp -s "$ROOT/src/aprs_functions.cpp" gen/aprs_functions.cpp && { echo "  mutation did not apply to aprs_functions.cpp (source changed?)"; TOOL=none; }
+SOURCES="pos_harness.cpp $ROOT/src/charset_filter.cpp"
+CFLAGS="-Igen -Istubs -I$ROOT/test/support -I$ROOT/src -DNATIVE_BUILD=1 -DUNIT_TEST=1 -DMAXLEN=24"
+FLAGS="--unwind 30"
+EXPECT=fail
+CHECKS="code mutation: lat/lon range check removed from decodeAPRSPOS -> out-of-range float-to-int conversion must be found"
+EXPECT_PROP='floating-point conversion out of range'
+TIER=heavy
+TIMEOUT=1800

@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="canon_harness.cpp hmac_model.cpp $ROOT/src/remote_cmd.cpp"
+CFLAGS="-I$ROOT/src -Ishim -DNATIVE_BUILD=1"
+FLAGS="--unwind 110"
+EXPECT=pass
+CHECKS="rmCanonical alone (contract of the rmCheck proofs): memory safety, 0 with out[0]==0 on failure, else 1..n-1 with NUL at len and len <= 94"
+TIMEOUT=2400

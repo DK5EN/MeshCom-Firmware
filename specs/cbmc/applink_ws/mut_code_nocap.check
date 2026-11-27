@@ -2,8 +2,11 @@ TOOL=esbmc
 # small scope: a copy of the decoder with APPLINK_MAX_IN reduced to 6, so the message cap and the 1009 path are
 # reached by a 13-byte stream with the real code (the cap logic does not depend on the value of the constant)
 mkdir -p gen && sed 's/^#define APPLINK_MAX_IN .*/#define APPLINK_MAX_IN 6/' "$ROOT/src/applink_ws.h" > gen/applink_ws.h
-# code mutation: both length checks against APPLINK_MAX_IN are removed from the copy
-sed -e 's/if (!ctl && d->ext_len + d->msg_len > APPLINK_MAX_IN)/if (0)/' -e 's/if (d->ext_len > APPLINK_MAX_IN)/if (0)/' "$ROOT/src/applink_ws.cpp" > gen/applink_ws_nocap.cpp
+# code mutation: every length check against the message cap is removed from the copy -- the two header checks
+# against APPLINK_MAX_IN and, since B-AL-RANGE-01 (2026-11-26), the room check in unmaskAppend() that backs them up
+# (removing only the header checks no longer overflows: the local check catches it, so the job passed vacuously)
+sed -e 's/if (!ctl && d->ext_len + d->msg_len > APPLINK_MAX_IN)/if (0)/' -e 's/if (d->ext_len > APPLINK_MAX_IN)/if (0)/' -e 's/if (at > cap || n > cap - at)/if (0)/' "$ROOT/src/applink_ws.cpp" > gen/applink_ws_nocap.cpp
+grep -q 'if (at > cap || n > cap - at)' gen/applink_ws_nocap.cpp && { echo "  mutation did not remove the room check (source changed?)"; TOOL=none; }
 cmp -s "$ROOT/src/applink_ws.h" gen/applink_ws.h && { echo "  APPLINK_MAX_IN was not reduced (header changed?)"; TOOL=none; }
 cmp -s "$ROOT/src/applink_ws.cpp" gen/applink_ws_nocap.cpp && { echo "  mutation did not apply to applink_ws.cpp (source changed?)"; TOOL=none; }
 SOURCES="harness.cpp gen/applink_ws_nocap.cpp"

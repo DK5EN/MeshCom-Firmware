@@ -1,7 +1,9 @@
 TOOL=esbmc
 SOURCES="harness.cpp $ROOT/src/applink_ws.cpp"
 CFLAGS="-I$ROOT/src -DMODE_BIG -DBIG_SINGLE -DBIG_FIXED -DBIGCALLS=2"
-FLAGS="--unwind 310"
+# Outer byte loop of alWsFeed() bounded by name (header bytes + one payload step per call need ~10 passes); with
+# the global --unwind alone it was unrolled 310 times around the 300-byte copy loop (memout at 15 GB, 2026-11-26).
+FLAGS="--unwind 310 --unwindsetname alWsFeed:1:16"
 EXPECT=pass
 CHECKS="one BIN frame, 16-bit length 297..302 vs APPLINK_MAX_IN=300, chunks header|payload: msg[300] filled but never overrun, 1009 beyond"
 TIMEOUT=1800

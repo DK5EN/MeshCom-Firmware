@@ -3,6 +3,7 @@
 #include "serial_command.h"
 #include "printfdeb_functions.h"
 #include "command_functions.h"
+#include "serial_line_guard.h"
 
 // C3 carve-out of checkSerialCommand() out of nrf52_main.cpp; see
 // serial_command.h for why the two copies are not merged here. Moved
@@ -75,6 +76,16 @@ void checkSerialCommand(void)
     {
         if(strText[iTxtLen-1] == '\n' || strText[iTxtLen-1] == '\r')
         {
+            // SER-JUNK-01: a line with control bytes or invalid UTF-8 is supply/UART noise (E22 1-2 W PA spikes),
+            // not typed text. Drop it whole: it must neither go out over LoRa nor run as a command.
+            if(!serialLineIsClean(strText, (size_t)iTxtLen))
+            {
+                printfdeb("\n...input dropped: control or invalid bytes\n");
+                memset(strText, 0x00, sizeof(strText));
+                iTxtPos = 0;
+                return;
+            }
+
             strTextWork = strText;
             strTextWork.trim();
             snprintf(strText, sizeof(strText), "%s", strTextWork.c_str());

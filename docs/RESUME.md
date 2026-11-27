@@ -7,6 +7,35 @@ Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 
 ## Now (2026-11-26)
 
+- **Upstream issues for the library patch wave, 2026-11-26:** filed #1330 (NimBLE), #1331 (arduino-esp32), #1332
+  (IDF mDNS/DHCP server/MTU), #1333 (DNS in the tcpip thread), #1334 (Auto Update TLS dates, TLS 1.2), #1335
+  (W5100S), #1336 (Safeboot ESP32Async web lib), #1337 (UDP drain and EXTUDP queue), #1338 (APRS encoder, asset
+  URL), #1339 (net console handshake), English, assigned DK5EN, neutral wording (texts: `docs/upstream-issue-drafts-20261126.md`). Net console (F2-10 plus FORMAL-NETCON-MARK) filed as #1339, worded as hardening work (operator). #1318 closed (web part in #1328, the A/W
+  labels are an app topic); #1309 commented: only SB-06 left, planned with #1336. Open upstream issues of ours now:
+  #1309, #1311, #1327 plus #1330-#1341.
+- **Operator decisions 2026-11-26 (execbrief):** Safeboot rest goes into #1309 as a comment (gzip upload page, web
+  upload drops a staged image; posted). CET-RESTAMP-01: every node with NTP or GPS with fix restamps, GPS counts, on
+  by default; filed as #1340; decisions recorded in the concept. BMC jobs over 7 GB are split into slices
+  (BACKLOG FORMAL-SPLIT). The release plan line "Safeboot shows MeshCom 4.4" was wrong (the Safeboot page is labelled
+  the same in fork and upstream), corrected.
+- **FORMAL01-RUN done 2026-11-27, working tree, not committed:** TLC `--all` 56/56 as expected, BMC `--all --heavy`
+  74/74 with 0 unexpected results or tool errors (`specs/tla/RESULTS.md`, `specs/cbmc/RESULTS.md`; local, one runner
+  at a time, 15 GB budget, peak 11.3 GB). Every job that ran over 15 GB or into its time limit passes after a
+  verifiability refactor or a proof split (operator rule; BACKLOG FORMAL-SPLIT): B-APRS-PATH-01 (`decodeAPRS` path and
+  payload as ranges, `src/aprs_path_scan.h`, FCS sum proven on its own), B-APRS-POS-01 (`decodeAPRSPOS` one tag pass,
+  bounded reads), B-RM-RANGE-01 (`remote_cmd.cpp` bounded scans and explicit lengths, one strike call site in
+  `rmCheck`, division-free `outU32`, `rmCanonical` proven on its own behind `RM_CANONICAL_EXTERNAL`), B-AL-RANGE-01
+  (`applink_ws.cpp` payload copy). Each identical to a frozen copy of the old code (differential host tests
+  `test_aprs_path_scan`, `test_aprs_pos_scan`, `test_rm_range`, `test_applink_ws_range`; old/new drivers with MeshMap,
+  corpus and generated data). Found and fixed: APRS-POS-RANGE-01 (lat/lon such as `1e99` reached an undefined
+  float-to-int cast; regression test red before, green after). Gate PASS (4,292 host cases). Upstream issue for
+  APRS-POS-RANGE-01: operator decision.
+- **FORMAL-NETCON-MARK fixed 2026-11-26 (working tree, #1339):** mark/free only by the current holder under
+  `s_hs_mux`; regression test red before, green after; `netconsole.cfg` with `MarkGuard = TRUE`, old state in
+  `netconsole_was_*.cfg`. Bench with several connections open.
+- **SLEEP-PULLUP-01 (2026-11-26):** `--deepsleep` with `--button off` on a board without external pull-up wakes at once
+  (wake pin armed, pull-up only with `--button on`). Operator: fix with `INPUT_PULLUP` before arming; BACKLOG row and
+  upstream issue #1341.
 - **Upstream sync 2026-11-26:** #1328 (combined) and #1329 (GW-SRV-1324) merged upstream on 2026-11-26 without review
   changes; merged `upstream/dev` `5bca4703` into fork-dev (merge path). All 21 conflicted paths keep fork-dev; the
   auto-merge duplicated `extudp_refresh_decide()` in `src/extudp_refresh.h`, fork-dev side kept there too. Merge tree

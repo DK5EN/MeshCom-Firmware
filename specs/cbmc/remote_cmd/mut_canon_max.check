@@ -1,0 +1,8 @@
+TOOL=esbmc
+SOURCES="canon_harness.cpp hmac_model.cpp $ROOT/src/remote_cmd.cpp"
+CFLAGS="-I$ROOT/src -Ishim -DNATIVE_BUILD=1 -DMUT_CANON_MAX93"
+FLAGS="--unwind 110"
+EXPECT=fail
+CHECKS="mutation: canonical text never longer than 93 -> must fail (the contract bound 94 is reached)"
+EXPECT_PROP="assertion len <= 93"
+TIMEOUT=2400

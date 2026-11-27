@@ -18,6 +18,12 @@ namespace
 
 // ---- small bounded text builder (no printf, no malloc) --------------------
 
+// Scan bounds for strings whose size the caller knows but this file does not see. Each lies well above anything a
+// caller can hand over, so the result is the same for every real input; a longer string is refused:
+const size_t RM_CALL_SCAN_MAX = 32;   // dst/src callsign: node_call[10], msg_source_call[21]
+const size_t RM_PASSWD_SCAN_MAX = 64; // node_passwd[15]
+const size_t RM_TEXT_SCAN_MAX = 200;  // a DM text carries at most 160 characters (rmParse reads up to 200 as well)
+
 struct Out
 {
     char *p;
@@ -43,28 +49,72 @@ void outStr(Out &o, const char *s)
         o.ok = false;
         return;
     }
-    while (*s)
+    // B-RM-RANGE-01 (2026-11-26): one length, one bound check, one copy. The former loop wrote byte by byte
+    // behind a counter and gave up at the first byte that left no room for the terminator; the result is
+    // the same (fails iff len + n >= capacity for n > 0), except that a failed append now writes nothing
+    // (outEnd() returns 0 and clears p[0] either way). A bounded model checker sees the write position as
+    // one offset instead of a counter that depends on every earlier byte.
+    const size_t n = strlen(s);
+    if (n != 0 && o.len + n >= o.n)
     {
-        if (o.len + 1 >= o.n)
-        {
-            o.ok = false;
-            return;
-        }
-        o.p[o.len++] = *s++;
+        o.ok = false;
+        return;
     }
+    memcpy(o.p + o.len, s, n);
+    o.len += n;
 }
 
+// outStr() for a field of known size: the length is measured with that size as bound. Same as outStr() for a
+// terminated field; an unterminated one is appended up to its size instead of being read past its end.
+void outStrN(Out &o, const char *s, size_t cap)
+{
+    if (!o.ok)
+        return;
+    if (s == nullptr)
+    {
+        o.ok = false;
+        return;
+    }
+    const size_t n = strnlen(s, cap);
+    if (n != 0 && o.len + n >= o.n)
+    {
+        o.ok = false;
+        return;
+    }
+    memcpy(o.p + o.len, s, n);
+    o.len += n;
+}
+
+// a dst/src callsign within the scan bound (nullptr is handled by outStrN)
+bool callFits(const char *call)
+{
+    return call == nullptr || strnlen(call, RM_CALL_SCAN_MAX + 1) <= RM_CALL_SCAN_MAX;
+}
+
+// Decimal text of v, no leading zeros ("0" for 0). Each digit is found by subtracting its power of ten at most nine
+// times: a fixed 10 x 9 compare-and-subtract with no division and no value-dependent loop count, so a bounded model
+// checker sees one small circuit instead of a chain of 32-bit dividers (B-RM-RANGE-01, 2026-11-26). Same text as the
+// former v % 10 / v /= 10 loop for every v (test_rm_range).
 void outU32(Out &o, uint32_t v)
 {
+    static const uint32_t POW10[10] = {1000000000u, 100000000u, 10000000u, 1000000u, 100000u,
+                                       10000u,      1000u,      100u,      10u,      1u};
     char tmp[11];
-    unsigned i = sizeof(tmp);
-    tmp[--i] = '\0';
-    do
+    size_t n = 0;
+    for (unsigned k = 0; k < 10; k++)
     {
-        tmp[--i] = (char)('0' + (v % 10));
-        v /= 10;
-    } while (v != 0);
-    outStr(o, tmp + i);
+        char d = '0';
+        for (unsigned j = 0; j < 9; j++)
+            if (v >= POW10[k])
+            {
+                v -= POW10[k];
+                d++;
+            }
+        if (d != '0' || n != 0 || k == 9)
+            tmp[n++] = d;
+    }
+    tmp[n] = '\0';
+    outStrN(o, tmp, sizeof(tmp));
 }
 
 size_t outEnd(Out &o)
@@ -85,7 +135,9 @@ size_t strippedLen(const char *passwd)
 {
     if (passwd == nullptr)
         return 0;
-    size_t n = strlen(passwd);
+    size_t n = strnlen(passwd, RM_PASSWD_SCAN_MAX + 1);
+    if (n > RM_PASSWD_SCAN_MAX)
+        return 0; // longer than any password field: refused like an empty secret
     while (n > 0 && passwd[n - 1] == ' ')
         n--;
     return n;
@@ -96,13 +148,29 @@ bool isLowerHex(char ch)
     return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f');
 }
 
-bool isForbiddenText(const char *s)
+// B-RM-RANGE-01: string helpers whose loops have a fixed bound, so a bounded model checker unrolls them exactly
+// as often as the data can need, not up to its global --unwind. Same results as strcmp()/strlen() on a terminated
+// string that fits.
+const size_t RM_ARG_CAP = RM_MAX_ARGS + 1; // size of RmCmd::args
+
+// s equals the string literal lit; the loop runs over lit, so its length is the bound
+bool litEq(const char *s, const char *lit)
 {
-    for (; *s; s++)
+    size_t k = 0;
+    for (; lit[k] != '\0'; k++)
+        if (s[k] != lit[k])
+            return false;
+    return s[k] == '\0';
+}
+
+// cap = size of the array s lives in (cmd or args field)
+bool isForbiddenText(const char *s, size_t cap)
+{
+    for (size_t k = 0; k < cap && s[k] != '\0'; k++)
     {
-        if (*s == ';' || *s == '{' || *s == '%')
+        if (s[k] == ';' || s[k] == '{' || s[k] == '%')
             return true;
-        if (*s == '-' && s[1] == '-')
+        if (s[k] == '-' && k + 1 < cap && s[k + 1] == '-')
             return true;
     }
     return false;
@@ -111,7 +179,7 @@ bool isForbiddenText(const char *s)
 // decimal digits only, no leading zero unless the whole token is "0", at most maxDigits
 bool parseSmallInt(const char *s, unsigned maxDigits, int &out)
 {
-    size_t n = strlen(s);
+    size_t n = strnlen(s, (size_t)maxDigits + 1); // > maxDigits means too long, as strlen() would tell
     if (n == 0 || n > maxDigits)
         return false;
     if (n > 1 && s[0] == '0')
@@ -129,7 +197,7 @@ bool parseSmallInt(const char *s, unsigned maxDigits, int &out)
 
 bool isOnOff(const char *a)
 {
-    return strcmp(a, "on") == 0 || strcmp(a, "off") == 0;
+    return litEq(a, "on") || litEq(a, "off");
 }
 
 // allowlist of section 6.4 as a table: one row per command name, generated from rm_commands.h. Adding
@@ -177,16 +245,16 @@ bool argsMatch(RmArgShape shape, const char *a, int minTxPower, int maxTxPower)
     case RM_ARGS_ONOFF:
         return isOnOff(a);
     case RM_ARGS_LED:
-        return isOnOff(a) || strcmp(a, "flash") == 0;
+        return isOnOff(a) || litEq(a, "flash");
     case RM_ARGS_CHGLED:
-        return a[0] == '\0' || isOnOff(a) || strcmp(a, "auto") == 0;
+        return a[0] == '\0' || isOnOff(a) || litEq(a, "auto");
     case RM_ARGS_TXPOWER:
     {
         int v = 0;
         return parseSmallInt(a, 3, v) && v >= minTxPower && v <= maxTxPower;
     }
     case RM_ARGS_SETOUT:
-        return strlen(a) >= 4 && (a[0] == 'a' || a[0] == 'b') && a[1] >= '0' && a[1] <= '7' && a[2] == ' ' &&
+        return strnlen(a, 4) >= 4 && (a[0] == 'a' || a[0] == 'b') && a[1] >= '0' && a[1] <= '7' && a[2] == ' ' &&
                isOnOff(a + 3);
     case RM_ARGS_NAME:
         return a[0] == '\0' || rmArgIsFreeText(a, RM_NAME_MAX);
@@ -198,22 +266,22 @@ bool argsMatch(RmArgShape shape, const char *a, int minTxPower, int maxTxPower)
     {
         // an all-digit token is a row index only (4+ digits must not pass as a callsign)
         bool digits = a[0] != '\0';
-        for (const char *q = a; *q; q++)
-            digits = digits && *q >= '0' && *q <= '9';
+        for (size_t k = 0; k < RM_ARG_CAP && a[k] != '\0'; k++)
+            digits = digits && a[k] >= '0' && a[k] <= '9';
         return digits ? rmArgIsRowIndex(a) : rmArgIsCall(a);
     }
     case RM_ARGS_CALLS:
     {
         if (a[0] == '\0')
             return true;
-        for (const char *q = a; *q; q++)
+        for (size_t k = 0; k < RM_ARG_CAP && a[k] != '\0'; k++)
         {
-            const char ch = *q;
+            const char ch = a[k];
             if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == ',' ||
                   ch == '-'))
                 return false;
         }
-        return strlen(a) <= RM_MAX_ARGS;
+        return strnlen(a, RM_ARG_CAP) <= RM_MAX_ARGS;
     }
     case RM_ARGS_PINS:
     {
@@ -233,29 +301,30 @@ bool argsMatch(RmArgShape shape, const char *a, int minTxPower, int maxTxPower)
     {
         if (a[0] == '\0')
             return true;
-        const char *sp = strchr(a, ' ');
-        if (sp == nullptr || sp - a < 1 || sp - a > 2)
+        // the first space must be at index 1 or 2 (a 1- or 2-digit pin); only those can be it
+        const char *sp = a[1] == ' ' ? a + 1 : (a[1] != '\0' && a[2] == ' ') ? a + 2 : nullptr;
+        if (sp == nullptr)
             return false;
         char num[3] = {a[0], sp - a == 2 ? a[1] : '\0', '\0'};
         int v = 0;
-        return parseSmallInt(num, 2, v) && v <= 48 && (strcmp(sp + 1, "on") == 0 || strcmp(sp + 1, "off") == 0 || strcmp(sp + 1, "in") == 0);
+        return parseSmallInt(num, 2, v) && v <= 48 && (litEq(sp + 1, "on") || litEq(sp + 1, "off") || litEq(sp + 1, "in"));
     }
     case RM_ARGS_UPD:
     {
-        if (a[0] == '\0' || strcmp(a, "check") == 0)
+        if (a[0] == '\0' || litEq(a, "check"))
             return true;
 #if defined(MC_AU_DEV_CHANNEL)
-        if (strcmp(a, "chan prod") == 0 || strcmp(a, "chan dev") == 0)
+        if (litEq(a, "chan prod") || litEq(a, "chan dev"))
             return true;
 #endif
         if (strncmp(a, "go ", 3) != 0)
             return false;
-        const size_t n = strlen(a + 3);
+        const size_t n = strnlen(a + 3, 24);
         if (n < 1 || n > 23)
             return false;
-        for (const char *q = a + 3; *q; q++)
+        for (size_t k = 3; k < 3 + n; k++)
         {
-            const char ch = *q;
+            const char ch = a[k];
             if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '.' ||
                   ch == '_' || ch == '-'))
                 return false;
@@ -268,29 +337,32 @@ bool argsMatch(RmArgShape shape, const char *a, int minTxPower, int maxTxPower)
 
 bool allowed(const RmCmd &c, int minTxPower, int maxTxPower)
 {
+    // B-RM-RANGE-01: litEq() runs over the table name, so each comparison is bounded by that name's length.
+    // Same result as strcmp() for a terminated cmd.
     for (const RmAllowRow &r : RM_ALLOWLIST)
-        if (strcmp(c.cmd, r.name) == 0)
+        if (litEq(c.cmd, r.name))
             return argsMatch(r.shape, c.args, minTxPower, maxTxPower);
     return false;
 }
 
 // computes the 16-hex tag of text under the key derived from passwd
-void tagOf(const char *passwd, const char *text, char tagHex[17])
+// len = the length the canonical builder returned (no second scan of text)
+void tagOf(const char *passwd, const char *text, size_t len, char tagHex[17])
 {
     uint8_t key[32];
     uint8_t mac[32];
     rmDeriveKey(passwd, key);
-    hmacSha256(key, sizeof(key), reinterpret_cast<const uint8_t *>(text), strlen(text), mac);
+    hmacSha256(key, sizeof(key), reinterpret_cast<const uint8_t *>(text), len, mac);
     hexLower(mac, 8, tagHex);
     hmac_sha256_detail::wipe(key, sizeof(key));
     hmac_sha256_detail::wipe(mac, sizeof(mac));
 }
 
 // same, with the key already derived (sender side)
-void tagOfKey(const uint8_t key[32], const char *text, char tagHex[17])
+void tagOfKey(const uint8_t key[32], const char *text, size_t len, char tagHex[17])
 {
     uint8_t mac[32];
-    hmacSha256(key, 32, reinterpret_cast<const uint8_t *>(text), strlen(text), mac);
+    hmacSha256(key, 32, reinterpret_cast<const uint8_t *>(text), len, mac);
     hexLower(mac, 8, tagHex);
     hmac_sha256_detail::wipe(mac, sizeof(mac));
 }
@@ -386,8 +458,7 @@ RmVerdict reject(RmState &s, const char *src, RmVerdict v, uint32_t now, const R
     const bool windowOpen = r->rejCount != 0 && (uint32_t)(now - r->rejWindowMs) < RM_REJ_WINDOW_MS;
     if (windowOpen)
         for (uint8_t i = 0; i < r->nFrames; i++)
-            if (r->frame[i].ctr == f.ctr && r->frame[i].cmdArgsHash == f.cmdArgsHash &&
-                memcmp(r->frame[i].tag, f.tag, sizeof(f.tag)) == 0)
+            if (r->frame[i].ctr == f.ctr && r->frame[i].cmdArgsHash == f.cmdArgsHash && tagEqual(r->frame[i].tag, f.tag))
                 return v;
     if (!windowOpen)
     {
@@ -526,31 +597,38 @@ bool rmParse(const char *text, RmCmd &out)
     const size_t bodyEnd = tagPos - 1; // index of the space before the tag
     if (i >= bodyEnd || text[i] == ' ')
         return false;
-    size_t cl = 0;
+    // B-RM-RANGE-01: cmd and args are located as ranges of text and copied once each; the checks are the
+    // former per-byte ones (cmd 1..15 bytes without capitals, args 1..RM_MAX_ARGS bytes without a double
+    // space). A frame rejected by these checks now leaves cmd and args all zero (they used to hold the bytes
+    // copied so far; no caller reads `out` after a false return).
+    const size_t cmdStart = i;
     while (i < bodyEnd && text[i] != ' ')
     {
-        if (cl + 1 >= sizeof(out.cmd) || (text[i] >= 'A' && text[i] <= 'Z'))
+        if (i - cmdStart + 1 >= sizeof(out.cmd) || (text[i] >= 'A' && text[i] <= 'Z'))
             return false;
-        out.cmd[cl++] = text[i++];
+        i++;
     }
+    const size_t cmdLen = i - cmdStart;
+    size_t argStart = bodyEnd, argLen = 0;
     if (i < bodyEnd)
     {
         i++; // the single space before args
         if (i >= bodyEnd || text[i] == ' ')
             return false;
-        size_t al = 0;
-        while (i < bodyEnd)
-        {
-            if (al + 1 >= sizeof(out.args))
+        argStart = i;
+        argLen = bodyEnd - i;
+        if (argLen + 1 > sizeof(out.args))
+            return false;
+        for (size_t k = argStart; k < bodyEnd; k++)
+            if (text[k] == ' ' && text[k + 1] == ' ')
                 return false;
-            if (text[i] == ' ' && text[i + 1] == ' ')
-                return false;
-            out.args[al++] = text[i++];
-        }
     }
+    memcpy(out.cmd, text + cmdStart, cmdLen);
+    if (argLen != 0)
+        memcpy(out.args, text + argStart, argLen);
 
     out.ctr = ctr;
-    if (out.ctr == 0 && strcmp(out.cmd, "sync") != 0)
+    if (out.ctr == 0 && !litEq(out.cmd, "sync"))
         return false;
     memcpy(out.tag, text + tagPos, 16);
     out.tag[16] = '\0';
@@ -568,38 +646,47 @@ void rmDeriveKey(const char *passwd, uint8_t key[32])
     sha256(reinterpret_cast<const uint8_t *>(passwd), n, key);
 }
 
+// RM_CANONICAL_EXTERNAL: the bounded proofs of rmCheck() replace this builder by its contract
+// (specs/cbmc/remote_cmd/harness.cpp -DCANON_CONTRACT) and prove the builder on its own (canon.check). Firmware builds
+// never define it.
+#ifndef RM_CANONICAL_EXTERNAL
 size_t rmCanonical(const RmCmd &c, const char *dst, const char *src, char *out, size_t n)
 {
     Out o;
     outInit(o, out, n);
+    if (!callFits(dst) || !callFits(src))
+        o.ok = false;
     outStr(o, "RM1|");
-    outStr(o, dst);
+    outStrN(o, dst, RM_CALL_SCAN_MAX);
     outStr(o, "|");
-    outStr(o, src);
+    outStrN(o, src, RM_CALL_SCAN_MAX);
     outStr(o, "|");
     outU32(o, c.ctr);
     outStr(o, "|");
-    outStr(o, c.cmd);
+    outStrN(o, c.cmd, sizeof(c.cmd));
     if (c.args[0] != '\0')
     {
         outStr(o, " ");
-        outStr(o, c.args);
+        outStrN(o, c.args, sizeof(c.args));
     }
     return outEnd(o);
 }
+#endif
 
 size_t rmReplyCanonical(uint32_t ctr, const char *dst, const char *src, const char *result, char *out, size_t n)
 {
     Out o;
     outInit(o, out, n);
+    if (!callFits(dst) || !callFits(src) || (result != nullptr && strnlen(result, RM_MAX_RESULT + 1) > RM_MAX_RESULT))
+        o.ok = false;
     outStr(o, "RM1R|");
-    outStr(o, dst);
+    outStrN(o, dst, RM_CALL_SCAN_MAX);
     outStr(o, "|");
-    outStr(o, src);
+    outStrN(o, src, RM_CALL_SCAN_MAX);
     outStr(o, "|");
     outU32(o, ctr);
     outStr(o, "|");
-    outStr(o, result);
+    outStrN(o, result, RM_MAX_RESULT);
     return outEnd(o);
 }
 
@@ -659,8 +746,14 @@ uint8_t rmLockedSenders(const RmState &s, uint32_t nowMs, uint32_t *maxRemainMs)
     return n;
 }
 
-RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, const char *passwd,
-                  int minTxPower, int maxTxPower, uint32_t nowMs)
+namespace
+{
+// rmCheck() without the strike: every path returns its verdict, and rmCheck() books a strike for the counted ones
+// (FORMAT, TAG, BLOCKED) at its single exit. One reject() call instead of one per check keeps the code a bounded model
+// checker unrolls small (B-RM-RANGE-01, 2026-11-26); the order of effects is unchanged, reject() was always the last
+// step of a counted path.
+RmVerdict checkFrame(RmState &s, const RmCmd &c, const char *dst, const char *src, const char *passwd,
+                     int minTxPower, int maxTxPower, uint32_t nowMs)
 {
     if (strippedLen(passwd) == 0)
         return RM_REJ_DISABLED;
@@ -674,19 +767,20 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
 
     if (dst == nullptr || src == nullptr || c.tag[16] != '\0' || c.cmd[sizeof(c.cmd) - 1] != '\0' ||
         c.args[sizeof(c.args) - 1] != '\0')
-        return reject(s, src, RM_REJ_FORMAT, nowMs, c);
+        return RM_REJ_FORMAT;
 
-    const bool isSync = strcmp(c.cmd, "sync") == 0;
+    const bool isSync = litEq(c.cmd, "sync");
     if ((c.ctr == 0) != isSync)
-        return reject(s, src, RM_REJ_FORMAT, nowMs, c);
+        return RM_REJ_FORMAT;
 
     char canon[160]; // "RM1|<9>|<9>|<10>|<15>|<39>" <= 90
-    if (rmCanonical(c, dst, src, canon, sizeof(canon)) == 0)
-        return reject(s, src, RM_REJ_FORMAT, nowMs, c);
+    const size_t cl = rmCanonical(c, dst, src, canon, sizeof(canon));
+    if (cl == 0)
+        return RM_REJ_FORMAT;
     char want[17];
-    tagOf(passwd, canon, want);
+    tagOf(passwd, canon, cl, want);
     if (!tagEqual(want, c.tag))
-        return reject(s, src, RM_REJ_TAG, nowMs, c);
+        return RM_REJ_TAG;
 
     if (!isSync)
     {
@@ -711,7 +805,7 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
         // a sync carries no arguments; with a valid tag but args it is a malformed frame, not an answerable
         // command (no counter to consume), so it stays a strike
         if (!allowed(c, minTxPower, maxTxPower))
-            return reject(s, src, RM_REJ_BLOCKED, nowMs, c);
+            return RM_REJ_BLOCKED;
         if (s.strict && s.haveSync && (uint32_t)(nowMs - s.lastSyncMs) < RM_SYNC_RATE_MS)
             return RM_REJ_RATE;
         s.lastSyncMs = nowMs;
@@ -724,9 +818,19 @@ RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, 
 
     // RM-STRIKE: the allowlist is decided last. The tag is valid here, so the sender is authenticated and a
     // refusal is an answer (RM_REFUSED, no strike), not an attack signal. The caller consumes the counter.
-    if (isForbiddenText(c.cmd) || isForbiddenText(c.args) || !allowed(c, minTxPower, maxTxPower))
+    if (isForbiddenText(c.cmd, sizeof(c.cmd)) || isForbiddenText(c.args, sizeof(c.args)) || !allowed(c, minTxPower, maxTxPower))
         return RM_REFUSED;
     return RM_OK;
+}
+} // namespace
+
+RmVerdict rmCheck(RmState &s, const RmCmd &c, const char *dst, const char *src, const char *passwd,
+                  int minTxPower, int maxTxPower, uint32_t nowMs)
+{
+    const RmVerdict v = checkFrame(s, c, dst, src, passwd, minTxPower, maxTxPower, nowMs);
+    if (v == RM_REJ_FORMAT || v == RM_REJ_TAG || v == RM_REJ_BLOCKED)
+        return reject(s, src, v, nowMs, c);
+    return v;
 }
 
 size_t rmRefusalText(const RmCmd &c, int minTxPower, int maxTxPower, char *out, size_t n)
@@ -735,7 +839,7 @@ size_t rmRefusalText(const RmCmd &c, int minTxPower, int maxTxPower, char *out, 
         return 0;
     Out o;
     outInit(o, out, n);
-    if (strcmp(c.cmd, "txpower") == 0 && !argsMatch(RM_ARGS_TXPOWER, c.args, minTxPower, maxTxPower))
+    if (litEq(c.cmd, "txpower") && !argsMatch(RM_ARGS_TXPOWER, c.args, minTxPower, maxTxPower))
     {
         outStr(o, "err range ");
         outU32(o, minTxPower > 0 ? (uint32_t)minTxPower : 0u); // remote floor is >= 0 by contract
@@ -762,7 +866,7 @@ uint32_t rmAccept(RmState &s, const RmCmd &c, const char *result, uint32_t nowMs
     size_t n = 0;
     if (result != nullptr)
     {
-        n = strlen(result);
+        n = strnlen(result, RM_MAX_RESULT + 1);
         if (n > RM_MAX_RESULT)
             n = RM_MAX_RESULT;
         memcpy(s.lastReply, result, n);
@@ -775,24 +879,25 @@ size_t rmReply(const RmCmd &c, const char *result, const char *dst, const char *
                char *out, size_t n)
 {
     if (result == nullptr || dst == nullptr || src == nullptr || strippedLen(passwd) == 0 ||
-        strlen(result) > RM_MAX_RESULT)
+        strnlen(result, RM_MAX_RESULT + 1) > RM_MAX_RESULT)
         return 0;
 
     char canon[200];
-    if (rmReplyCanonical(c.ctr, dst, src, result, canon, sizeof(canon)) == 0)
+    const size_t cl = rmReplyCanonical(c.ctr, dst, src, result, canon, sizeof(canon));
+    if (cl == 0)
         return 0;
 
     char rtag[17];
-    tagOf(passwd, canon, rtag);
+    tagOf(passwd, canon, cl, rtag);
 
     Out r;
     outInit(r, out, n);
     outStr(r, "RM1 ");
     outU32(r, c.ctr);
     outStr(r, " ");
-    outStr(r, result);
+    outStrN(r, result, RM_MAX_RESULT);
     outStr(r, " ");
-    outStr(r, rtag);
+    outStrN(r, rtag, sizeof(rtag));
     return outEnd(r);
 }
 
@@ -801,7 +906,7 @@ bool rmIsReply(const char *text)
     if (text == nullptr || strncmp(text, "RM1 ", 4) != 0)
         return false;
     const char *p = text + 4;
-    while (*p >= '0' && *p <= '9')
+    while (p < text + RM_TEXT_SCAN_MAX && *p >= '0' && *p <= '9')
         p++;
     if (p == text + 4 || *p != ' ')
         return false;
@@ -816,19 +921,22 @@ bool rmCommandAllowed(const char *cmd, const char *args, int minTxPower, int max
         args = "";
     RmCmd c;
     memset(&c, 0, sizeof(c));
-    if (strlen(cmd) == 0 || strlen(cmd) >= sizeof(c.cmd) || strlen(args) >= sizeof(c.args))
+    const size_t cl = strnlen(cmd, sizeof(c.cmd));
+    const size_t al = strnlen(args, sizeof(c.args));
+    if (cl == 0 || cl >= sizeof(c.cmd) || al >= sizeof(c.args))
         return false;
-    memcpy(c.cmd, cmd, strlen(cmd));
-    memcpy(c.args, args, strlen(args));
+    memcpy(c.cmd, cmd, cl);
+    memcpy(c.args, args, al);
     // wire form: lower case command name, printable ASCII args (capitals only where a shape allows them,
     // allowed() decides), single spaces (rmParse); anything else could never be received
-    for (const char *p = cmd; *p; p++)
-        if (*p < 'a' || *p > 'z')
+    for (size_t k = 0; k < cl; k++)
+        if (cmd[k] < 'a' || cmd[k] > 'z')
             return false;
-    for (const char *p = args; *p; p++)
-        if ((unsigned char)*p < 0x20 || (unsigned char)*p > 0x7e || (*p == ' ' && (p[1] == ' ' || p[1] == '\0' || p == args)))
+    for (size_t k = 0; k < al; k++)
+        if ((unsigned char)args[k] < 0x20 || (unsigned char)args[k] > 0x7e ||
+            (args[k] == ' ' && (args[k + 1] == ' ' || args[k + 1] == '\0' || k == 0)))
             return false;
-    return !isForbiddenText(c.cmd) && !isForbiddenText(c.args) && allowed(c, minTxPower, maxTxPower);
+    return !isForbiddenText(c.cmd, sizeof(c.cmd)) && !isForbiddenText(c.args, sizeof(c.args)) && allowed(c, minTxPower, maxTxPower);
 }
 
 size_t rmBuildCommand(const char *dst, const char *src, uint32_t ctr, const char *cmd, const char *args,
@@ -840,31 +948,34 @@ size_t rmBuildCommand(const char *dst, const char *src, uint32_t ctr, const char
         args = "";
     RmCmd c;
     memset(&c, 0, sizeof(c));
-    if (strlen(cmd) == 0 || strlen(cmd) >= sizeof(c.cmd) || strlen(args) >= sizeof(c.args))
+    const size_t cl = strnlen(cmd, sizeof(c.cmd));
+    const size_t al = strnlen(args, sizeof(c.args));
+    if (cl == 0 || cl >= sizeof(c.cmd) || al >= sizeof(c.args))
         return 0;
     c.ctr = ctr;
-    memcpy(c.cmd, cmd, strlen(cmd));
-    memcpy(c.args, args, strlen(args));
+    memcpy(c.cmd, cmd, cl);
+    memcpy(c.args, args, al);
 
     char canon[160]; // "RM1|<9>|<9>|<10>|<15>|<39>" <= 90
-    if (rmCanonical(c, dst, src, canon, sizeof(canon)) == 0)
+    const size_t canonLen = rmCanonical(c, dst, src, canon, sizeof(canon));
+    if (canonLen == 0)
         return 0;
     char tag[17];
-    tagOfKey(key, canon, tag);
+    tagOfKey(key, canon, canonLen, tag);
 
     Out o;
     outInit(o, out, n);
     outStr(o, "RM1 ");
     outU32(o, ctr);
     outStr(o, " ");
-    outStr(o, cmd);
-    if (args[0] != '\0')
+    outStrN(o, c.cmd, sizeof(c.cmd));
+    if (al != 0)
     {
         outStr(o, " ");
-        outStr(o, args);
+        outStrN(o, c.args, sizeof(c.args));
     }
     outStr(o, " ");
-    outStr(o, tag);
+    outStrN(o, tag, sizeof(tag));
     return outEnd(o);
 }
 
@@ -876,7 +987,7 @@ bool rmVerifyReply(const char *text, const char *dst, const char *src, uint32_t 
     if (!rmIsReply(text))
         return false;
 
-    const size_t len = strlen(text);
+    const size_t len = strnlen(text, 161);
     if (len < 4 + 1 + 1 + 3 + 1 + 16 || len > 160)
         return false;
 
@@ -899,11 +1010,12 @@ bool rmVerifyReply(const char *text, const char *dst, const char *src, uint32_t 
     memcpy(res, text + i, resLen);
     res[resLen] = '\0';
     char canon[200];
-    if (rmReplyCanonical(ctr, dst, src, res, canon, sizeof(canon)) == 0)
+    const size_t cl = rmReplyCanonical(ctr, dst, src, res, canon, sizeof(canon));
+    if (cl == 0)
         return false;
 
     char want[17];
-    tagOfKey(key, canon, want);
+    tagOfKey(key, canon, cl, want);
     if (!tagEqual(want, text + tagPos))
         return false;
 

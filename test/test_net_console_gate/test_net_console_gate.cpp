@@ -84,6 +84,35 @@ static void test_slot_rxseen_nur_eigene_generation(void)
     TEST_ASSERT_FALSE(netConsoleSlotMayPreempt(true, netConsoleSlotRxSeen(rxGen, curGen), 10000u, 0u));
 }
 
+// FORMAL-NETCON-MARK (#1339): the trace of netconsole_today_kickmarked.cfg. Holder gen 1 is preempted, gen 2
+// takes the slot and receives a byte (mark = 2); then task 1 wakes late (EOF) and marks. The mark must stay 2,
+// so gen 2 is not silent and a third connection may not take its slot.
+static void test_mark_spaeter_alter_task_ueberschreibt_nicht(void)
+{
+    uint32_t rx = 0, gen = 1;
+    rx = netConsoleSlotMark(rx, gen, 1);           // task 1 receives a byte
+    gen = 2;                                       // connection 2 takes the slot over
+    TEST_ASSERT_FALSE(netConsoleSlotRxSeen(rx, gen));
+    rx = netConsoleSlotMark(rx, gen, 2);           // task 2 receives a byte
+    TEST_ASSERT_TRUE(netConsoleSlotRxSeen(rx, gen));
+    rx = netConsoleSlotMark(rx, gen, 1);           // task 1 wakes late and marks
+    TEST_ASSERT_TRUE_MESSAGE(netConsoleSlotRxSeen(rx, gen), "late mark of the preempted task made the holder look silent");
+    TEST_ASSERT_FALSE(netConsoleSlotMayPreempt(true, netConsoleSlotRxSeen(rx, gen), 10000, 0));
+}
+
+static void test_mark_aktueller_halter_setzt(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(7, netConsoleSlotMark(3, 7, 7));
+    TEST_ASSERT_EQUAL_UINT32(3, netConsoleSlotMark(3, 7, 6));
+    TEST_ASSERT_EQUAL_UINT32(3, netConsoleSlotMark(3, 7, 8));
+}
+
+static void test_free_nur_eigener_slot(void)
+{
+    TEST_ASSERT_TRUE(netConsoleSlotMayFree(5, 5));
+    TEST_ASSERT_FALSE(netConsoleSlotMayFree(6, 5));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -100,6 +129,9 @@ int main(int, char **)
     RUN_TEST(test_slot_nicht_wenn_frei);
     RUN_TEST(test_slot_millis_umlauf);
     RUN_TEST(test_slot_rxseen_nur_eigene_generation);
+    RUN_TEST(test_mark_spaeter_alter_task_ueberschreibt_nicht);
+    RUN_TEST(test_mark_aktueller_halter_setzt);
+    RUN_TEST(test_free_nur_eigener_slot);
 
     return UNITY_END();
 }

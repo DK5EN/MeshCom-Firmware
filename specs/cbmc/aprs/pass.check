@@ -1,9 +1,14 @@
 TOOL=esbmc
 SOURCES="harness.cpp"
-CFLAGS="-Istubs -I$ROOT/test/support -I$ROOT/src -DNATIVE_BUILD=1 -DUNIT_TEST=1"
+CFLAGS="-Istubs -I$ROOT/test/support -I$ROOT/src -DNATIVE_BUILD=1 -DUNIT_TEST=1 -DAPRS_FCS_EXTERNAL -DFCS_CONTRACT"
 FLAGS="--unwind 270"
 EXPECT=pass
-CHECKS="decodeAPRS memory safety + NUL-terminated fields, rsize 0..255 (full UDP frame), charset filter modelled"
+CHECKS="decodeAPRS memory safety + NUL-terminated fields, rsize 0..255 (full UDP frame), charset filter modelled, FCS sum by contract (fcs.check)"
 # memout at the 6 GB cap after 114 s on 2026-11-23 (then still with --no-unwinding-assertions, removed: a pass
 # without them is unsound). Bounded twin that fits the quick tier: pass_40.check
 TIER=heavy
+# 2026-11-26: after B-APRS-PATH-01 the formula is small (symex 1.6 s, 10k VCCs); the solver needs more than the
+# default 900 s.
+TIMEOUT=2700
+# 2026-11-26: the FCS byte sum (up to 255 additions over a variable length) ran the full frame out of 15 GB; it is
+# its own function now, proven in fcs.check, and used here by contract (experiment: 873 s, 11.3 GB with the sum modelled).

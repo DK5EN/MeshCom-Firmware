@@ -1,4 +1,5 @@
 #include "mc_text.h"
+#include "aprs_path_scan.h"
 #include <aprs_functions.h>
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
@@ -74,7 +75,11 @@ int CheckGroup(const char *callsign)
 			return 0;
 	}
 
-	int ig=atoi(callsign);
+	// B-APRS-PATH-01: the value of the 1..6 digits checked above, over exactly those digits (atoi() would stop
+	// at the NUL right after them: same value, but its loop has no bound a model checker can see)
+	int ig=0;
+	for(size_t ic=0;ic<len;ic++)
+		ig = ig*10 + (callsign[ic] - '0');
 
 	if(ig == 100001)
         return ig;
@@ -198,8 +203,6 @@ uint16_t decodeAPRS(uint8_t RcvBuffer[UDP_TX_BUF_SIZE], uint16_t rsize, struct a
 
     if(aprsmsg.payload_type == 0x3A || aprsmsg.payload_type == 0x21 || aprsmsg.payload_type == 0x40)
     {
-        uint16_t ib=0;
-
         aprsmsg.msg_id = RcvBuffer[1] | (RcvBuffer[2] << 8) | (RcvBuffer[3] << 16) | (RcvBuffer[4] << 24);
 
         aprsmsg.max_hop = RcvBuffer[5] & 0x0F;
@@ -220,66 +223,19 @@ uint16_t decodeAPRS(uint8_t RcvBuffer[UDP_TX_BUF_SIZE], uint16_t rsize, struct a
 
         bool bCallsignOk=true;
 
-        // Source Path
-        bool bSourceEndOk=false;
-        bool bSourceCall=true;
-        
-        aprsmsg.msg_last_path_cnt=1;
+        // Source Path (B-APRS-PATH-01, 2026-11-26): the field is scanned once for its end and split at the
+        // first and last comma; every output is one range of RcvBuffer (aprs_path_scan.h). Same result as
+        // the former byte-by-byte copy into three 255-byte stack buffers, which the bounded model checker
+        // could not close (the write position depended on the whole byte history).
+        const AprsPathField src = aprsPathScan(RcvBuffer, 6, rsize, '>');
+        aprsmsg.msg_last_path_cnt = (uint8_t)(1 + src.commas);
+        if(src.found)
+            inext = (uint16_t)(src.end + 1);
+        bool bSourceEndOk = src.found;
 
-        char cConcat1[UDP_TX_BUF_SIZE];
-        memset(cConcat1, 0x00, UDP_TX_BUF_SIZE);
-        int iConcat1=0;
-        char cConcat2[UDP_TX_BUF_SIZE];
-        memset(cConcat2, 0x00, UDP_TX_BUF_SIZE);
-        int iConcat2=0;
-        char cConcat3[UDP_TX_BUF_SIZE];
-        memset(cConcat3, 0x00, UDP_TX_BUF_SIZE);
-        int iConcat3=0;
-
-        for(ib=6; ib < rsize && (ib - 6) < 120; ib++)
-        {
-            if(RcvBuffer[ib] == '>')
-            {
-                inext=ib+1;
-                bSourceEndOk=true;
-                break;
-            }
-            else
-            {
-                if(RcvBuffer[ib] < 0x20 || RcvBuffer[ib] > 0x7E)
-                    break;
-
-                cConcat1[iConcat1] = (char)RcvBuffer[ib];
-                iConcat1++;
-                
-                if(RcvBuffer[ib] == ',')
-                {
-                    aprsmsg.msg_last_path_cnt++;
-                    
-                    bSourceCall=false;
-
-                    //aprsmsg.msg_source_last=""
-                    memset(cConcat2, 0x00, UDP_TX_BUF_SIZE);
-                    iConcat2 = 0;
-
-                }
-                else
-                {
-                    cConcat2[iConcat2] = (char)RcvBuffer[ib];
-                    iConcat2++;
-                }
-
-                if(bSourceCall)
-                {
-                    cConcat3[iConcat3] = (char)RcvBuffer[ib];
-                    iConcat3++;
-                }
-            }
-        }
-
-        mcSet(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), cConcat1);
-        mcSet(aprsmsg.msg_source_last, sizeof(aprsmsg.msg_source_last), cConcat2);
-        mcSet(aprsmsg.msg_source_call, sizeof(aprsmsg.msg_source_call), cConcat3);
+        aprsPathCopy(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), RcvBuffer, src.start, src.end);
+        aprsPathCopy(aprsmsg.msg_source_last, sizeof(aprsmsg.msg_source_last), RcvBuffer, src.last_start, src.end);
+        aprsPathCopy(aprsmsg.msg_source_call, sizeof(aprsmsg.msg_source_call), RcvBuffer, src.start, src.first_end);
 
         if(!bSourceEndOk)
         {
@@ -331,50 +287,14 @@ uint16_t decodeAPRS(uint8_t RcvBuffer[UDP_TX_BUF_SIZE], uint16_t rsize, struct a
             return 0x00;
         }
 
-        // Destination Path
-        bool bDestinationEndOk=false;
-        uint16_t inextstart=inext;
+        // Destination Path: same range scan, terminated by the payload type (B-APRS-PATH-01).
+        const AprsPathField dst = aprsPathScan(RcvBuffer, inext, rsize, aprsmsg.payload_type);
+        if(dst.found)
+            inext = (uint16_t)(dst.end + 1);
+        bool bDestinationEndOk = dst.found;
 
-        memset(cConcat1, 0x00, UDP_TX_BUF_SIZE);
-        iConcat1=0;
-        memset(cConcat2, 0x00, UDP_TX_BUF_SIZE);
-        iConcat2=0;
-        memset(cConcat3, 0x00, UDP_TX_BUF_SIZE);
-        iConcat3=0;
-
-
-        for(ib=inextstart; ib < rsize && (ib - inextstart) < 120; ib++)
-        {
-            if(RcvBuffer[ib] == aprsmsg.payload_type)
-            {
-                inext=ib+1;
-                bDestinationEndOk=true;
-                break;
-            }
-            else
-            {
-                if(RcvBuffer[ib] < 0x20 || RcvBuffer[ib] > 0x7E)
-                    break;
-
-                cConcat1[iConcat1] = (char)RcvBuffer[ib];
-                iConcat1++;
-
-                if(RcvBuffer[ib] == ',')
-                {
-                    //aprsmsg.msg_destination_call="";
-                    memset(cConcat2, 0x00, UDP_TX_BUF_SIZE);
-                    iConcat2 = 0;
-                }
-                else
-                {
-                    cConcat2[iConcat2] = (char)RcvBuffer[ib];
-                    iConcat2++;
-                }
-            }
-        }
-
-        mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), cConcat1);    // routing & message to
-        mcSet(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), cConcat2);    // message to
+        aprsPathCopy(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), RcvBuffer, dst.start, dst.end);    // routing & message to
+        aprsPathCopy(aprsmsg.msg_destination_call, sizeof(aprsmsg.msg_destination_call), RcvBuffer, dst.last_start, dst.end);    // message to
 
         if(!bDestinationEndOk)
         {
@@ -419,10 +339,10 @@ uint16_t decodeAPRS(uint8_t RcvBuffer[UDP_TX_BUF_SIZE], uint16_t rsize, struct a
 
         // Payload
         bool bPayloadEndOk=false;
-        inextstart=inext;
 
+        char cConcat1[UDP_TX_BUF_SIZE];
         memset(cConcat1, 0x00, UDP_TX_BUF_SIZE);
-        iConcat1=0;
+        int iConcat1=0;
 
         // R2-04: die Schranke `iConcat1 < (int)sizeof(cConcat1) - 1` ist NEU.
         // Vorher lief diese Schleife allein bis `rsize` und verliess sich
@@ -435,19 +355,16 @@ uint16_t decodeAPRS(uint8_t RcvBuffer[UDP_TX_BUF_SIZE], uint16_t rsize, struct a
         // Schleife ueber cConcat1[UDP_TX_BUF_SIZE] hinausgeschrieben, mitten in
         // cConcat2/cConcat3 auf demselben Stack. Diese Zeile macht die
         // Sicherheit oertlich, statt sie von den Aufrufern zu borgen.
-        for(ib=inext; ib < rsize && iConcat1 < (int)sizeof(cConcat1) - 1; ib++)
+        // B-APRS-PATH-01: the payload is located as one range (up to the NUL, rsize or sizeof(cConcat1) - 1
+        // bytes) and copied once; same bounds as the former byte-by-byte loop.
         {
-            if(RcvBuffer[ib] == 0x00)
-            {
-                inext=ib+1;
-                bPayloadEndOk=true;
-                break;
-            }
-            else
-            {
-                cConcat1[iConcat1] = (char)RcvBuffer[ib];
-                iConcat1++;
-            }
+            const uint16_t pstart = inext;
+            const uint16_t pend = aprsPayloadScan(RcvBuffer, pstart, rsize, (uint16_t)(sizeof(cConcat1) - 1), &bPayloadEndOk);
+            iConcat1 = (int)(pend - pstart);
+            if(iConcat1 > 0)
+                memcpy(cConcat1, RcvBuffer + pstart, (size_t)iConcat1);
+            if(bPayloadEndOk)
+                inext = (uint16_t)(pend + 1);
         }
 
         // CHR-01: strip C0/C1 controls, invalid/overlong UTF-8 and bidi/
@@ -499,11 +416,7 @@ uint16_t decodeAPRS(uint8_t RcvBuffer[UDP_TX_BUF_SIZE], uint16_t rsize, struct a
         aprsmsg.msg_fcs = (RcvBuffer[inext] << 8) | RcvBuffer[inext+1];
 
         // Check FCS
-        unsigned int FCS_SUMME=0;
-        for(ib=0; ib<inext; ib++)
-        {
-            FCS_SUMME += (unsigned int)RcvBuffer[ib];
-        }
+        unsigned int FCS_SUMME = aprsFcsSum(RcvBuffer, inext);   // B-APRS-PATH-01: same byte sum, own function
 
         inext=inext+2;
 
@@ -681,44 +594,76 @@ enum AprsTagType
     APRS_TAG_FLOAT,        // "%f" -> float *
 };
 
-static void aprsExtractTag(const char *PayloadBuffer, size_t PayloadLen, unsigned int istarttext, char tagchar, AprsTagType type, void *target)
+// B-APRS-POS-01 (2026-11-26): the tags are located in ONE pass over the payload (aprsPosFindTags) instead of one
+// full scan per tag, and each value is read at its known position with a fixed bound (at most 7 characters plus
+// the delimiter). Same values as the former per-tag scan, which a bounded model checker had to unroll once per
+// tag and payload position (memout at 15 GB for 24-byte payloads).
+struct AprsPosTags
 {
-    char decode_text[8];
-    memset(decode_text, 0x00, sizeof(decode_text));
-    unsigned int ipt = 0;
+    int16_t at[26]; // index of the first "/X=" for X = 'A'..'Z', -1 if absent
+    int16_t ncnt;   // index of the first "/N" followed by '1'..'9', -1 if absent
+};
+
+static void aprsPosFindTags(const char *PayloadBuffer, size_t PayloadLen, unsigned int istarttext, AprsPosTags &tags)
+{
+    for(int k=0; k<26; k++)
+        tags.at[k] = -1;
+    tags.ncnt = -1;
 
     for(unsigned int itxt=istarttext; itxt<PayloadLen; itxt++)
     {
-        if(PayloadBuffer[itxt] == '/' && PayloadBuffer[itxt+1] == tagchar && PayloadBuffer[itxt+2] == '=')
+        if(PayloadBuffer[itxt] != '/')
+            continue;
+        const char c1 = PayloadBuffer[itxt+1];   // the buffer carries 2 bytes of lookahead past PayloadLen
+        const char c2 = PayloadBuffer[itxt+2];
+        if(c1 >= 'A' && c1 <= 'Z' && c2 == '=' && tags.at[c1 - 'A'] < 0)
+            tags.at[c1 - 'A'] = (int16_t)itxt;
+        if(c1 == 'N' && c2 >= '1' && c2 <= '9' && tags.ncnt < 0)
+            tags.ncnt = (int16_t)itxt;
+    }
+}
+
+// Value of the tag found at pos ("/X=" then up to 7 characters, ended by '/', ' ' or the 7-character cap) into
+// target. Nothing is read when the tag is absent, and nothing is converted when the payload ends before a
+// delimiter (the former loop never reached sscanf() then either).
+static void aprsExtractTag(const char *PayloadBuffer, size_t PayloadLen, int pos, AprsTagType type, void *target)
+{
+    if(pos < 0)
+        return;
+    char decode_text[8];
+    memset(decode_text, 0x00, sizeof(decode_text));
+
+    for(unsigned int k=0; k<8; k++)
+    {
+        const unsigned int id = (unsigned int)pos + 3 + k;
+        if(id >= PayloadLen)
+            return;
+        // ENDE
+        if(PayloadBuffer[id] == '/' || PayloadBuffer[id] == ' ' || k > 6)
         {
-            for(unsigned int id=itxt+3; id<PayloadLen; id++)
+            switch(type)
             {
-                // ENDE
-                if(PayloadBuffer[id] == '/' || PayloadBuffer[id] == ' ' || id == PayloadLen || ipt > 6)
-                {
-                    switch(type)
-                    {
-                        case APRS_TAG_INT:          sscanf(decode_text, "%d", (int *)target);   break;
-                        case APRS_TAG_INT_AUTOBASE: sscanf(decode_text, "%i", (int *)target);   break;
-                        case APRS_TAG_FLOAT:        sscanf(decode_text, "%f", (float *)target); break;
-                    }
-                    break;
-                }
-
-                if(ipt < 7)
-                {
-                    decode_text[ipt]=PayloadBuffer[id];
-                    ipt++;
-                }
+                case APRS_TAG_INT:          sscanf(decode_text, "%d", (int *)target);   break;
+                case APRS_TAG_INT_AUTOBASE: sscanf(decode_text, "%i", (int *)target);   break;
+                case APRS_TAG_FLOAT:        sscanf(decode_text, "%f", (float *)target); break;
             }
-
-            break;
+            return;
         }
+        decode_text[k]=PayloadBuffer[id];
     }
 }
 
 // Payload is copied once into a stack buffer (no String churn per packet). Same
 // semantics as the String version: a ' ' is appended and bytes past the end read 0.
+// APRS-POS-RANGE-01 (2026-11-26): sscanf("%lf") also reads an exponent, "inf" and "nan", so an 11-byte lat/lon field
+// such as "1e99" gave a value whose (int)(x / 100.0) at the end of decodeAPRSPOS() is undefined behaviour. A value is
+// usable when x / 100 fits an int; 2e11 keeps every 11-digit field without exponent (at most 99999999999), NaN fails
+// both comparisons. Found by the bounded model checker (specs/cbmc/aprs/pos_pass.check).
+static bool aprsPosRawInRange(double x)
+{
+    return x > -2.0e11 && x < 2.0e11;
+}
+
 uint16_t decodeAPRSPOS(const char *Payload, struct aprsPosition &aprspos)
 {
     initAPRSPOS(aprspos);
@@ -750,7 +695,11 @@ uint16_t decodeAPRSPOS(const char *Payload, struct aprsPosition &aprspos)
 
             decode_text[ipt]=0x00;
 
-            sscanf(decode_text, "%lf", &aprspos.lat);
+            double raw = 0.0; // aprspos.lat is 0.0 from initAPRSPOS(), sscanf() without a number leaves it so
+            sscanf(decode_text, "%lf", &raw);
+            if (!aprsPosRawInRange(raw))
+                return 0x00;
+            aprspos.lat = raw;
 
             aprspos.lat_c = PayloadBuffer[itxt];
             itxt++;
@@ -782,7 +731,11 @@ uint16_t decodeAPRSPOS(const char *Payload, struct aprsPosition &aprspos)
 
             decode_text[ipt]=0x00;
 
-            sscanf(decode_text, "%lf", &aprspos.lon);
+            double raw = 0.0; // aprspos.lon is 0.0 from initAPRSPOS(), sscanf() without a number leaves it so
+            sscanf(decode_text, "%lf", &raw);
+            if (!aprsPosRawInRange(raw))
+                return 0x00;
+            aprspos.lon = raw;
             aprspos.lon_c = PayloadBuffer[itxt];
             itxt++;
             aprspos.aprs_symbol = PayloadBuffer[itxt];
@@ -864,63 +817,54 @@ uint16_t decodeAPRSPOS(const char *Payload, struct aprsPosition &aprspos)
     aprspos.bat = 0;
     aprspos.alt = 0;
 
+    AprsPosTags tags;
+    aprsPosFindTags(PayloadBuffer, PayloadLen, (unsigned int)istarttext, tags);
+
     // check Batt
-    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'B', APRS_TAG_INT, &aprspos.bat);
+    aprsExtractTag(PayloadBuffer, PayloadLen, tags.at['B' - 'A'], APRS_TAG_INT, &aprspos.bat);
 
     // check Altitute
-    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'A', APRS_TAG_INT, &aprspos.alt);
+    aprsExtractTag(PayloadBuffer, PayloadLen, tags.at['A' - 'A'], APRS_TAG_INT, &aprspos.alt);
 
     // check Press
-    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'P', APRS_TAG_FLOAT, &aprspos.press);
+    aprsExtractTag(PayloadBuffer, PayloadLen, tags.at['P' - 'A'], APRS_TAG_FLOAT, &aprspos.press);
 
     // check Hum
-    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'H', APRS_TAG_FLOAT, &aprspos.hum);
+    aprsExtractTag(PayloadBuffer, PayloadLen, tags.at['H' - 'A'], APRS_TAG_FLOAT, &aprspos.hum);
 
     // check Temp
-    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'T', APRS_TAG_FLOAT, &aprspos.temp);
+    aprsExtractTag(PayloadBuffer, PayloadLen, tags.at['T' - 'A'], APRS_TAG_FLOAT, &aprspos.temp);
 
     // check Temp2
-    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'O', APRS_TAG_FLOAT, &aprspos.temp2);
+    aprsExtractTag(PayloadBuffer, PayloadLen, tags.at['O' - 'A'], APRS_TAG_FLOAT, &aprspos.temp2);
 
     // check QFE
-    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'F', APRS_TAG_INT, &aprspos.qfe);
+    aprsExtractTag(PayloadBuffer, PayloadLen, tags.at['F' - 'A'], APRS_TAG_INT, &aprspos.qfe);
 
     // check QNH
-    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'Q', APRS_TAG_FLOAT, &aprspos.qnh);
+    aprsExtractTag(PayloadBuffer, PayloadLen, tags.at['Q' - 'A'], APRS_TAG_FLOAT, &aprspos.qnh);
 
     // check GASRES
-    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'G', APRS_TAG_FLOAT, &aprspos.gasres);
+    aprsExtractTag(PayloadBuffer, PayloadLen, tags.at['G' - 'A'], APRS_TAG_FLOAT, &aprspos.gasres);
 
-    // check NCNT
+    // check NCNT: "/N" + digit, the value is its first 3 characters up to the next '/' or ' '. The payload always
+    // ends with the appended ' ', so a delimiter is always found and the value always converted (the former loop
+    // scanned on to that delimiter without copying more).
     memset(decode_text, 0x00, sizeof(decode_text));
-    ipt=0;
-    
-    for(itxt=istarttext; itxt<PayloadLen; itxt++)
+    if(tags.ncnt >= 0)
     {
-        if(PayloadBuffer[itxt] == '/' && PayloadBuffer[itxt+1] == 'N' && PayloadBuffer[itxt+2] >= '1' && PayloadBuffer[itxt+2] <= '9')
+        for(unsigned int k=0; k<3; k++)
         {
-            for(unsigned int id=itxt+2;id<PayloadLen;id++)
-            {
-                // ENDE
-                if(PayloadBuffer[id] == '/' || PayloadBuffer[id] == ' ' || id == PayloadLen || ipt > 6)
-                {
-                    sscanf(decode_text, "%d", &aprspos.ncnt);
-                    break;
-                }
-
-                if(ipt < 3)
-                {
-                    decode_text[ipt]=PayloadBuffer[id];
-                    ipt++;
-                }
-            }
-
-            break;
+            const unsigned int id = (unsigned int)tags.ncnt + 2 + k;
+            if(id >= PayloadLen || PayloadBuffer[id] == '/' || PayloadBuffer[id] == ' ')
+                break;
+            decode_text[k]=PayloadBuffer[id];
         }
+        sscanf(decode_text, "%d", &aprspos.ncnt);
     }
 
     // check CO2
-    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'C', APRS_TAG_FLOAT, &aprspos.co2);
+    aprsExtractTag(PayloadBuffer, PayloadLen, tags.at['C' - 'A'], APRS_TAG_FLOAT, &aprspos.co2);
 
     // check GRC (Group-Call list) /R=; up to 6 groups separated by ';'.
     // Own buffer sized for the worst case (6 x "99999;" = 36 chars) instead
@@ -930,9 +874,9 @@ uint16_t decodeAPRSPOS(const char *Payload, struct aprsPosition &aprspos)
         memset(decode_grc, 0x00, sizeof(decode_grc));
         int igrc = 0;
 
-        for(itxt=istarttext; itxt<PayloadLen; itxt++)
+        if(tags.at['R' - 'A'] >= 0)
         {
-            if(PayloadBuffer[itxt] == '/' && PayloadBuffer[itxt+1] == 'R' && PayloadBuffer[itxt+2] == '=')
+            itxt = (unsigned int)tags.at['R' - 'A'];
             {
                 for(unsigned int id=itxt+3;id<PayloadLen;id++)
                 {
@@ -965,7 +909,7 @@ uint16_t decodeAPRSPOS(const char *Payload, struct aprsPosition &aprspos)
                         memset(ctoken, 0x00, sizeof(ctoken));
                         memcpy(ctoken, decode_grc + istart_tok, toklen);
 
-                        int grcval = CheckGroup(String(ctoken));
+                        int grcval = CheckGroup((const char *)ctoken);   // same result as the String overload, no temporary
 
                         if(grcval == 0)
                             break;
@@ -976,50 +920,48 @@ uint16_t decodeAPRSPOS(const char *Payload, struct aprsPosition &aprspos)
                         istart_tok = ic+1;
                     }
                 }
-
-                break;
             }
         }
     }
 
     // check version
-    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'V', APRS_TAG_INT_AUTOBASE, &aprspos.version);
+    aprsExtractTag(PayloadBuffer, PayloadLen, tags.at['V' - 'A'], APRS_TAG_INT_AUTOBASE, &aprspos.version);
 
     // check Bus-Voltage /U=
-    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'U', APRS_TAG_FLOAT, &aprspos.vbus);
+    aprsExtractTag(PayloadBuffer, PayloadLen, tags.at['U' - 'A'], APRS_TAG_FLOAT, &aprspos.vbus);
 
     // check Current /I=
-    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'I', APRS_TAG_FLOAT, &aprspos.vcurrent);
+    aprsExtractTag(PayloadBuffer, PayloadLen, tags.at['I' - 'A'], APRS_TAG_FLOAT, &aprspos.vcurrent);
 
     // check telemetry
-    aprsExtractTag(PayloadBuffer, PayloadLen, istarttext, 'Y', APRS_TAG_INT_AUTOBASE, &aprspos.telemetry);
+    aprsExtractTag(PayloadBuffer, PayloadLen, tags.at['Y' - 'A'], APRS_TAG_INT_AUTOBASE, &aprspos.telemetry);
 
     memset(decode_text, 0x00, sizeof(decode_text));
     ipt=0;
 
-    // check Digital /D=
-    for(itxt=istarttext; itxt<PayloadLen; itxt++)
+    // check Digital /D=: exactly 8 characters of '0'/'1'. A 9th character before the delimiter rejects the token;
+    // looking at 9 positions decides that (the former loop scanned on to the delimiter).
+    if(tags.at['D' - 'A'] >= 0)
     {
-        if(PayloadBuffer[itxt] == '/' && PayloadBuffer[itxt+1] == 'D' && PayloadBuffer[itxt+2] == '=')
+        itxt = (unsigned int)tags.at['D' - 'A'];
         {
             bool din_overflow = false;
 
-            for(unsigned int id=itxt+3;id<PayloadLen;id++)
+            for(unsigned int k=0; k<9; k++)
             {
+                const unsigned int id = itxt + 3 + k;
                 // ENDE
-                if(PayloadBuffer[id] == '/' || PayloadBuffer[id] == ' ' || id == PayloadLen)
-                {
+                if(id >= PayloadLen || PayloadBuffer[id] == '/' || PayloadBuffer[id] == ' ')
                     break;
-                }
 
-                if(ipt < 8)
+                if(k < 8)
                 {
-                    decode_text[ipt]=PayloadBuffer[id];
+                    decode_text[k]=PayloadBuffer[id];
                     ipt++;
                 }
                 else
                 {
-                    // 9th+ data byte -- token too long, reject below
+                    // 9th data byte -- token too long, reject below
                     din_overflow = true;
                 }
             }
@@ -1043,8 +985,6 @@ uint16_t decodeAPRSPOS(const char *Payload, struct aprsPosition &aprspos)
                     aprspos.din[8] = 0x00;
                 }
             }
-
-            break;
         }
     }
 

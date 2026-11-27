@@ -3,6 +3,7 @@
 #include "serial_command.h"
 #include "printfdeb_functions.h"
 #include "command_functions.h"
+#include "serial_line_guard.h"
 
 // C3 carve-out of checkSerialCommand() out of esp32_main.cpp; see
 // serial_command.h for why the two copies are not merged here. Moved
@@ -29,8 +30,28 @@ int test_get_iTxtPos(void) { return iTxtPos; }
 
 void checkSerialCommand(void)
 {
+    // SER-JUNK-01 step 2: no UART reading while the node transmits; what arrived meanwhile is discarded at TX end,
+    // with the line it would have been appended to. The net console below is not affected (no UART noise there).
+    static bool s_txWasBusy = false;
+    const SerialTxGate gate = serialTxGateStep(serialLoraTxBusy(), &s_txWasBusy);
+    if(gate == SERIAL_TX_FLUSH && Serial)
+    {
+        int dropped = 0;
+        while(Serial.available() > 0 && dropped < 1024)
+        {
+            (void)Serial.read();
+            dropped++;
+        }
+        if(dropped > 0)
+        {
+            printfdeb("\n...%d serial byte(s) received during LoRa TX dropped\n", dropped);
+            memset(strText, 0x00, sizeof(strText));
+            iTxtPos = 0;
+        }
+    }
+
     // Serial available
-    if(Serial)
+    if(gate == SERIAL_TX_READ && Serial)
     {
         // Check USB Serial input (Serial == MSerial after telnet_functions.h include)
         if(Serial.available() > 0)
@@ -100,6 +121,16 @@ void checkSerialCommand(void)
     {
         if(strText[iTxtLen-1] == '\n' || strText[iTxtLen-1] == '\r')
         {
+            // SER-JUNK-01: a line with control bytes or invalid UTF-8 is supply/UART noise (E22 1-2 W PA spikes),
+            // not typed text. Drop it whole: it must neither go out over LoRa nor run as a command.
+            if(!serialLineIsClean(strText, (size_t)iTxtLen))
+            {
+                printfdeb("\n...input dropped: control or invalid bytes\n");
+                memset(strText, 0x00, sizeof(strText));
+                iTxtPos = 0;
+                return;
+            }
+
             strTextWork = strText;
             strTextWork.trim();
             snprintf(strText, sizeof(strText), "%s", strTextWork.c_str());

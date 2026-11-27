@@ -27,20 +27,23 @@ C code named in `../manifest.json`.** Rules, commands and limits: [`../README.md
 - Other names are sensitivity runs: a defence is removed and the property must still hold or break as stated in the
   file's first comment.
 
-## Predicted findings in the network console (not yet run)
+## Network console finding FORMAL-NETCON-MARK (confirmed and fixed 2026-11-26, #1339)
 
-The slot takeover (F2-10-SLOT) stores the rx mark without checking the generation
-(`src/net_console.cpp`, `markRx` in `authTask`).
+The slot takeover (F2-10-SLOT) stored the rx mark without checking the generation (`markRx` in `authTask`,
+`src/net_console.cpp`). TLC confirmed all three predicted violations on 2026-11-26; the fix of the same day marks
+and frees only while the task is the current holder, check and store under `s_hs_mux` (`netConsoleSlotMark`,
+`netConsoleSlotMayFree` in `src/net_console_slot.h`, host test `test_net_console_gate`).
 
-- **`netconsole_today_kickmarked.cfg`:** a preempted task wakes late and overwrites the mark of the new holder
-  with its own old generation. The new holder then looks silent and a third connection preempts it.
-- **`netconsole_today_deadinstall.cfg`:** if that holder was already verified, it installs its shut-down socket as
-  the session and closes the previous good session.
-- **`netconsole_today_foreignshut.cfg`:** a holder that closed its socket but has not freed the slot yet is
-  preempted. `accept()` has already reused the fd number, so `shutdown()` hits the new connection.
-- **`netconsole_markguard.cfg`** is a proposal, not code: mark only while the task is the current holder.
-- **Reach:** all three need LAN access to the console port and three connections in a narrow order. None grants a
-  session without the password. If TLC does not find them, the runner reports the configuration as vacuous.
+- **`netconsole.cfg`** is the code after the fix (`MarkGuard = TRUE`): every property holds, including the three
+  below.
+- **`netconsole_was_kickmarked.cfg`:** before the fix a preempted task woke late and overwrote the mark of the new
+  holder with its own old generation. The new holder then looked silent and a third connection preempted it.
+- **`netconsole_was_deadinstall.cfg`:** if that holder was already verified, it installed its shut-down socket as
+  the session and closed the previous good session.
+- **`netconsole_was_foreignshut.cfg`:** a holder that closed its socket but had not freed the slot yet was
+  preempted. `accept()` had already reused the fd number, so `shutdown()` hit the new connection.
+- **Reach:** all three needed LAN access to the console port and three connections in a narrow order. None granted
+  a session without the password.
 
 ## Changes of the rework (2026-11-23)
 

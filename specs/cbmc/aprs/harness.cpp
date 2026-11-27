@@ -5,8 +5,23 @@
 // Mutations (EXPECT=fail jobs):
 //   -DMUT_SHORT_BUF  buffer one byte shorter than rsize -> an out-of-bounds read must be found
 //   -DWITNESS_TEXT   assert no accepted frame ever carries non-empty text -> must fail (accept path reachable)
+//   -DFCS_CONTRACT   (with -DAPRS_FCS_EXTERNAL) aprsFcsSum() is replaced by its contract: any value, and the read of
+//                    buf[0..n) must stay inside the buffer (checked at its last byte). The sum itself is proven in fcs.check.
 #include "prelude.h"
 #include <assert.h>
+#if defined(FCS_CONTRACT)
+#include <stdint.h>
+extern "C" unsigned int nondet_uint();
+unsigned int aprsFcsSum(const uint8_t *buf, uint16_t n)
+{
+    if(n > 0)
+    {
+        volatile uint8_t last = buf[n - 1];   // the range read by the real sum ends here: out of bounds is still found
+        (void)last;
+    }
+    return nondet_uint();
+}
+#endif
 #include <aprs_functions.cpp>
 #include <nrf52/WisBlock-API.h>
 

@@ -46,8 +46,7 @@ CONSTANTS
     HasDeadline,        \* TRUE: the handshake has the 10 s total deadline
     AcceptAnyTime,      \* TRUE: accept may run while the loop task sits between recv and teardownIfCurrent
     Takeover,           \* TRUE (today): a new connection takes the handshake slot from a holder without rx mark
-    MarkGuard,          \* FALSE (today): markRx stores the task's generation unconditionally.
-                        \* TRUE (proposal): a task marks only while it is the current holder (s_hs_gen == myGen)
+    MarkGuard,          \* TRUE (today, fix of 2026-11-26): markRx only by the current holder; FALSE: unguarded store (before).
     BugNoFdCheck,       \* teardownIfCurrent without the s_fd == fd test
     BugFlagSurvive,     \* teardown leaves s_authenticated set
     BugNoReset,         \* a new connection becomes s_fd at accept, before auth, s_authenticated not reset
@@ -142,7 +141,7 @@ PeerClose ==
                    silentBlock, kickMarked, foreignShut, deadInst>>
 
 \* ---- authTask of connection c, outside the mutex ----------------------------------------------------
-\* markRx: today an unguarded store of the task's own generation
+\* markRx: with MarkGuard (today) only by the current holder, check and store one step; without it an unguarded store
 MarkVal(c) == IF MarkGuard /\ hsGen # tgen[c] THEN hsRx ELSE tgen[c]
 
 TRecv(c) ==     \* recv() returns the first byte of the peer

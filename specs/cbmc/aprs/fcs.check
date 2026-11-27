@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="fcs_harness.cpp"
+CFLAGS="-I$ROOT/src"
+FLAGS="--unwind 260"
+EXPECT=pass
+CHECKS="aprsFcsSum (decodeAPRS frame check sequence): reads only buf[0..n), sum <= 255*n, any buffer 0..255 B"

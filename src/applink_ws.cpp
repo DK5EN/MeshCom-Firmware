@@ -308,6 +308,17 @@ static AlWsEvent fail(AlWsDecoder *d, uint16_t code)
     return AL_WS_ERROR;
 }
 
+// Append n unmasked bytes of src at dst[at..]; rot is the mask rotated to src[0]. False (nothing written) when
+// they do not fit into cap.
+static bool unmaskAppend(uint8_t *dst, size_t cap, size_t at, const uint8_t *src, size_t n, const uint8_t rot[4])
+{
+    if (at > cap || n > cap - at)
+        return false;
+    for (size_t k = 0; k < n; k++)
+        dst[at + k] = (uint8_t)(src[k] ^ rot[k & 3]);
+    return true;
+}
+
 // header complete (length and mask known): validate size, enter payload or finish an empty frame
 static AlWsEvent headerDone(AlWsDecoder *d)
 {
@@ -473,9 +484,21 @@ size_t alWsFeed(AlWsDecoder *d, const uint8_t *in, size_t len, AlWsEvent *ev)
             if ((uint64_t)n > d->remaining)
                 n = (size_t)d->remaining;
             const bool ctl = (d->opcode & 0x8) != 0;
-            uint8_t *dst = ctl ? d->ctl + d->ctl_len : d->msg + d->msg_len;
-            for (size_t k = 0; k < n; k++)
-                dst[k] = (uint8_t)(in[i + k] ^ d->mask[(d->mask_pos + k) & 3]);
+            // B-AL-RANGE-01 (2026-11-26): the mask is rotated once to this chunk's start, each output array is
+            // addressed directly (no pointer that may point into either of two arrays), and the room is checked
+            // right here. Same bytes as before; headerDone() already bounds msg_len + remaining by
+            // APPLINK_MAX_IN and a control frame by 125, so the local check never fires. It makes the bound
+            // visible next to the write for a bounded model checker.
+            uint8_t rot[4];
+            for (uint8_t j = 0; j < 4; j++)
+                rot[j] = d->mask[(d->mask_pos + j) & 3];
+            const bool fits = ctl ? unmaskAppend(d->ctl, sizeof(d->ctl), d->ctl_len, in + i, n, rot)
+                                  : unmaskAppend(d->msg, sizeof(d->msg), d->msg_len, in + i, n, rot);
+            if (!fits)
+            {
+                e = fail(d, 1009);
+                break;
+            }
             d->mask_pos += n;
             if (ctl)
                 d->ctl_len += n;

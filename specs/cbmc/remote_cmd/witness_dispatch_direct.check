@@ -1,6 +1,6 @@
 TOOL=esbmc
 SOURCES="harness.cpp hmac_model.cpp $ROOT/src/remote_cmd.cpp"
-CFLAGS="-I$ROOT/src -Ishim -DNATIVE_BUILD=1 -DDIRECT -DWITNESS_DISPATCH"
+CFLAGS="-I$ROOT/src -Ishim -DNATIVE_BUILD=1 -DDIRECT -DRM_CANONICAL_EXTERNAL -DCANON_CONTRACT -DWITNESS_DISPATCH"
 FLAGS="--unwind 110"
 EXPECT=fail
 CHECKS="witness: dispatch reachable (RmCmd direct)"

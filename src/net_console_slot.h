@@ -41,3 +41,36 @@ static inline bool netConsoleSlotRxSeen(uint32_t rxGen, uint32_t curGen)
 {
     return rxGen == curGen;
 }
+
+/**
+ * @brief Value of the rx mark after the task of generation myGen saw a byte (or left the receive phase).
+ *
+ * FORMAL-NETCON-MARK (#1339): only the CURRENT slot holder may mark. A task that was preempted and wakes late
+ * (EOF after shutdown()) keeps the mark as it is; storing its own, older generation would make the new holder
+ * look silent and let a third connection take a slot that is busy or already verified. The caller evaluates
+ * this and stores the result under the same lock that changes the generation (specs/tla/netconsole.tla,
+ * MarkGuard: check and store are one step).
+ *
+ * @param curRx   current rx mark (s_hs_rx_gen)
+ * @param curGen  generation of the current slot holder (s_hs_gen)
+ * @param myGen   generation of the marking task
+ */
+static inline uint32_t netConsoleSlotMark(uint32_t curRx, uint32_t curGen, uint32_t myGen)
+{
+#ifdef NET_CONSOLE_MARK_UNGUARDED   // the behaviour before the fix, only for the regression test's red run
+    (void)curRx;
+    (void)curGen;
+    return myGen;
+#else
+    return curGen == myGen ? myGen : curRx;
+#endif
+}
+
+/**
+ * @brief May the task of generation myGen free the slot? Only while it still holds it.
+ */
+static inline bool netConsoleSlotMayFree(uint32_t curGen, uint32_t myGen)
+{
+    return curGen == myGen;
+}
+

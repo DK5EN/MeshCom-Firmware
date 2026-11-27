@@ -23,6 +23,11 @@
 //   -DMUT_NOAUTH        assert dispatch happens only when the hmac model was NOT called (opposite of the auth property) -> must fail
 //   -DMUT_TAGFLIP       assert at dispatch that the tag does NOT equal hexLower(mac) (opposite) -> must fail
 //   -DMUT_SHORT_TEXT    text buffer one byte shorter than it is read (no terminator) -> read past it must be found
+//   -DCANON_CONTRACT    (with -DRM_CANONICAL_EXTERNAL) rmCanonical() is replaced by its contract (below); the AUTH claim
+//                       "HMAC over exactly rmCanonical(cmd,dst,src)" becomes: rmCheck() called the builder with this
+//                       cmd/dst/src, and the HMAC ran over exactly the text and length the builder returned. The builder
+//                       itself is proven in canon.check. Recomputing the text here made the solver prove two copies of
+//                       the builder equal, which did not finish in 40 min (2026-11-27); with the contract: seconds.
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
@@ -45,6 +50,41 @@ extern "C" unsigned nondet_uint();
 #endif
 
 static bool is_dispatch(RmVerdict v) { return v == RM_OK || v == RM_REFUSED || v == RM_SYNC || v == RM_CACHED; }
+
+#ifdef CANON_CONTRACT
+// Contract of rmCanonical() for the inputs of this harness (dst, src at most 10 characters, cmd/args any bytes), proven
+// in canon.check:
+// reads each input within its bounds; returns 0 with out[0] == 0 (n > 0), or a length 1..CANON_MAX below n with
+// out[len] == 0. The text is any bytes; the model records it and the inputs it was called with.
+enum { CANON_MAX = 94 }; // "RM1|" + dst 10 + "|" + src 10 + "|" + ctr 10 + "|" + cmd 16 + " " + args 40 (unterminated fields)
+static struct
+{
+    unsigned calls;
+    const RmCmd *c;
+    const char *dst, *src;
+    size_t len;
+    char text[CANON_MAX];
+} g_canon;
+size_t rmCanonical(const RmCmd &c, const char *dst, const char *src, char *out, size_t n)
+{
+    volatile char r = c.cmd[sizeof(c.cmd) - 1]; // the real builder reads cmd and args within their arrays
+    r = c.args[sizeof(c.args) - 1];
+    if(dst) (void)strnlen(dst, 33); // RM_CALL_SCAN_MAX + 1 (remote_cmd.cpp)
+    if(src) (void)strnlen(src, 33);
+    (void)r;
+    g_canon.calls++;
+    g_canon.c = &c; g_canon.dst = dst; g_canon.src = src; g_canon.len = 0;
+    if(out == nullptr || n == 0) return 0;
+    if(nondet_int() != 0) { out[0] = 0; return 0; }
+    size_t len = nondet_uint();
+    __ESBMC_assume(len >= 1 && len < n && len <= CANON_MAX);
+    for(size_t i = 0; i < CANON_MAX; i++)
+        if(i < len) { out[i] = (char)nondet_uchar(); g_canon.text[i] = out[i]; }
+    out[len] = 0;
+    g_canon.len = len;
+    return len;
+}
+#endif
 
 static void nondet_str(char *p, int cap) // cap bytes, NUL-terminated somewhere inside, printable-ish nondet content
 {
@@ -136,6 +176,9 @@ int main()
     for(int round = 0; round < ROUNDS; round++) {
         uint32_t now = nondet_uint();
         g_m.sha_calls = g_m.hmac_calls = 0; g_m.msg_len = 0;
+#ifdef CANON_CONTRACT
+        g_canon.calls = 0; g_canon.len = 0;
+#endif
         uint32_t hwm_before = s.hwm;
         RmVerdict v = rmCheck(s, cmd, dst, src, passwd, minTx, maxTx, now);
 #ifdef EMPTY_SECRET
@@ -143,7 +186,10 @@ int main()
         assert(g_m.hmac_calls == 0 && g_m.sha_calls == 0);
         assert(!is_dispatch(v));
 #else
-        if(is_dispatch(v)) {
+        // AUTH is asserted in the last round only. Round 1 starts from exactly the states of the ROUNDS=1 jobs
+        // (rmStateInit with nondet hwm and strict), where pass_auth_direct proves it; a later round adds the states left
+        // by round 1 (reply cache, strikes). Asserting it in both rounds of one job did not finish in 40 min (2026-11-27).
+        if(is_dispatch(v) && round == ROUNDS - 1) {
 #ifdef WITNESS_DISPATCH
             assert(0);
 #endif
@@ -151,9 +197,31 @@ int main()
             assert(g_m.hmac_calls == 0);
 #endif
             assert(g_m.hmac_calls >= 1);
+#ifdef CANON_CONTRACT
+            // the builder ran once in this check, on this frame, and the HMAC ran over exactly its text
+            assert(g_canon.calls == 1 && g_canon.c == &cmd && g_canon.dst == dst && g_canon.src == src);
+            assert(g_canon.len > 0 && g_canon.len == g_m.msg_len);
+            for(size_t i = 0; i < CANON_MAX; i++)
+                if(i < g_canon.len)
+                    assert(g_canon.text[i] == (char)g_m.msg[i]);
+#else
             char canon[160];
             size_t cl = rmCanonical(cmd, dst, src, canon, sizeof(canon));
-            assert(cl > 0 && cl == g_m.msg_len && memcmp(canon, g_m.msg, cl) == 0);
+            assert(cl > 0 && cl == g_m.msg_len);
+#ifndef WITNESS_OK
+            // Byte by byte over a fixed count (same claim as memcmp(canon, g_m.msg, cl) == 0): a memcmp over the
+            // variable length cl was unrolled thousands of times and ran the proof into its time limit (2026-11-26).
+            // CANON_MAX covers the longest canonical text this harness can build ("RM1|" + dst 10 + "|" + src 10 + "|"
+            // + ctr 10 + "|" + cmd 15 + " " + args 39 = 92); the assert proves it, and the count stays below --unwind 110.
+            // Left out of the WITNESS_OK job: it only shows RM_OK is reachable, and incremental unwinding would have to
+            // reach k = CANON_MAX first.
+            enum { CANON_MAX = 96 };
+            assert(cl <= CANON_MAX);
+            for(size_t i = 0; i < CANON_MAX; i++)
+                if(i < cl)
+                    assert(canon[i] == (char)g_m.msg[i]);
+#endif
+#endif
             char hex[17];
             hexLower(g_m.mac, 8, hex);
 #ifdef MUT_TAGFLIP

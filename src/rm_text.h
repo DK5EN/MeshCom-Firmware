@@ -84,6 +84,8 @@ struct RmPosArg
 
 // Scans a coordinate token at *p: optional '-', 1-3 digits, optional '.' + 1-6 digits. On success
 // advances *p past the token and stores the value. No exponent, no '+', no NaN by construction.
+// val == nullptr checks the syntax only and computes nothing (B-RM-RANGE-01: no floating point on the
+// syntax path of the allowlist, which a bounded model checker pays for dearly).
 inline bool rmPosScanCoord(const char **p, double *val)
 {
     const char *s = *p;
@@ -97,7 +99,8 @@ inline bool rmPosScanCoord(const char **p, double *val)
     double v = 0.0;
     while (*s >= '0' && *s <= '9' && nd < 4)
     {
-        v = v * 10.0 + (*s - '0');
+        if (val != nullptr)
+            v = v * 10.0 + (*s - '0');
         s++;
         nd++;
     }
@@ -110,15 +113,19 @@ inline bool rmPosScanCoord(const char **p, double *val)
         double scale = 0.1;
         while (*s >= '0' && *s <= '9' && nf < 7)
         {
-            v += (*s - '0') * scale;
-            scale /= 10.0;
+            if (val != nullptr)
+            {
+                v += (*s - '0') * scale;
+                scale /= 10.0;
+            }
             s++;
             nf++;
         }
         if (nf < 1 || nf > 6)
             return false;
     }
-    *val = neg ? -v : v;
+    if (val != nullptr)
+        *val = neg ? -v : v;
     *p = s;
     return true;
 }
@@ -150,10 +157,11 @@ inline bool rmPosScan(const char *args, RmPosArg *out, bool ranged)
     const char *p = args;
     double lat = 0, lon = 0;
     int alt = 0;
-    if (!rmPosScanCoord(&p, &lat) || *p != ' ')
+    const bool values = ranged || out != nullptr; // syntax only: no floating point at all
+    if (!rmPosScanCoord(&p, values ? &lat : nullptr) || *p != ' ')
         return false;
     p++;
-    if (!rmPosScanCoord(&p, &lon) || *p != ' ')
+    if (!rmPosScanCoord(&p, values ? &lon : nullptr) || *p != ' ')
         return false;
     p++;
     if (!rmPosScanAlt(&p, &alt) || *p != '\0')

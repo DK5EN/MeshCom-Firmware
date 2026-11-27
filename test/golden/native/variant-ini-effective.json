@@ -2586,6 +2586,8 @@
   "test_build_src": "True",
   "test_filter": [
    "test_regex_call",
+   "test_serial_line_guard",
+   "test_aprs_path_scan",
    "test_sset3_restore",
    "test_autosymbol",
    "test_posinfo_next",
@@ -2752,7 +2754,8 @@
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
-   "test_applink_ws"
+   "test_applink_ws",
+   "test_applink_ws_range"
   ],
   "test_framework": "unity"
  },
@@ -2793,6 +2796,7 @@
   "test_filter": [
    "test_aprs_decode",
    "test_aprs_corpus",
+   "test_aprs_pos_scan",
    "test_aprs_spec",
    "test_aprs_epilogue",
    "test_hey_report",
@@ -5020,7 +5024,8 @@
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
-   "test_remote_cmd"
+   "test_remote_cmd",
+   "test_rm_range"
   ],
   "test_framework": "unity"
  },
@@ -5049,7 +5054,8 @@
   "platform": "native",
   "test_build_src": "True",
   "test_filter": [
-   "test_remote_cmd"
+   "test_remote_cmd",
+   "test_rm_range"
   ],
   "test_framework": "unity"
  },

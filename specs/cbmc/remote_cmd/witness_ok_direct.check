@@ -1,7 +1,9 @@
 TOOL=esbmc
 SOURCES="harness.cpp hmac_model.cpp $ROOT/src/remote_cmd.cpp"
 CFLAGS="-I$ROOT/src -Ishim -DNATIVE_BUILD=1 -DDIRECT -DWITNESS_OK"
-FLAGS="--unwind 110"
+# Incremental unwinding (2026-11-26): the witness is found at a short command length. With a fixed --unwind 110 the
+# job ran into the 2400 s timeout at 13 GB; incremental: 328 s, 5.2 GB.
+FLAGS="--incremental-bmc --max-k-step 110"
 EXPECT=fail
 CHECKS="witness: RM_OK reachable"
 EXPECT_PROP='assertion 0$'

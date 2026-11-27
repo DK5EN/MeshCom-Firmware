@@ -125,3 +125,12 @@ The transmitter appends its queue time to the frame; the receiver adds it.
 2. **GPS:** count GPS with fix as good enough to restamp (recommended: yes, a GPS fix is within a few ms), or NTP only?
 3. **Default:** on by default (recommended, it only makes beacons more accurate), or behind a setting first for the
    field test?
+
+## Decisions (operator 2026-11-26)
+
+1. **Who restamps:** every node with NTP or GPS with fix, gateways and relays (Option B).
+2. **GPS:** a GPS fix counts as a trusted clock.
+3. **Default:** on by default.
+
+Upstream issue [#1340](https://github.com/icssw-org/MeshCom-Firmware/issues/1340) (2026-11-26) announces the feature
+with these choices. Open before the PR: server dedup of a restamped copy uploaded by another gateway.

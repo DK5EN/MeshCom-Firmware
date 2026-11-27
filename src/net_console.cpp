@@ -72,6 +72,10 @@ static volatile uint32_t s_hs_rx_gen      = 0;       // generation of the holder
 static volatile int      s_hs_fd          = -1;      // socket of the slot holder
 static volatile uint32_t s_hs_startMs     = 0;       // when the slot was taken
 static volatile uint32_t s_hs_gen         = 0;       // slot generation; a preempted task must not free the new holder's slot
+// FORMAL-NETCON-MARK (#1339): the generation, the rx mark and the slot flag change together under this lock, so a
+// task's "am I still the holder?" check and its store are one step (specs/tla/netconsole.tla, MarkGuard). Held for a
+// few instructions only, never across a syscall.
+static portMUX_TYPE      s_hs_mux         = portMUX_INITIALIZER_UNLOCKED;
 static uint32_t          s_acceptErrLogMs = 0;   // rate limit for the accept() error log
 
 // 1-byte lookahead for netConsoleAvailable()
@@ -155,9 +159,19 @@ static void authTask(void* arg)
     const uint32_t myGen = a->gen;
     delete a;
     // A preempted task must not free the slot of the connection that took it over.
-    auto freeSlot = [myGen]() { if (s_hs_gen == myGen) s_hs_running = false; };
-    // Single word store of OUR generation: harmless if we were preempted (s_hs_gen != myGen then).
-    auto markRx = [myGen]() { s_hs_rx_gen = myGen; };
+    auto freeSlot = [myGen]() {
+        portENTER_CRITICAL(&s_hs_mux);
+        if (netConsoleSlotMayFree(s_hs_gen, myGen))
+            s_hs_running = false;
+        portEXIT_CRITICAL(&s_hs_mux);
+    };
+    // Only the current holder marks (FORMAL-NETCON-MARK): a preempted task that wakes late must not make the new
+    // holder look silent. Check and store under the lock that changes the generation.
+    auto markRx = [myGen]() {
+        portENTER_CRITICAL(&s_hs_mux);
+        s_hs_rx_gen = netConsoleSlotMark(s_hs_rx_gen, s_hs_gen, myGen);
+        portEXIT_CRITICAL(&s_hs_mux);
+    };
     if (fd < 0) { freeSlot(); vTaskDelete(nullptr); return; }
 
     // Blocking mode for the auth exchange
@@ -525,9 +539,12 @@ void loopNetConsole()
         // F2-10-SLOT: take the slot over from a holder that has sent nothing for NET_CONSOLE_HS_SILENT_MS.
         // shutdown() (not close()) wakes the old task's recv() with EOF; the task closes its own fd on the
         // FAIL path, so the fd number cannot be reused under it. A holder that is sending is never preempted.
+        portENTER_CRITICAL(&s_hs_mux);
         const uint32_t gen0 = s_hs_gen;
         const int      fd0  = s_hs_fd;
-        if (netConsoleSlotMayPreempt(s_hs_running, netConsoleSlotRxSeen(s_hs_rx_gen, gen0), millis(), s_hs_startMs))
+        const bool     preempt = netConsoleSlotMayPreempt(s_hs_running, netConsoleSlotRxSeen(s_hs_rx_gen, gen0), millis(), s_hs_startMs);
+        portEXIT_CRITICAL(&s_hs_mux);
+        if (preempt)
         {
             s_hwSerial.println("[CON ]...Silent handshake peer dropped, slot taken over");
             // Check-then-act: the holder may have got EOF and freed the slot (closing fd0) since the check
@@ -553,16 +570,24 @@ void loopNetConsole()
     setsockopt(client_fd, IPPROTO_TCP, TCP_KEEPINTVL, &intvl, sizeof(intvl));
     setsockopt(client_fd, IPPROTO_TCP, TCP_KEEPCNT,   &cnt,   sizeof(cnt));
 
+    const uint32_t nowMs = millis();
+    portENTER_CRITICAL(&s_hs_mux);
     s_hs_gen++;   // new generation: the previous holder's rx mark no longer counts (s_hs_rx_gen != s_hs_gen)
+    const uint32_t newGen = s_hs_gen;
     s_hs_fd      = client_fd;
-    s_hs_startMs = millis();
+    s_hs_startMs = nowMs;
     s_hs_running = true;
-    AuthArgs* args = new AuthArgs{ client_fd, s_hs_gen };
+    portEXIT_CRITICAL(&s_hs_mux);
+    AuthArgs* args = new AuthArgs{ client_fd, newGen };
     BaseType_t rc = xTaskCreatePinnedToCore(authTask, "con_auth", 3072, args, 1, nullptr, 1);
     if (rc != pdPASS)
     {
         s_hwSerial.printf("[CON ]...xTaskCreate failed: %d\n", rc);
-        delete args; ::close(client_fd); s_hs_running = false; s_hs_gen++;
+        delete args; ::close(client_fd);
+        portENTER_CRITICAL(&s_hs_mux);
+        s_hs_running = false;
+        s_hs_gen++;
+        portEXIT_CRITICAL(&s_hs_mux);
     }
 }
 

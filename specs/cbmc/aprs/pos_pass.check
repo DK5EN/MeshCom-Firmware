@@ -4,5 +4,7 @@ CFLAGS="-Istubs -I$ROOT/test/support -I$ROOT/src -DNATIVE_BUILD=1 -DUNIT_TEST=1 
 FLAGS="--unwind 30"
 EXPECT=pass
 CHECKS="decodeAPRSPOS memory safety"
-# memout at the 6 GB cap after 76 s on 2026-11-23
+# memout at the 6 GB cap after 76 s on 2026-11-23; after B-APRS-POS-01 and the harness sscanf model: pass, 848 s / 2.3 GB
+# (2026-11-27), so the 900 s default is too tight
+TIMEOUT=1800
 TIER=heavy
