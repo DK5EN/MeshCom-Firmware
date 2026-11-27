@@ -44,7 +44,7 @@
 //   D-2. Every finished line is wiped from `line` (today: only Cookie and /rmsend|login lines).
 //   D-3. After WH_DONE or WH_LINE_TOO_BIG the accumulator is sticky: further pushes change nothing and
 //        repeat the result. WH_LINE_TOO_BIG wipes line and head, as the 431 branch does today.
-//   D-4. New judgements, computed but acting on nothing yet (B3 / B6 of section 7.2):
+//   D-4. Judgements the server answers 400 on since wave 7b step 4 (B3 / B6 of section 7.2):
 //        webHeadBadContentLength(), WRQ_BAD_VERSION, WRQ_BAD_CONTENT_LENGTH, WRQ_BAD_REQUEST_LINE.
 //        webReqParse fills every output field it can even when it returns an error code.
 //        The strict Content-Length is judged twice on purpose: the accumulator (cl_strict, WEB_HF_CL_BAD)

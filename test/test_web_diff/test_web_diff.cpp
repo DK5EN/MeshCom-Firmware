@@ -12,7 +12,7 @@
 // The unit under test is a function pointer table. Every corpus request (corpus/*.req, built by tools/web_corpus.py)
 // runs under every profile through every entry; the record of the run (handler trace, every byte written, the close,
 // the fake clock) is compared with golden/<name>.txt, and the live record with the frozen one. Intended deltas
-// (B1-B10 of docs/web-server-seams-20261127.md 7.2) go into kWhitelist, keyed by corpus name (B2 in kWhitelist, B1 in kWhitelistB1, B3 in kWhitelistB3: all profiles, 400), each row naming the profiles where the live record differs.
+// (B1-B10 of docs/web-server-seams-20261127.md 7.2) go into kWhitelist, keyed by corpus name (B2 in kWhitelist, B1 in kWhitelistB1, B3 in kWhitelistB3 and B6 in kWhitelistB6: all profiles, 400), each row naming the profiles where the live record differs.
 #include <unity.h>
 
 #include "web_route.h" // reads no build macro: the feature mask is computed in web_functions.cpp
@@ -276,7 +276,34 @@ static const std::map<std::string, const char *> kWhitelistB3 = {
     {"mut-437-path-only", kWhyB3Line},
 };
 
-static bool isWhitelisted(const std::string &n) { return kWhitelist.count(n) != 0 || kWhitelistB1.count(n) != 0 || kWhitelistB3.count(n) != 0; }
+// B6 (wave 7b step 4 part B6): Content-Length is not plain digits, a second Content-Length differs, or the value is over 65535
+// (webReqParse: WRQ_BAD_CONTENT_LENGTH). Same answer as B3: 400 right after the guard in every profile; the frozen record
+// answers what the legacy chain and its lenient length made of it. Rows carry only the reason (profiles: all of kProfiles).
+static const char *const kWhyB6 = "B6: Content-Length not plain digits, a second differing value, or over 65535: 400";
+static const std::map<std::string, const char *> kWhitelistB6 = {
+    {"mut-337-cl-rmsend-content-length-5", kWhyB6},
+    {"mut-338-cl-config-content-length-5", kWhyB6},
+    {"mut-339-cl-rmsend-content-length-12abc", kWhyB6},
+    {"mut-340-cl-config-content-length-12abc", kWhyB6},
+    {"mut-341-cl-rmsend-content-length-abc", kWhyB6},
+    {"mut-342-cl-config-content-length-abc", kWhyB6},
+    {"mut-343-cl-rmsend-content-length-99999999999", kWhyB6},
+    {"mut-344-cl-config-content-length-99999999999", kWhyB6},
+    {"mut-345-cl-rmsend-content-length-2147483648", kWhyB6},
+    {"mut-346-cl-config-content-length-2147483648", kWhyB6},
+    {"mut-347-cl-rmsend-content-length-4294967296", kWhyB6},
+    {"mut-348-cl-config-content-length-4294967296", kWhyB6},
+    {"mut-359-cl-rmsend-content-length-65536", kWhyB6},
+    {"mut-360-cl-config-content-length-65536", kWhyB6},
+    {"mut-361-cl-rmsend-content-length", kWhyB6},
+    {"mut-362-cl-config-content-length", kWhyB6},
+    {"mut-368-cl-dup-diff", kWhyB6},
+    {"mut-369-cl-dup-diff2", kWhyB6},
+    {"mut-370-cl-huge-nobody", kWhyB6},
+    {"mut-371-cl-huge-nobody__closed", kWhyB6},
+};
+
+static bool isWhitelisted(const std::string &n) { return kWhitelist.count(n) != 0 || kWhitelistB1.count(n) != 0 || kWhitelistB3.count(n) != 0 || kWhitelistB6.count(n) != 0; }
 
 static const WebProfile kProfiles[] = {
     {"open", "", "", false, false},
@@ -463,7 +490,7 @@ static void test_entries_agree_with_the_first(void)
             }
             TEST_ASSERT_TRUE_MESSAGE(same, n.c_str());
         }
-        TEST_ASSERT_EQUAL_size_t_MESSAGE(kWhitelist.size() + kWhitelistB1.size() + kWhitelistB3.size(), whitelisted, "every whitelist entry must be a corpus request");
+        TEST_ASSERT_EQUAL_size_t_MESSAGE(kWhitelist.size() + kWhitelistB1.size() + kWhitelistB3.size() + kWhitelistB6.size(), whitelisted, "every whitelist entry must be a corpus request");
     }
 }
 
@@ -522,6 +549,13 @@ static void test_whitelist_names_corpus_requests(void)
         TEST_ASSERT_TRUE_MESSAGE(kWhitelist.count(w.first) == 0, (std::string("request in both whitelists: ") + w.first).c_str());
         TEST_ASSERT_TRUE_MESSAGE(strncmp(w.second.why, "B1:", 3) == 0, w.first.c_str());
         TEST_ASSERT_TRUE_MESSAGE(kWhitelistB3.count(w.first) == 0, (std::string("request in both whitelists: ") + w.first).c_str());
+        TEST_ASSERT_TRUE_MESSAGE(kWhitelistB6.count(w.first) == 0, (std::string("request in both whitelists: ") + w.first).c_str());
+    }
+    for (const auto &w : kWhitelistB6)
+    {
+        TEST_ASSERT_TRUE_MESSAGE(have.count(w.first) == 1, (std::string("B6 whitelist names no corpus request: ") + w.first).c_str());
+        TEST_ASSERT_TRUE_MESSAGE(kWhitelist.count(w.first) == 0 && kWhitelistB1.count(w.first) == 0 && kWhitelistB3.count(w.first) == 0, (std::string("request in both whitelists: ") + w.first).c_str());
+        TEST_ASSERT_TRUE_MESSAGE(strncmp(w.second, "B6:", 3) == 0, w.first.c_str());
     }
     for (const auto &w : kWhitelistB3)
     {
@@ -622,25 +656,63 @@ static void test_whitelist_rows_differ_exactly_where_listed(void)
     }
 }
 
-// B3 rows: live differs from frozen in every profile and answers 400 with the bad-request JSON body
-static void test_b3_rows_answer_400_in_every_profile(void)
+// B3 and B6 rows: live differs from frozen in every profile and answers 400 with the bad-request JSON body
+static void checkRows400(const char *tag, const std::map<std::string, const char *> &rows)
 {
-    for (const auto &w : kWhitelistB3)
+    for (const auto &w : rows)
     {
         std::map<std::string, std::string> live;
         const std::set<std::string> got = differingProfiles(w.first, &live);
         std::set<std::string> all;
         for (size_t p = 0; p < kProfileCount; p++)
             all.insert(kProfiles[p].name);
-        const std::string m = "B3 " + w.first + ": live differs from frozen in [" + joinSet(got) + "], the row lists [" + joinSet(all) + "]";
+        const std::string m = std::string(tag) + " " + w.first + ": live differs from frozen in [" + joinSet(got) + "], the row lists [" + joinSet(all) + "]";
         TEST_ASSERT_TRUE_MESSAGE(got == all, m.c_str());
         for (const std::string &prof : all)
         {
             const std::string &out = live[prof];
-            const std::string am = "B3 " + w.first + " [" + prof + "]: " + webRigEsc(out.substr(0, 300));
+            const std::string am = std::string(tag) + " " + w.first + " [" + prof + "]: " + webRigEsc(out.substr(0, 300));
             TEST_ASSERT_TRUE_MESSAGE(out.compare(0, 12, "HTTP/1.1 400") == 0, am.c_str());
             TEST_ASSERT_TRUE_MESSAGE(out.find("{\"ok\":false,\"err\":\"bad request\"}") != std::string::npos, am.c_str());
         }
+    }
+}
+static void test_b3_rows_answer_400_in_every_profile(void) { checkRows400("B3", kWhitelistB3); }
+static void test_b6_rows_answer_400_in_every_profile(void) { checkRows400("B6", kWhitelistB6); }
+
+// B6 past the window: the parser judges only the 1023-byte window, the accumulator every finished head line. A bad
+// Content-Length after the window is a 400 too (web_request.h D-4: B6 acts on the accumulator's judgement); the frozen
+// reference routes both requests with the lenient value. The corpus has no head this long, so the rows are built here.
+static void test_b6_content_length_past_the_window(void)
+{
+    const WebProfile &open = kProfiles[0];
+    const std::string pad = std::string("X-Pad-A: ") + std::string(500, 'a') + "\r\nX-Pad-B: " + std::string(500, 'b') + "\r\n";
+    const std::string reqs[2] = {
+        "POST /rmsend HTTP/1.1\r\nHost: 192.0.2.10\r\nX-MC: 1\r\n" + pad + "Content-Length: 12abc\r\n\r\nhello world!",
+        "POST /rmsend HTTP/1.1\r\nHost: 192.0.2.10\r\nX-MC: 1\r\nContent-Length: 5\r\n" + pad + "Content-Length: 900\r\n\r\nhello",
+    };
+    for (const std::string &req : reqs)
+    {
+        TEST_ASSERT_TRUE(req.find("\r\n\r\n") > 1023); // the second Content-Length line lies past the window
+        webRigBegin(req, false, open);
+        kEntries[0].run();
+        {
+            std::string tr;
+            for (const auto &t : webRig().trace)
+                tr += t + " | ";
+            const std::string fm = "frozen: " + webRigEsc(webRig().out.substr(0, 120)) + " trace: " + tr;
+            TEST_ASSERT_TRUE_MESSAGE(tr.find("sub_rm_send") != std::string::npos, fm.c_str()); // routed with the lenient value
+        }
+        webRigBegin(req, false, open);
+        kEntries[1].run();
+        const std::string out = webRig().out;
+        std::string ltr;
+        for (const auto &t : webRig().trace)
+            ltr += t + " | ";
+        const std::string lm = "live: " + webRigEsc(out.substr(0, 120)) + " trace: " + ltr;
+        TEST_ASSERT_TRUE_MESSAGE(out.compare(0, 13, "HTTP/1.1 400 ") == 0, lm.c_str());
+        TEST_ASSERT_TRUE(out.find("{\"ok\":false,\"err\":\"bad request\"}") != std::string::npos);
+        TEST_ASSERT_TRUE(webRig().trace.empty() || webRig().trace.at(0).find("content_length=") == std::string::npos);
     }
 }
 
@@ -820,6 +892,8 @@ int main(int, char **)
     RUN_TEST(test_whitelist_names_corpus_requests);
     RUN_TEST(test_whitelist_rows_differ_exactly_where_listed);
     RUN_TEST(test_b3_rows_answer_400_in_every_profile);
+    RUN_TEST(test_b6_rows_answer_400_in_every_profile);
+    RUN_TEST(test_b6_content_length_past_the_window);
     RUN_TEST(test_live_leaves_no_request_bytes);
     RUN_TEST(test_live_copy_is_current);
     RUN_TEST(test_corpus_reaches_the_handlers);

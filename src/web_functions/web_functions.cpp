@@ -1153,8 +1153,8 @@ static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header
 
 // FORMAL-02 web step 4: the number of requests where the route the dispatcher uses differs from the route table's own match
 // (web_route.h, webRouteMatch), counted in webRouteDecide: every request answered 404 / 405 (B1) or 404 page (WRL_PAGE_UNKNOWN),
-// every table route whose feature is not built, and every request the parser refuses (legacy chain, B3/B6). Debug only, no
-// behaviour hangs on it; the later steps drop it.
+// every table route whose feature is not built, and every request the parser refuses (a 400 since step 4; the legacy chain
+// is unreachable). Debug only, no behaviour hangs on it; the later steps drop it.
 uint32_t web_route_disagree = 0;
 
 /**
@@ -1207,8 +1207,8 @@ struct WebRouteVerdict
 /**
  * The route of the request in the window (B1 + B2, exact match): a parsed request goes to the table's route when its
  * handler is built into this board (feature mask below), to the 404 page when it is page-shaped, else to the 404 / 405
- * refusal (never the scaffold; GET / is the table's scaffold row). A request the parser refuses keeps the legacy chain
- * (webRouteLegacy: B3/B6, step 4). The rules are webRouteDecideCore / webRouteRefusal (web_route.h, unit-tested);
+ * refusal (never the scaffold; GET / is the table's scaffold row). A request the parser refuses (B3/B6) is a 400 since
+ * step 4 and never gets here; the legacy chain (webRouteLegacy) still runs for a refused parse, but its result routes nothing; kept until its removal step. The rules are webRouteDecideCore / webRouteRefusal (web_route.h, unit-tested);
  * this function only gathers the inputs and returns the route, the whole verdict is in *out. A difference between the
  * decision and the table is still counted (the later steps drop it).
  */
@@ -1375,12 +1375,14 @@ void work_webpage(void)
                         continue;
                     }
 
-                    // B1/B3: the router decides once, here (parse, table, refusal); the no-session gate below reads the same
-                    // verdict. A request line the parser refuses (B3) is a 400 -- after the guard (its 403 stays first), before
-                    // the AU-busy 503, assets, login and every route, with or without a session.
+                    // B1/B3/B6: the router decides once, here (parse, table, refusal); the no-session gate below reads the
+                    // same verdict. A request the parser refuses (B3 request line, B6 Content-Length in the window) or whose
+                    // Content-Length the accumulator refused on any head line, also past the 1023-byte window (B6), is a 400
+                    // -- after the guard (its 403 stays first), before the AU-busy 503, assets, login and every route, with
+                    // or without a session.
                     WebRouteVerdict web_verdict;
                     webRouteDecide(web_acc, web_header, &web_verdict);
-                    if (webRouteBadRequest(web_verdict.wrq))
+                    if (webRouteBadRequest(web_verdict.wrq) || webHeadBadContentLength(web_acc))
                     {
                         web_wipe_request(web_header, wg_path);
                         send_http_header(400, RESPONSE_TYPE_JSON);
@@ -1508,7 +1510,7 @@ void work_webpage(void)
                         uint8_t gate;
                         if (web_verdict.parsed)
                             gate = webRouteNoSession(web_verdict.page_shaped, web_verdict.route);
-                        else if (web_header.indexOf("/?page=") >= 0) // refused parse (B3/B6, step 4): the legacy gate rule
+                        else if (web_header.indexOf("/?page=") >= 0) // unreachable since step 4 (a refused parse is a 400 before): legacy gate rule, kept until removal
                             gate = WRD_LOGIN_PAGE;
                         else if (web_header.indexOf("/") >= 0 && web_header.indexOf("HTTP/1.1") > web_header.indexOf("/") + 2)
                             gate = WRD_UNAUTH;

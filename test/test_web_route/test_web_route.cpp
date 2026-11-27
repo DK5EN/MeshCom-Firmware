@@ -1081,7 +1081,7 @@ static const size_t kDeltaCount = sizeof(kDeltas) / sizeof(kDeltas[0]);
 
 // Requests that route like today but that webReqParse refuses (B3 bad version / bad request line, B6 bad Content-Length,
 // CORPUS a request no browser sends). Since wave 7b step 4 part B3 the wiring answers 400 right after the guard for every
-// code webRouteBadRequest accepts (B3 and CORPUS rows); B6 rows keep the legacy chain until part B6. Exact: no unlisted entry.
+// code webRouteBadRequest accepts (B3, B6 and CORPUS rows; B6 since part B6). Exact: no unlisted entry.
 struct Refused
 {
     const char *name, *bid;
@@ -1139,7 +1139,10 @@ static void test_bad_request_codes(void)
     TEST_ASSERT_FALSE(webRouteBadRequest(WRQ_OK));
     TEST_ASSERT_TRUE(webRouteBadRequest(WRQ_BAD_REQUEST_LINE));
     TEST_ASSERT_TRUE(webRouteBadRequest(WRQ_BAD_VERSION));
-    TEST_ASSERT_FALSE(webRouteBadRequest(WRQ_BAD_CONTENT_LENGTH)); // B6: legacy chain until part B6
+    TEST_ASSERT_TRUE(webRouteBadRequest(WRQ_BAD_CONTENT_LENGTH)); // B6
+    // every refusal of webReqParse is a 400: the router never sees a refused parse, the legacy chain is unreachable
+    for (uint8_t c = WRQ_OK + 1; c <= WRQ_BAD_CONTENT_LENGTH; c++)
+        TEST_ASSERT_TRUE_MESSAGE(webRouteBadRequest(c), "a non-OK WRQ code must be a bad request");
     TEST_ASSERT_FALSE(webRouteBadRequest(200));                    // an unknown code is not a 400
 }
 
@@ -1155,8 +1158,8 @@ static void test_corpus_refused_requests_are_listed(void)
         TEST_ASSERT_TRUE_MESSAGE(it != c.refusedSame.end(), kRefused[k].name); // no stale entry
         TEST_ASSERT_EQUAL_INT_MESSAGE(kRefused[k].pr, it->second, kRefused[k].name);
         const std::string b = kRefused[k].bid;
-        // B3 and CORPUS rows are refused -> 400; B6 rows stay on the legacy chain (until part B6)
-        TEST_ASSERT_EQUAL_INT_MESSAGE(b != "B6", webRouteBadRequest((uint8_t)it->second) ? 1 : 0, kRefused[k].name);
+        // every refused row (B3, B6, CORPUS) is a 400
+        TEST_ASSERT_TRUE_MESSAGE(webRouteBadRequest((uint8_t)it->second), kRefused[k].name);
         if (b == "B3")
         {
             b3++;
