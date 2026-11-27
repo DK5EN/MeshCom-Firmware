@@ -311,6 +311,7 @@ struct WhiteB3Http10
     const char *trace;
     size_t at = 0; // index of that line in the trace (sendmessage: webTxBeginChunked and setMsgOrigin come first)
 };
+static const char *const kWhyB11 = "B11: tocall is read by its name: \"&message=..&tocall=X\" goes to X, not to the swapped-bounds text";
 static const char *const kWhyB3Http10 = "B3: HTTP/1.0 request line: the version text no longer lands in the name / value of the parameter handler";
 static const std::map<std::string, WhiteB3Http10> kWhitelistB3Http10 = {
     {"mut-020-setparam-onewire-on-http-1-0", {kWhyB3Http10, "open,password,password+session", "webSetup_setParam name='onewire' value='on'"}},
@@ -319,6 +320,9 @@ static const std::map<std::string, WhiteB3Http10> kWhitelistB3Http10 = {
     // step 5c: call_function and send_message read the parsed query; the version and header text no longer land in the name / message
     {"mut-039-callfunction-sendpos-http-1-0", {kWhyB3Http10, "open,password,password+session", "webFunctionCall name='sendpos' param=''"}},
     {"mut-048-sendmessage-tocall-9999-message-hi-20the", {kWhyB3Http10, "open,password,password+session", "sendMessage len=15 text=':{9999}hi there'", 2}},
+    // B11 (operator 2026-11-27): send_message reads tocall by its name; the reversed order goes to the named station (the
+    // message keeps "everything after &message=", seams 7.2 "kept on purpose"); the password profiles answer 401 in both entries
+    {"mut-434-msg-order", {kWhyB11, "open", "sendMessage len=20 text=':{9999}m&tocall=9999'", 2}},
 };
 
 // B4 (wave 7b step 5b): /setparam/?<query> without '=' (also "?" and a request without '?') answers 422 with
@@ -596,7 +600,7 @@ static void test_whitelist_names_corpus_requests(void)
         TEST_ASSERT_TRUE_MESSAGE(have.count(w.first) == 1, (std::string("B3 HTTP/1.0 whitelist names no corpus request: ") + w.first).c_str());
         TEST_ASSERT_TRUE_MESSAGE(kWhitelist.count(w.first) == 0 && kWhitelistB1.count(w.first) == 0 && kWhitelistB3.count(w.first) == 0 && kWhitelistB6.count(w.first) == 0,
                                  (std::string("request in both whitelists: ") + w.first).c_str());
-        TEST_ASSERT_TRUE_MESSAGE(strncmp(w.second.why, "B3:", 3) == 0, w.first.c_str());
+        TEST_ASSERT_TRUE_MESSAGE(strncmp(w.second.why, "B3:", 3) == 0 || strncmp(w.second.why, "B11:", 4) == 0, w.first.c_str());
     }
     for (const auto &w : kWhitelistB4)
     {
@@ -1104,6 +1108,18 @@ static void test_call_and_send_deliberate_deltas(void)
                            "webFunctionCall name='a' param=''", "webFunctionCall name='aHTTP/1.1' param='b'", "B3 HTTP/1.1 in the query");
     checkDiffersFromFrozen("GET /callfunction/?a=b\t" + nul + "x HTTP/1.1" + hdr + "\r\n", "webFunctionCall",
                            "webFunctionCall name='a' param='b\\t'", "webFunctionCall name='a' param='b'", "NUL after a tab");
+    // B11: tocall by name; the reversed order goes to the named station, tocall stops at a later "&message" as before
+    checkDiffersFromFrozen("GET /?sendmessage&message=m&tocall=9999 HTTP/1.1" + hdr + "\r\n", "sendMessage",
+                           "sendMessage len=34 text=':{&MESSAGE=M&TOCALL=}m&tocall=9999'", "sendMessage len=20 text=':{9999}m&tocall=9999'",
+                           "B11 reversed order");
+    checkDiffersFromFrozen("GET /?sendmessage&message=a&tocall=ab&message=b HTTP/1.1" + hdr + "\r\n", "sendMessage",
+                           "sendMessage len=42 text=':{&MESSAGE=A&TOCALL=}a&tocall=ab&message=b'", "sendMessage len=26 text=':{AB}a&tocall=ab&message=b'",
+                           "B11 reversed order, a second &message");
+    // B11: an empty tocall in reversed order is a group-less message like an empty tocall in normal order (":hi" above);
+    // before, it went to the swapped-bounds text as tocall
+    checkDiffersFromFrozen("GET /?sendmessage&message=m&tocall= HTTP/1.1" + hdr + "\r\n", "sendMessage",
+                           "sendMessage len=30 text=':{&MESSAGE=M&TOCALL=}m&tocall='", "sendMessage len=10 text=':m&tocall='",
+                           "B11 reversed order, empty tocall");
 }
 
 static void test_call_and_send_extraction_live_equals_frozen(void)
@@ -1129,7 +1145,6 @@ static void test_call_and_send_extraction_live_equals_frozen(void)
     std::string long_msg = std::string(142, 'a') + "%C3%A4bb"; // the 2-byte char starts at byte 149 of ":{9999}" + text: cut before it
     const std::vector<Case> sends = {
         {"/?sendmessage&tocall=9999&message=hi%20there", "sendMessage len=15 text=':{9999}hi there'"},
-        {"/?sendmessage&message=m&tocall=9999", "sendMessage len=34 text=':{&MESSAGE=M&TOCALL=}m&tocall=9999'"},
         {"/?sendmessage&tocall=ab&messagex=1&message=hi", "sendMessage len=7 text=':{AB}hi'"},
         {"/?sendmessage&tocall=9999&message=", "(none)"},
         {"/?sendmessage&tocall=9999&message=%20%20", "(none)"},

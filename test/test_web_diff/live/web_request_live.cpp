@@ -1060,7 +1060,7 @@ void send_http_header_live(uint16_t http_status_code, uint8_t content_type, cons
     webTxBeginChunked(web_client);                                            // WEB-TX-01: every flush from here on is one chunk
 }
 
-// ==== send_message (web_functions.cpp) lines 5125-5230 (working tree) ====
+// ==== send_message (web_functions.cpp) lines 5125-5225 (working tree) ====
 /**
  * ###########################################################################################################################
  * handles incoming sendmessage request
@@ -1080,21 +1080,16 @@ void send_message_live(const WebReq &wr)
     { // check if all neccessary parameters are there
         mspan.p = q.p + first_message + 9; // message = everything after the first "&message=" (webQueryTail)
         mspan.n = (uint16_t)(q.n - (size_t)first_message - 9);
-        // tocall = text between "&tocall=" and the first "&message" (webQueryUntil). When "&message" comes BEFORE "&tocall="
-        // today's substring(a, b) swaps its bounds and tocall becomes the text from "&message" up to and including
-        // "&tocall=", kept in step 5c. TODO(B11): drop the swap branch, read tocall by name (webQueryGet / webQueryUntil).
-        const int stop = webFindLit(q, "&message"); // >= 0: "&message=" is in the text
+        // tocall is read by its name (B11): the text after "&tocall=" up to the next "&message" after it, or to the end.
+        // (Before B11 a "&message" BEFORE "&tocall=" made substring(a, b) swap its bounds, and the message went to the
+        // garbage destination "&message=..&tocall=".)
         const size_t from = (size_t)first_tocall + 8;
-        if ((size_t)stop >= from)
-        {
-            tspan.p = q.p + from;
-            tspan.n = (uint16_t)((size_t)stop - from);
-        }
-        else
-        {
-            tspan.p = q.p + stop;
-            tspan.n = (uint16_t)(from - (size_t)stop);
-        }
+        WebSpan rest;
+        rest.p = q.p + from;
+        rest.n = (uint16_t)(q.n - from);
+        const int stop = webFindLit(rest, "&message");
+        tspan.p = rest.p;
+        tspan.n = stop >= 0 ? (uint16_t)stop : rest.n;
         have = true;
     }
     if (have)
@@ -1168,7 +1163,7 @@ void send_message_live(const WebReq &wr)
     web_client.println(); // The HTTP response ends with another blank line
 }
 
-// ==== call_function (web_functions.cpp) lines 5304-5389 (working tree) ====
+// ==== call_function (web_functions.cpp) lines 5299-5384 (working tree) ====
 /**
  * ###########################################################################################################################
  * Tries to execute a Web-API function call.
@@ -1256,7 +1251,7 @@ void call_function_live(const WebReq &wr, const String &full_header)
     rm_wipe_string(functionData.functionName);
 }
 
-// ==== webSetparamValueVerdict (web_functions.cpp) lines 5391-5426 (working tree) ====
+// ==== webSetparamValueVerdict (web_functions.cpp) lines 5386-5421 (working tree) ====
 /**
  * B7 (step 5b): may this decoded setparam value reach the setter? 0 = yes, else a refusal (1 too long, 2 "--", 3 leading
  * "&&"). A value over 200 bytes is refused for every name (the setters' own buffers may still cut a value near that
@@ -1294,7 +1289,7 @@ static uint8_t webSetparamValueVerdict(const char *name, const char *value, size
     return dashes ? 2 : 0;
 }
 
-// ==== setparam (web_functions.cpp) lines 5428-5572 (working tree) ====
+// ==== setparam (web_functions.cpp) lines 5423-5567 (working tree) ====
 /**
  * ###########################################################################################################################
  * Set the Value of a parameter (if known)
@@ -1441,7 +1436,7 @@ void setparam_live(const WebReq &wr, const String &full_header)
     rm_wipe_string(setupData.returnValue);
 }
 
-// ==== getparam (web_functions.cpp) lines 5574-5639 (working tree) ====
+// ==== getparam (web_functions.cpp) lines 5569-5634 (working tree) ====
 /**
  * ###########################################################################################################################
  * Get the Value of a parameter (if known)
@@ -2518,21 +2513,16 @@ void send_message(const WebReq &wr)
     { // check if all neccessary parameters are there
         mspan.p = q.p + first_message + 9; // message = everything after the first "&message=" (webQueryTail)
         mspan.n = (uint16_t)(q.n - (size_t)first_message - 9);
-        // tocall = text between "&tocall=" and the first "&message" (webQueryUntil). When "&message" comes BEFORE "&tocall="
-        // today's substring(a, b) swaps its bounds and tocall becomes the text from "&message" up to and including
-        // "&tocall=", kept in step 5c. TODO(B11): drop the swap branch, read tocall by name (webQueryGet / webQueryUntil).
-        const int stop = webFindLit(q, "&message"); // >= 0: "&message=" is in the text
+        // tocall is read by its name (B11): the text after "&tocall=" up to the next "&message" after it, or to the end.
+        // (Before B11 a "&message" BEFORE "&tocall=" made substring(a, b) swap its bounds, and the message went to the
+        // garbage destination "&message=..&tocall=".)
         const size_t from = (size_t)first_tocall + 8;
-        if ((size_t)stop >= from)
-        {
-            tspan.p = q.p + from;
-            tspan.n = (uint16_t)((size_t)stop - from);
-        }
-        else
-        {
-            tspan.p = q.p + stop;
-            tspan.n = (uint16_t)(from - (size_t)stop);
-        }
+        WebSpan rest;
+        rest.p = q.p + from;
+        rest.n = (uint16_t)(q.n - from);
+        const int stop = webFindLit(rest, "&message");
+        tspan.p = rest.p;
+        tspan.n = stop >= 0 ? (uint16_t)stop : rest.n;
         have = true;
     }
     if (have)

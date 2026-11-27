@@ -5141,21 +5141,16 @@ void send_message(const WebReq &wr)
     { // check if all neccessary parameters are there
         mspan.p = q.p + first_message + 9; // message = everything after the first "&message=" (webQueryTail)
         mspan.n = (uint16_t)(q.n - (size_t)first_message - 9);
-        // tocall = text between "&tocall=" and the first "&message" (webQueryUntil). When "&message" comes BEFORE "&tocall="
-        // today's substring(a, b) swaps its bounds and tocall becomes the text from "&message" up to and including
-        // "&tocall=", kept in step 5c. TODO(B11): drop the swap branch, read tocall by name (webQueryGet / webQueryUntil).
-        const int stop = webFindLit(q, "&message"); // >= 0: "&message=" is in the text
+        // tocall is read by its name (B11): the text after "&tocall=" up to the next "&message" after it, or to the end.
+        // (Before B11 a "&message" BEFORE "&tocall=" made substring(a, b) swap its bounds, and the message went to the
+        // garbage destination "&message=..&tocall=".)
         const size_t from = (size_t)first_tocall + 8;
-        if ((size_t)stop >= from)
-        {
-            tspan.p = q.p + from;
-            tspan.n = (uint16_t)((size_t)stop - from);
-        }
-        else
-        {
-            tspan.p = q.p + stop;
-            tspan.n = (uint16_t)(from - (size_t)stop);
-        }
+        WebSpan rest;
+        rest.p = q.p + from;
+        rest.n = (uint16_t)(q.n - from);
+        const int stop = webFindLit(rest, "&message");
+        tspan.p = rest.p;
+        tspan.n = stop >= 0 ? (uint16_t)stop : rest.n;
         have = true;
     }
     if (have)
