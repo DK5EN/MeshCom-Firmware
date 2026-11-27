@@ -1183,8 +1183,9 @@ static void web_send_refusal(uint8_t route, uint8_t allow)
 /**
  * Decision (c): the request head (web_header, a global String whose buffer outlives the request) and the request line
  * (wg_path, freed unwiped when work_webpage leaves the block) are overwritten on EVERY exit after the head is complete.
- * Covers these two Strings only: copies a handler makes (the login argument, the by-value String parameters of
- * setparam / getparam / call_function / send_message) are freed unwiped today (BACKLOG WEB-WIPE-COPIES-01).
+ * Covers these two Strings only. The API handlers (setparam / getparam / call_function / send_message) read the parsed
+ * request and wipe their decoded copies since step 5; the login argument and a few setter copies are still freed
+ * unwiped (BACKLOG WEB-WIPE-COPIES-01).
  */
 static void web_wipe_request(String &head, String &line)
 {
@@ -1594,11 +1595,11 @@ void work_webpage(void)
 #endif
                         case WR_CALLFUNCTION: // user requested to invoke a function
                                 // ### !!function will generate a HTML header itself
-                                call_function(web_header);
+                                call_function(web_verdict.req, web_header);
                                 break;
                         case WR_SENDMESSAGE: // user requested to send a message to the mesh
                                 send_http_header(200, RESPONSE_TYPE_TEXT);
-                                send_message(web_header);
+                                send_message(web_verdict.req);
                                 break;
                         case WR_GETMESSAGES: // user requested to retrieve the stored messages
                                 send_http_header(200, RESPONSE_TYPE_TEXT);
@@ -1760,23 +1761,11 @@ static String webDecodeSpan(WebSpan s)
 }
 
 /**
- * The text setparam / getparam take their name and value from: the query. A request without '?' ("GET /setparam/") has
- * no query; today's header scan then cuts the header from byte 10 ("GET /setparam/" minus 10 = "ram/") up to the HTTP
- * version, and the name becomes "ram/" (a 422 answer). That window is kept in step 5a so no answer changes; the
- * target of such a request is exactly "/setparam/" or "/getparam/" (the route table matches nothing else), 6 bytes
- * before its end the text starts. getparam keeps that window; setparam (B4, step 5b) takes an absent query as empty
- * (legacyWindow = false) and refuses it, like any query without '='.
+ * The span ends at the first raw NUL: today's String searches (indexOf = strstr) and c_str() decodes stop there, so the
+ * text of a handler does too.
  */
-static WebSpan webParamText(const WebReq &wr, bool legacyWindow)
+static WebSpan webCutAtNul(WebSpan w)
 {
-    WebSpan w = wr.query;
-    if (legacyWindow && wr.path.n == wr.target.n && wr.target.n > 6)
-    {
-        w = wr.target;
-        w.p += 6;
-        w.n -= 6;
-    }
-    // today's String searches (indexOf = strstr) end at a raw NUL, so the text ends there too
     for (size_t i = 0; i < w.n; i++)
         if (w.p[i] == 0)
         {
@@ -1784,6 +1773,40 @@ static WebSpan webParamText(const WebReq &wr, bool legacyWindow)
             break;
         }
     return w;
+}
+
+/**
+ * Offset of the first occurrence of the literal `lit` in the span, or -1 (indexOf on the cut text).
+ */
+static int webFindLit(WebSpan w, const char *lit)
+{
+    const size_t ll = strlen(lit);
+    for (size_t i = 0; ll > 0 && i + ll <= w.n; i++)
+        if (memcmp(w.p + i, lit, ll) == 0)
+            return (int)i;
+    return -1;
+}
+
+/**
+ * The text setparam / getparam / call_function take their name and value from: the query. A request without '?'
+ * ("GET /setparam/") has no query; today's header scan then cuts the header from byte 10 ("GET /setparam/" minus 10 =
+ * "ram/") up to the HTTP version, and the name becomes "ram/" (a 422 answer). That window is kept in step 5a so no answer
+ * changes; the target of such a request is exactly "/setparam/", "/getparam/" or "/callfunction/" (the route table
+ * matches nothing else); `skip` is where the text starts inside the target: 6 for the param routes, 10 for
+ * "/callfunction/" (the scan starts at indexOf("/callfunction/?") + 15 = 14 of "GET /callfunction/", "GET " is 4 bytes).
+ * getparam keeps that window; setparam (B4, step 5b) takes an absent query as empty (legacyWindow = false) and refuses it,
+ * like any query without '='.
+ */
+static WebSpan webParamText(const WebReq &wr, bool legacyWindow, uint16_t skip = 6)
+{
+    WebSpan w = wr.query;
+    if (legacyWindow && wr.path.n == wr.target.n && wr.target.n > skip)
+    {
+        w = wr.target;
+        w.p += skip;
+        w.n -= skip;
+    }
+    return webCutAtNul(w);
 }
 
 #if defined(ESP32)
@@ -5105,20 +5128,41 @@ __attribute__((unused)) static void _create_setup_led_mode_element(const char id
  * ToDo: this might be better located anywhere else - maybe nodefunctioncalls?
  * ToDo: switch response to JSON
  */
-void send_message(String web_header)
+void send_message(const WebReq &wr)
 {
-    if ((web_header.indexOf("&tocall=") >= 0) && (web_header.indexOf("&message=") >= 0))
+    // FORMAL-02 web step 5c: tocall and message come from the parsed query (no header scan); the query ends where the
+    // request line's " HTTP/1.1" starts, so no version or header text lands in the message (B3). Text ends at a raw NUL (strstr).
+    const WebSpan q = webCutAtNul(wr.query);
+    WebSpan tspan, mspan;
+    bool have = false;
+    const int first_tocall = webFindLit(q, "&tocall=");
+    const int first_message = webFindLit(q, "&message=");
+    if (first_tocall >= 0 && first_message >= 0)
     { // check if all neccessary parameters are there
-        if (web_header.lastIndexOf(" HTTP/1.1") >= 0)
+        mspan.p = q.p + first_message + 9; // message = everything after the first "&message=" (webQueryTail)
+        mspan.n = (uint16_t)(q.n - (size_t)first_message - 9);
+        // tocall = text between "&tocall=" and the first "&message" (webQueryUntil). When "&message" comes BEFORE "&tocall="
+        // today's substring(a, b) swaps its bounds and tocall becomes the text from "&message" up to and including
+        // "&tocall=", kept in step 5c. TODO(B11): drop the swap branch, read tocall by name (webQueryGet / webQueryUntil).
+        const int stop = webFindLit(q, "&message"); // >= 0: "&message=" is in the text
+        const size_t from = (size_t)first_tocall + 8;
+        if ((size_t)stop >= from)
         {
-            web_header = web_header.substring(0, web_header.lastIndexOf(" HTTP/1.1")); // remove last occurance of " HTTP/1.1" wich is path of the html header
+            tspan.p = q.p + from;
+            tspan.n = (uint16_t)((size_t)stop - from);
         }
-        String tocall = web_header.substring(web_header.indexOf("&tocall=") + 8, web_header.indexOf("&message"));
-        String message = web_header.substring(web_header.indexOf("&message=") + 9);
-
+        else
+        {
+            tspan.p = q.p + stop;
+            tspan.n = (uint16_t)(from - (size_t)stop);
+        }
+        have = true;
+    }
+    if (have)
+    {
         // replace Percent-Coded Chars with its original Char (e.g.: replace %20 with SPACE)
-        tocall = decodeURLPercentCoding(tocall);
-        message = decodeURLPercentCoding(message);
+        String tocall = webDecodeSpan(tspan);
+        String message = webDecodeSpan(mspan);
 
         tocall.trim();
         message.trim();
@@ -5174,6 +5218,8 @@ void send_message(String web_header)
             }
         }
 
+        rm_wipe_string(tocall); // WEB-WIPE-COPIES-01: the decoded text must not stay in freed heap
+        rm_wipe_string(message);
         web_client.println(bp_result_text);
     }
     else
@@ -5260,21 +5306,30 @@ static void sub_au_status()
  * Tries to execute a Web-API function call.
  * This will return a JSON containing the result of the function execution ("ok" or "failed")
  */
-void call_function(String web_header)
+void call_function(const WebReq &wr, const String &full_header)
 {
-    const String full_header = web_header; // the X-MC check below needs the header lines
-    web_header = web_header.substring(web_header.indexOf("/callfunction/?") + 15, web_header.indexOf("HTTP/1.1"));
-    web_header.trim();
+    // full_header: only the X-MC guard below needs the header lines; name and parameter come from the parsed query
+    // (FORMAL-02 web step 5c). The text is trimmed before the split; name = up to the first '=' when that is not the first
+    // byte, the rest is the parameter (a further '=' or '&' stays); else the whole text is the name.
+    WebSpan text = webParamText(wr, true, 10);
+    while (text.n > 0 && isspace((unsigned char)text.p[0]))
+    {
+        text.p++;
+        text.n--;
+    }
+    while (text.n > 0 && isspace((unsigned char)text.p[text.n - 1]))
+        text.n--;
     funCallStruct functionData;
 
-    if (web_header.indexOf("=") > 0)
+    WebSpan k, v;
+    if (webQueryFirst(text, &k, &v) && k.n > 0)
     {
-        functionData.functionName = decodeURLPercentCoding(web_header.substring(0, web_header.indexOf("=")));
-        functionData.functionParameter = decodeURLPercentCoding(web_header.substring(web_header.indexOf("=") + 1));
+        functionData.functionName = webDecodeSpan(k);
+        functionData.functionParameter = webDecodeSpan(v);
     }
     else
     {
-        functionData.functionName = decodeURLPercentCoding(web_header);
+        functionData.functionName = webDecodeSpan(text);
         functionData.functionParameter = "";
     }
 
@@ -5287,6 +5342,8 @@ void call_function(String web_header)
         web_cors_ok = false;
         send_http_header(403, RESPONSE_TYPE_JSON);
         web_client.println("{\"ok\":false,\"err\":\"forbidden\"}");
+        rm_wipe_string(functionData.functionParameter); // WEB-WIPE-COPIES-01
+        rm_wipe_string(functionData.functionName);
         return;
     }
 
@@ -5327,6 +5384,8 @@ void call_function(String web_header)
     doc[functionData.functionName] = (functionData.returnCode == WF_RETURNCODE_OKAY) ? "ok" : "failed"; // {"functionName":"ok|failed"}
     serializeJson(doc, web_client);
     web_client.println();
+    rm_wipe_string(functionData.functionParameter); // WEB-WIPE-COPIES-01: a parameter can be a secret
+    rm_wipe_string(functionData.functionName);
 }
 
 /**

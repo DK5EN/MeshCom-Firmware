@@ -1126,7 +1126,7 @@ static void test_au_web_gate_and_status_wiring_pins()
     const size_t cors = pin_find(wf, "web_cors_ok = false;", route, "no web_cors_ok = false in the /austatus route");
     TEST_ASSERT_TRUE_MESSAGE(cors < route_end, "web_cors_ok = false is not set inside the /austatus route");
     // call_function: upd* goes through webGuardCallAllowed before anything runs
-    const size_t cf = pin_find(wf, "void call_function(String web_header)", 0, "no call_function");
+    const size_t cf = pin_find(wf, "void call_function(const WebReq &wr, const String &full_header)", 0, "no call_function");
     const size_t gate = pin_find(wf, "!webGuardCallAllowed(functionData.functionName.c_str()", cf, "call_function does not use webGuardCallAllowed");
     TEST_ASSERT_TRUE_MESSAGE(gate < pin_find(wf, "webFunctionCall(&functionData)", cf, "no webFunctionCall"), "the upd* gate must run before the function call");
     // setparam: manualcommand with an update command goes through webGuardSetparamAllowed before webSetup_setParam

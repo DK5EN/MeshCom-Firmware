@@ -192,8 +192,6 @@ static const std::map<std::string, WhiteB1> kWhitelistB1 = {
     {"cap-030-rmheard", {kWhyB1NoSession, "password,password+session", 401, ""}},
     {"cap-031-getparam-gateway", {kWhyB1NoSession, "password,password+session", 401, ""}},
     {"cap-032-getparam-tdecktheme", {kWhyB1NoSession, "password,password+session", 401, ""}},
-    {"mut-039-callfunction-sendpos-http-1-0", {kWhyB1NoSession, "password,password+session", 401, ""}},
-    {"mut-048-sendmessage-tocall-9999-message-hi-20the", {kWhyB1NoSession, "password,password+session", 401, ""}},
     {"mut-058-pinstatus-http-1-0", {kWhyB1NoSession, "password,password+session", 401, ""}},
     {"mut-059-pinstatus-http-1-0-nohdr", {kWhyB1NoSession, "password,password+session", 401, ""}},
     {"mut-068-rmstatus-http-1-0", {kWhyB1NoSession, "password,password+session", 401, ""}},
@@ -311,12 +309,16 @@ struct WhiteB3Http10
     const char *why;
     const char *profiles;
     const char *trace;
+    size_t at = 0; // index of that line in the trace (sendmessage: webTxBeginChunked and setMsgOrigin come first)
 };
 static const char *const kWhyB3Http10 = "B3: HTTP/1.0 request line: the version text no longer lands in the name / value of the parameter handler";
 static const std::map<std::string, WhiteB3Http10> kWhitelistB3Http10 = {
     {"mut-020-setparam-onewire-on-http-1-0", {kWhyB3Http10, "open,password,password+session", "webSetup_setParam name='onewire' value='on'"}},
     {"mut-029-getparam-gateway-http-1-0", {kWhyB3Http10, "open,password,password+session", "webSetup_getParam name='gateway'"}},
     {"mut-030-getparam-gateway-http-1-0-nohdr", {kWhyB3Http10, "open,password,password+session", "webSetup_getParam name='gateway'"}},
+    // step 5c: call_function and send_message read the parsed query; the version and header text no longer land in the name / message
+    {"mut-039-callfunction-sendpos-http-1-0", {kWhyB3Http10, "open,password,password+session", "webFunctionCall name='sendpos' param=''"}},
+    {"mut-048-sendmessage-tocall-9999-message-hi-20the", {kWhyB3Http10, "open,password,password+session", "sendMessage len=15 text=':{9999}hi there'", 2}},
 };
 
 // B4 (wave 7b step 5b): /setparam/?<query> without '=' (also "?" and a request without '?') answers 422 with
@@ -754,7 +756,7 @@ static void test_b3_http10_rows_keep_working(void)
                 TEST_ASSERT_TRUE_MESSAGE(live[prof].compare(0, 12, "HTTP/1.1 200") == 0, am.c_str());
                 webRigBegin(readCorpus(w.first), closedVariant(w.first), kProfiles[0]);
                 kEntries[1].run();
-                TEST_ASSERT_EQUAL_STRING_MESSAGE(w.second.trace, webRig().trace.at(0).c_str(), am.c_str());
+                TEST_ASSERT_EQUAL_STRING_MESSAGE(w.second.trace, webRig().trace.at(w.second.at).c_str(), am.c_str());
             }
             else
                 TEST_ASSERT_TRUE_MESSAGE(live[prof].compare(0, 12, "HTTP/1.1 401") == 0, am.c_str());
@@ -1050,6 +1052,101 @@ static void test_param_extraction_live_equals_frozen(void)
     }
 }
 
+// step 5c: call_function and send_message read name / parameter / tocall / message from the parsed query. For every request
+// below the live entry hands webFunctionCall / sendMessage exactly what the frozen copy does (frozen == live, whole answer
+// and trace), and the text is pinned: the reversed order "&message=..&tocall=.." keeps today's swapped substring() bounds
+// (B11 will change it), "&message" without '=' stops tocall, '&' stays in the message, the message is cut to 150 bytes on
+// a UTF-8 boundary, a raw NUL ends the text (strstr).
+static std::string traceWithPrefix(const char *prefix)
+{
+    for (const std::string &t : webRig().trace)
+        if (t.compare(0, strlen(prefix), prefix) == 0)
+            return t;
+    return "(none)";
+}
+static void checkSameAsFrozen(const std::string &req, const char *prefix, const char *want, const char *why)
+{
+    std::string out[2];
+    for (size_t e = 0; e < kEntryCount; e++)
+    {
+        webRigBegin(req, false, kProfiles[0]);
+        kEntries[e].run();
+        out[e] = webRig().out;
+        const std::string m = std::string(kEntries[e].name) + ": " + why + ": " + webRigEsc(out[e].substr(0, 200));
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(want, traceWithPrefix(prefix).c_str(), m.c_str());
+    }
+    TEST_ASSERT_TRUE_MESSAGE(out[0] == out[1], (std::string("frozen and live answer differ: ") + why).c_str());
+}
+// step 5c, the three requests where frozen and live differ on purpose (advisor 5c; none is in the corpus):
+//   B2: send_message reads &tocall= / &message= from the query only, never from a header line (a Referer); today a
+//       header-line token made it send text cut from the request line ("ndmessage&tocall=X"), now "sendmessage failed";
+//   B3: "HTTP/1.1" as text inside the query no longer cuts the callfunction name (today: the first "HTTP/1.1" anywhere);
+//   NUL: blanks before a raw NUL in a callfunction value are trimmed (today the trim saw the end of the head instead).
+static void checkDiffersFromFrozen(const std::string &req, const char *prefix, const char *want_frozen, const char *want_live,
+                                   const char *why)
+{
+    const char *want[2] = {want_frozen, want_live};
+    for (size_t e = 0; e < 2; e++)
+    {
+        webRigBegin(req, false, kProfiles[0]);
+        kEntries[e].run();
+        const std::string m = std::string(kEntries[e].name) + ": " + why + ": " + webRigEsc(webRig().out.substr(0, 200));
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(want[e], traceWithPrefix(prefix).c_str(), m.c_str());
+    }
+}
+static void test_call_and_send_deliberate_deltas(void)
+{
+    const std::string nul(1, '\0');
+    const std::string hdr = "\r\nHost: 192.0.2.10\r\nX-MC: 1\r\n";
+    checkDiffersFromFrozen("GET /?sendmessage&tocall=X HTTP/1.1" + hdr + "Referer: http://192.0.2.10/?&message=hi\r\n\r\n",
+                           "sendMessage", "sendMessage len=22 text=':{X}ndmessage&tocall=X'", "(none)", "B2 &message= in a Referer");
+    checkDiffersFromFrozen("GET /callfunction/?aHTTP/1.1=b HTTP/1.1" + hdr + "\r\n", "webFunctionCall",
+                           "webFunctionCall name='a' param=''", "webFunctionCall name='aHTTP/1.1' param='b'", "B3 HTTP/1.1 in the query");
+    checkDiffersFromFrozen("GET /callfunction/?a=b\t" + nul + "x HTTP/1.1" + hdr + "\r\n", "webFunctionCall",
+                           "webFunctionCall name='a' param='b\\t'", "webFunctionCall name='a' param='b'", "NUL after a tab");
+}
+
+static void test_call_and_send_extraction_live_equals_frozen(void)
+{
+    const std::string nul(1, '\0');
+    const char *const tail = " HTTP/1.1\r\nHost: 192.0.2.10\r\nX-MC: 1\r\n\r\n";
+    struct Case
+    {
+        std::string line;
+        std::string want;
+    };
+    const std::vector<Case> calls = {
+        {"/callfunction/?sendpos", "webFunctionCall name='sendpos' param=''"},
+        {"/callfunction/?a=b=c", "webFunctionCall name='a' param='b=c'"},
+        {"/callfunction/?a=%20x%20", "webFunctionCall name='a' param=' x '"},
+        {"/callfunction/?=x", "webFunctionCall name='=x' param=''"},
+        {"/callfunction/?a" + nul + "=b", "webFunctionCall name='a' param=''"},
+        {"/callfunction/?a=b&c=d", "webFunctionCall name='a' param='b&c=d'"},
+        {"/callfunction/", "webFunctionCall name='ion/' param=''"},
+    };
+    for (const Case &c : calls)
+        checkSameAsFrozen("GET " + c.line + tail, "webFunctionCall", c.want.c_str(), c.line.c_str());
+    std::string long_msg = std::string(142, 'a') + "%C3%A4bb"; // the 2-byte char starts at byte 149 of ":{9999}" + text: cut before it
+    const std::vector<Case> sends = {
+        {"/?sendmessage&tocall=9999&message=hi%20there", "sendMessage len=15 text=':{9999}hi there'"},
+        {"/?sendmessage&message=m&tocall=9999", "sendMessage len=34 text=':{&MESSAGE=M&TOCALL=}m&tocall=9999'"},
+        {"/?sendmessage&tocall=ab&messagex=1&message=hi", "sendMessage len=7 text=':{AB}hi'"},
+        {"/?sendmessage&tocall=9999&message=", "(none)"},
+        {"/?sendmessage&tocall=9999&message=%20%20", "(none)"},
+        {"/?sendmessage&tocall=9999&message=a&b=c", "sendMessage len=12 text=':{9999}a&b=c'"},
+        {"/?sendmessage&tocall=9999&message=ab" + nul + "cd", "sendMessage len=9 text=':{9999}ab'"},
+        {"/?sendmessage&tocall=&message=hi", "sendMessage len=3 text=':hi'"},
+        {"/?sendmessage&message=x", "(none)"},
+        {"/?sendmessage&tocall=9999&message=" + long_msg, "sendMessage len=149 text=':{9999}" + std::string(142, 'a') + "'"},
+    };
+    for (const Case &c : sends)
+        checkSameAsFrozen("GET " + c.line + tail, "sendMessage", c.want.c_str(), c.line.substr(0, 80).c_str());
+    // "sendmessage failed": the answer, same in both entries
+    webRigBegin("GET /?sendmessage&message=x" + std::string(tail), false, kProfiles[0]);
+    kEntries[1].run();
+    TEST_ASSERT_TRUE(webRig().out.find("sendmessage failed") != std::string::npos);
+}
+
 // B7 (step 5b): setparam refuses a decoded value that contains "--" (also as the splitter sees it after the look-alike dash
 // fold) or starts with "&&" (every name except manualcommand), and any decoded value over 200 bytes (manualcommand too);
 // 422 {"returncode":1,"<name>":""}, no setter call. "Starts with" is judged on the decoded value as is (no trim); "&&" in
@@ -1146,6 +1243,8 @@ int main(int, char **)
     RUN_TEST(test_config_json_max_is_the_source_value);
     RUN_TEST(test_known_requests);
     RUN_TEST(test_param_extraction_live_equals_frozen);
+    RUN_TEST(test_call_and_send_extraction_live_equals_frozen);
+    RUN_TEST(test_call_and_send_deliberate_deltas);
     RUN_TEST(test_b7_value_verdicts);
     RUN_TEST(test_entries_match_golden);
     RUN_TEST(test_golden_set_is_complete);

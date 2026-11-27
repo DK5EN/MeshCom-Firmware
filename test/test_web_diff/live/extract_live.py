@@ -128,6 +128,8 @@ def generate():
         seg_func(WF, wf, r"^void work_webpage\(", "work_webpage"),
         seg_func(WF, wf, r"^String decodeURLPercentCoding\(", "decodeURLPercentCoding"),
         seg_func(WF, wf, r"^static String webDecodeSpan\(", "webDecodeSpan"),
+        seg_func(WF, wf, r"^static WebSpan webCutAtNul\(", "webCutAtNul"),
+        seg_func(WF, wf, r"^static int webFindLit\(", "webFindLit"),
         seg_func(WF, wf, r"^static WebSpan webParamText\(", "webParamText"),
         seg_func(WF, wf, r"^void send_http_header\(", "send_http_header"),
         seg_func(WF, wf, r"^void send_message\(", "send_message"),
@@ -166,7 +168,9 @@ def generate():
     # step 5a: setparam / getparam take the parsed request; the plumbing's forward declarations (read from the frozen unit,
     # which still has the String forms) are replaced here
     for old, new in (("void setparam_live(String web_header);", "void setparam_live(const WebReq &wr, const String &full_header);"),
-                     ("void getparam_live(String web_header);", "void getparam_live(const WebReq &wr);")):
+                     ("void getparam_live(String web_header);", "void getparam_live(const WebReq &wr);"),
+                     ("void call_function_live(String web_header);", "void call_function_live(const WebReq &wr, const String &full_header);"),
+                     ("void send_message_live(String web_header);", "void send_message_live(const WebReq &wr);")):
         if live_pre.count(old) != 1:
             die("plumbing of frozen/extract.sh: expected exactly one '%s'" % old)
         live_pre = live_pre.replace(old, new)
