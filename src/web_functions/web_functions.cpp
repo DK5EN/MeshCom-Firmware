@@ -851,15 +851,10 @@ static void sub_config_download(void)
     if (fi == 0)
         snprintf(fname, sizeof(fname), "node");
 
-    web_client.printf("HTTP/1.1 200 OK \n");
-    web_client.println("Content-type:application/json");
-    web_client.printf("Content-Disposition: attachment; filename=\"meshcom-%s.json\"\n", fname);
-    web_client.printf("Content-Length: %u\n", (unsigned int)n);
-    web_client.println("Connection: close");
-    web_client.println("Cache-Control: no-cache, no-store, must-revalidate");
-    web_client.println("Pragma: no-cache");
-    web_client.println("Expires: 0");
-    web_client.println();
+    // D14: CRLF line endings and one head writer (was "200 OK \n" and bare \n after Content-Disposition / Content-Length)
+    char extra[128];
+    snprintf(extra, sizeof(extra), "Content-Disposition: attachment; filename=\"meshcom-%s.json\"\r\nPragma: no-cache\r\nExpires: 0\r\n", fname);
+    webSendFixedHead(200, "application/json", (size_t)n, extra, "no-cache, no-store, must-revalidate");
 
     web_client.print(web_cfg_buf);
 
@@ -982,15 +977,7 @@ static bool deliver_web_asset(const String &req)
     else
         return false;
 
-    web_client.println("HTTP/1.1 200 OK");
-    web_client.print("Content-type:");
-    web_client.println(type);
-    web_client.println("Content-Encoding: gzip");
-    web_client.print("Content-Length: ");
-    web_client.println((unsigned)len);
-    web_client.println("Cache-Control: public, max-age=31536000, immutable");
-    web_client.println("Connection: close");
-    web_client.println();
+    webSendFixedHead(200, type, len, "Content-Encoding: gzip\r\n", "public, max-age=31536000, immutable");
     web_client.write(blob, len);
     return true;
 }
@@ -1004,22 +991,11 @@ static void sub_screen_rgb565(void)
     if (buf == NULL)
     {
         tdeck_dbg_shadow_on();
-        web_client.println("HTTP/1.1 503 Service Unavailable");
-        web_client.println("Retry-After: 1");
-        web_client.println("Content-Length: 0");
-        web_client.println("Connection: close");
-        web_client.println();
+        webSendFixedHead(503, NULL, 0, "Retry-After: 1\r\n", NULL);
         return;
     }
     const size_t len = tdeck_dbg_shadow_bytes();
-    web_client.println("HTTP/1.1 200 OK");
-    web_client.println("Content-type:application/octet-stream");
-    web_client.println("X-Screen-Format: rgb565be");
-    web_client.print("Content-Length: ");
-    web_client.println((unsigned)len);
-    web_client.println("Cache-Control: no-store");
-    web_client.println("Connection: close");
-    web_client.println();
+    webSendFixedHead(200, "application/octet-stream", len, "X-Screen-Format: rgb565be\r\n", "no-store");
     web_client.write(buf, len);
 }
 #endif
@@ -1253,12 +1229,7 @@ void work_webpage(void)
         // no heap for the accumulator: refuse cleanly, the server stays up
         static const char kNoMem[] = "{\"ok\":false,\"err\":\"out of memory\"}";
         web_cors_ok = false;
-        web_client.println("HTTP/1.1 503 Service Unavailable");
-        web_client.println("Content-Type: application/json");
-        web_client.print("Content-Length: ");
-        web_client.println((unsigned)(sizeof(kNoMem) - 1));
-        web_client.println("Connection: close");
-        web_client.println();
+        webSendFixedHead(503, NULL, sizeof(kNoMem) - 1, "Content-Type: application/json\r\n", NULL);
         web_client.write((const uint8_t *)kNoMem, sizeof(kNoMem) - 1);
         web_client.stop();
         return;
@@ -1382,13 +1353,10 @@ void work_webpage(void)
                         const char *body = page ? kBusyHtml : kBusy;
                         const unsigned blen = (unsigned)(page ? sizeof(kBusyHtml) - 1 : sizeof(kBusy) - 1);
                         web_cors_ok = false;
-                        web_client.println("HTTP/1.1 503 Service Unavailable");
-                        web_client.println("Retry-After: 10");
-                        web_client.println(page ? "Content-Type: text/html; charset=utf-8" : "Content-Type: application/json");
-                        web_client.print("Content-Length: ");
-                        web_client.println(blen);
-                        web_client.println("Connection: close");
-                        web_client.println();
+                        webSendFixedHead(503, NULL, blen,
+                                         page ? "Retry-After: 10\r\nContent-Type: text/html; charset=utf-8\r\n"
+                                              : "Retry-After: 10\r\nContent-Type: application/json\r\n",
+                                         NULL);
                         web_client.write((const uint8_t *)body, blen);
                         web_wipe_request(web_header, wg_path);
                         web_client.stop();
@@ -4953,42 +4921,8 @@ static void __attribute__((noinline)) sub_pin_status()
  */
 void send_http_header(uint16_t http_status_code, uint8_t content_type, const char *extra_header)
 {
-    String status_text = "";
-    switch (http_status_code)
-    {
-    case 200:
-        status_text = "OK";
-        break; // use this when ever a request was successful
-    case 400:
-        status_text = "Bad Request";
-        break; // use this when a request body was rejected (CS-03 config upload)
-    case 431:
-        status_text = "Request Header Fields Too Large";
-        break;
-    case 401:
-        status_text = "Unauthorized";
-        break; // use this when ever a request was successful
-    case 403:
-        status_text = "Forbidden";
-        break; // RM GUI W1c: web guard (rebinding Host / cross-site request)
-    case 404:
-        status_text = "Not Found";
-        break; // use this if a request was not known
-    case 405:
-        status_text = "Method Not Allowed";
-        break; // W2-1: GET /rmsend (the password must travel in a POST body)
-    case 408:
-        status_text = "Request Timeout";
-        break; // B10: the head or the body of a request stalled
-    case 422:
-        status_text = "Unprocessable Entity";
-        break; // use this if a parameter was not processable (e.g. out of bounds or somehow wrong)
-    default:
-        status_text = "Unknown"; // fallback
-    }
-
     // Serial.println("STATUS_TEXT="+status_text);
-    web_client.printf("HTTP/1.1 %i %s \n", http_status_code, status_text.c_str());
+    web_client.printf("HTTP/1.1 %i %s \n", http_status_code, webStatusText(http_status_code));
     if (content_type == RESPONSE_TYPE_JSON)
         web_client.println("Content-type:application/json");
     else

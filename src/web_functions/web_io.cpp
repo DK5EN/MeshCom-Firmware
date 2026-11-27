@@ -48,4 +48,28 @@ int webReadBody(char *buf, size_t cap, long content_length, uint32_t idle_ms, ui
     const int8_t e = webBodyEnd(&a);
     return e == 0 ? (int)a.got : e;
 }
+
+/**
+ * Head of every fixed-length response (web_io.h): one writer, one line ending, one reason-phrase table.
+ */
+void webSendFixedHead(uint16_t status, const char *type, size_t len, const char *extra, const char *cache)
+{
+    web_client.printf("HTTP/1.1 %u %s\r\n", (unsigned)status, webStatusText(status));
+    if (type)
+    {
+        web_client.print("Content-type:");
+        web_client.print(type);
+        web_client.print("\r\n");
+    }
+    if (extra)
+        web_client.print(extra);
+    web_client.printf("Content-Length: %u\r\n", (unsigned)len);
+    if (cache)
+    {
+        web_client.print("Cache-Control: ");
+        web_client.print(cache);
+        web_client.print("\r\n");
+    }
+    web_client.print("Connection: close\r\n\r\n");
+}
 #endif

@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include "web_rm_util.h"   // web_client (CommonWebClient)
 #include "../oled_shot.h"
+#include "web_io.h"
 
 void sub_screen_oled(void)
 {
@@ -14,26 +15,15 @@ void sub_screen_oled(void)
     if (st != 0)
     {
         const char *why = (st == 1) ? "no-display" : (st == 2) ? "display-off" : "not-full-frame";
-        web_client.println("HTTP/1.1 503 Service Unavailable");
-        web_client.println("Content-type:text/plain");
-        web_client.print("X-Reason: ");
-        web_client.println(why);
-        web_client.print("Content-Length: ");
-        web_client.println((unsigned)strlen(why));
-        web_client.println("Cache-Control: no-store");
-        web_client.println("Connection: close");
-        web_client.println();
+        char extra[40];
+        snprintf(extra, sizeof(extra), "X-Reason: %s\r\n", why);
+        webSendFixedHead(503, "text/plain", strlen(why), extra, "no-store");
         web_client.print(why);
         return;
     }
-    web_client.println("HTTP/1.1 200 OK");
-    web_client.println("Content-type:application/octet-stream");
-    web_client.printf("X-Screen-Format: oled1-%dx%d\r\n", w, h);
-    web_client.print("Content-Length: ");
-    web_client.println((unsigned)len);
-    web_client.println("Cache-Control: no-store");
-    web_client.println("Connection: close");
-    web_client.println();
+    char extra[48];
+    snprintf(extra, sizeof(extra), "X-Screen-Format: oled1-%dx%d\r\n", w, h);
+    webSendFixedHead(200, "application/octet-stream", len, extra, "no-store");
     web_client.write(buf, len);
 }
 #endif

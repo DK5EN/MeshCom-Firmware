@@ -93,7 +93,7 @@ def parse_frozen():
 def generate():
     """returns {file name: text} of the two generated files"""
     names, pre, mid = parse_frozen()
-    names = names + ["urlDecode", "webReadBody"]  # urlDecode: the live decoder copy defines it next to url_percent_decode; webReadBody: web_io.cpp (7b step 7)
+    names = names + ["urlDecode", "webReadBody", "webSendFixedHead"]  # urlDecode: the live decoder copy defines it next to url_percent_decode; webReadBody / webSendFixedHead: web_io.cpp (7b step 7, 8a)
 
     def ren(text):
         out = []
@@ -114,6 +114,7 @@ def generate():
     a = seg_line(WF, wf, r"^static char \*web_cfg_buf = NULL;", "web_cfg_buf")
     b = seg_func(WF, wf, r"^static int web_read_body\(", "web_read_body")
     segs["pre"].append(seg_func(IO, io, r"^int webReadBody\(", "webReadBody"))  # the shared body reader, before its two callers
+    segs["pre"].append(seg_func(IO, io, r"^void webSendFixedHead\(", "webSendFixedHead"))  # the one fixed-length head writer (8a), before its callers
     segs["pre"].append((WF, "config buffer + web_read_body", a[2], b[3]))
     segs["rm"] = [
         seg_range(RH, rh, r"^#define RM_BODY_TIMEOUT_MS ", r"^#define RM_BODY_TOTAL_MS ", "rm body deadlines"),
@@ -166,7 +167,7 @@ def generate():
     # includes of the frozen unit, so the live unit adds it next to web_functions.h (outside the namespace)
     if live_pre.count("#include <web_functions.h>") != 1:
         die("plumbing of frozen/extract.sh: expected exactly one #include <web_functions.h>")
-    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>\n#include <web_query.h>\n#include <web_body.h>    // 7b step 7: WB_* codes of webReadBody\n#include <watchdog_feed.h> // rig stub (stubs/watchdog_feed.h): counts meshcom_wdt_feed() calls\n#include <command_dash.h>\n#include <num_parse.h>   // B5: mboxpurge / mboxdeliver slot\n// the rig does not include msgstore_api.h (its stubs declare msgstorePurge(long)); test_web_diff.cpp asserts this value\n#ifndef MSGSTORE_SLOTS_MAX\n#define MSGSTORE_SLOTS_MAX 50\n#endif")
+    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>\n#include <web_query.h>\n#include <web_body.h>    // 7b step 7: WB_* codes of webReadBody\n#include <web_io.h>      // 8a: webStatusText (inline), webSendFixedHead declaration\n#include <watchdog_feed.h> // rig stub (stubs/watchdog_feed.h): counts meshcom_wdt_feed() calls\n#include <command_dash.h>\n#include <num_parse.h>   // B5: mboxpurge / mboxdeliver slot\n// the rig does not include msgstore_api.h (its stubs declare msgstorePurge(long)); test_web_diff.cpp asserts this value\n#ifndef MSGSTORE_SLOTS_MAX\n#define MSGSTORE_SLOTS_MAX 50\n#endif")
     # step 5a: setparam / getparam take the parsed request; the plumbing's forward declarations (read from the frozen unit,
     # which still has the String forms) are replaced here
     for old, new in (("void setparam_live(String web_header);", "void setparam_live(const WebReq &wr, const String &full_header);"),

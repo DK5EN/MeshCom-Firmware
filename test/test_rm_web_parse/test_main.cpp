@@ -676,8 +676,10 @@ static const char *b10PinsHold(const B10Src &s)
     if (!has(s.rh, "send_http_header(err == nullptr ? 200 : (strcmp(err, \"short\") == 0 ? 408 : 422), RESPONSE_TYPE_JSON);"))
         return "rmAnswer: the token short must answer 408";
     // send_http_header knows the status
-    if (!has(s.wf, "case 408:\n        status_text = \"Request Timeout\";"))
-        return "send_http_header: case 408 Request Timeout";
+    // step 8a: the reason phrase comes from webStatusText (web_io.h); its 408 row is checked at runtime by
+    // test_web_diff test_status_text_table
+    if (!has(s.wf, "web_client.printf(\"HTTP/1.1 %i %s \\n\", http_status_code, webStatusText(http_status_code));"))
+        return "send_http_header: reason phrase from webStatusText";
     // work_webpage: head that never ends, at least one byte, still connected after the deadline
     if (!has(s.wf, "if (web_head_bytes && web_client.connected() && (web_currentTime - web_previousTime) > WEB_TIMEOUT_TIME)\n"
                    "    {\n        web_cors_ok = false;\n        send_http_header(408, RESPONSE_TYPE_JSON);\n"
@@ -733,7 +735,7 @@ static void test_b10_pins_catch_mutations(void)
         {0, "n == WB_SHORT ? 408 : 400", "n == WB_SHORT ? 400 : 400"},                             // config upload back to 400
         {0, "(strcmp(err, \"short\") == 0 ? 408 : 422)", "(strcmp(err, \"short\") == 0 ? 422 : 422)"}, // sub_rm_send back to 422
         {1, "(strcmp(err, \"short\") == 0 ? 408 : 422)", "(strcmp(err, \"short\") == 0 ? 422 : 422)"}, // rmAnswer back to 422
-        {0, "case 408:", "case 409:"},
+        {0, "webStatusText(http_status_code)", "\"Unknown\""},                                     // own reason text again
         {0, "send_http_header(408, RESPONSE_TYPE_JSON);", "send_http_header(400, RESPONSE_TYPE_JSON);"}, // stalled head
         {0, "if (web_head_bytes && ", "if ("},                                                           // zero bytes would answer too
         {0, "meshcom_wdt_feed(); // B10", "// B10"},                                                      // head loop without the feed

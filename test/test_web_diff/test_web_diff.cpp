@@ -13,9 +13,11 @@
 // runs under every profile through every entry; the record of the run (handler trace, every byte written, the close,
 // the fake clock) is compared with golden/<name>.txt, and the live record with the frozen one. Intended deltas
 // (B1-B10 of docs/web-server-seams-20261127.md 7.2) go into kWhitelist, keyed by corpus name (B2 in kWhitelist, B1 in kWhitelistB1, B3 in kWhitelistB3 and B6 in kWhitelistB6: all profiles, 400; B4 in kWhitelistB4: 422), each row naming the profiles where the live record differs.
+#include <dirent.h>
 #include <unity.h>
 
 #include "msgstore_api.h" // MSGSTORE_SLOTS_MAX: the live unit defines its own copy (extract_live.py), pinned below
+#include "web_io.h" // webStatusText (inline, pure); webSendFixedHead is tested through its live copy
 #include "web_route.h" // reads no build macro: the feature mask is computed in web_functions.cpp
 
 #include "../support/repo_file.h"
@@ -1393,6 +1395,117 @@ static void test_b10_head_stalls_answer_408_and_a_silent_connection_stays_silent
     TEST_ASSERT_EQUAL_INT(1, webRig().stopCalls);
 }
 
+
+// ---- 7b step 8a: the one fixed-length head writer -------------------------------------------------------------------------
+namespace web_live
+{
+void webSendFixedHead_live(uint16_t status, const char *type, size_t len, const char *extra, const char *cache);
+}
+
+static std::string fixedHead(uint16_t st, const char *type, size_t len, const char *extra, const char *cache)
+{
+    webRigBegin("", false, kProfiles[0]);
+    web_live::webSendFixedHead_live(st, type, len, extra, cache);
+    return webRig().out;
+}
+
+static void test_status_text_table(void)
+{
+    struct { uint16_t c; const char *t; } k[] = {
+        {200, "OK"}, {400, "Bad Request"}, {401, "Unauthorized"}, {403, "Forbidden"}, {404, "Not Found"},
+        {405, "Method Not Allowed"}, {408, "Request Timeout"}, {422, "Unprocessable Entity"},
+        {431, "Request Header Fields Too Large"}, {500, "Internal Server Error"}, {503, "Service Unavailable"},
+        {418, "Unknown"}, {0, "Unknown"}};
+    for (const auto &r : k)
+        TEST_ASSERT_EQUAL_STRING(r.t, webStatusText(r.c));
+}
+
+// each site's arguments against the byte string the pre-8a code of that site wrote (read off the old println/print calls)
+static void test_fixed_head_equals_the_old_site_bytes(void)
+{
+    // 1 deliver_web_asset
+    TEST_ASSERT_EQUAL_STRING("HTTP/1.1 200 OK\r\nContent-type:text/css\r\nContent-Encoding: gzip\r\nContent-Length: 123\r\n"
+                             "Cache-Control: public, max-age=31536000, immutable\r\nConnection: close\r\n\r\n",
+                             fixedHead(200, "text/css", 123, "Content-Encoding: gzip\r\n", "public, max-age=31536000, immutable").c_str());
+    // 2 sub_screen_rgb565 (T-Deck INSTRUMENT only)
+    TEST_ASSERT_EQUAL_STRING("HTTP/1.1 503 Service Unavailable\r\nRetry-After: 1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                             fixedHead(503, NULL, 0, "Retry-After: 1\r\n", NULL).c_str());
+    TEST_ASSERT_EQUAL_STRING("HTTP/1.1 200 OK\r\nContent-type:application/octet-stream\r\nX-Screen-Format: rgb565be\r\nContent-Length: 153600\r\n"
+                             "Cache-Control: no-store\r\nConnection: close\r\n\r\n",
+                             fixedHead(200, "application/octet-stream", 153600, "X-Screen-Format: rgb565be\r\n", "no-store").c_str());
+    // 3 no-heap 503 of work_webpage
+    TEST_ASSERT_EQUAL_STRING("HTTP/1.1 503 Service Unavailable\r\nContent-Type: application/json\r\nContent-Length: 34\r\nConnection: close\r\n\r\n",
+                             fixedHead(503, NULL, 34, "Content-Type: application/json\r\n", NULL).c_str());
+    // 4 AU busy 503
+    TEST_ASSERT_EQUAL_STRING("HTTP/1.1 503 Service Unavailable\r\nRetry-After: 10\r\nContent-Type: application/json\r\nContent-Length: 7\r\nConnection: close\r\n\r\n",
+                             fixedHead(503, NULL, 7, "Retry-After: 10\r\nContent-Type: application/json\r\n", NULL).c_str());
+    // 5 sub_screen_oled
+    TEST_ASSERT_EQUAL_STRING("HTTP/1.1 503 Service Unavailable\r\nContent-type:text/plain\r\nX-Reason: display-off\r\nContent-Length: 11\r\n"
+                             "Cache-Control: no-store\r\nConnection: close\r\n\r\n",
+                             fixedHead(503, "text/plain", 11, "X-Reason: display-off\r\n", "no-store").c_str());
+    TEST_ASSERT_EQUAL_STRING("HTTP/1.1 200 OK\r\nContent-type:application/octet-stream\r\nX-Screen-Format: oled1-128x64\r\nContent-Length: 1024\r\n"
+                             "Cache-Control: no-store\r\nConnection: close\r\n\r\n",
+                             fixedHead(200, "application/octet-stream", 1024, "X-Screen-Format: oled1-128x64\r\n", "no-store").c_str());
+    // 6 sub_config_download: D14, the one deliberate change. Was "HTTP/1.1 200 OK \n", Content-Disposition and Content-Length ended
+    // in a bare \n and Cache-Control came after Connection; now CRLF throughout and Cache-Control before Connection.
+    TEST_ASSERT_EQUAL_STRING("HTTP/1.1 200 OK\r\nContent-type:application/json\r\nContent-Disposition: attachment; filename=\"meshcom-DK5EN-1.json\"\r\n"
+                             "Pragma: no-cache\r\nExpires: 0\r\nContent-Length: 900\r\nCache-Control: no-cache, no-store, must-revalidate\r\n"
+                             "Connection: close\r\n\r\n",
+                             fixedHead(200, "application/json", 900,
+                                       "Content-Disposition: attachment; filename=\"meshcom-DK5EN-1.json\"\r\nPragma: no-cache\r\nExpires: 0\r\n",
+                                       "no-cache, no-store, must-revalidate").c_str());
+}
+
+// no hand-built response head is left in src/web_functions/: every .cpp/.h there is scanned (listed from the directory, so
+// a new or renamed file is covered); the only "HTTP/1.1 " literals are the writer (web_io.cpp) and send_http_header's
+// format string; the 8 heads call webSendFixedHead
+static void test_no_hand_built_response_heads(void)
+{
+    std::vector<std::string> files;
+    DIR *d = opendir(repo_path("src/web_functions").c_str());
+    TEST_ASSERT_NOT_NULL_MESSAGE(d, "src/web_functions/ cannot be listed");
+    for (struct dirent *e; (e = readdir(d)) != NULL;)
+    {
+        const std::string f = e->d_name;
+        const size_t dot = f.rfind('.');
+        if (dot != std::string::npos && (f.substr(dot) == ".cpp" || f.substr(dot) == ".h"))
+            files.push_back(f);
+    }
+    closedir(d);
+    TEST_ASSERT_TRUE_MESSAGE(files.size() >= 30, ("only " + std::to_string(files.size()) + " sources listed in src/web_functions/").c_str());
+    int wfLiterals = -1;
+    for (const std::string &f : files)
+    {
+        const std::string rel = "src/web_functions/" + f;
+        const std::string src = repo_slurp(rel.c_str()); // fails the test when a listed file cannot be read
+        size_t at = 0;
+        int n = 0;
+        while ((at = src.find("\"HTTP/1.1 ", at)) != std::string::npos)
+        {
+            const std::string line = src.substr(at, src.find('\n', at) - at);
+            const bool ok = f == "web_io.cpp" || (f == "web_functions.cpp" && line.find("\"HTTP/1.1 %i %s \\n\"") == 0);
+            TEST_ASSERT_TRUE_MESSAGE(ok, (rel + ": hand-built response head: " + line).c_str());
+            n++;
+            at++;
+        }
+        if (f == "web_functions.cpp")
+            wfLiterals = n;
+    }
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, wfLiterals, "web_functions.cpp: only send_http_header's format string");
+    const std::string wf = repo_slurp("src/web_functions/web_functions.cpp");
+    const std::string os = repo_slurp("src/web_functions/web_oled_shot.cpp");
+    auto count = [](const std::string &s, const char *needle) {
+        int n = 0;
+        for (size_t at = 0; (at = s.find(needle, at)) != std::string::npos; at++)
+            n++;
+        return n;
+    };
+    TEST_ASSERT_EQUAL_INT_MESSAGE(8, count(wf, "webSendFixedHead(") + count(os, "webSendFixedHead("), "all 8 heads (asset, rgb565 x2, no-heap, AU busy, oled x2, config download) call webSendFixedHead");
+    TEST_ASSERT_EQUAL_INT(6, count(wf, "webSendFixedHead("));
+    TEST_ASSERT_EQUAL_INT(2, count(os, "webSendFixedHead("));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, count(wf, "Content-Length: "), "web_functions.cpp prints no Content-Length itself");
+}
+
 // every route of the table is built under the macros of this build (ESP32, ENABLE_MSGSTORE, OLED_SHOT_WEB), except the
 // T-Deck bench screenshot (INSTRUMENT_ENABLED and BOARD_T_DECK, which the rig does not model): the router the rig
 // runs can reach every other handler, so a build flag lost from the env cannot hide a route
@@ -1423,6 +1536,9 @@ int main(int, char **)
     UNITY_BEGIN();
     RUN_TEST(test_corpus_has_minimum_counts);
     RUN_TEST(test_config_json_max_is_the_source_value);
+    RUN_TEST(test_status_text_table);
+    RUN_TEST(test_fixed_head_equals_the_old_site_bytes);
+    RUN_TEST(test_no_hand_built_response_heads);
     RUN_TEST(test_known_requests);
     RUN_TEST(test_param_extraction_live_equals_frozen);
     RUN_TEST(test_call_and_send_extraction_live_equals_frozen);

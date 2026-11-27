@@ -15,6 +15,7 @@
 #include <web_request.h>
 #include <web_query.h>
 #include <web_body.h>    // 7b step 7: WB_* codes of webReadBody
+#include <web_io.h>      // 8a: webStatusText (inline), webSendFixedHead declaration
 #include <watchdog_feed.h> // rig stub (stubs/watchdog_feed.h): counts meshcom_wdt_feed() calls
 #include <command_dash.h>
 #include <num_parse.h>   // B5: mboxpurge / mboxdeliver slot
@@ -111,6 +112,31 @@ int webReadBody_live(char *buf, size_t cap, long content_length, uint32_t idle_m
     return e == 0 ? (int)a.got : e;
 }
 
+// ==== webSendFixedHead (web_io.cpp) lines 52-74 (working tree) ====
+/**
+ * Head of every fixed-length response (web_io.h): one writer, one line ending, one reason-phrase table.
+ */
+void webSendFixedHead_live(uint16_t status, const char *type, size_t len, const char *extra, const char *cache)
+{
+    web_client.printf("HTTP/1.1 %u %s\r\n", (unsigned)status, webStatusText(status));
+    if (type)
+    {
+        web_client.print("Content-type:");
+        web_client.print(type);
+        web_client.print("\r\n");
+    }
+    if (extra)
+        web_client.print(extra);
+    web_client.printf("Content-Length: %u\r\n", (unsigned)len);
+    if (cache)
+    {
+        web_client.print("Cache-Control: ");
+        web_client.print(cache);
+        web_client.print("\r\n");
+    }
+    web_client.print("Connection: close\r\n\r\n");
+}
+
 // ==== config buffer + web_read_body (web_functions.cpp) lines 596-649 (working tree) ====
 /**
  * ###########################################################################################################################
@@ -189,7 +215,7 @@ const char *rmReadBody_live(char *buf, size_t cap, long content_length)
 #define WEB_RIG_CFG_BUF web_cfg_buf
 #include "../stubs/web_handler_stubs.h"
 
-// ==== deliver_web_asset (web_functions.cpp) lines 947-996 (working tree) ====
+// ==== deliver_web_asset (web_functions.cpp) lines 942-983 (working tree) ====
 /**
  * ###########################################################################################################################
  * Serves one of the static GUI assets (web_assets.h): gzip blob, own header (send_http_header_live() says no-cache and
@@ -228,15 +254,7 @@ static bool deliver_web_asset_live(const String &req)
     else
         return false;
 
-    web_client.println("HTTP/1.1 200 OK");
-    web_client.print("Content-type:");
-    web_client.println(type);
-    web_client.println("Content-Encoding: gzip");
-    web_client.print("Content-Length: ");
-    web_client.println((unsigned)len);
-    web_client.println("Cache-Control: public, max-age=31536000, immutable");
-    web_client.println("Connection: close");
-    web_client.println();
+    webSendFixedHead_live(200, type, len, "Content-Encoding: gzip\r\n", "public, max-age=31536000, immutable");
     web_client.write(blob, len);
     return true;
 }
@@ -251,7 +269,7 @@ WebHeadAcc *web_head_acc_get(void)
     return web_head_acc;
 }
 
-// ==== webRouteLegacy + webRouteDecide (web_functions.cpp) lines 1039-1228 (working tree) ====
+// ==== webRouteLegacy + webRouteDecide (web_functions.cpp) lines 1015-1204 (working tree) ====
 static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header)
 {
     if (web_header.startsWith("POST /rmsend"))
@@ -443,7 +461,7 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
     return v.route;
 }
 
-// ==== work_webpage (web_functions.cpp) lines 1230-1715 (working tree) ====
+// ==== work_webpage (web_functions.cpp) lines 1206-1683 (working tree) ====
 void work_webpage_live(void)
 {
     // RAM-Rueckgewinn (2026-09-20): der 1-kB-Sammelpuffer web_header_collect
@@ -470,12 +488,7 @@ void work_webpage_live(void)
         // no heap for the accumulator: refuse cleanly, the server stays up
         static const char kNoMem[] = "{\"ok\":false,\"err\":\"out of memory\"}";
         web_cors_ok = false;
-        web_client.println("HTTP/1.1 503 Service Unavailable");
-        web_client.println("Content-Type: application/json");
-        web_client.print("Content-Length: ");
-        web_client.println((unsigned)(sizeof(kNoMem) - 1));
-        web_client.println("Connection: close");
-        web_client.println();
+        webSendFixedHead_live(503, NULL, sizeof(kNoMem) - 1, "Content-Type: application/json\r\n", NULL);
         web_client.write((const uint8_t *)kNoMem, sizeof(kNoMem) - 1);
         web_client.stop();
         return;
@@ -599,13 +612,10 @@ void work_webpage_live(void)
                         const char *body = page ? kBusyHtml : kBusy;
                         const unsigned blen = (unsigned)(page ? sizeof(kBusyHtml) - 1 : sizeof(kBusy) - 1);
                         web_cors_ok = false;
-                        web_client.println("HTTP/1.1 503 Service Unavailable");
-                        web_client.println("Retry-After: 10");
-                        web_client.println(page ? "Content-Type: text/html; charset=utf-8" : "Content-Type: application/json");
-                        web_client.print("Content-Length: ");
-                        web_client.println(blen);
-                        web_client.println("Connection: close");
-                        web_client.println();
+                        webSendFixedHead_live(503, NULL, blen,
+                                         page ? "Retry-After: 10\r\nContent-Type: text/html; charset=utf-8\r\n"
+                                              : "Retry-After: 10\r\nContent-Type: application/json\r\n",
+                                         NULL);
                         web_client.write((const uint8_t *)body, blen);
                         web_wipe_request(web_header, wg_path);
                         web_client.stop();
@@ -931,7 +941,7 @@ void work_webpage_live(void)
     memset(web_acc->line, 0, sizeof(web_acc->line));
 }
 
-// ==== decodeURLPercentCoding (web_functions.cpp) lines 1717-1727 (working tree) ====
+// ==== decodeURLPercentCoding (web_functions.cpp) lines 1685-1695 (working tree) ====
 /**
  * ###########################################################################################################################
  * decodes Percent-Coded Strings (e.g. URLs and its parameters)
@@ -944,7 +954,7 @@ String decodeURLPercentCoding_live(const String &input)
     return String(buf.data());
 }
 
-// ==== webDecodeSpan (web_functions.cpp) lines 1729-1743 (working tree) ====
+// ==== webDecodeSpan (web_functions.cpp) lines 1697-1711 (working tree) ====
 /**
  * The same decode as decodeURLPercentCoding_live() for a span of the parsed request (FORMAL-02 web step 5a): URLD_LEGACY, the
  * result is a String (the handlers keep their setupStruct Strings until B7). The temporary decode buffer is wiped before it
@@ -961,7 +971,7 @@ static String webDecodeSpan(WebSpan s)
     return out;
 }
 
-// ==== webCutAtNul (web_functions.cpp) lines 1745-1758 (working tree) ====
+// ==== webCutAtNul (web_functions.cpp) lines 1713-1726 (working tree) ====
 /**
  * The span ends at the first raw NUL: today's String searches (indexOf = strstr) and c_str() decodes stop there, so the
  * text of a handler does too.
@@ -977,7 +987,7 @@ static WebSpan webCutAtNul(WebSpan w)
     return w;
 }
 
-// ==== webFindLit (web_functions.cpp) lines 1760-1770 (working tree) ====
+// ==== webFindLit (web_functions.cpp) lines 1728-1738 (working tree) ====
 /**
  * Offset of the first occurrence of the literal `lit` in the span, or -1 (indexOf on the cut text).
  */
@@ -990,7 +1000,7 @@ static int webFindLit(WebSpan w, const char *lit)
     return -1;
 }
 
-// ==== webParamText (web_functions.cpp) lines 1772-1792 (working tree) ====
+// ==== webParamText (web_functions.cpp) lines 1740-1760 (working tree) ====
 /**
  * The text setparam / getparam / call_function take their name and value from: the query. A request without '?'
  * ("GET /setparam/") has no query; today's header scan then cuts the header from byte 10 ("GET /setparam/" minus 10 =
@@ -1013,7 +1023,7 @@ static WebSpan webParamText(const WebReq &wr, bool legacyWindow, uint16_t skip =
     return webCutAtNul(w);
 }
 
-// ==== send_http_header (web_functions.cpp) lines 4949-5006 (working tree) ====
+// ==== send_http_header (web_functions.cpp) lines 4917-4940 (working tree) ====
 /**
  * ###########################################################################################################################
  * Sends a valid HTTP header. Takes care of the status code.
@@ -1021,42 +1031,8 @@ static WebSpan webParamText(const WebReq &wr, bool legacyWindow, uint16_t skip =
  */
 void send_http_header_live(uint16_t http_status_code, uint8_t content_type, const char *extra_header)
 {
-    String status_text = "";
-    switch (http_status_code)
-    {
-    case 200:
-        status_text = "OK";
-        break; // use this when ever a request was successful
-    case 400:
-        status_text = "Bad Request";
-        break; // use this when a request body was rejected (CS-03 config upload)
-    case 431:
-        status_text = "Request Header Fields Too Large";
-        break;
-    case 401:
-        status_text = "Unauthorized";
-        break; // use this when ever a request was successful
-    case 403:
-        status_text = "Forbidden";
-        break; // RM GUI W1c: web guard (rebinding Host / cross-site request)
-    case 404:
-        status_text = "Not Found";
-        break; // use this if a request was not known
-    case 405:
-        status_text = "Method Not Allowed";
-        break; // W2-1: GET /rmsend (the password must travel in a POST body)
-    case 408:
-        status_text = "Request Timeout";
-        break; // B10: the head or the body of a request stalled
-    case 422:
-        status_text = "Unprocessable Entity";
-        break; // use this if a parameter was not processable (e.g. out of bounds or somehow wrong)
-    default:
-        status_text = "Unknown"; // fallback
-    }
-
     // Serial.println("STATUS_TEXT="+status_text);
-    web_client.printf("HTTP/1.1 %i %s \n", http_status_code, status_text.c_str());
+    web_client.printf("HTTP/1.1 %i %s \n", http_status_code, webStatusText(http_status_code));
     if (content_type == RESPONSE_TYPE_JSON)
         web_client.println("Content-type:application/json");
     else
@@ -1073,7 +1049,7 @@ void send_http_header_live(uint16_t http_status_code, uint8_t content_type, cons
     webTxBeginChunked(web_client);                                            // WEB-TX-01: every flush from here on is one chunk
 }
 
-// ==== send_message (web_functions.cpp) lines 5110-5210 (working tree) ====
+// ==== send_message (web_functions.cpp) lines 5044-5144 (working tree) ====
 /**
  * ###########################################################################################################################
  * handles incoming sendmessage request
@@ -1176,7 +1152,7 @@ void send_message_live(const WebReq &wr)
     web_client.println(); // The HTTP response ends with another blank line
 }
 
-// ==== call_function (web_functions.cpp) lines 5284-5378 (working tree) ====
+// ==== call_function (web_functions.cpp) lines 5218-5312 (working tree) ====
 /**
  * ###########################################################################################################################
  * Tries to execute a Web-API function call.
@@ -1273,7 +1249,7 @@ void call_function_live(const WebReq &wr, const String &full_header)
     rm_wipe_string(functionData.functionName);
 }
 
-// ==== webSetparamValueVerdict (web_functions.cpp) lines 5380-5415 (working tree) ====
+// ==== webSetparamValueVerdict (web_functions.cpp) lines 5314-5349 (working tree) ====
 /**
  * B7 (step 5b): may this decoded setparam value reach the setter? 0 = yes, else a refusal (1 too long, 2 "--", 3 leading
  * "&&"). A value over 200 bytes is refused for every name (the setters' own buffers may still cut a value near that
@@ -1311,7 +1287,7 @@ static uint8_t webSetparamValueVerdict(const char *name, const char *value, size
     return dashes ? 2 : 0;
 }
 
-// ==== setparam (web_functions.cpp) lines 5417-5561 (working tree) ====
+// ==== setparam (web_functions.cpp) lines 5351-5495 (working tree) ====
 /**
  * ###########################################################################################################################
  * Set the Value of a parameter (if known)
@@ -1458,7 +1434,7 @@ void setparam_live(const WebReq &wr, const String &full_header)
     rm_wipe_string(setupData.returnValue);
 }
 
-// ==== getparam (web_functions.cpp) lines 5563-5628 (working tree) ====
+// ==== getparam (web_functions.cpp) lines 5497-5562 (working tree) ====
 /**
  * ###########################################################################################################################
  * Get the Value of a parameter (if known)
@@ -1593,6 +1569,29 @@ int webReadBody(char *buf, size_t cap, long content_length, uint32_t idle_ms, ui
     const int8_t e = webBodyEnd(&a);
     return e == 0 ? (int)a.got : e;
 })LIVESRC"},
+    {"src/web_functions/web_io.cpp", "webSendFixedHead", R"LIVESRC(/**
+ * Head of every fixed-length response (web_io.h): one writer, one line ending, one reason-phrase table.
+ */
+void webSendFixedHead(uint16_t status, const char *type, size_t len, const char *extra, const char *cache)
+{
+    web_client.printf("HTTP/1.1 %u %s\r\n", (unsigned)status, webStatusText(status));
+    if (type)
+    {
+        web_client.print("Content-type:");
+        web_client.print(type);
+        web_client.print("\r\n");
+    }
+    if (extra)
+        web_client.print(extra);
+    web_client.printf("Content-Length: %u\r\n", (unsigned)len);
+    if (cache)
+    {
+        web_client.print("Cache-Control: ");
+        web_client.print(cache);
+        web_client.print("\r\n");
+    }
+    web_client.print("Connection: close\r\n\r\n");
+})LIVESRC"},
     {"src/web_functions/web_functions.cpp", "config buffer + web_read_body", R"LIVESRC(/**
  * ###########################################################################################################################
  * CS-03: config download / upload
@@ -1694,15 +1693,7 @@ static bool deliver_web_asset(const String &req)
     else
         return false;
 
-    web_client.println("HTTP/1.1 200 OK");
-    web_client.print("Content-type:");
-    web_client.println(type);
-    web_client.println("Content-Encoding: gzip");
-    web_client.print("Content-Length: ");
-    web_client.println((unsigned)len);
-    web_client.println("Cache-Control: public, max-age=31536000, immutable");
-    web_client.println("Connection: close");
-    web_client.println();
+    webSendFixedHead(200, type, len, "Content-Encoding: gzip\r\n", "public, max-age=31536000, immutable");
     web_client.write(blob, len);
     return true;
 })LIVESRC"},
@@ -1930,12 +1921,7 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
         // no heap for the accumulator: refuse cleanly, the server stays up
         static const char kNoMem[] = "{\"ok\":false,\"err\":\"out of memory\"}";
         web_cors_ok = false;
-        web_client.println("HTTP/1.1 503 Service Unavailable");
-        web_client.println("Content-Type: application/json");
-        web_client.print("Content-Length: ");
-        web_client.println((unsigned)(sizeof(kNoMem) - 1));
-        web_client.println("Connection: close");
-        web_client.println();
+        webSendFixedHead(503, NULL, sizeof(kNoMem) - 1, "Content-Type: application/json\r\n", NULL);
         web_client.write((const uint8_t *)kNoMem, sizeof(kNoMem) - 1);
         web_client.stop();
         return;
@@ -2059,13 +2045,10 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
                         const char *body = page ? kBusyHtml : kBusy;
                         const unsigned blen = (unsigned)(page ? sizeof(kBusyHtml) - 1 : sizeof(kBusy) - 1);
                         web_cors_ok = false;
-                        web_client.println("HTTP/1.1 503 Service Unavailable");
-                        web_client.println("Retry-After: 10");
-                        web_client.println(page ? "Content-Type: text/html; charset=utf-8" : "Content-Type: application/json");
-                        web_client.print("Content-Length: ");
-                        web_client.println(blen);
-                        web_client.println("Connection: close");
-                        web_client.println();
+                        webSendFixedHead(503, NULL, blen,
+                                         page ? "Retry-After: 10\r\nContent-Type: text/html; charset=utf-8\r\n"
+                                              : "Retry-After: 10\r\nContent-Type: application/json\r\n",
+                                         NULL);
                         web_client.write((const uint8_t *)body, blen);
                         web_wipe_request(web_header, wg_path);
                         web_client.stop();
@@ -2469,42 +2452,8 @@ static WebSpan webParamText(const WebReq &wr, bool legacyWindow, uint16_t skip =
  */
 void send_http_header(uint16_t http_status_code, uint8_t content_type, const char *extra_header)
 {
-    String status_text = "";
-    switch (http_status_code)
-    {
-    case 200:
-        status_text = "OK";
-        break; // use this when ever a request was successful
-    case 400:
-        status_text = "Bad Request";
-        break; // use this when a request body was rejected (CS-03 config upload)
-    case 431:
-        status_text = "Request Header Fields Too Large";
-        break;
-    case 401:
-        status_text = "Unauthorized";
-        break; // use this when ever a request was successful
-    case 403:
-        status_text = "Forbidden";
-        break; // RM GUI W1c: web guard (rebinding Host / cross-site request)
-    case 404:
-        status_text = "Not Found";
-        break; // use this if a request was not known
-    case 405:
-        status_text = "Method Not Allowed";
-        break; // W2-1: GET /rmsend (the password must travel in a POST body)
-    case 408:
-        status_text = "Request Timeout";
-        break; // B10: the head or the body of a request stalled
-    case 422:
-        status_text = "Unprocessable Entity";
-        break; // use this if a parameter was not processable (e.g. out of bounds or somehow wrong)
-    default:
-        status_text = "Unknown"; // fallback
-    }
-
     // Serial.println("STATUS_TEXT="+status_text);
-    web_client.printf("HTTP/1.1 %i %s \n", http_status_code, status_text.c_str());
+    web_client.printf("HTTP/1.1 %i %s \n", http_status_code, webStatusText(http_status_code));
     if (content_type == RESPONSE_TYPE_JSON)
         web_client.println("Content-type:application/json");
     else
