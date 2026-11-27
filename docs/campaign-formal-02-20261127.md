@@ -5,15 +5,21 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-6, 7a and 7b steps 1-2 committed on `fork-dev` (last `34fb0a3b`), not pushed. `fork-dev` contains
-all of `upstream/dev` (checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; next is 7b
-step 3 (B1).
+**State:** waves 1-6, 7a and 7b steps 1-3 committed on `fork-dev`, not pushed. `fork-dev` contains all of
+`upstream/dev` (checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; next is 7b step 4
+(B3 + B6: 400 on a refused parse).
 
+- **Step 4 recon (scout, 2026-11-27):** `webReqParse` returns `WRQ_BAD_REQUEST_LINE` / `WRQ_BAD_VERSION` (B3) and
+  `WRQ_BAD_CONTENT_LENGTH` (B6, from `strictCl()`, cap `WEB_CL_MAX` 65535; flag `WEB_HF_CL_BAD`,
+  `webHeadBadContentLength()`); its only caller is `webRouteDecide`. Nothing answers 400 yet: a refused parse takes the
+  legacy chain and the legacy no-session gate (`indexOf("/?page=")`, `indexOf("HTTP/1.1")`). `web_content_length` is
+  the lenient `webHeadContentLength()`. The refused corpus requests are `kRefused` in `test_web_route.cpp` (~:925:
+  B3 19, B6 20, CORPUS 1); they become `kWhitelist` rows per profile in the rig (rows now name their differing
+  profiles, `test_whitelist_rows_differ_exactly_where_listed`). Once a refused parse answers 400, `webRouteLegacy`,
+  `WRL_RM_SEND_GET` and the legacy gate branch lose their last caller (drop them in step 4 or with step 8).
 - **Wave 7b plan (serial, `web_functions.cpp` is the hotspot, one writer per step, gate + advisor + commit each):**
   step 1 router as classifier + switch, table alongside (`ccdf9260`, done); step 2 B2 exact match (`34fb0a3b`, done,
-  33 rig whitelist rows); step 3 B1: `WR_NONE` -> 404, method outside the row -> 405 with `Allow` from the row mask,
-  page-shaped requests without a session keep the login page, `GET /rmsend` and `/rmsendx` join the generic 405, wipe
-  head and line on every exit; step 4 B3 + B6 (400 on a refused parse, one commit each); step 5 web_query.h in
+  33 rig whitelist rows); step 3 B1 (done); step 4 B3 + B6 (400 on a refused parse, one commit each); step 5 web_query.h in
   setparam/callfunction/getparam/send_message (B4, B7; B11 only after the operator's yes, else today's swapped-order
   behaviour stays); step 6 num_parse.h at the 9 sites (B5, trim first, `mcFormatDec3`); step 7 web_body.h + body reader
   with WDT feed and 408 (B10); step 8 fixed response heads; then drop `webRouteLegacy` and the disagreement counter.
@@ -57,12 +63,12 @@ step 3 (B1).
 Plan source for the web steps: `docs/web-server-seams-20261127.md` 6.2-6.8 (design) and 7.3 (steps). B1-B10 are
 accepted (operator 2026-11-27); each B change gets its own commit and a counted `kWhitelist` row in the rig.
 
-| Wave | Content                                                                                                                                                                                                                                                                                                                                                              | Owner files (writer)                                                                                                                           | Parallel with                                  |
-| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| 7    | Web wave B, steps 4-8: route table, REST handlers on `WebReq`, `num_parse.h`, body reader with WDT feed and 408, fixed response heads; B1-B7, B10. B1 needs the `mcau.js` change first (scaffold-as-liveness, seams doc 7.4). B3/B6 (strict request line and Content-Length, already computed by `web_request.h`, act on nothing yet) land here as their own commits | `web_functions.cpp` is the hotspot: one writer at a time, or carve out new modules (`web_route.h`, `web_query.h`, `num_parse.h`, `web_body.h`) | full host gate after step 5                    |
-| 8    | Web wave C, steps 9-11: spectrum sweep one step per loop pass on explicit action (B8) plus the shading bug, config upload reboot from the loop (B9), relocations, non-blocking send for TDECK-LAG-01, docs                                                                                                                                                           | per relocation, one commit each                                                                                                                | re-measure TDECK-LAG-01 on DK5EN-14 afterwards |
-| 9    | Heap work for NimBLE F3 (+600 B): candidates phone rings dynamic on S3 (~6 KB), UDP hold store only during outages (6 KB), raw LoRa log 20 to 10 slots (~2.6 KB); then F3                                                                                                                                                                                            | to be mapped                                                                                                                                   |                                                |
-| 10   | Large bench test (operator: at the end), full host gate, `regression.sh --formal` on request                                                                                                                                                                                                                                                                         | orchestrator                                                                                                                                   |                                                |
+| Wave | Content                                                                                                                                                                                                                                                                                                                                                                          | Owner files (writer)                                                                                                                           | Parallel with                                  |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 7    | Web wave B, steps 4-8: route table, REST handlers on `WebReq`, `num_parse.h`, body reader with WDT feed and 408, fixed response heads; B1-B7, B10. B1 needs no `mcau.js` change (checked in step 3, see the wave 7b step 3 archive line). B3/B6 (strict request line and Content-Length, already computed by `web_request.h`, act on nothing yet) land here as their own commits | `web_functions.cpp` is the hotspot: one writer at a time, or carve out new modules (`web_route.h`, `web_query.h`, `num_parse.h`, `web_body.h`) | full host gate after step 5                    |
+| 8    | Web wave C, steps 9-11: spectrum sweep one step per loop pass on explicit action (B8) plus the shading bug, config upload reboot from the loop (B9), relocations, non-blocking send for TDECK-LAG-01, docs                                                                                                                                                                       | per relocation, one commit each                                                                                                                | re-measure TDECK-LAG-01 on DK5EN-14 afterwards |
+| 9    | Heap work for NimBLE F3 (+600 B): candidates phone rings dynamic on S3 (~6 KB), UDP hold store only during outages (6 KB), raw LoRa log 20 to 10 slots (~2.6 KB); then F3                                                                                                                                                                                                        | to be mapped                                                                                                                                   |                                                |
+| 10   | Large bench test (operator: at the end), full host gate, `regression.sh --formal` on request                                                                                                                                                                                                                                                                                     | orchestrator                                                                                                                                   |                                                |
 
 ### How to run (rules for every wave)
 
@@ -182,7 +188,7 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 - Web server (`docs/web-server-seams-20261127.md` section 7.2): behaviour changes B1 to B10 accepted (404/405 for
   unknown paths, exact route match, strict request line, numbers and Content-Length; B7 values with `--`/`&&` refused
   except manualcommand, over 200 bytes refused; spectrum scan step-wise on request; config upload reboot after 500 ms;
-  408 on timeout). B1 needs the `mcau.js` fix first.
+  408 on timeout). B1 needed the `mcau.js` fix first; step 3 found no failure case and lifted that gate (archive, wave 7b step 3).
 - Browser request capture for the differential corpus: on bench node DK5EN-14, flash current `fork-dev` and record.
 - NimBLE F3 (pre-allocate 300 B per characteristic, ~600 B heap): deferred; first find where ESP32 heap can be won
   (operator: there are large BLE buffers of about 9 KB already).
@@ -227,6 +233,17 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 ## Open questions
 
 ## Archive
+
+- Wave 7b step 3 (2026-11-27): B1 wired. A parsed request with no built route gets 404 (JSON) or 405 with `Allow`
+  from the rows' method masks; an unknown page 404 + the unknown page; no session: page-shaped -> login page, `GET /`
+  -> login scaffold, other routes 401, no route -> the same 404/405 (the gate reads the parsed request line, so a
+  Referer `/?page=` or HTTP/1.0 no longer gives the login page: 401). `GET /rmsendx` 404. A refused parse keeps the
+  legacy chain until step 4. `web_header` and `wg_path` wiped on every exit after the head (`web_wipe_request`). Rig:
+  77 B1 rows, every row names the profiles where it differs, B1 rows assert status and Allow per profile; leak probe
+  over all corpus requests and profiles (before the fix 1,826 of 4,988 runs left request bytes). `mcau.js` gate
+  lifted: the liveness probe hits the freshly installed image, and every ESP32 image with B1 routes `/austatus`
+  (JSON) under the same guard that serves `/mcau.js`; an older image still answers the scaffold. Advisor: two rounds
+  (per-profile rig check, wipes on all exits; docs); handler copies of secrets -> BACKLOG WEB-WIPE-COPIES-01.
 
 - Wave 7b steps 1-2 (2026-11-27): router as classifier + switch with the table alongside (`ccdf9260`); B2 exact match
   (`34fb0a3b`) with build-feature mask (a route not built on a board counts as no route). Advisor caught two board-
