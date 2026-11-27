@@ -5,19 +5,26 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-6, 7a and 7b steps 1-4 committed on `fork-dev`, not pushed. `fork-dev` contains all of
-`upstream/dev` (checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; next is 7b step 5
-(REST handlers on `web_query.h`: B4, B7, B11, one commit each; the full host gate is due after step 5).
+**State:** waves 1-6, 7a and 7b steps 1-5 committed on `fork-dev`, not pushed; full host gate after step 5 green
+(141 envs, 4,448 ok, 1 skipped). `fork-dev` contains all of `upstream/dev` (checked 2026-11-27). Start a fresh
+session with `/orchestrate-waves` on this doc; next is 7b step 6 (`num_parse.h` at the 9 sites, B5).
 
-- **Step 5 inputs:** see "Step 5 recon" below. Every refused parse is a 400 since step 4, so the handlers only ever see
-  a parsed `WebReq`; they still take `String web_header` by value today (BACKLOG WEB-WIPE-COPIES-01 is fixed by
-  moving them to spans). B4/B7/B11 have no corpus rows: build the requests in the rig like
-  `test_b6_content_length_past_the_window`.
+- **Step 6 inputs:** `src/num_parse.h` (wave 7a: strict int and 3-digit fixed point, `mcTrimSpan`, `mcFormatDec3`; B5
+  table against today's site parsers in its suite). Sites: `web_setup.cpp` `sscanf`/`atoi`/`toInt` rungs and
+  `mboxpurge`/`mboxdeliver` in `call_function` (seams 7.3 step 6: `tools/webgui_settings_test.js` and
+  `test_command_setters` pin source text of these rungs). Decision from 7a: trim space/tab before `mcParse*`;
+  windcal/tempoff format back with `mcFormatDec3`. B5 answers 422 through the existing setparam answer shape.
+
+- **5c recon (scout, 2026-11-27):** `call_function` cuts at `"HTTP/1.1"` (not `" HTTP/1.1"`) and trims, splits on the
+  first `=` (no `=`: name = whole, value empty), guard `webGuardCallAllowed(name, header, len)`, mbox actions inline
+  under `ENABLE_MSGSTORE`, then `webFunctionCall(funCallStruct*)` (`web_nodefunctioncalls.cpp:22`). `send_message`:
+  needs both `&tocall=` and `&message=`; tocall = up to `&message` (no `=`), message = everything after `&message=`,
+  decoded, trimmed, tocall upper-cased, `":{TOCALL}msg"` cut to 150 (UTF-8 safe), answers `sendmessage
+ok|refused|dropped|invalid`; an empty message still answers `ok`. HTTP/1.0 rows: `mut-039/040` (callfunction),
+  `mut-048/049` (sendmessage).
 - **Wave 7b plan (serial, `web_functions.cpp` is the hotspot, one writer per step, gate + advisor + commit each):**
   step 1 router as classifier + switch, table alongside (`ccdf9260`, done); step 2 B2 exact match (`34fb0a3b`, done,
-  33 rig whitelist rows); step 3 B1 (done); step 4 B3 + B6 (done); step 5 web_query.h in
-  setparam/callfunction/getparam/send_message (B4, B7, B11 -- B11 accepted by the operator 2026-11-27, own
-  commit); step 6 num_parse.h at the 9 sites (B5, trim first, `mcFormatDec3`); step 7 web_body.h + body reader
+  33 rig whitelist rows); step 3 B1 (done); step 4 B3 + B6 (done); step 5 (done); step 6 num_parse.h at the 9 sites (B5, trim first, `mcFormatDec3`); step 7 web_body.h + body reader
   with WDT feed and 408 (B10); step 8 fixed response heads; then drop `webRouteLegacy` and the disagreement counter.
 - **Wave 7b mechanics:** `webRouteDecide` (web_functions.cpp) gathers inputs, `webRouteDecideCore` (web_route.h, pure)
   decides; the feature mask `built` (WRB_*) mirrors the switch guards and is pinned by `test_web_route`. Rig whitelist
@@ -235,6 +242,15 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 ## Open questions
 
 ## Archive
+
+- Wave 7b step 5 (2026-11-27): the four API handlers read the parsed `WebReq` (`3199d5f2` setparam/getparam, `77b655be`
+  callfunction/sendmessage; identical except B3 HTTP/1.0 values, `HTTP/1.1` inside a query, header-line `&tocall=` /
+  `&message=` (B2), blanks before a raw NUL; all pinned frozen != live). B4 `fba81154` (setparam without `=` -> 422), B7
+  `7d2cecaa` (`--`, leading `&&`, look-alike dashes after the setters' trim/lower-case, values over 200 bytes -> 422;
+  manualcommand exempt from the dash rule), B11 (tocall by name). Refusals answer `{"returncode":1,"<name>":""}`.
+  Advisor findings fixed with regression tests: NUL before `=`, the webhost/tz dash bypass of B7, and the pre-existing
+  X-MC guard bypass with look-alike dashes (WEB-GUARD-DASH-01, `c22944b2`). WEB-WIPE-COPIES-01 done for the four
+  handlers. Full host gate green.
 
 - Wave 7b step 4 (2026-11-27): B3 (`d090c380`) and B6 answer 400 `{"ok":false,"err":"bad request"}` right after the
   guard 403, before AU-busy 503, assets, login and every route, with or without a session; the router decides once,
