@@ -1,26 +1,25 @@
 # Bounded model checking
 
-**69 jobs in 8 groups check parsers and decoders of `src/` with ESBMC. A job compiles the real source, so a pass
+**104 jobs in 10 groups check parsers and decoders of `src/` with ESBMC. A job compiles the real source, so a pass
 holds for the code, up to the stated input length and unwind bound.** Rules, commands and limits:
-[`../README.md`](../README.md).
-
-> [!WARNING]
-> **No complete run is on record.** The run of 2026-11-23 stopped after 22 jobs. The groups `fw_assets`,
-> `remote_cmd`, `settings_decode` and `url_decode` and every job added in the rework are unmeasured: their memory
-> budgets are defaults, not measurements.
+[`../README.md`](../README.md). The last complete run (74 jobs, before FORMAL-02) is in [`RESULTS.md`](RESULTS.md);
+the groups `ack_rx`, `phone_frame` and the `settings_decode/roundtrip_*` jobs were added and run one by one on
+2026-11-27 (campaign FORMAL-02), all with the expected verdict.
 
 ## Groups
 
-| Group             | Target                                           | Bound                                         | Quick | Heavy |
-| ----------------- | ------------------------------------------------ | --------------------------------------------- | ----- | ----- |
-| `conf_frame`      | `parseConfFrame`                                 | full frame, 255 B                             | 4     | 0     |
-| `url_decode`      | `url_percent_decode`                             | 24 B                                          | 5     | 0     |
-| `byte_fifo`       | byte ring operations                             | capacity 8, 4 operations                      | 5     | 0     |
-| `settings_decode` | `decode_*`, `unescape_string`                    | values up to 8 B                              | 12    | 0     |
-| `fw_assets`       | `FwJsonScan`                                     | any length through `step.check`               | 10    | 0     |
-| `aprs`            | `decodeAPRS`, `encodeStartAPRS`, `decodeAPRSPOS` | 40 B quick, 255 B heavy                       | 8     | 2     |
-| `applink_ws`      | `alWsFeed`                                       | 10 B, cap edge with a reduced cap             | 7     | 4     |
-| `remote_cmd`      | `rmParse`, `rmCheck`                             | 32 B free text, 90 B shaped, two rounds heavy | 10    | 2     |
+| Group             | Target                                                   | Bound                                         | Quick | Heavy |
+| ----------------- | -------------------------------------------------------- | --------------------------------------------- | ----- | ----- |
+| `conf_frame`      | `parseConfFrame`                                         | full frame, 255 B                             | 4     | 0     |
+| `url_decode`      | `url_percent_decode`                                     | 24 B                                          | 5     | 0     |
+| `byte_fifo`       | byte ring operations                                     | capacity 8, 4 operations                      | 5     | 0     |
+| `settings_decode` | `decode_*`, `unescape_string`, encode->decode round trip | values up to 8 B                              | 19    | 0     |
+| `fw_assets`       | `FwJsonScan`                                             | any length through `step.check`               | 10    | 0     |
+| `aprs`            | `decodeAPRS`, `encodeStartAPRS`, `decodeAPRSPOS`         | 40 B quick, 255 B heavy                       | 9     | 3     |
+| `applink_ws`      | `alWsFeed`                                               | 10 B, cap edge with a reduced cap             | 7     | 4     |
+| `remote_cmd`      | `rmParse`, `rmCheck`                                     | 32 B free text, 90 B shaped, two rounds heavy | 13    | 2     |
+| `ack_rx`          | `ackRxDecide` (ACK receive decision)                     | 16 B quick, 255 B heavy, full tables          | 7     | 1     |
+| `phone_frame`     | `phoneFrameDecode` (phone command frames)                | 12-40 B quick, 300 B heavy                    | 11    | 4     |
 
 ## Job names
 

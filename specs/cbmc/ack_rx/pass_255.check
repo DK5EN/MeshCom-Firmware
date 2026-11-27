@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+TIER=heavy
+CFLAGS="-Istubs -I$ROOT/src -DSZMAX=255"
+FLAGS="--unwind 257"
+EXPECT=pass
+CHECKS="as pass, size 0..255 (any real receive size; the core reads at most 15)"

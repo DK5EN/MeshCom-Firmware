@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-Istubs -I$ROOT/src -DSZMAX=16 -DWITNESS_FWD"
+FLAGS="--unwind 102"
+EXPECT=fail
+CHECKS="witness: FWD verdict reachable (assert it never happens must fail)"
+EXPECT_PROP='main.assertion|assertion'

@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-Istubs -I$ROOT/src -DSZMAX=16"
+FLAGS="--unwind 102"
+EXPECT=pass
+CHECKS="memory safety and verdict consistency vs independent loops; payload exactly size bytes, size 0..16, full-size tables (100/20 rows), any bytes"

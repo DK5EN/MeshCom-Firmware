@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DLMAX=258 -DTYPE=0x50"
+FLAGS="--unwind 310"
+EXPECT=pass
+TIER=heavy
+CHECKS="callsign (0x50): n nondet 0..255, NUL at data[n], no read past len; len 0..258"

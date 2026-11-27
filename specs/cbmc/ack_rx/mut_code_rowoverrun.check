@@ -1,0 +1,10 @@
+TOOL=esbmc
+# a quote include resolves next to the including file first: the unmodified core is copied next to the mutated header
+mkdir -p gen/rowoverrun && cp "$ROOT/src/ack_rx_core.h" gen/rowoverrun/ack_rx_core.h && sed '/idTableFind(const/,/^}/ s/i < rows/i <= rows/' "$ROOT/src/id_table_find.h" > gen/rowoverrun/id_table_find.h
+cmp -s "$ROOT/src/id_table_find.h" gen/rowoverrun/id_table_find.h && { echo "  mutation did not apply to id_table_find.h (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp"
+CFLAGS="-Igen/rowoverrun -Istubs -I$ROOT/src -DSZMAX=16"
+FLAGS="--unwind 103"
+EXPECT=fail
+CHECKS="code mutation: dedup-ring lookup runs one row too far -> read past the table"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

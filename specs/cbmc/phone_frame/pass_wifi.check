@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DLMAX=300 -DTYPE=0x55"
+FLAGS="--unwind 310"
+EXPECT=pass
+TIER=heavy
+CHECKS="wifi (0x55): ssid/pwd lengths nondet, cut at cap, both NUL-terminated, no read past len; len 0..300"

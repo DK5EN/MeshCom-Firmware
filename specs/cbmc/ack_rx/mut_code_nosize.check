@@ -1,0 +1,9 @@
+TOOL=esbmc
+mkdir -p gen/nosize && sed 's/payload == NULL || size < 12 || payload\[0\]/payload == NULL || payload[0]/' "$ROOT/src/ack_rx_core.h" > gen/nosize/ack_rx_core.h
+cmp -s "$ROOT/src/ack_rx_core.h" gen/nosize/ack_rx_core.h && { echo "  mutation did not apply to ack_rx_core.h (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp"
+CFLAGS="-Igen/nosize -Istubs -I$ROOT/src -DSZMAX=16"
+FLAGS="--unwind 102"
+EXPECT=fail
+CHECKS="code mutation: size check before payload[0] removed -> read past a short payload"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

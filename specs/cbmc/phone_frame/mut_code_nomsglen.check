@@ -1,0 +1,10 @@
+TOOL=esbmc
+# code mutation: the msg_len > len check is removed -> text copy reads past len
+mkdir -p gen && sed 's/if ((size_t)msg_len > len)/if (0)/' "$ROOT/src/phone_frame.h" > gen/phone_frame.h
+cmp -s "$ROOT/src/phone_frame.h" gen/phone_frame.h && { echo "  mutation did not apply to phone_frame.h (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp"
+CFLAGS="-Igen -I$ROOT/src -DLMAX=12 -DTYPE=0xA0"
+FLAGS="--unwind 310"
+EXPECT=fail
+CHECKS="code mutation: msg_len > len check removed -> read past len"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

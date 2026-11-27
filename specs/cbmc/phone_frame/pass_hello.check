@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DLMAX=40 -DTYPE=0x10"
+FLAGS="--unwind 310"
+EXPECT=pass
+CHECKS="hello (0x10) with and without PIN hash: no read past len, hash only with len>=36; len 0..40"

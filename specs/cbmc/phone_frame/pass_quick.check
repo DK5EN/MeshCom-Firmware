@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DLMAX=12"
+FLAGS="--unwind 310"
+EXPECT=pass
+CHECKS="no read past len, status consistency, NUL termination; len 0..12, any type, any bytes"

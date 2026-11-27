@@ -1,6 +1,0 @@
-TOOL=esbmc
-SOURCES="harness.cpp"
-CFLAGS="-I$ROOT/src -DMODE_ROUNDTRIP -DRT_DOUBLE "
-FLAGS="--unwind 50"
-EXPECT=pass
-CHECKS="DOUBLE token framing: 1..63 bytes, no newline/equals/NUL (value identity is a host test, strtod is modelled)"

@@ -10,10 +10,16 @@
 // NVS image is a key whose stored type changed (the typed getter then silently returns the default), so for
 // ESP32 the suite pins per-key type stability against the manifest (test_nvs_key_types_stable_across_tags).
 //
-// Built as ESP32 + T-Deck, the widest schema: the nRF52 key set is a subset, so every key an nRF52 node
-// writes is covered; the nRF52 radio unit differences (Hz, index) are not (see sanitize test).
+// Two builds of this file:
+//   native_settings_migration        ESP32 + T-Deck, the widest schema (codec only, see above).
+//   native_settings_migration_nrf52  NRF52_SERIES: the REAL settingsStoreLoad() (src/nrf52/settings_store_nrf52.cpp) runs
+//                                    over the in-memory InternalFS of test_nrf52_settings_paths (stubs reused via -I).
+//                                    Fixture keys the nRF52 schema lacks (platform esp32 | tdeck) are unknown keys and
+//                                    must be ignored. Radio values are converted to nRF52 units (Hz, bw/cr index) before
+//                                    the sanitize check. Not covered: init_flash()/sanitize_loaded_settings() (nrf52_flash.cpp).
 //
 //   pio test -e native_settings_migration
+//   pio test -e native_settings_migration_nrf52
 #include <unity.h>
 
 #include <repo_file.h>
@@ -32,6 +38,17 @@
 #include <map>
 #include <string>
 #include <vector>
+
+#if defined(NRF52_SERIES)
+#include <nrf52/WisBlock-API.h> // stub (force-included): s_meshcom_settings, extern meshcom_settings
+#include <nrf52/settings_store_nrf52.h> // settingsStoreLoad()
+#include "Adafruit_LittleFS.h" // g_fake_fs
+// Defined by nrf52_flash.cpp in the firmware; that file is not built here.
+s_meshcom_settings meshcom_settings;
+#define MIG_NRF52 1
+#else
+#define MIG_NRF52 0
+#endif
 
 using settings_store::DecodeStats;
 using settings_store::FieldDescriptor;
@@ -65,6 +82,7 @@ struct Fixture
     std::string tag;
     std::vector<std::pair<std::string, std::string>> rec; // key, raw value text
     std::map<std::string, std::string> type;              // key -> manifest type name
+    std::map<std::string, std::string> plat;              // key -> common | esp32 | tdeck | nrf52
 };
 
 std::vector<Fixture> load_fixtures()
@@ -85,7 +103,9 @@ std::vector<Fixture> load_fixtures()
         {
             size_t sp = l.find(' ');
             size_t sp2 = l.find(' ', sp + 1);
+            size_t sp3 = l.find(' ', sp2 + 1);
             f.type[l.substr(0, sp)] = l.substr(sp + 1, sp2 - sp - 1);
+            f.plat[l.substr(0, sp)] = l.substr(sp2 + 1, sp3 - sp2 - 1);
         }
         TEST_ASSERT_EQUAL_size_t_MESSAGE(f.rec.size(), f.type.size(), "rec/keys row count differs");
         out.push_back(f);
@@ -252,6 +272,24 @@ std::string record_text(const Fixture &f)
     return s;
 }
 
+// Loads `text` into `st` the way the platform does. nRF52: seed the fake InternalFS and run settingsStoreLoad() (the
+// target struct is the global meshcom_settings, starting from the struct defaults as after boot). ESP32: the codec only.
+DecodeStats load_record(const std::string &text, s_meshcom_settings &st)
+{
+#if MIG_NRF52
+    g_fake_fs.reset();
+    g_fake_fs.seed("/MeshCom-Settings-Store", text.data(), text.size());
+    meshcom_settings = s_meshcom_settings();
+    SettingsLoadResult r = settingsStoreLoad();
+    TEST_ASSERT_TRUE_MESSAGE(r.file_found && r.read_ok, "settingsStoreLoad did not read the seeded record");
+    st = meshcom_settings;
+    return r.stats;
+#else
+    st = s_meshcom_settings();
+    return settings_store::decode(settings_schema::fields(), settings_schema::fieldCount(), &st, text.data(), text.size());
+#endif
+}
+
 void expect_empty(const std::string &failures, const char *what)
 {
     if (!failures.empty())
@@ -275,7 +313,8 @@ void test_fixture_inventory_minimums()
 {
     std::vector<Fixture> fx = load_fixtures();
     TEST_ASSERT_GREATER_OR_EQUAL_size_t_MESSAGE(25, fx.size(), "release tags since 2026-10-01");
-    TEST_ASSERT_GREATER_OR_EQUAL_size_t_MESSAGE(150, settings_schema::fieldCount(), "schema rows (ESP32 + T-Deck view)");
+    TEST_ASSERT_GREATER_OR_EQUAL_size_t_MESSAGE(MIG_NRF52 ? 120 : 150, settings_schema::fieldCount(),
+                                                MIG_NRF52 ? "schema rows (nRF52 view)" : "schema rows (ESP32 + T-Deck view)");
     size_t total = 0;
     for (auto &f : fx)
     {
@@ -293,8 +332,7 @@ void test_every_old_record_loads_with_current_schema()
     {
         s_meshcom_settings st;
         const std::string text = record_text(f);
-        DecodeStats stats = settings_store::decode(settings_schema::fields(), settings_schema::fieldCount(), &st,
-                                                   text.data(), text.size());
+        DecodeStats stats = load_record(text, st);
         size_t removed = 0;
         for (auto &kv : f.rec)
         {
@@ -319,8 +357,10 @@ void test_every_old_record_loads_with_current_schema()
         }
     }
     expect_empty(failures, "old record did not load as written");
-    TEST_ASSERT_GREATER_OR_EQUAL_size_t(3000, keys_checked);
-    TEST_ASSERT_GREATER_THAN_size_t_MESSAGE((size_t)0, clamped_total, "the spectrum range narrowing is no longer exercised");
+    TEST_ASSERT_GREATER_OR_EQUAL_size_t(MIG_NRF52 ? 2500 : 3000, keys_checked);
+    // spectrum rows are ESP32-only; on nRF52 no fixture value may be moved by a range at all
+    if (MIG_NRF52) TEST_ASSERT_EQUAL_size_t_MESSAGE(0, clamped_total, "nRF52 load moved a value by range");
+    else TEST_ASSERT_GREATER_THAN_size_t_MESSAGE((size_t)0, clamped_total, "the spectrum range narrowing is no longer exercised");
     printf("[migration] %zu key values checked, %zu removed-key lines ignored, %zu documented clamps\n", keys_checked,
            removed_total, clamped_total);
 }
@@ -334,7 +374,7 @@ void test_keys_added_later_keep_their_default()
     {
         s_meshcom_settings st;
         const std::string text = record_text(f);
-        settings_store::decode(settings_schema::fields(), settings_schema::fieldCount(), &st, text.data(), text.size());
+        load_record(text, st);
         std::map<std::string, bool> have;
         for (auto &kv : f.rec) have[kv.first] = true;
         const FieldDescriptor *d = settings_schema::fields();
@@ -358,7 +398,7 @@ void test_fixture_values_are_not_the_defaults()
     {
         s_meshcom_settings st;
         const std::string text = record_text(f);
-        settings_store::decode(settings_schema::fields(), settings_schema::fieldCount(), &st, text.data(), text.size());
+        load_record(text, st);
         for (auto &kv : f.rec)
         {
             const FieldDescriptor *d = find_key(kv.first);
@@ -398,24 +438,65 @@ void test_nvs_key_types_stable_across_tags()
             compared++;
             if (!manifest_type_matches(f.type.at(kv.first), d->type))
                 failures += f.tag + " " + kv.first + ": type " + f.type.at(kv.first) + " at the tag, different now\n";
-            if (kv.first.size() > 15) failures += f.tag + " " + kv.first + ": NVS key longer than 15\n";
+            if (!MIG_NRF52 && kv.first.size() > 15) failures += f.tag + " " + kv.first + ": NVS key longer than 15\n";
         }
     expect_empty(failures, "NVS key type drift");
-    TEST_ASSERT_GREATER_OR_EQUAL_size_t(3000, compared);
+    TEST_ASSERT_GREATER_OR_EQUAL_size_t(MIG_NRF52 ? 2500 : 3000, compared);
+}
+
+void test_platform_key_subset_of_newest_fixture()
+{
+    // Per the manifest platform column: this build's schema holds every key of its platforms and none of the others
+    // (an esp32/tdeck key in an nRF52 record is then an unknown key, counted and ignored by the test above).
+    std::vector<Fixture> fx = load_fixtures();
+    const Fixture &f = fx.back();
+    std::string failures;
+    size_t present = 0, foreign = 0;
+    for (auto &kv : f.plat)
+    {
+        const std::string &pl = kv.second;
+#if MIG_NRF52
+        bool mine = pl == "common" || pl == "nrf52";
+#else
+        bool mine = pl == "common" || pl == "esp32" || pl == "tdeck";
+#endif
+        bool have = find_key(kv.first) != nullptr;
+        if (mine && !have) failures += kv.first + " (" + pl + "): missing from this build's schema\n";
+        if (!mine && have) failures += kv.first + " (" + pl + "): present in this build's schema\n";
+        (mine ? present : foreign)++;
+    }
+    expect_empty(failures, "platform key subset differs from the manifest");
+    TEST_ASSERT_GREATER_OR_EQUAL_size_t(MIG_NRF52 ? 100 : 140, present);
+    printf("[migration] newest %s: %zu keys of this platform, %zu of other platforms\n", f.tag.c_str(), present, foreign);
 }
 
 void test_loaded_old_records_pass_sanitize()
 {
     // The load path of both platforms runs settings_sanitize on the decoded struct; a record that sanitize
-    // rewrites would change on the first boot after the update. ESP32 limits (MHz, kHz, 5..8).
+    // rewrites would change on the first boot after the update. ESP32 limits (MHz, kHz, 5..8); nRF52 (Hz, index).
     std::string failures;
     for (const Fixture &f : load_fixtures())
     {
         s_meshcom_settings st;
         const std::string text = record_text(f);
-        settings_store::decode(settings_schema::fields(), settings_schema::fieldCount(), &st, text.data(), text.size());
+        load_record(text, st);
+#if MIG_NRF52
+        // nRF52 stores Hz, a bandwidth index (0..2) and a coding-rate index (1..4); fixtures carry the ESP32 units.
+        RadioLimits lim = { TX_POWER_MIN, TX_POWER_MAX, 400.0e6f, 960.0e6f, 1, 1, 17 };
+        float freq = st.node_freq == 0.0f ? 0.0f : (float)((double)st.node_freq * 1.0e6);
+        float bw = st.node_bw == 125.0f ? 0.0f : st.node_bw == 250.0f ? 1.0f : st.node_bw == 500.0f ? 2.0f : st.node_bw;
+        int cr = st.node_cr >= 5 && st.node_cr <= 8 ? st.node_cr - 4 : st.node_cr;
+        RadioParams p = { st.node_power, freq, bw, st.node_sf, cr, st.node_country };
+        {
+            // negative control: the unconverted ESP32 units must be rewritten by the nRF52 limits
+            RadioParams raw = { st.node_power, st.node_freq, st.node_bw, st.node_sf, st.node_cr, st.node_country };
+            if (st.node_freq != 0.0f && sanitize_radio_params(raw, lim, nullptr) == 0)
+                failures += f.tag + ": nRF52 limits accepted ESP32 radio units\n";
+        }
+#else
         RadioLimits lim = { TX_POWER_MIN, TX_POWER_MAX, 400.0f, 960.0f, 0, 0, 17 };
         RadioParams p = { st.node_power, st.node_freq, st.node_bw, st.node_sf, st.node_cr, st.node_country };
+#endif
         if (sanitize_radio_params(p, lim, nullptr) != 0) failures += f.tag + ": radio params rewritten\n";
         int hop = st.max_hop_text;
         if (sanitize_max_hop_text(hop, nullptr)) failures += f.tag + ": max_hop_text rewritten\n";
@@ -503,8 +584,10 @@ void test_current_schema_roundtrip_edge_values_is_lossless()
     for (size_t i = 0; i < settings_schema::fieldCount(); i++) types[(int)settings_schema::fields()[i].type]++;
     // every FieldType the schema uses is exercised (I8 is not used by any row today)
     for (FieldType t : {FieldType::U8, FieldType::I32, FieldType::U32, FieldType::FLOAT, FieldType::DOUBLE,
-                        FieldType::BOOL, FieldType::STRING})
+                        FieldType::STRING})
         TEST_ASSERT_GREATER_THAN_size_t((size_t)0, types[(int)t]);
+    // BOOL rows are T-Deck only (settings manifest platform "tdeck"); the nRF52 schema has none
+    if (!MIG_NRF52) TEST_ASSERT_GREATER_THAN_size_t((size_t)0, types[(int)FieldType::BOOL]);
 
     for (int pass = 0; pass < 2; pass++)
     {
@@ -626,6 +709,7 @@ int main(int, char **)
     RUN_TEST(test_fixture_values_are_not_the_defaults);
     RUN_TEST(test_removed_keys_are_ignored_and_listed);
     RUN_TEST(test_nvs_key_types_stable_across_tags);
+    RUN_TEST(test_platform_key_subset_of_newest_fixture);
     RUN_TEST(test_loaded_old_records_pass_sanitize);
     RUN_TEST(test_current_schema_roundtrip_edge_values_is_lossless);
     RUN_TEST(test_real_values_roundtrip_bit_identical);

@@ -15,8 +15,10 @@
 //                 One type per run: -DRT_I8 / RT_U8 / RT_I32 / RT_U32 / RT_BOOL / RT_STRING / RT_FLOAT / RT_DOUBLE.
 //                 Domain: a value inside the descriptor's range and allowed set; STRING: content without NUL, length < size.
 //                 FLOAT/DOUBLE: strtod is a nondet model here, so value identity (the %.9g / %.17g digit-count guarantee of
-//                 the C library) is NOT provable; the run proves the framing contract instead: the token is 1..63 bytes
-//                 (fits copy_token) and contains no '\n', '=' or NUL. Bit identity is pinned in test_settings_migration.
+//                 the C library) is NOT provable, and ESBMC 8.7's snprintf model gives no usable "%g" length either
+//                 (the framing assertion fails at once on the model, 2026-11-27): no .check job runs RT_FLOAT/RT_DOUBLE.
+//                 The mode stays for a later tool version. Bit identity and framing are pinned in test_settings_migration
+//                 (60k random bit patterns plus edge values).
 //                 MUT_SRC_GEN includes gen/settings_store.cpp (a sed-mutated copy, see roundtrip_mut_*.check).
 // Mutations: MUT_CAP (out buffer one byte smaller than cap), MUT_LEN (value buffer one byte smaller than value_len),
 //            WITNESS (assert the accept path is never taken).

@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DLMAX=12 -DWIT_TIME -DTYPE=0x20"
+FLAGS="--unwind 310"
+EXPECT=fail
+CHECKS="witness: PF_OK time reachable"
+EXPECT_PROP='PFC_TIME\)'

@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DLMAX=300 -DTYPE=0xA0"
+FLAGS="--unwind 310"
+EXPECT=pass
+TIER=heavy
+CHECKS="text (0xA0): msg_len nondet, up to len 300, NUL at data[dlen], no read past len"

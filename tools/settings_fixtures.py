@@ -55,7 +55,8 @@ MACRO_VALUES = {
 # Rows whose value must be a specific member / sentinel-free choice.
 FORCED: dict[str, str] = {
     "node_dht": "22",        # allowed set {11, 22}, 11 is the default
-    "node_power": "7",       # escape row (-20 = not set); pick a real value
+    "node_autoupd": "2",     # platform default differs (ESP32 1, nRF52 0); 2 is neither
+    "node_power": "7",      # escape row (-20 = not set); pick a real value
     "max_hop_text": "3",     # escape row (0 = not set)
     # plausible ESP32 radio values: the sanitize pass resets implausible ones
     "node_freq": "%.9g" % struct.unpack("<f", struct.pack("<f", 433.175))[0],

@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DLMAX=12 -DWIT_TRUNC"
+FLAGS="--unwind 310"
+EXPECT=fail
+CHECKS="witness: PF_TRUNCATED reachable"
+EXPECT_PROP='status != PF_TRUNCATED'

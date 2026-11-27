@@ -1,0 +1,10 @@
+TOOL=esbmc
+# code mutation: the callsign length check (3 + n > len) is removed -> memcpy reads past len
+mkdir -p gen && sed 's/if (3 + n > len)/if (0)/' "$ROOT/src/phone_frame.h" > gen/phone_frame.h
+cmp -s "$ROOT/src/phone_frame.h" gen/phone_frame.h && { echo "  mutation did not apply to phone_frame.h (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp"
+CFLAGS="-Igen -I$ROOT/src -DLMAX=12 -DTYPE=0x50"
+FLAGS="--unwind 310"
+EXPECT=fail
+CHECKS="code mutation: callsign length check removed -> read past len"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'
