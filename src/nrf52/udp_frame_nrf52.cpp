@@ -32,6 +32,8 @@
 #include "gw_reg_runtime.h"
 #include "gw_reg_state.h"
 #include "udp_frame.h"
+#include "udp_frame_parse.h"      // FORMAL-02: zero scan, indicator class, GATE span
+#include "udp_frame_platform.h"   // FORMAL-02: the platform hooks
 #include "gw_udp_ring.h"   // GWRX-01: udp_rx enqueue (text -> RING_KIND_RELAY)
 #include "ack_attribution.h"   // DR-09: buildAckPhoneFrame()
 #include "own_msg_status.h"   // late ACK -> durable web GUI status (ring slot may be gone)
@@ -47,7 +49,6 @@
 // for why it moved and why the two platform copies are not merged. Moved
 // unchanged.
 
-extern NrfETH neth;
 // DR-03: der Warn-Latch der Heartbeat-Diagnose. Definiert in
 // loop_functions.cpp:629, bis 2026-09-17 nur von der ESP32-Seite gelesen.
 extern bool hb_warn_logged;
@@ -64,6 +65,12 @@ extern bool hasExternIPaddress;
 void logRxDropUnconfigured(const char *call);
 void logRxDropBlocked(const char *path);   // BLK-01
 
+// FORMAL-02 (D6/P6): the server payload copy and the re-encode buffer are this
+// TU's own, static, zero-padded per frame. Before, the payload went into the
+// shared LoRa scratch RcvBuffer that OnRxDone also fills (another task, not
+// proven serialised) and a 260 byte encode buffer sat on this stack.
+static uint8_t udpFrameBuf[UDP_TX_BUF_SIZE + 50];
+
 /**@brief C1 carve-out (DRY unification U1): everything that happens once a
  * datagram is in the buffer -- no socket, no NTP, no DHCP. Returns 0 when the
  * frame was handled and 1 when it carried more than MAX_ZEROS zero bytes, in
@@ -71,36 +78,25 @@ void logRxDropBlocked(const char *path);   // BLK-01
  * in udp_functions.h, so both sides can be linked into one native binary and
  * fed the same corpus (twin-differential).
  */
-int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddress remote_ip)
+int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddress src_ip)
 {
-  // registration reply from the server: consumed here, it must not count as link-alive (no last_upd_timer)
-  if (packetSize > 0 && gwRegFrameIsOther(inc_udp_buffer, (size_t)packetSize) &&
-      gwRegOnDatagram((uint32_t)remote_ip, inc_udp_buffer, (size_t)packetSize, millis()))
-    return 0;
-
   char source_call[MC_CALL_LEN_Z] = {0};
   char destination_call[MC_CALL_LEN_Z] = {0};
 
-  // an extra buffer for udp tx, as we add other stuff (ID, RSSI, SNR, MODE)
-  uint8_t convBuffer[UDP_TX_BUF_SIZE+5];
+  // registration reply from the server: consumed here, it must not count as link-alive (no last_upd_timer)
+  if (packetSize > 0 && gwRegFrameIsOther(inc_udp_buffer, (size_t)packetSize) &&
+      gwRegOnDatagram((uint32_t)src_ip, inc_udp_buffer, (size_t)packetSize, millis()))
+    return 0;
 
-  // if more than n values are 00 we might have received a faulty message
-  uint8_t zerocount = 0;
-
-  for (int i = 0; i + 1 < packetSize; i+=2)
-  {
-    if (inc_udp_buffer[i] == 0x00 && inc_udp_buffer[i + 1] == 0x00)
-    {
-      zerocount += 2;
-    }
-    else
-      zerocount = 0;
-  }
+  // if more than n values are 00 we might have received a faulty message;
+  // the zero scan, the indicator class and the GATE span are the pure core
+  UdpFrameInfo frame;
+  udpFrameClassify(inc_udp_buffer, packetSize > 0 ? (size_t)packetSize : 0, &frame);
 
   if(packetSize > 0 && bDEBUG)// && bDEBUG)
-    printfdeb("[UDP_ETH] UDP zerocount: %i ? > 6\n", zerocount);
+    printfdeb("[UDP_ETH] UDP zerocount: %i ? > 6\n", frame.zero_run);
 
-  if (zerocount <= MAX_ZEROS)
+  if (frame.cls != UDPF_REJECT_ZEROS)
   {
     /* we now need to distinguish if we got a LoRa packet to send from the server
     or it is a config message. First 4 Bytes indicate if it is
@@ -108,39 +104,29 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
     CONF: 0x43 4F 4E 46
     */
 
-    // get the first 4 bytes of the incoming udp message
-    char indicator_b[UDP_MSG_INDICATOR_LEN];
-
-    memcpy(indicator_b, inc_udp_buffer, UDP_MSG_INDICATOR_LEN);
-
-    char gate[] = "GATE";
-    char conf[] = "CONF";
-    char beat[] = "BEAT";
-
-    if (memcmp(indicator_b, gate, UDP_MSG_INDICATOR_LEN) == 0)
+    if (frame.cls == UDPF_GATE)
     {
 
       if(bDEBUG)
         printfdeb("[GATE] Received a LoRa packet to transmit\n");
 
-      neth.last_upd_timer = millis();
+      udpPlatformNoteServerRx(millis(), false);
       gwLinkNoteRx(millis());   // real server frame (not the OTHER branch)
       hb_warn_logged = false;   // DR-03: Latch nur zusammen mit der Alterung zuruecksetzen
 
-      neth.lora_tx_msg_len = packetSize - UDP_MSG_INDICATOR_LEN;
-      if (neth.lora_tx_msg_len > UDP_TX_BUF_SIZE)
-        neth.lora_tx_msg_len = UDP_TX_BUF_SIZE; // zur Sicherheit
+      const uint16_t lora_tx_msg_len = frame.gate_len;   // clamped to UDP_TX_BUF_SIZE by the core (P4: no neth member)
 
-      memcpy(RcvBuffer, inc_udp_buffer+UDP_MSG_INDICATOR_LEN, neth.lora_tx_msg_len);
+      memset(udpFrameBuf, 0, sizeof(udpFrameBuf));
+      memcpy(udpFrameBuf, inc_udp_buffer+UDP_MSG_INDICATOR_LEN, lora_tx_msg_len);
 
       // printout message type
-      uint8_t msg_type_b = RcvBuffer[0];
+      const uint8_t msg_type_b = frame.msg_type;
 
       switch (msg_type_b)
       {
         case 0x3A: DEBUG_MSG("UDP", "Received Textmessage"); break; // ':'
         case 0x21: DEBUG_MSG("UDP", "Received PosInfo"); break;
-        case 0x40: DEBUG_MSG("UDP", "Received Weather"); break;
+        case 0x40: DEBUG_MSG("UDP", "Received Hey"); break;     // 0x40 is HEY (MSG_TYPE_HEY), not weather
         default: DEBUG_MSG("UDP", "Received unknown"); break;
       }
 
@@ -166,7 +152,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
       bool bBlockedRx = false;
       if (msg_type_b == 0x3A || msg_type_b == 0x21 || msg_type_b == 0x40)
       {
-        msg_type_b_lora = decodeAPRS(RcvBuffer, neth.lora_tx_msg_len, aprsmsg);
+        msg_type_b_lora = decodeAPRS(udpFrameBuf, lora_tx_msg_len, aprsmsg);
         if(msg_type_b_lora > 0 && isBlockedFrame(aprsmsg.msg_source_call, aprsmsg.msg_source_path))
         {
           // No effect on the node besides the counter: no display, phone,
@@ -181,7 +167,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
         if(hasExternIPaddress && !bBlockedRx)
         {
           if(bEXTUDP)
-            sendExtern(true, (char*)"udp", RcvBuffer, neth.lora_tx_msg_len, 0, 0);
+            sendExtern(true, (char*)"udp", udpFrameBuf, lora_tx_msg_len, 0, 0);
         }
       }
 
@@ -192,11 +178,6 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
         // (decoded above, ahead of the EXTUDP tap -- BLK-01)
         if(msg_type_b_lora > 0 && !bBlockedRx)
         {
-          if(bDisplayInfo)
-          {
-            printBuffer_aprs((char*)"RX-UDP ", aprsmsg);
-          }
-
           snprintf(source_call, sizeof(source_call), "%s", aprsmsg.msg_source_call);
           snprintf(destination_call, sizeof(destination_call), "%s", aprsmsg.msg_destination_call);
 
@@ -221,55 +202,17 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
           bool bUDPtoLoraSend = !bSrcUnconfigured;
 
-#if defined(ENABLE_MSGSTORE)
-          // SNF-GW-04: echo guard input. Must be read HERE, before the own call
-          // is appended to the source path below -- that append precedes the
-          // is-new gate on this side, so at the gate the path always ends in
-          // the own call and the guard would always fire.
-          bool bSrcPathHadOwnCall = mboxPathHasCall(aprsmsg.msg_source_path, meshcom_settings.node_call);
-#endif
-
-          // GWRX-01: Pfad wie vom Server empfangen, fuer nbrServerNeed() (gw_udp_ring.h)
-          char srcPathAsRx[sizeof(aprsmsg.msg_source_path)];
-          mcSet(srcPathAsRx, sizeof(srcPathAsRx), aprsmsg.msg_source_path);
-
-          mcAppendChar(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), ',');
-          mcAppend(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
-
-          aprsmsg.msg_server = true;
-
-          aprsmsg.msg_last_hw = BOARD_HARDWARE | 0x80; // hardware  last sending node
-          aprsmsg.msg_source_mod = (getMOD() & 0xF) | (meshcom_settings.node_country << 4); // modulation & country
-
-          if(bDEBUG)
-          {
-            printfdeb("RX-UDP Source-Path:%s\n",  aprsmsg.msg_source_path);
-          }
-
-
-          memset(convBuffer, 0x00, UDP_TX_BUF_SIZE);
-
-          // MeshCom 5 (Konzept docs/meshcom5-topologie/ 4.11, Anhang E, Stufe 3):
-          // Zielpfad vor checkVia() auf das Ziel zuruecksetzen. Ein Via ist ein
-          // Naechster-Hop-Feld der Absender-Region; vom Server eingespeist
-          // nennt er Knoten, die hier niemand hoert, und kein Nachbar mit
-          // Firmware ab dem 13.06. wiederholte den Rahmen. Danach setzt
-          // checkVia() hoechstens den eigenen Via (node_via). Die Anzeige,
-          // die Telefon-Kopien und die zweite checkVia()-Stelle weiter unten
-          // arbeiten auf demselben, hier schon zurueckgesetzten aprsmsg.
-          mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), aprsmsg.msg_destination_call);
-
-          checkVia(aprsmsg);
-
-          uint16_t size = encodeAPRS(convBuffer, aprsmsg);
-
-          if(size > UDP_TX_BUF_SIZE)
-              size = UDP_TX_BUF_SIZE;
-
-          if(bDEBUG)
-          {
-            printfdeb("RX-UDP Check-payload (%i):%02X \n", size, msg_type_b);
-          }
+          // TM-31 (as on ESP32): read the dedup gate once, ahead of everything below.
+          // is_new_packet() has no side effects; nothing between here and the relay
+          // gate inserts into the ring on this side (D2: ESP32 inserts a position id
+          // in the position branch, this side does not yet).
+          uint8_t udp_mid[4] = {
+              (uint8_t)(aprsmsg.msg_id),
+              (uint8_t)(aprsmsg.msg_id >> 8),
+              (uint8_t)(aprsmsg.msg_id >> 16),
+              (uint8_t)(aprsmsg.msg_id >> 24)
+          };
+          bool bUdpMsgIsNew = is_new_packet(udp_mid);
 
           // TM-39: raw & unconditional (printfdeb needs --debug and strips
           // ';' outside csv) -- classify by the same {SET}/{CET} prefixes
@@ -302,21 +245,95 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 #endif
           }
 
-          // DR-04/DR-05 (2026-09-12 decided esp32-correct): position-branch
-          // display parity and bGATEWAY_NOPOS veto, mirroring
-          // udp_frame_esp32.cpp:174-184. Lands after DR-06's decode gate
-          // above, so a decode-rejected frame never reaches this either.
-          // Deliberately NOT porting the early addLoraRxBuffer()/dedup-insert
-          // that sits alongside it on ESP32 (the TM-31 fix): this side never
-          // had the early-insert bug TM-31 describes, and adding it here
-          // would reintroduce exactly that bug (the is_new_packet() read
-          // below would see the id this same call just inserted).
+          // MeshCom 5 (Konzept docs/meshcom5-topologie/ 4.11, Anhang E, Stufe 3):
+          // Zielpfad vor checkVia() auf das Ziel zuruecksetzen. Ein Via ist ein
+          // Naechster-Hop-Feld der Absender-Region; vom Server eingespeist
+          // nennt er Knoten, die hier niemand hoert, und kein Nachbar mit
+          // Firmware ab dem 13.06. wiederholte den Rahmen. Danach setzt
+          // checkVia() hoechstens den eigenen Via (node_via). Die Anzeige,
+          // die Telefon-Kopien und die zweite checkVia()-Stelle weiter unten
+          // arbeiten auf demselben, hier schon zurueckgesetzten aprsmsg.
+          mcSet(aprsmsg.msg_destination_path, sizeof(aprsmsg.msg_destination_path), aprsmsg.msg_destination_call);
+
+          // D2 (open): ESP32 inserts a new position id into the dedup ring right
+          // here (UDP-04); this side inserts at the relay decision only.
           if(msg_type_b == 0x21)
           {
             sendDisplayPosition(aprsmsg, 99, 0);
 
             if(bGATEWAY_NOPOS)
               bUDPtoLoraSend = false;
+          }
+
+
+          // print aprs message
+          if(bDisplayInfo)
+          {
+            printBuffer_aprs((char*)"RX-UDP ", aprsmsg);
+            printlndeb("");
+          }
+
+          udpPlatformNoteRelayedFrame();
+
+#if defined(ENABLE_MSGSTORE)
+          // SNF-GW-04 (issue #1188): store-node hook on the server ingress. Runs
+          // BEFORE the own-call append below, so the echo guard sees the path
+          // exactly as the server sent it (a frame carrying our own call is our
+          // own upload coming back). Classifies the payload as received, ahead
+          // of the text branch's {NNN cut (D4: this used to run after it).
+          if(bUdpMsgIsNew && msg_type_b == MSG_TYPE_TEXT && !bSrcUnconfigured &&
+             strcmp(destination_call, meshcom_settings.node_call) != 0 &&
+             !mboxPathHasCall(aprsmsg.msg_source_path, meshcom_settings.node_call))
+          {
+              MboxDecision mboxDec = mboxClassify(aprsmsg.msg_source_call, destination_call, aprsmsg.msg_payload,
+                                                  CheckGroup(destination_call) != 0,
+                                                  false,                                       // peer delivery is RF-only
+                                                  pnRxIsRepeat(aprsmsg, MSG_TYPE_TEXT),        // XOR copy via the server must not refresh stored_ms
+                                                  msgstoreEligible(destination_call));
+
+              if(mboxDec.action == MBOX_ACK)
+                  msgstoreOnAck(aprsmsg.msg_source_call, destination_call, mboxDec.nnn);   // server-side :ackNNN purges a held PM
+              else
+              if(mboxDec.action == MBOX_STORE)
+              {
+                  char mboxText[MC_PAYLOAD_LEN];
+                  mcSet(mboxText, sizeof(mboxText), aprsmsg.msg_payload);
+                  mcTruncate(mboxText, sizeof(mboxText), mboxDec.textLen);
+                  msgstoreStore(aprsmsg.msg_source_call, destination_call, mboxDec.nnn, mboxText, strlen(mboxText));
+              }
+          }
+#endif
+
+          // GWRX-01: Pfad wie vom Server empfangen, fuer nbrServerNeed() (gw_udp_ring.h)
+          char srcPathAsRx[sizeof(aprsmsg.msg_source_path)];
+          mcSet(srcPathAsRx, sizeof(srcPathAsRx), aprsmsg.msg_source_path);
+
+          mcAppendChar(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), ',');
+          mcAppend(aprsmsg.msg_source_path, sizeof(aprsmsg.msg_source_path), meshcom_settings.node_call);
+
+          aprsmsg.msg_server = true;
+
+          aprsmsg.msg_last_hw = BOARD_HARDWARE | 0x80; // hardware  last sending node
+          aprsmsg.msg_source_mod = (getMOD() & 0xF) | (meshcom_settings.node_country << 4); // modulation & country
+
+          if(bDEBUG)
+          {
+            printfdeb("RX-UDP Source-Path:%s\n",  aprsmsg.msg_source_path);
+          }
+
+
+          memset(udpFrameBuf, 0x00, UDP_TX_BUF_SIZE);
+
+          checkVia(aprsmsg);
+
+          uint16_t size = encodeAPRS(udpFrameBuf, aprsmsg);
+
+          if(size > UDP_TX_BUF_SIZE)
+              size = UDP_TX_BUF_SIZE;
+
+          if(bDEBUG)
+          {
+            printfdeb("RX-UDP Check-payload (%i):%02X \n", size, msg_type_b);
           }
 
           // GW-GROUP-01/GW-DM-01: decided once; gates only what the phone and the display get.
@@ -328,12 +345,12 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
           {
             if(memcmp(aprsmsg.msg_payload, "{SET}", 5) == 0)
             {
-                sendDisplayText(aprsmsg, (int16_t)99, (int8_t)0);
+                sendDisplayText(aprsmsg, 99, 0);
             }
             else
             if(memcmp(aprsmsg.msg_payload, "{CET}", 5) == 0)
             {
-                sendDisplayText(aprsmsg, (int16_t)99, (int8_t)0);
+                sendDisplayText(aprsmsg, 99, 0);
             }
             else
             if((strcmp(destination_call, "*") == 0 && !bNoMSGtoALL) || strcmp(destination_call, meshcom_settings.node_call) == 0 || CheckGroup(destination_call) > 0)
@@ -495,7 +512,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                 if(iAckPos <= 0 && bDmDedupNew && !bStoConsumed && !bRmConsumed && bForNode)
                 {
                   if(!bGATEWAY)
-                    sendDisplayText(aprsmsg, (int16_t)99, (int8_t)0);
+                    sendDisplayText(aprsmsg, 99, 0);
                 }
 
                 aprsmsg.max_hop = aprsmsg.max_hop | 0x20;   // msg_app_offline true
@@ -545,41 +562,8 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
             }
           }
 
-          // Check dedup ring first (same check that LoRa RX path uses)
-          uint8_t udp_mid[4] = {
-              (uint8_t)(aprsmsg.msg_id),
-              (uint8_t)(aprsmsg.msg_id >> 8),
-              (uint8_t)(aprsmsg.msg_id >> 16),
-              (uint8_t)(aprsmsg.msg_id >> 24)
-          };
-
-          if(is_new_packet(udp_mid))
+          if(bUdpMsgIsNew)
           {
-#if defined(ENABLE_MSGSTORE)
-            // SNF-GW-04 (docs/concept-open-issues-20261004.md section 7, #1188): a text frame
-            // from the server for someone else -- a server-side ":ackNNN" purges a held DM, a
-            // PM with "{NNN" for the store set goes into the mailbox. Same decision as OnRxDone
-            // (msgstore_hook.h). Runs in the loop task; the msgstore hooks take their own lock.
-            // Echo guard (path already carried the own call) is bSrcPathHadOwnCall, see above.
-            if(msg_type_b == MSG_TYPE_TEXT && !bSrcUnconfigured &&
-               strcmp(destination_call, meshcom_settings.node_call) != 0 &&
-               !bSrcPathHadOwnCall)
-            {
-                MboxDecision md = mboxClassify(aprsmsg.msg_source_call, destination_call, aprsmsg.msg_payload,
-                                               CheckGroup(destination_call) != 0, false,
-                                               pnRxIsRepeat(aprsmsg, MSG_TYPE_TEXT),
-                                               msgstoreEligible(destination_call));
-                if(md.action == MBOX_ACK)
-                    msgstoreOnAck(aprsmsg.msg_source_call, destination_call, md.nnn);
-                else if(md.action == MBOX_STORE)
-                {
-                    char mboxText[MC_PAYLOAD_LEN];
-                    mcSet(mboxText, sizeof(mboxText), aprsmsg.msg_payload);
-                    mcTruncate(mboxText, sizeof(mboxText), md.textLen);
-                    msgstoreStore(aprsmsg.msg_source_call, destination_call, md.nnn, mboxText, strlen(mboxText));
-                }
-            }
-#endif
             // Eigene PN-Retry-Kopie (Bits 10-11 gekippt, pn_retry.h) vom Server zurueck:
             // own_msg_id[] kennt nur die Original-id -- zurueckfalten, sonst sendet der
             // Knoten seine eigene Kopie noch einmal, sobald sie aus dem Dedup-Ring ist.
@@ -607,7 +591,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                 // store last message to compare later on
                 insertOwnTx(aprsmsg.msg_id);
 
-                gwUdpRxEnqueue(convBuffer, size, aprsmsg.payload_type, srcPathAsRx, aprsmsg.msg_id); // fire-and-forget, no retransmission for UDP relay (GWRX-01: text may become RING_KIND_RELAY)
+                gwUdpRxEnqueue(udpFrameBuf, (uint16_t)size, aprsmsg.payload_type, srcPathAsRx, aprsmsg.msg_id); // fire-and-forget, no retransmission for UDP relay (GWRX-01: text may become RING_KIND_RELAY)
 
                 if(bDisplayLog)
                 {
@@ -631,7 +615,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
                       printfdeb("RX-UDP addBLEOutBuffer\n");
                     }
 
-                    addBLEOutBuffer(convBuffer, size);
+                    addBLEOutBuffer(udpFrameBuf, size);
                 }
               }
               else
@@ -648,7 +632,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
         }
       }
     }
-    else if (memcmp(indicator_b, conf, UDP_MSG_INDICATOR_LEN) == 0)
+    else if (frame.cls == UDPF_CONF)
     {
 
       if(bDisplayInfo)
@@ -664,11 +648,9 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
       // too (used to fall into OTHER there).
       Serial.printf("[GW];rx;type;CONF;len;%d;ms;%lu\n", packetSize, (unsigned long)millis());
 
-      neth.last_upd_timer = millis();
+      udpPlatformNoteServerRx(millis(), true);
       gwLinkNoteRx(millis());   // real server frame (not the OTHER branch)
       hb_warn_logged = false;   // DR-03: Latch nur zusammen mit der Alterung zuruecksetzen
-
-      neth.had_initial_udp_conn = true;
 
       // CONF-01: guard, parse and apply mirror the ESP32 handler
       // (src/udp_functions.cpp, commit b624bd33) via the shared
@@ -676,13 +658,11 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
       // only when the datagram's source matches the resolved gateway
       // server -- on nRF52 that is udp_dest_addr (the address
       // startUDP()/startFIXUDP() set as GATE/BEAT/CONF destination and
-      // origin). remote_ip above was read fresh for this exact packet,
+      // origin). src_ip above was read fresh for this exact packet,
       // so unlike the ESP32 side (which tracks a separate "last seen rx
       // IP" across getUDP() calls) there is no staleness window here.
-      if (packetSize < UDP_MSG_INDICATOR_LEN || packetSize > UDP_CONF_BUFF_SIZE)
-      {
-        printfdeb("[CONF] ignored: size %d out of bounds\n", packetSize);
-      }
+      const IPAddress serverAddr = udpPlatformServerAddr();
+      // C10: source guard first, then the size guard, as on ESP32
       // DR-08 (2026-09-12 decided esp32-correct): explicit zero-address
       // guard added to the equality check, mirroring
       // udp_frame_esp32.cpp:369-387 -- a plain equality check alone would
@@ -690,11 +670,15 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
       // while udp_dest_addr (the resolved gateway server) is itself still
       // unresolved (pre-DHCP/pre-resolve). ESP32's comment there treats
       // this as a deliberate anti-spoofing measure, not an accident.
-      else if ((uint32_t)neth.udp_dest_addr == 0 || !(remote_ip == neth.udp_dest_addr))   // nRF52 IPAddress has no operator!=
+      if ((uint32_t)serverAddr == 0 || !(src_ip == serverAddr))   // nRF52 IPAddress has no operator!=
       {
         printfdeb("[CONF] ignored: source %d.%d.%d.%d does not match gateway server %d.%d.%d.%d\n",
-                   remote_ip[0], remote_ip[1], remote_ip[2], remote_ip[3],
-                   neth.udp_dest_addr[0], neth.udp_dest_addr[1], neth.udp_dest_addr[2], neth.udp_dest_addr[3]);
+                   src_ip[0], src_ip[1], src_ip[2], src_ip[3],
+                   serverAddr[0], serverAddr[1], serverAddr[2], serverAddr[3]);
+      }
+      else if (!frame.conf_size_ok)
+      {
+        printfdeb("[CONF] ignored: size %d out of bounds\n", packetSize);
       }
       else
       {
@@ -737,15 +721,14 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
 
             save_settings();
 
-            // same auto-reboot as a changed --setcall (commandAction(), src/command_functions.cpp).
-            // No T-Deck exception needed here -- BOARD_T_DECK/BOARD_T_DECK_PLUS
-            // are ESP32-only board defines, never set in an nRF52 build.
-            rebootAuto = millis() + 15 * 1000; // 15 Sekunden
+            // same auto-reboot as a changed --setcall (commandAction(), src/command_functions.cpp);
+            // the T-Deck exception lives in the ESP32 hook, those defines never exist on nRF52
+            udpPlatformScheduleConfReboot(15 * 1000); // 15 Sekunden
           }
         }
       }
     }
-    else if (memcmp(indicator_b, beat, UDP_MSG_INDICATOR_LEN) == 0)
+    else if (frame.cls == UDPF_BEAT)
     {
 
       // we got an heartbeat from server which we use to check connection (saving time we got it)
@@ -758,7 +741,7 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
       // TM-39: raw & unconditional
       Serial.printf("[GW];rx;type;BEAT;len;%d;ms;%lu\n", packetSize, (unsigned long)millis());
 
-      neth.last_upd_timer = millis();
+      udpPlatformNoteServerRx(millis(), false);
       gwLinkNoteRx(millis());   // real server frame (not the OTHER branch)
       hb_warn_logged = false;   // DR-03: Latch nur zusammen mit der Alterung zuruecksetzen
       
@@ -776,9 +759,13 @@ int handleUdpFrame_nrf52(unsigned char *inc_udp_buffer, int packetSize, IPAddres
       // UDP-03 (#1231): no server frame -- leave the HB watchdog and its warn latch alone
     }
 
-    return 0;   // handled
+  }
+  else
+  {
+    DEBUG_MSG("ERROR", "UDP Message has too much Zeros");
+    return 1;   // too many zeros
   }
 
-  return 1;   // too many zeros
+  return 0;   // handled
 }
 #endif

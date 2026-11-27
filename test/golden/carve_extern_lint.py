@@ -46,6 +46,9 @@ CARVED = [
     "src/nrf52/udp_drain_nrf52.cpp",
     "src/esp32/udp_frame_esp32.cpp",
     "src/nrf52/udp_frame_nrf52.cpp",
+    # FORMAL-02: the platform seam files re-declare the same hand-written externs
+    "src/esp32/udp_frame_platform_esp32.cpp",
+    "src/nrf52/udp_frame_platform_nrf52.cpp",
     # 2026-09-16: the hazard in the docstring above is not a property of being
     # "carved" -- it is a property of hand-writing an `extern` for something
     # defined in another TU, and this tree does that in six more files. The

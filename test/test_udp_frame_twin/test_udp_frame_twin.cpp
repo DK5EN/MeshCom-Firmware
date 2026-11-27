@@ -76,6 +76,7 @@
 #include <own_msg_status.h>  // web GUI tick fix: late server ACK reaches the durable status row
 #include <msgstore_api.h>    // SNF-GW-04: store-node hooks both handlers call on server ingress (faked below)
 #include <lora_functions.h>  // SNF-GW-04: pnRxIsRepeat() declaration (faked below)
+#include "../../src/udp_frame_platform.h"   // FORMAL-02 hook seam (the hooks are defined below, one set switching on the side)
 
 // ---------------------------------------------------------------------------
 // File-scope state the two handlers extern. Types/values copied verbatim
@@ -122,6 +123,60 @@ uint8_t own_msg_id[MAX_RING][5];
 unsigned long rebootAuto = 0;
 uint8_t RcvBuffer[UDP_TX_BUF_SIZE * 2];
 std::atomic<uint32_t> stat_newid{0};
+
+// ---------------------------------------------------------------------------
+// FORMAL-02 platform hooks (src/udp_frame_platform.h). On a board there is one
+// definition per platform (udp_frame_platform_esp32.cpp / _nrf52.cpp); both
+// handlers share this binary, so the hooks switch on the side the wrapper
+// below announced. Bodies mirror the two board files line for line.
+// ---------------------------------------------------------------------------
+static int g_udp_hook_side = 0;   // 0 = ESP32 handler running, 1 = nRF52
+
+void udpPlatformNoteServerRx(unsigned long now_ms, bool initial_conn)
+{
+    if (g_udp_hook_side == 0)
+    {
+        last_upd_timer = now_ms;
+        if (initial_conn) had_initial_udp_conn = true;
+    }
+    else
+    {
+        neth.last_upd_timer = now_ms;
+        if (initial_conn) neth.had_initial_udp_conn = true;
+    }
+}
+
+IPAddress udpPlatformServerAddr(void)
+{
+    return g_udp_hook_side == 0 ? node_hostip : neth.udp_dest_addr;
+}
+
+void udpPlatformNoteRelayedFrame(void)
+{
+    if (g_udp_hook_side == 0)
+        bLED_ORANGE = true;
+}
+
+void udpPlatformScheduleConfReboot(unsigned long delay_ms)
+{
+    rebootAuto = millis() + delay_ms;   // the board files differ only by the T-Deck exception, no native define
+}
+
+// Every call site below (about 130) goes through these two wrappers so the
+// hooks see the right side; the macros come after the wrappers because they
+// call the real names.
+static int twinFeedEsp32(unsigned char *buf, int n, IPAddress ip)
+{
+    g_udp_hook_side = 0;
+    return handleUdpFrame_esp32(buf, n, ip);
+}
+static int twinFeedNrf52(unsigned char *buf, int n, IPAddress ip)
+{
+    g_udp_hook_side = 1;
+    return handleUdpFrame_nrf52(buf, n, ip);
+}
+#define handleUdpFrame_esp32(...) twinFeedEsp32(__VA_ARGS__)
+#define handleUdpFrame_nrf52(...) twinFeedNrf52(__VA_ARGS__)
 
 // aprs_functions.cpp's own externs -- same values test_udp_send_twin.cpp
 // uses, for the same reason (int-vs-uint8_t ODR match with the real .cpp).

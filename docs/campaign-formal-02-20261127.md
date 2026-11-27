@@ -22,14 +22,14 @@ archive section at the end with one line each.
 
 ## Waves
 
-| Wave | Content                                                                                                                                 | State                    |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| 1    | Seams: `handleACK` core, `readPhoneCommand` with explicit length, settings round trip + migration; UDP twin analysis, web_functions map | done                     |
-| 1b   | UDP receive consolidation into one module (`docs/udp-consolidation-20261127.md`)                                                        | waits for operator D1-D5 |
-| 2    | Bounded proofs for the new cores (ACK, phone frame, UDP RX), mutations, witnesses                                                       | open                     |
-| 3    | BLE host task vs main loop model (ESP32 queue, nRF52 flag), fixes                                                                       | open                     |
-| 4    | NimBLE boundary and library; production web server seams and proofs                                                                     | open                     |
-| 5    | Mesh model: relay, dedup ring, ACK and retries across nodes                                                                             | open                     |
+| Wave | Content                                                                                                                                 | State   |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1    | Seams: `handleACK` core, `readPhoneCommand` with explicit length, settings round trip + migration; UDP twin analysis, web_functions map | done    |
+| 1b   | UDP receive consolidation into one module (`docs/udp-consolidation-20261127.md`)                                                        | running |
+| 2    | Bounded proofs for the new cores (ACK, phone frame, UDP RX), mutations, witnesses                                                       | open    |
+| 3    | BLE host task vs main loop model (ESP32 queue, nRF52 flag), fixes                                                                       | open    |
+| 4    | NimBLE boundary and library; production web server seams and proofs                                                                     | open    |
+| 5    | Mesh model: relay, dedup ring, ACK and retries across nodes                                                                             | open    |
 
 ## Rules for this campaign
 
@@ -54,14 +54,27 @@ archive section at the end with one line each.
 - No host test covers `web_functions.cpp`, `web_setup.cpp`, `web_rm_handlers.cpp`. Already pure and tested:
   `web_guard.h`, `web_rm_parse.h`, `web_txbuf`, `web_auth`, `url_decode`.
 
+## Operator decisions for the UDP merge (2026-11-27)
+
+- D3: nRF gateways show server DM/group text and answer `{pong}`/`{MCP}`, like ESP32 (the `if(!bGATEWAY)` guard goes).
+- D2: option A, a server position (0x21) enters the dedup ring at once on receipt, like ESP32.
+- D1: every GATE frame from the server stamps server liveness, like nRF.
+- D5: datagrams under 4 bytes are class OTHER; a 4-byte GATE frame carries no type.
+- Not asked, taken: UDP gets its own receive buffer (no shared LoRa `RcvBuffer`, D6); entry points renamed at once.
+
+## Carry into wave 1b part 2
+
+- Advisor 2026-11-27 (part 1 APPROVED): the C7 move makes the nRF "RX-UDP" debug line print the reset destination
+  path (like ESP32), a content change the differential cannot see (the twin `printBuffer_aprs` stub records only
+  source and tail). Record `msg_source_path`/`msg_destination_path` in the PRINT stub and whitelist the case.
+- Orphans to remove: `lora_tx_msg_len` (`udp_functions.cpp`), `neth.lora_tx_msg_len` (`nrf_eth.h`, stub follows via
+  `twin_stub_lint`); ESP32 `convBuffer` is now used only by `udp_drain_esp32.cpp`.
+- Unverified by the differential (printfdeb is a no-op natively): C10 log text, nRF `bDEBUG` traces, the ESP32 caller
+  busy flag and wider wipe (board build only).
+
 ## Open questions
 
-- UDP merge decisions (analysis doc section 2): D3 nRF gateways show server DM/group text (recommend yes, like ESP32);
-  D2 when a vetoed server position enters the dedup ring (recommend A, early like ESP32); D1 every GATE frame stamps
-  server liveness (recommend yes, like nRF); D5 datagrams under 4 bytes are class OTHER (recommend yes).
-- nRF52 view of the settings migration test (the keyed file loader runs only on nRF52; the suite builds the ESP32 +
-  T-Deck view): add a second env in the wave 1b gate.
-- Not yet run: ESBMC `settings_decode/roundtrip_*` (orchestrator, wave 2 gate).
+- Not yet run: ESBMC `settings_decode/roundtrip_*`, `ack_rx/*`, `phone_frame/*` (orchestrator, wave 2 gate).
 
 ## Archive
 

@@ -112,6 +112,14 @@
 //
 // The twin turns each of those into a failing-on-change test rather than a
 // comment; see test/test_udp_frame_twin.
+//
+// FORMAL-02 (docs/udp-consolidation-20261127.md): the two handlers are being
+// merged. The zero scan, the indicator class and the GATE span already live
+// once, in udp_frame_parse.h; the platform differences sit behind the hooks of
+// udp_frame_platform.h. What still differs between the two files is marked
+// D2/D3 in them (decisions pending). test/test_udp_frame_diff compares both
+// against byte-frozen copies of the originals. This essay is rewritten when
+// the files are collapsed (step 6 of the plan).
 
 #include <stdint.h>
 #include <stdio.h>

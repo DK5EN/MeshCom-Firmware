@@ -5533,6 +5533,39 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_settings_migration_nrf52": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-D NRF52_SERIES",
+   "-D TX_POWER_MIN=2",
+   "-D TX_POWER_MAX=22",
+   "-D MAX_HOP_TEXT_DEFAULT=4",
+   "-I test/test_nrf52_settings_paths/stubs",
+   "-I test/support",
+   "-I src",
+   "-Wall",
+   "-Wextra",
+   "-Wno-missing-braces"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<nrf52/settings_store_nrf52.cpp>",
+   "+<settings_store.cpp>",
+   "+<settings_schema.cpp>",
+   "+<settings_sanitize.cpp>"
+  ],
+  "extra_scripts": [
+   "pre:tools/force_include_settings_stub.py"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_settings_migration"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_settings_roundtrip": {
   "build_flags": [
    "-std=gnu++17",
@@ -5887,6 +5920,54 @@
   "test_build_src": "True",
   "test_filter": [
    "test_tz_rule"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_udp_frame_diff": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-D ENABLE_MSGSTORE=1",
+   "-I test/test_udp_frame_twin/stubs",
+   "-I test/support",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<Regexp.cpp>",
+   "+<regex_functions.cpp>",
+   "+<aprs_functions.cpp>",
+   "+<charset_filter.cpp>",
+   "+<dedup_functions.cpp>",
+   "+<conf_frame.cpp>",
+   "+<setlog_lines.cpp>",
+   "+<via_functions.cpp>",
+   "+<txring_functions.cpp>",
+   "+<dm_stats.cpp>",
+   "+<dm_dedup.cpp>",
+   "+<reack_limiter.cpp>",
+   "+<own_msg_status.cpp>",
+   "+<remote_cmd.cpp>",
+   "+<hmac_sha256.cpp>",
+   "+<gw_link_status.cpp>",
+   "+<blocked_calls.cpp>",
+   "+<esp32/udp_frame_esp32.cpp>",
+   "+<nrf52/udp_frame_nrf52.cpp>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_udp_frame_diff"
   ],
   "test_framework": "unity"
  },

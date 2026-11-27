@@ -239,7 +239,15 @@ void getMeshComUDP()
       // paths in gateway_service_esp32.cpp, which only call it once
       // WiFi.status() != WL_CONNECTED already confirms the link is down,
       // and to the MAX_ERR_UDP_TX path in udp_drain_esp32.cpp.
-      if(handleUdpFrame_esp32(incomingPacket, len, remote_ip) != 0)
+      // FORMAL-02 (P5): busy flag and buffer wipe moved here from the handler,
+      // like NrfETH::getUDP() has always done them. The wipe now covers every
+      // frame class (before: the GATE branch only); nothing reads the buffer
+      // after the handler returns.
+      udp_is_busy = true;
+      const int udpVerdict = handleUdpFrame_esp32(incomingPacket, len, remote_ip);
+      memset(incomingPacket, 0, UDP_TX_BUF_SIZE);
+      udp_is_busy = false;
+      if(udpVerdict != 0)
       {
         if(WiFi.status() == WL_CONNECTED)
         {
