@@ -318,7 +318,7 @@ async function settle() { for (let i = 0; i < 6; i++) await flush(); }
     check('WP network/401 error is reported', $('wp_msg').textContent.length > 0 && $('wp_msg').style.color === 'var(--mcred)');
     timers = [];
     const src = fs.readFileSync(SRC, 'utf8');
-    check('WP route POST /rmwebpwd dispatches sub_web_passwd behind the same guards', /startsWith\("POST \/rmwebpwd"\)\)\s*\{[^}]*sub_web_passwd\(web_content_length\)/.test(src));
+    check('WP route POST /rmwebpwd dispatches sub_web_passwd behind the same guards', /startsWith\("POST \/rmwebpwd"\)\)\s*return WR_WEB_PASSWD;/.test(src) && /case WR_WEB_PASSWD:[^\n]*\n\s*sub_web_passwd\(web_content_length\);/.test(src));
     check('WP card prints only set / not set from node_webpwd', /strlen\(meshcom_settings\.node_webpwd\) > 0 \? WP_ST_SET : WP_ST_NOT/.test(src));
   }
 

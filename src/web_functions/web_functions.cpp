@@ -18,6 +18,7 @@
 #include "gpio_control.h"      // GPIO-01 Part B: state of the free-GPIO control (glue calls ESP32 only)
 #include "web_functions.h"
 #include "web_request.h" // FORMAL-02 web step 3: request-head accumulator of work_webpage()
+#include "web_route.h"   // FORMAL-02 web step 4: route table, computed beside the legacy router
 #include "web_oled_shot.h"
 #include "web_txbuf.h"     // WEB-TX-01: webTxBeginChunked in send_http_header
 #include "esp32/netif_mtu.h" // NMTU-01 (lwIP part ESP32 only)
@@ -1056,6 +1057,122 @@ static void sub_screen_rgb565(void)
  * Handle Web requests and call the matching sub function
  */
 
+/**
+ * FORMAL-02 web step 4: the router of today, moved out of work_webpage() unchanged in behaviour. It decides the
+ * handler from the head window (web_header) after the guard and the auth gate and returns a WebRoute id (web_route.h);
+ * the two ids WRL_* are branches the table has no row for. A feature that is not built is not named here, so the
+ * request falls through to the next branch exactly as before. noinline: its String temporaries stay out of
+ * work_webpage's frame.
+ */
+#define WRL_RM_SEND_GET WR_COUNT      // GET /rmsend: refused 405 (the table: generic 405, B1)
+#define WRL_PAGE_UNKNOWN (WR_COUNT + 1) // "/?page=" with an unknown name: 404 page (the table: WR_NONE, B1)
+static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header)
+{
+    if (web_header.startsWith("POST /rmsend"))
+        return WR_RM_SEND;
+    else if (web_header.startsWith("GET /rmsend"))
+        return WRL_RM_SEND_GET;
+    else if (web_header.startsWith("GET /rmstatus"))
+        return WR_RM_STATUS;
+    else if (web_header.startsWith("POST /rmpasswd"))
+        return WR_RM_PASSWD;
+    else if (web_header.startsWith("POST /rmwebpwd"))
+        return WR_WEB_PASSWD;
+    else if (web_header.startsWith("GET /pinstatus"))
+        return WR_PIN_STATUS;
+    else if (web_header.startsWith("GET /pinassign"))
+        return WR_PIN_ASSIGN;
+    else if (web_header.startsWith("GET /gpiostatus"))
+        return WR_GPIO_STATUS;
+    else if (web_header.startsWith("GET /rmnodes"))
+        return WR_RM_NODES_GET;
+    else if (web_header.startsWith("POST /rmnodes"))
+        return WR_RM_NODES_POST;
+    else if (web_header.startsWith("GET /rmheard"))
+        return WR_RM_HEARD;
+    else if (web_header.indexOf("/?page=remote") >= 0)
+        return WR_PAGE_REMOTE;
+#if defined(ESP32)
+    else if (web_header.startsWith("GET /austatus"))
+        return WR_AU_STATUS;
+#endif
+    else if (web_header.indexOf("/callfunction/") >= 0)
+        return WR_CALLFUNCTION;
+    else if (web_header.indexOf("/?sendmessage") >= 0)
+        return WR_SENDMESSAGE;
+    else if (web_header.indexOf("/?getmessages") >= 0)
+        return WR_GETMESSAGES;
+    else if (web_header.indexOf("/setparam/") >= 0)
+        return WR_SETPARAM;
+    else if (web_header.indexOf("/getparam/") >= 0)
+        return WR_GETPARAM;
+#if INSTRUMENT_ENABLED && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS))
+    else if (web_header.startsWith("GET /screen.rgb565"))
+        return WR_SCREEN_RGB565;
+#endif
+#if OLED_SHOT_WEB
+    else if (web_header.startsWith("GET /screen.oled"))
+        return WR_SCREEN_OLED;
+#endif
+    else if (web_header.indexOf("/config.json") >= 0)
+        return WR_CONFIG_GET;
+    else if (web_header.indexOf("POST /config") >= 0)
+        return WR_CONFIG_POST;
+    else if (web_header.indexOf("/?page=setup") >= 0)
+        return WR_PAGE_SETUP;
+    else if (web_header.indexOf("/?page=position") >= 0)
+        return WR_PAGE_POSITION;
+    else if (web_header.indexOf("/?page=wx") >= 0)
+        return WR_PAGE_WX;
+    else if (web_header.indexOf("/?page=mheard") >= 0)
+        return WR_PAGE_MHEARD;
+    else if (web_header.indexOf("/?page=neighbours") >= 0)
+        return WR_PAGE_NEIGHBOURS;
+    else if (web_header.indexOf("/?page=messages") >= 0)
+        return WR_PAGE_MESSAGES;
+#if defined(ENABLE_MSGSTORE)
+    else if (web_header.indexOf("/?page=mailbox") >= 0)
+        return WR_PAGE_MAILBOX;
+#endif
+    else if (web_header.indexOf("/?page=rxlog") >= 0)
+        return WR_PAGE_RXLOG;
+    else if (web_header.indexOf("/?page=path") >= 0)
+        return WR_PAGE_PATH;
+    else if (web_header.indexOf("/?page=spectrum") >= 0)
+        return WR_PAGE_SPECTRUM;
+    // D9: the second, identical "/?page=mcp23017" branch of the old chain was unreachable (same test, no side
+    // effect in the test) and is gone
+    else if (web_header.indexOf("/?page=mcp23017") >= 0)
+        return WR_PAGE_MCP23017;
+    else if (web_header.indexOf("/?page=pins") >= 0)
+        return WR_PAGE_PINS;
+    else if (web_header.indexOf("/?page=info") >= 0)
+        return WR_PAGE_INFO;
+    else if (web_header.indexOf("/?page=") >= 0)
+        return WRL_PAGE_UNKNOWN;
+    return WR_SCAFFOLD;
+}
+
+// FORMAL-02 web step 4: the number of requests where the route table (web_route.h, the target rules) and the legacy
+// chain above chose differently. Debug only, no behaviour hangs on it; the later steps switch cases one by one.
+uint32_t web_route_disagree = 0;
+
+/**
+ * The route of the request in the window: the legacy chain decides, the table is computed beside it and a
+ * difference is only counted (also when the window does not parse).
+ */
+static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, const String &web_header)
+{
+    const uint8_t legacy = webRouteLegacy(web_header);
+    WebReq wr;
+    uint8_t table = WR_NONE;
+    if (webReqParse(acc->head, acc->head_len, (acc->flags & WEB_HF_CUT) != 0, &wr) == WRQ_OK)
+        table = webRouteMatch(wr.method, wr.path, wr.query);
+    if (table != legacy)
+        web_route_disagree++;
+    return legacy;
+}
+
 void work_webpage(void)
 {
     // RAM-Rueckgewinn (2026-09-20): der 1-kB-Sammelpuffer web_header_collect
@@ -1316,191 +1433,152 @@ void work_webpage(void)
                     else
                     {
 
-                        if (web_header.startsWith("POST /rmsend"))
-                        { // W2-1: remote management send, the password is in the BODY, read by the handler
-                            sub_rm_send(web_content_length);
-                        }
-                        else if (web_header.startsWith("GET /rmsend"))
-                        { // W2-1: refused, and the request line is wiped in case it carried a password
-                            rm_wipe_string(web_header);
-                            send_http_header(405, RESPONSE_TYPE_JSON);
-                            web_client.println("{\"ok\":false,\"err\":\"use POST\"}");
-                        }
-                        else if (web_header.startsWith("GET /rmstatus"))
-                        { // W2: status + sent list for the remote management card
-                            sub_rm_status();
-                        }
-                        else if (web_header.startsWith("POST /rmpasswd"))
-                        { // RM GUI: set / clear node_passwd, the password is in the BODY
-                            sub_rm_passwd(web_content_length);
-                        }
-                        else if (web_header.startsWith("POST /rmwebpwd"))
-                        { // WEB-PWD-01: set / clear the web login password, the password is in the BODY
-                            sub_web_passwd(web_content_length);
-                        }
-                        else if (web_header.startsWith("GET /pinstatus"))
-                        { // Pins page: cached state of the board LED, charge LED and MCP23017 pins, read-only, GET only
-                            sub_pin_status();
-                        }
-                        else if (web_header.startsWith("GET /pinassign"))
-                        { // Pins page: the four pin assignments (1-Wire, button, analog, anemometer), read-only, GET only
-                            sub_pin_assign();
-                        }
-                        else if (web_header.startsWith("GET /gpiostatus"))
-                        { // Pins page: the free GPIOs and the gpio control state, read-only, GET only
-                            sub_gpio_status();
-                        }
-                        else if (web_header.startsWith("GET /rmnodes"))
-                        { // RM GUI: the three saved nodes (slot, used, call), never a key
-                            sub_rm_nodes_get();
-                        }
-                        else if (web_header.startsWith("POST /rmnodes"))
-                        { // RM GUI: save / delete / forget saved nodes, the password is in the BODY
-                            sub_rm_nodes_post(web_content_length);
-                        }
-                        else if (web_header.startsWith("GET /rmheard"))
-                        { // RM GUI: up to 12 heard nodes for the Remote page chips
-                            sub_rm_heard();
-                        }
-                        else if (web_header.indexOf("/?page=remote") >= 0)
-                        { // RM GUI: the Remote page
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_remote();
-                        }
+                        switch (webRouteDecide(web_acc, web_header))
+                        {
+                        case WR_RM_SEND: // W2-1: remote management send, the password is in the BODY, read by the handler
+                                sub_rm_send(web_content_length);
+                                break;
+                        case WRL_RM_SEND_GET: // W2-1: refused, and the request line is wiped in case it carried a password
+                                rm_wipe_string(web_header);
+                                send_http_header(405, RESPONSE_TYPE_JSON);
+                                web_client.println("{\"ok\":false,\"err\":\"use POST\"}");
+                                break;
+                        case WR_RM_STATUS: // W2: status + sent list for the remote management card
+                                sub_rm_status();
+                                break;
+                        case WR_RM_PASSWD: // RM GUI: set / clear node_passwd, the password is in the BODY
+                                sub_rm_passwd(web_content_length);
+                                break;
+                        case WR_WEB_PASSWD: // WEB-PWD-01: set / clear the web login password, the password is in the BODY
+                                sub_web_passwd(web_content_length);
+                                break;
+                        case WR_PIN_STATUS: // Pins page: cached state of the board LED, charge LED and MCP23017 pins, read-only, GET only
+                                sub_pin_status();
+                                break;
+                        case WR_PIN_ASSIGN: // Pins page: the four pin assignments (1-Wire, button, analog, anemometer), read-only, GET only
+                                sub_pin_assign();
+                                break;
+                        case WR_GPIO_STATUS: // Pins page: the free GPIOs and the gpio control state, read-only, GET only
+                                sub_gpio_status();
+                                break;
+                        case WR_RM_NODES_GET: // RM GUI: the three saved nodes (slot, used, call), never a key
+                                sub_rm_nodes_get();
+                                break;
+                        case WR_RM_NODES_POST: // RM GUI: save / delete / forget saved nodes, the password is in the BODY
+                                sub_rm_nodes_post(web_content_length);
+                                break;
+                        case WR_RM_HEARD: // RM GUI: up to 12 heard nodes for the Remote page chips
+                                sub_rm_heard();
+                                break;
+                        case WR_PAGE_REMOTE: // RM GUI: the Remote page
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_page_remote();
+                                break;
 #if defined(ESP32)
-                        else if (web_header.startsWith("GET /austatus"))
-                        { // AU web GUI: read-only update state for the Info page row, no CORS (node-local)
-                            web_cors_ok = false;
-                            sub_au_status();
-                        }
+                        case WR_AU_STATUS: // AU web GUI: read-only update state for the Info page row, no CORS (node-local)
+                                web_cors_ok = false;
+                                sub_au_status();
+                                break;
 #endif
-                        else if (web_header.indexOf("/callfunction/") >= 0)
-                        { // user requested to invoke a function
-                            // ### !!function will generate a HTML header itself
-                            call_function(web_header);
-                        }
-                        else if (web_header.indexOf("/?sendmessage") >= 0)
-                        { // user requested to send a message to the mesh
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            send_message(web_header);
-                        }
-                        else if (web_header.indexOf("/?getmessages") >= 0)
-                        { // user requested to retrieve the stored messages
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_content_messages();
-                        }
-                        else if (web_header.indexOf("/setparam/") >= 0)
-                        { // user requested to set a parameter
-                            // ### !!function will generate a HTML header itself
-                            setparam(web_header);
-                        }
-                        else if (web_header.indexOf("/getparam/") >= 0)
-                        { // user requested to get a parameter
-                            // ### !!function will generate a HTML header itself
-                            getparam(web_header);
-                        }
+                        case WR_CALLFUNCTION: // user requested to invoke a function
+                                // ### !!function will generate a HTML header itself
+                                call_function(web_header);
+                                break;
+                        case WR_SENDMESSAGE: // user requested to send a message to the mesh
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                send_message(web_header);
+                                break;
+                        case WR_GETMESSAGES: // user requested to retrieve the stored messages
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_content_messages();
+                                break;
+                        case WR_SETPARAM: // user requested to set a parameter
+                                // ### !!function will generate a HTML header itself
+                                setparam(web_header);
+                                break;
+                        case WR_GETPARAM: // user requested to get a parameter
+                                // ### !!function will generate a HTML header itself
+                                getparam(web_header);
+                                break;
 #if INSTRUMENT_ENABLED && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS))
-                        else if (web_header.startsWith("GET /screen.rgb565"))
-                        { // bench screenshot, tools/bench/tdeck_screenshot.py
-                            sub_screen_rgb565();
-                        }
+                        case WR_SCREEN_RGB565: // bench screenshot, tools/bench/tdeck_screenshot.py
+                                sub_screen_rgb565();
+                                break;
 #endif
 #if OLED_SHOT_WEB
-                        else if (web_header.startsWith("GET /screen.oled"))
-                        { // bench screenshot, tools/bench/oled_screenshot.py
-                            sub_screen_oled();
-                        }
+                        case WR_SCREEN_OLED: // bench screenshot, tools/bench/oled_screenshot.py
+                                sub_screen_oled();
+                                break;
 #endif
-                        else if (web_header.indexOf("/config.json") >= 0)
-                        { // CS-03: download the configuration as a file
-                            // ### !!function will generate a HTML header itself
-                            sub_config_download();
-                        }
-                        else if (web_header.indexOf("POST /config") >= 0)
-                        { // CS-03: restore a configuration file, then reboot
-                            // ### !!function will generate a HTML header itself
-                            sub_config_upload(web_content_length);
-                        }
-                        else if (web_header.indexOf("/?page=setup") >= 0)
-                        { // user requested the position page
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_setup();
-                        }
-                        else if (web_header.indexOf("/?page=position") >= 0)
-                        { // user requested the position page
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_position();
-                        }
-                        else if (web_header.indexOf("/?page=wx") >= 0)
-                        { // user requested the weather page
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_wx();
-                        }
-                        else if (web_header.indexOf("/?page=mheard") >= 0)
-                        { // user requested the mheard page
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_mheard();
-                        }
-                        else if (web_header.indexOf("/?page=neighbours") >= 0)
-                        { // NBR-W2: user requested the neighbour-matrix page
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_neighbours();
-                        }
-                        else if (web_header.indexOf("/?page=messages") >= 0)
-                        { // user requested the messages page
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_messages();
-                        }
+                        case WR_CONFIG_GET: // CS-03: download the configuration as a file
+                                // ### !!function will generate a HTML header itself
+                                sub_config_download();
+                                break;
+                        case WR_CONFIG_POST: // CS-03: restore a configuration file, then reboot
+                                // ### !!function will generate a HTML header itself
+                                sub_config_upload(web_content_length);
+                                break;
+                        case WR_PAGE_SETUP:
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_page_setup();
+                                break;
+                        case WR_PAGE_POSITION:
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_page_position();
+                                break;
+                        case WR_PAGE_WX:
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_page_wx();
+                                break;
+                        case WR_PAGE_MHEARD:
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_page_mheard();
+                                break;
+                        case WR_PAGE_NEIGHBOURS: // NBR-W2: the neighbour-matrix page
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_page_neighbours();
+                                break;
+                        case WR_PAGE_MESSAGES:
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_page_messages();
+                                break;
 #if defined(ENABLE_MSGSTORE)
-                        else if (web_header.indexOf("/?page=mailbox") >= 0)
-                        { // user requested the mailbox (store node) page, stage 3
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_mailbox();
-                        }
+                        case WR_PAGE_MAILBOX: // the mailbox (store node) page, stage 3
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_page_mailbox();
+                                break;
 #endif
-                        else if (web_header.indexOf("/?page=rxlog") >= 0)
-                        { // user requested the rx log page
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_rxlog();
-                        }
-                        else if (web_header.indexOf("/?page=path") >= 0)
-                        { // user requested the path page
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_path();
-                        }
-                        else if (web_header.indexOf("/?page=spectrum") >= 0)
-                        { // user requested the path page
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_spectrum();
-                        }
-                        else if (web_header.indexOf("/?page=mcp23017") >= 0)
-                        { // user requested the path page
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_mcp23017();
-                        }
-                        else if (web_header.indexOf("/?page=mcp23017") >= 0)
-                        { // user requested the path page
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_mcp23017();
-                        }
-                        else if (web_header.indexOf("/?page=pins") >= 0)
-                        { // user requested the pins page
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_pins();
-                        }
-                        else if (web_header.indexOf("/?page=info") >= 0)
-                        { // user requested the info page
-                            send_http_header(200, RESPONSE_TYPE_TEXT);
-                            sub_page_info();
-                        }
-                        else if (web_header.indexOf("/?page=") >= 0)
-                        { // user requested a page we do not know
-                            send_http_header(404, RESPONSE_TYPE_TEXT);
-                            sub_page_unknown();
-                        }
-                        else
-                        {
-                            deliver_scaffold(bget_password);
+                        case WR_PAGE_RXLOG:
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_page_rxlog();
+                                break;
+                        case WR_PAGE_PATH:
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_page_path();
+                                break;
+                        case WR_PAGE_SPECTRUM:
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_page_spectrum();
+                                break;
+                        case WR_PAGE_MCP23017:
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_page_mcp23017();
+                                break;
+                        case WR_PAGE_PINS:
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_page_pins();
+                                break;
+                        case WR_PAGE_INFO:
+                                send_http_header(200, RESPONSE_TYPE_TEXT);
+                                sub_page_info();
+                                break;
+                        case WRL_PAGE_UNKNOWN: // user requested a page we do not know
+                                send_http_header(404, RESPONSE_TYPE_TEXT);
+                                sub_page_unknown();
+                                break;
+                        default: // WR_SCAFFOLD (the legacy chain returns no other id)
+                                deliver_scaffold(bget_password);
+                                break;
                         }
                     } // if (bget_password)
 

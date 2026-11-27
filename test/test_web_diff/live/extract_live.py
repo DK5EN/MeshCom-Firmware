@@ -118,8 +118,13 @@ def generate():
         seg_func(RH, rh, r"^const char \*rmReadBody\(", "rmReadBody"),
     ]
     segs["asset"] = [seg_func(WF, wf, r"^static bool deliver_web_asset\(", "deliver_web_asset")]
+    # router of work_webpage: the WRL_* ids, webRouteLegacy, the disagreement counter and webRouteDecide, one block
+    r0 = only(wf, r"^#define WRL_RM_SEND_GET ", "webRoute block start")
+    rd = only(wf, r"^static uint8_t __attribute__\(\(noinline\)\) webRouteDecide\(", "webRouteDecide")
+    route_seg = (WF, "webRouteLegacy + webRouteDecide", r0, end_brace(wf, rd, "webRouteDecide"))
     segs["rest"] = [
         seg_func(WF, wf, r"^WebHeadAcc \*web_head_acc_get\(", "web_head_acc_get"),
+        route_seg,
         seg_func(WF, wf, r"^void work_webpage\(", "work_webpage"),
         seg_func(WF, wf, r"^String decodeURLPercentCoding\(", "decodeURLPercentCoding"),
         seg_func(WF, wf, r"^void send_http_header\(", "send_http_header"),
@@ -154,7 +159,7 @@ def generate():
     # includes of the frozen unit, so the live unit adds it next to web_functions.h (outside the namespace)
     if live_pre.count("#include <web_functions.h>") != 1:
         die("plumbing of frozen/extract.sh: expected exactly one #include <web_functions.h>")
-    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>")
+    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>\n#include <web_route.h>")
     body.append(ren(live_pre) + "\n")
     body.append("size_t urlDecode_live(char *buf, size_t len, uint8_t policy); // own plumbing: the live decoder (url_decode_live.cpp)\n")
     for s in segs["pre"]:

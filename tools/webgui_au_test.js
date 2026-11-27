@@ -195,7 +195,7 @@ async function mkPage(node, opts) {
   }
   check('banner and .au-banner CSS are gone', !/au-banner|au_banner/.test(cpp));
   check('loadPage hooks auPageLeave/auPageInit through RAK-empty macros', /#define AU_LP_LEAVE ""/.test(cpp) && /" AU_LP_LEAVE "/.test(cpp) && /AU_LP_INIT/.test(cpp));
-  check('GET /austatus route sets web_cors_ok = false and is ESP32 only', /#if defined\(ESP32\)\n\s+else if \(web_header\.startsWith\("GET \/austatus"\)\)\n\s+\{[^\n]*\n\s+web_cors_ok = false;/.test(cpp));
+  check('GET /austatus route sets web_cors_ok = false and is ESP32 only', /#if defined\(ESP32\)\n\s+else if \(web_header\.startsWith\("GET \/austatus"\)\)\n\s+return WR_AU_STATUS;/.test(cpp) && /#if defined\(ESP32\)\n\s+case WR_AU_STATUS:[^\n]*\n\s+web_cors_ok = false;\n\s+sub_au_status\(\);/.test(cpp));
   check('call_function refuses upd* without X-MC through webGuardCallAllowed', /webGuardCallAllowed\(functionData\.functionName\.c_str\(\)/.test(cpp));
   check('setparam refuses manualcommand update commands without X-MC through webGuardSetparamAllowed', /webGuardSetparamAllowed\(param_name\.c_str\(\), param_value\.c_str\(\), full_header\.c_str\(\)/.test(cpp));
 
