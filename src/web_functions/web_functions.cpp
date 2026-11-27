@@ -68,6 +68,7 @@
 #include "esp32/esp32_pmu.h"    // LED-02: effective charge-LED mode (RM override)
 #endif
 #include "web_auth.h"           // WEB-AUTH-01: nonce login + cookie sessions
+#include "command_dash.h"       // B7: commandFoldDashes(), the fold commandAction() runs before its "--" splitter
 #include "web_guard.h"          // RM GUI W1c: Host allowlist (DNS rebinding) and Sec-Fetch-Site (CSRF), header-only
 #include "web_rm_util.h"       // RM GUI G1: rm_wipe / rm_wipe_string / rm_json_str shared with web_rm_page.cpp
 #include "web_rm_page.h"       // RM GUI W2b: sub_page_remote(), rmScaffoldJs()
@@ -5329,6 +5330,43 @@ void call_function(String web_header)
 }
 
 /**
+ * B7 (step 5b): may this decoded setparam value reach the setter? 0 = yes, else a refusal (1 too long, 2 "--", 3 leading
+ * "&&"). A value over 200 bytes is refused for every name (the setters' own buffers may still cut a value near that
+ * length; text rows then read back FAIL). Every name
+ * except manualcommand: the value lands in a "--<cmd> %s" line that commandAction() splits on "--" only, so a "--" inside
+ * the value would run a second command; the look-alike dash fold of commandAction (CMD-DASH-01) runs first, so the scan
+ * sees the text after the same fold. A leading "&&" is the manualcommand spelling of "--" (webSetup_setParam) and refused
+ * the same way, judged on the decoded value as is (no trim); "&&" further in is no splitter and stays allowed.
+ */
+static uint8_t webSetparamValueVerdict(const char *name, const char *value, size_t len)
+{
+    const size_t kMax = 200; // longest value accepted
+    if (len > kMax)
+        return 1;
+    if (strcmp(name, "manualcommand") == 0)
+        return 0;
+    if (len >= 2 && value[0] == '&' && value[1] == '&')
+        return 3;
+    char buf[kMax + 1];
+    memcpy(buf, value, len);
+    buf[len] = 0;
+    // the setters may trim (tz) or lower-case (webhost) the value before they build the line: fold what they could
+    // produce, so ASCII upper case is folded to lower case and every other blank String::trim() removes becomes a space
+    // (a fold boundary)
+    for (size_t i = 0; i < len; i++)
+    {
+        if (buf[i] >= 'A' && buf[i] <= 'Z')
+            buf[i] = (char)(buf[i] - 'A' + 'a');
+        else if (buf[i] == '\r' || buf[i] == '\n' || buf[i] == '\v' || buf[i] == '\f')
+            buf[i] = ' ';
+    }
+    commandFoldDashes(buf);
+    const bool dashes = strstr(buf, "--") != NULL;
+    rm_wipe(buf, sizeof(buf)); // a setpwd value
+    return dashes ? 2 : 0;
+}
+
+/**
  * ###########################################################################################################################
  * Set the Value of a parameter (if known)
  * This will return a JSON containing the result like {"parameterName":"parameterValue"} using a HTTP return code (e.g. 200 or 422)
@@ -5366,8 +5404,10 @@ void setparam(const WebReq &wr, const String &full_header)
         return;
     }
 
-    if (!hasEq)
-    { // B4: a query without '=' (also "?" and no query) sets nothing; the guard above saw name = value = the query as before
+    // B4: a query without '=' (also "?" and no query) sets nothing; the guard above saw name = value = the query as before.
+    // B7: so does a value the setter would split into a second command or cut (webSetparamValueVerdict); the guard 403 stays first
+    if (!hasEq || webSetparamValueVerdict(param_name.c_str(), param_value.c_str(), param_value.length()) != 0)
+    {
         send_http_header(422, RESPONSE_TYPE_JSON);
         JsonDocument refused;
         refused["returncode"] = WS_RETURNCODE_FAIL;

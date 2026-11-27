@@ -334,7 +334,13 @@ static const std::map<std::string, WhiteB4> kWhitelistB4 = {
     {"mut-130-noeq-setparam", {"open", ""}},
 };
 
-static bool isWhitelisted(const std::string &n) { return kWhitelistB4.count(n) != 0 || kWhitelist.count(n) != 0 || kWhitelistB1.count(n) != 0 || kWhitelistB3.count(n) != 0 || kWhitelistB3Http10.count(n) != 0 || kWhitelistB6.count(n) != 0; }
+// B7 (wave 7b step 5b): a setparam value with "--" (or a leading "&&", or over 200 bytes) answers 422 {"returncode":1,"<name>":""} and
+// calls no setter; the guard 403 stays first. `profiles` as in B1; `name` is the key of the answer.
+static const std::map<std::string, WhiteB4> kWhitelistB7 = {
+    {"grd-121-setparam-setcall-x-20-update-20install", {"open", "setcall"}},
+};
+
+static bool isWhitelisted(const std::string &n) { return kWhitelistB7.count(n) != 0 || kWhitelistB4.count(n) != 0 || kWhitelist.count(n) != 0 || kWhitelistB1.count(n) != 0 || kWhitelistB3.count(n) != 0 || kWhitelistB3Http10.count(n) != 0 || kWhitelistB6.count(n) != 0; }
 
 static const WebProfile kProfiles[] = {
     {"open", "", "", false, false},
@@ -521,7 +527,7 @@ static void test_entries_agree_with_the_first(void)
             }
             TEST_ASSERT_TRUE_MESSAGE(same, n.c_str());
         }
-        TEST_ASSERT_EQUAL_size_t_MESSAGE(kWhitelist.size() + kWhitelistB1.size() + kWhitelistB3.size() + kWhitelistB3Http10.size() + kWhitelistB6.size() + kWhitelistB4.size(), whitelisted, "every whitelist entry must be a corpus request");
+        TEST_ASSERT_EQUAL_size_t_MESSAGE(kWhitelist.size() + kWhitelistB1.size() + kWhitelistB3.size() + kWhitelistB3Http10.size() + kWhitelistB6.size() + kWhitelistB4.size() + kWhitelistB7.size(), whitelisted, "every whitelist entry must be a corpus request");
     }
 }
 
@@ -594,6 +600,13 @@ static void test_whitelist_names_corpus_requests(void)
     {
         TEST_ASSERT_TRUE_MESSAGE(have.count(w.first) == 1, (std::string("B4 whitelist names no corpus request: ") + w.first).c_str());
         TEST_ASSERT_TRUE_MESSAGE(kWhitelist.count(w.first) == 0 && kWhitelistB1.count(w.first) == 0 && kWhitelistB3.count(w.first) == 0 && kWhitelistB3Http10.count(w.first) == 0 && kWhitelistB6.count(w.first) == 0,
+                                 (std::string("request in both whitelists: ") + w.first).c_str());
+    }
+    for (const auto &w : kWhitelistB7)
+    {
+        TEST_ASSERT_TRUE_MESSAGE(have.count(w.first) == 1, (std::string("B7 whitelist names no corpus request: ") + w.first).c_str());
+        TEST_ASSERT_TRUE_MESSAGE(kWhitelist.count(w.first) == 0 && kWhitelistB1.count(w.first) == 0 && kWhitelistB3.count(w.first) == 0 && kWhitelistB3Http10.count(w.first) == 0 &&
+                                     kWhitelistB6.count(w.first) == 0 && kWhitelistB4.count(w.first) == 0,
                                  (std::string("request in both whitelists: ") + w.first).c_str());
     }
     for (const auto &w : kWhitelistB6)
@@ -749,18 +762,18 @@ static void test_b3_http10_rows_keep_working(void)
     }
 }
 // B4 rows: live differs from frozen in exactly the listed profiles and answers 422 with the empty-value JSON, no setter call
-static void test_b4_rows_answer_422_and_set_nothing(void)
+static void checkRows422(const char *tag, const std::map<std::string, WhiteB4> &rows)
 {
-    for (const auto &w : kWhitelistB4)
+    for (const auto &w : rows)
     {
         const std::set<std::string> want = profileSet(w.second.profiles, w.first);
         std::map<std::string, std::string> live;
         const std::set<std::string> got = differingProfiles(w.first, &live);
-        const std::string m = "B4 " + w.first + ": live differs from frozen in [" + joinSet(got) + "], the row lists [" + joinSet(want) + "]";
+        const std::string m = std::string(tag) + " " + w.first + ": live differs from frozen in [" + joinSet(got) + "], the row lists [" + joinSet(want) + "]";
         TEST_ASSERT_TRUE_MESSAGE(want == got, m.c_str());
         for (const std::string &prof : want)
         {
-            const std::string am = "B4 " + w.first + " [" + prof + "]: " + webRigEsc(live[prof].substr(0, 300));
+            const std::string am = std::string(tag) + " " + w.first + " [" + prof + "]: " + webRigEsc(live[prof].substr(0, 300));
             TEST_ASSERT_TRUE_MESSAGE(live[prof].compare(0, 12, "HTTP/1.1 422") == 0, am.c_str());
             TEST_ASSERT_TRUE_MESSAGE(live[prof].find(std::string("{\"returncode\":1,\"") + w.second.name + "\":\"\"}") != std::string::npos, am.c_str());
         }
@@ -771,10 +784,12 @@ static void test_b4_rows_answer_422_and_set_nothing(void)
             webRigBegin(readCorpus(w.first), closedVariant(w.first), kProfiles[p]);
             kEntries[1].run();
             for (const std::string &t : webRig().trace)
-                TEST_ASSERT_TRUE_MESSAGE(t.find("webSetup_setParam") == std::string::npos, ("B4 " + w.first + ": setter called").c_str());
+                TEST_ASSERT_TRUE_MESSAGE(t.find("webSetup_setParam") == std::string::npos, (std::string(tag) + " " + w.first + ": setter called").c_str());
         }
     }
 }
+static void test_b4_rows_answer_422_and_set_nothing(void) { checkRows422("B4", kWhitelistB4); }
+static void test_b7_rows_answer_422_and_set_nothing(void) { checkRows422("B7", kWhitelistB7); }
 static void test_b3_rows_answer_400_in_every_profile(void) { checkRows400("B3", kWhitelistB3); }
 static void test_b6_rows_answer_400_in_every_profile(void) { checkRows400("B6", kWhitelistB6); }
 
@@ -1035,6 +1050,70 @@ static void test_param_extraction_live_equals_frozen(void)
     }
 }
 
+// B7 (step 5b): setparam refuses a decoded value that contains "--" (also as the splitter sees it after the look-alike dash
+// fold) or starts with "&&" (every name except manualcommand), and any decoded value over 200 bytes (manualcommand too);
+// 422 {"returncode":1,"<name>":""}, no setter call. "Starts with" is judged on the decoded value as is (no trim); "&&" in
+// the middle is allowed (commandAction splits on "--" only). The frozen entry accepts every one of these.
+static void test_b7_value_verdicts(void)
+{
+    struct Case
+    {
+        std::string line; // request target after /setparam/?
+        const char *name;
+        bool refused;
+    };
+    const std::string v200(200, 'x'), v201(201, 'x');
+    const std::vector<Case> cases = {
+        {"atxt=a--b", "atxt", true},
+        {"atxt=a%20--%20b", "atxt", true},
+        {"atxt=--", "atxt", true},
+        {"atxt=a--", "atxt", true},
+        {"atxt=%26%26x", "atxt", true},
+        {"atxt=&&x", "atxt", true},
+        {"atxt=a&&b", "atxt", false},
+        {"atxt=a%20%26%26%20b", "atxt", false},
+        {"atxt=%20&&x", "atxt", false},
+        {"atxt=a-b", "atxt", false},
+        {"atxt=a%20%E2%80%94x", "atxt", true}, // em dash after a blank, lower-case letter: commandAction folds it to "--"
+        {"atxt=a%20%E2%80%94%20b", "atxt", false}, // not followed by a letter: stays a dash
+        // the setters trim (tz) and lower-case (webhost) before they build the line: the check sees the value after both
+        // (advisor B7: without that, "--webhost \u2014update install" folded to a second command)
+        {"webhost=%E2%80%94UPDATE%20install", "webhost", true},
+        {"tz=%0D%E2%80%94reboot", "tz", true},
+        {"atxt=a%20%E2%80%94X", "atxt", true},
+        {"setcall=--setcall%20x", "setcall", true},
+        {"manualcommand=--info", "manualcommand", false},
+        {"manualcommand=&&info", "manualcommand", false},
+        {"manualcommand=--info%20--save", "manualcommand", false},
+        {"atxt=" + v200, "atxt", false},
+        {"atxt=" + v201, "atxt", true},
+        {"manualcommand=" + v200, "manualcommand", false},
+        {"manualcommand=" + v201, "manualcommand", true},
+        {"atxt=" + std::string(67, 'a') + "%20%20%20" + std::string(130, 'b'), "atxt", false}, // 200 decoded bytes from a longer encoded text
+    };
+    for (const Case &c : cases)
+    {
+        const std::string req = "GET /setparam/?" + c.line + " HTTP/1.1\r\nHost: 192.0.2.10\r\nX-MC: 1\r\n\r\n";
+        const std::string m = std::string(c.refused ? "refused: " : "accepted: ") + c.line.substr(0, 60);
+        webRigBegin(req, false, kProfiles[0]);
+        kEntries[0].run();
+        TEST_ASSERT_TRUE_MESSAGE(webRig().trace.at(0).find("webSetup_setParam") == 0, ("frozen: " + m).c_str());
+        webRigBegin(req, false, kProfiles[0]);
+        kEntries[1].run();
+        const WebRigState &r = webRig();
+        const std::string why = m + ": " + webRigEsc(r.out.substr(0, 160));
+        if (c.refused)
+        {
+            for (const std::string &t : r.trace)
+                TEST_ASSERT_TRUE_MESSAGE(t.find("webSetup_setParam") == std::string::npos, why.c_str());
+            TEST_ASSERT_TRUE_MESSAGE(r.out.compare(0, 12, "HTTP/1.1 422") == 0, why.c_str());
+            TEST_ASSERT_TRUE_MESSAGE(r.out.find(std::string("{\"returncode\":1,\"") + c.name + "\":\"\"}") != std::string::npos, why.c_str());
+        }
+        else
+            TEST_ASSERT_TRUE_MESSAGE(r.trace.at(0).find("webSetup_setParam name='") == 0, why.c_str());
+    }
+}
+
 // every route of the table is built under the macros of this build (ESP32, ENABLE_MSGSTORE, OLED_SHOT_WEB), except the
 // T-Deck bench screenshot (INSTRUMENT_ENABLED and BOARD_T_DECK, which the rig does not model): the router the rig
 // runs can reach every other handler, so a build flag lost from the env cannot hide a route
@@ -1067,6 +1146,7 @@ int main(int, char **)
     RUN_TEST(test_config_json_max_is_the_source_value);
     RUN_TEST(test_known_requests);
     RUN_TEST(test_param_extraction_live_equals_frozen);
+    RUN_TEST(test_b7_value_verdicts);
     RUN_TEST(test_entries_match_golden);
     RUN_TEST(test_golden_set_is_complete);
     RUN_TEST(test_entries_agree_with_the_first);
@@ -1076,6 +1156,7 @@ int main(int, char **)
     RUN_TEST(test_b3_http10_rows_keep_working);
     RUN_TEST(test_b6_rows_answer_400_in_every_profile);
     RUN_TEST(test_b4_rows_answer_422_and_set_nothing);
+    RUN_TEST(test_b7_rows_answer_422_and_set_nothing);
     RUN_TEST(test_b6_content_length_past_the_window);
     RUN_TEST(test_live_leaves_no_request_bytes);
     RUN_TEST(test_live_copy_is_current);

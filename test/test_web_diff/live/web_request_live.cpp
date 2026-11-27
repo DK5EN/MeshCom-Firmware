@@ -14,6 +14,7 @@
 #include <web_functions.h>
 #include <web_request.h>
 #include <web_query.h>
+#include <command_dash.h>
 #include <web_setup.h>
 #include <web_nodefunctioncalls.h>
 #include <web_guard.h>
@@ -43,12 +44,12 @@ void setparam_live(const WebReq &wr, const String &full_header);
 void getparam_live(const WebReq &wr);
 size_t urlDecode_live(char *buf, size_t len, uint8_t policy); // own plumbing: the live decoder (url_decode_live.cpp)
 
-// ==== web_cors_ok (web_functions.cpp) lines 77-79 (working tree) ====
+// ==== web_cors_ok (web_functions.cpp) lines 78-80 (working tree) ====
 // RM GUI W1c: set per request by the guard in work_webpage_live(). No CORS headers are emitted any more
 // (the GUI is same-origin and there is no documented cross-origin consumer); kept for the guard plumbing.
 static bool web_cors_ok = true;
 
-// ==== web_header + clock globals (web_functions.cpp) lines 232-240 (working tree) ====
+// ==== web_header + clock globals (web_functions.cpp) lines 233-241 (working tree) ====
 String web_header;
 // FORMAL-02 web step 3: the head accumulator (~2.4 kB) of work_webpage_live(), one heap block for the life of
 // the server, never on the loop stack. Allocated by startWebserver(); web_head_acc_get() retries.
@@ -59,7 +60,7 @@ unsigned long web_previousTime = 0;       // Previous time
 #define WEB_TIMEOUT_TIME 2000             // Define timeout time in milliseconds (example: 2000ms = 2s)
 bool bweb_server_running = false;
 
-// ==== config buffer + web_read_body (web_functions.cpp) lines 593-680 (working tree) ====
+// ==== config buffer + web_read_body (web_functions.cpp) lines 594-681 (working tree) ====
 /**
  * ###########################################################################################################################
  * CS-03: config download / upload
@@ -191,7 +192,7 @@ const char *rmReadBody_live(char *buf, size_t cap, long content_length)
 #define WEB_RIG_CFG_BUF web_cfg_buf
 #include "../stubs/web_handler_stubs.h"
 
-// ==== deliver_web_asset (web_functions.cpp) lines 977-1026 (working tree) ====
+// ==== deliver_web_asset (web_functions.cpp) lines 978-1027 (working tree) ====
 /**
  * ###########################################################################################################################
  * Serves one of the static GUI assets (web_assets.h): gzip blob, own header (send_http_header_live() says no-cache and
@@ -243,7 +244,7 @@ static bool deliver_web_asset_live(const String &req)
     return true;
 }
 
-// ==== web_head_acc_get (web_functions.cpp) lines 242-249 (working tree) ====
+// ==== web_head_acc_get (web_functions.cpp) lines 243-250 (working tree) ====
 // The accumulator, allocated on first use (startWebserver() calls this once at server start); NULL when the
 // heap is exhausted, work_webpage_live() then answers 503 and keeps the server alive.
 WebHeadAcc *web_head_acc_get(void)
@@ -253,7 +254,7 @@ WebHeadAcc *web_head_acc_get(void)
     return web_head_acc;
 }
 
-// ==== webRouteLegacy + webRouteDecide (web_functions.cpp) lines 1069-1257 (working tree) ====
+// ==== webRouteLegacy + webRouteDecide (web_functions.cpp) lines 1070-1258 (working tree) ====
 static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header)
 {
     if (web_header.startsWith("POST /rmsend"))
@@ -444,7 +445,7 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
     return v.route;
 }
 
-// ==== work_webpage (web_functions.cpp) lines 1259-1731 (working tree) ====
+// ==== work_webpage (web_functions.cpp) lines 1260-1732 (working tree) ====
 void work_webpage_live(void)
 {
     // RAM-Rueckgewinn (2026-09-20): der 1-kB-Sammelpuffer web_header_collect
@@ -919,7 +920,7 @@ void work_webpage_live(void)
     memset(web_acc->line, 0, sizeof(web_acc->line));
 }
 
-// ==== decodeURLPercentCoding (web_functions.cpp) lines 1733-1743 (working tree) ====
+// ==== decodeURLPercentCoding (web_functions.cpp) lines 1734-1744 (working tree) ====
 /**
  * ###########################################################################################################################
  * decodes Percent-Coded Strings (e.g. URLs and its parameters)
@@ -932,7 +933,7 @@ String decodeURLPercentCoding_live(const String &input)
     return String(buf.data());
 }
 
-// ==== webDecodeSpan (web_functions.cpp) lines 1745-1759 (working tree) ====
+// ==== webDecodeSpan (web_functions.cpp) lines 1746-1760 (working tree) ====
 /**
  * The same decode as decodeURLPercentCoding_live() for a span of the parsed request (FORMAL-02 web step 5a): URLD_LEGACY, the
  * result is a String (the handlers keep their setupStruct Strings until B7). The temporary decode buffer is wiped before it
@@ -949,7 +950,7 @@ static String webDecodeSpan(WebSpan s)
     return out;
 }
 
-// ==== webParamText (web_functions.cpp) lines 1761-1786 (working tree) ====
+// ==== webParamText (web_functions.cpp) lines 1762-1787 (working tree) ====
 /**
  * The text setparam / getparam take their name and value from: the query. A request without '?' ("GET /setparam/") has
  * no query; today's header scan then cuts the header from byte 10 ("GET /setparam/" minus 10 = "ram/") up to the HTTP
@@ -977,7 +978,7 @@ static WebSpan webParamText(const WebReq &wr, bool legacyWindow)
     return w;
 }
 
-// ==== send_http_header (web_functions.cpp) lines 4943-4997 (working tree) ====
+// ==== send_http_header (web_functions.cpp) lines 4944-4998 (working tree) ====
 /**
  * ###########################################################################################################################
  * Sends a valid HTTP header. Takes care of the status code.
@@ -1034,7 +1035,7 @@ void send_http_header_live(uint16_t http_status_code, uint8_t content_type, cons
     webTxBeginChunked(web_client);                                            // WEB-TX-01: every flush from here on is one chunk
 }
 
-// ==== send_message (web_functions.cpp) lines 5101-5183 (working tree) ====
+// ==== send_message (web_functions.cpp) lines 5102-5184 (working tree) ====
 /**
  * ###########################################################################################################################
  * handles incoming sendmessage request
@@ -1119,7 +1120,7 @@ void send_message_live(String web_header)
     web_client.println(); // The HTTP response ends with another blank line
 }
 
-// ==== call_function (web_functions.cpp) lines 5257-5329 (working tree) ====
+// ==== call_function (web_functions.cpp) lines 5258-5330 (working tree) ====
 /**
  * ###########################################################################################################################
  * Tries to execute a Web-API function call.
@@ -1194,7 +1195,45 @@ void call_function_live(String web_header)
     web_client.println();
 }
 
-// ==== setparam (web_functions.cpp) lines 5331-5473 (working tree) ====
+// ==== webSetparamValueVerdict (web_functions.cpp) lines 5332-5367 (working tree) ====
+/**
+ * B7 (step 5b): may this decoded setparam value reach the setter? 0 = yes, else a refusal (1 too long, 2 "--", 3 leading
+ * "&&"). A value over 200 bytes is refused for every name (the setters' own buffers may still cut a value near that
+ * length; text rows then read back FAIL). Every name
+ * except manualcommand: the value lands in a "--<cmd> %s" line that commandAction() splits on "--" only, so a "--" inside
+ * the value would run a second command; the look-alike dash fold of commandAction (CMD-DASH-01) runs first, so the scan
+ * sees the text after the same fold. A leading "&&" is the manualcommand spelling of "--" (webSetup_setParam) and refused
+ * the same way, judged on the decoded value as is (no trim); "&&" further in is no splitter and stays allowed.
+ */
+static uint8_t webSetparamValueVerdict(const char *name, const char *value, size_t len)
+{
+    const size_t kMax = 200; // longest value accepted
+    if (len > kMax)
+        return 1;
+    if (strcmp(name, "manualcommand") == 0)
+        return 0;
+    if (len >= 2 && value[0] == '&' && value[1] == '&')
+        return 3;
+    char buf[kMax + 1];
+    memcpy(buf, value, len);
+    buf[len] = 0;
+    // the setters may trim (tz) or lower-case (webhost) the value before they build the line: fold what they could
+    // produce, so ASCII upper case is folded to lower case and every other blank String::trim() removes becomes a space
+    // (a fold boundary)
+    for (size_t i = 0; i < len; i++)
+    {
+        if (buf[i] >= 'A' && buf[i] <= 'Z')
+            buf[i] = (char)(buf[i] - 'A' + 'a');
+        else if (buf[i] == '\r' || buf[i] == '\n' || buf[i] == '\v' || buf[i] == '\f')
+            buf[i] = ' ';
+    }
+    commandFoldDashes(buf);
+    const bool dashes = strstr(buf, "--") != NULL;
+    rm_wipe(buf, sizeof(buf)); // a setpwd value
+    return dashes ? 2 : 0;
+}
+
+// ==== setparam (web_functions.cpp) lines 5369-5513 (working tree) ====
 /**
  * ###########################################################################################################################
  * Set the Value of a parameter (if known)
@@ -1233,8 +1272,10 @@ void setparam_live(const WebReq &wr, const String &full_header)
         return;
     }
 
-    if (!hasEq)
-    { // B4: a query without '=' (also "?" and no query) sets nothing; the guard above saw name = value = the query as before
+    // B4: a query without '=' (also "?" and no query) sets nothing; the guard above saw name = value = the query as before.
+    // B7: so does a value the setter would split into a second command or cut (webSetparamValueVerdict); the guard 403 stays first
+    if (!hasEq || webSetparamValueVerdict(param_name.c_str(), param_value.c_str(), param_value.length()) != 0)
+    {
         send_http_header_live(422, RESPONSE_TYPE_JSON);
         JsonDocument refused;
         refused["returncode"] = WS_RETURNCODE_FAIL;
@@ -1339,7 +1380,7 @@ void setparam_live(const WebReq &wr, const String &full_header)
     rm_wipe_string(setupData.returnValue);
 }
 
-// ==== getparam (web_functions.cpp) lines 5475-5540 (working tree) ====
+// ==== getparam (web_functions.cpp) lines 5515-5580 (working tree) ====
 /**
  * ###########################################################################################################################
  * Get the Value of a parameter (if known)
@@ -2532,6 +2573,42 @@ void call_function(String web_header)
     serializeJson(doc, web_client);
     web_client.println();
 })LIVESRC"},
+    {"src/web_functions/web_functions.cpp", "webSetparamValueVerdict", R"LIVESRC(/**
+ * B7 (step 5b): may this decoded setparam value reach the setter? 0 = yes, else a refusal (1 too long, 2 "--", 3 leading
+ * "&&"). A value over 200 bytes is refused for every name (the setters' own buffers may still cut a value near that
+ * length; text rows then read back FAIL). Every name
+ * except manualcommand: the value lands in a "--<cmd> %s" line that commandAction() splits on "--" only, so a "--" inside
+ * the value would run a second command; the look-alike dash fold of commandAction (CMD-DASH-01) runs first, so the scan
+ * sees the text after the same fold. A leading "&&" is the manualcommand spelling of "--" (webSetup_setParam) and refused
+ * the same way, judged on the decoded value as is (no trim); "&&" further in is no splitter and stays allowed.
+ */
+static uint8_t webSetparamValueVerdict(const char *name, const char *value, size_t len)
+{
+    const size_t kMax = 200; // longest value accepted
+    if (len > kMax)
+        return 1;
+    if (strcmp(name, "manualcommand") == 0)
+        return 0;
+    if (len >= 2 && value[0] == '&' && value[1] == '&')
+        return 3;
+    char buf[kMax + 1];
+    memcpy(buf, value, len);
+    buf[len] = 0;
+    // the setters may trim (tz) or lower-case (webhost) the value before they build the line: fold what they could
+    // produce, so ASCII upper case is folded to lower case and every other blank String::trim() removes becomes a space
+    // (a fold boundary)
+    for (size_t i = 0; i < len; i++)
+    {
+        if (buf[i] >= 'A' && buf[i] <= 'Z')
+            buf[i] = (char)(buf[i] - 'A' + 'a');
+        else if (buf[i] == '\r' || buf[i] == '\n' || buf[i] == '\v' || buf[i] == '\f')
+            buf[i] = ' ';
+    }
+    commandFoldDashes(buf);
+    const bool dashes = strstr(buf, "--") != NULL;
+    rm_wipe(buf, sizeof(buf)); // a setpwd value
+    return dashes ? 2 : 0;
+})LIVESRC"},
     {"src/web_functions/web_functions.cpp", "setparam", R"LIVESRC(/**
  * ###########################################################################################################################
  * Set the Value of a parameter (if known)
@@ -2570,8 +2647,10 @@ void setparam(const WebReq &wr, const String &full_header)
         return;
     }
 
-    if (!hasEq)
-    { // B4: a query without '=' (also "?" and no query) sets nothing; the guard above saw name = value = the query as before
+    // B4: a query without '=' (also "?" and no query) sets nothing; the guard above saw name = value = the query as before.
+    // B7: so does a value the setter would split into a second command or cut (webSetparamValueVerdict); the guard 403 stays first
+    if (!hasEq || webSetparamValueVerdict(param_name.c_str(), param_value.c_str(), param_value.length()) != 0)
+    {
         send_http_header(422, RESPONSE_TYPE_JSON);
         JsonDocument refused;
         refused["returncode"] = WS_RETURNCODE_FAIL;

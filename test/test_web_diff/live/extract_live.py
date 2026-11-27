@@ -132,6 +132,7 @@ def generate():
         seg_func(WF, wf, r"^void send_http_header\(", "send_http_header"),
         seg_func(WF, wf, r"^void send_message\(", "send_message"),
         seg_func(WF, wf, r"^void call_function\(", "call_function"),
+        seg_func(WF, wf, r"^static uint8_t webSetparamValueVerdict\(", "webSetparamValueVerdict"),
         seg_func(WF, wf, r"^void setparam\(", "setparam"),
         seg_func(WF, wf, r"^void getparam\(", "getparam"),
     ]
@@ -161,7 +162,7 @@ def generate():
     # includes of the frozen unit, so the live unit adds it next to web_functions.h (outside the namespace)
     if live_pre.count("#include <web_functions.h>") != 1:
         die("plumbing of frozen/extract.sh: expected exactly one #include <web_functions.h>")
-    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>\n#include <web_query.h>")
+    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>\n#include <web_query.h>\n#include <command_dash.h>")
     # step 5a: setparam / getparam take the parsed request; the plumbing's forward declarations (read from the frozen unit,
     # which still has the String forms) are replaced here
     for old, new in (("void setparam_live(String web_header);", "void setparam_live(const WebReq &wr, const String &full_header);"),
