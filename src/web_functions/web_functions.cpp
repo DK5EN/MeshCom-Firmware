@@ -1201,6 +1201,7 @@ struct WebRouteVerdict
     uint8_t allow;
     bool parsed;
     bool page_shaped;
+    uint8_t wrq; // webReqParse's code (WRQ_OK when parsed); webRouteBadRequest(wrq) answers 400 right after the guard
 };
 
 /**
@@ -1218,7 +1219,8 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
     v.page_shaped = false;
     WebReq wr;
     uint8_t table = WR_NONE;
-    v.parsed = webReqParse(acc->head, acc->head_len, (acc->flags & WEB_HF_CUT) != 0, &wr) == WRQ_OK;
+    v.wrq = webReqParse(acc->head, acc->head_len, (acc->flags & WEB_HF_CUT) != 0, &wr);
+    v.parsed = v.wrq == WRQ_OK;
     if (v.parsed)
         table = webRouteMatch(wr.method, wr.path, wr.query);
     // the legacy id decides only a request the parser refuses
@@ -1373,6 +1375,20 @@ void work_webpage(void)
                         continue;
                     }
 
+                    // B1/B3: the router decides once, here (parse, table, refusal); the no-session gate below reads the same
+                    // verdict. A request line the parser refuses (B3) is a 400 -- after the guard (its 403 stays first), before
+                    // the AU-busy 503, assets, login and every route, with or without a session.
+                    WebRouteVerdict web_verdict;
+                    webRouteDecide(web_acc, web_header, &web_verdict);
+                    if (webRouteBadRequest(web_verdict.wrq))
+                    {
+                        web_wipe_request(web_header, wg_path);
+                        send_http_header(400, RESPONSE_TYPE_JSON);
+                        web_client.println("{\"ok\":false,\"err\":\"bad request\"}");
+                        web_client.stop();
+                        continue;
+                    }
+
 #if defined(ESP32)
                     // OTA-LOWHEAP-01 A4: while an AU session runs (gate to TLS end) only /austatus and the GUI assets
                     // are served; every other request, the 10 s mailbox refresh included, would take heap the TLS
@@ -1485,10 +1501,6 @@ void work_webpage(void)
                     // WEB-AUTH-01: a password is set and the request carries no live session cookie
                     const bool bget_password = strlen(meshcom_settings.node_webpwd) > 0 &&
                                                !webAuthSessionValid(web_cookie, web_cookie_len, millis());
-
-                    // B1: the router decides first (parse, table, refusal), so the no-session gate sees the same verdict
-                    WebRouteVerdict web_verdict;
-                    webRouteDecide(web_acc, web_header, &web_verdict);
 
                     // in every other case, we check if authentication is required but not yet provided
                     if (bget_password)

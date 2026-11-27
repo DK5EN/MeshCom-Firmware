@@ -419,6 +419,14 @@ inline uint8_t webRouteDecideCore(bool parsed, uint8_t table, uint8_t legacy, bo
     return refusal == WRD_NOT_ALLOWED ? WRD_NOT_ALLOWED : WRD_NOT_FOUND;
 }
 
+// Which refusals of webReqParse the wiring answers 400 (B3 request line / version since wave 7b step 4 part B3, 400 JSON
+// {"ok":false,"err":"bad request"} right after the guard, before the AU-busy 503 and every route). WRQ_BAD_CONTENT_LENGTH
+// (B6) still takes the legacy chain; part B6 flips it here.
+inline bool webRouteBadRequest(uint8_t wrq)
+{
+    return wrq == WRQ_BAD_REQUEST_LINE || wrq == WRQ_BAD_VERSION;
+}
+
 // The no-session gate of a PARSED request (a password is set and the cookie is not live); route is webRouteDecideCore's
 // answer. A page-shaped request gets the login page, known or unknown page (a); GET / (WR_SCAFFOLD) the login
 // scaffold; a refusal (404 / 405) stays what it is (no body tells more than that); any other built route is 401.

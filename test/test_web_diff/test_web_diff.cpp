@@ -12,7 +12,7 @@
 // The unit under test is a function pointer table. Every corpus request (corpus/*.req, built by tools/web_corpus.py)
 // runs under every profile through every entry; the record of the run (handler trace, every byte written, the close,
 // the fake clock) is compared with golden/<name>.txt, and the live record with the frozen one. Intended deltas
-// (B1-B10 of docs/web-server-seams-20261127.md 7.2) go into kWhitelist, keyed by corpus name (B2 in kWhitelist, B1 in kWhitelistB1), each row naming the profiles where the live record differs.
+// (B1-B10 of docs/web-server-seams-20261127.md 7.2) go into kWhitelist, keyed by corpus name (B2 in kWhitelist, B1 in kWhitelistB1, B3 in kWhitelistB3: all profiles, 400), each row naming the profiles where the live record differs.
 #include <unity.h>
 
 #include "web_route.h" // reads no build macro: the feature mask is computed in web_functions.cpp
@@ -207,7 +207,76 @@ static const std::map<std::string, WhiteB1> kWhitelistB1 = {
     {"mut-185-route-rmsendx", {"B1: unknown path /rmsendx (no exact row): 404, no longer the GET /rmsend 405 branch", "open,password,password+session", 404, ""}},
 };
 
-static bool isWhitelisted(const std::string &n) { return kWhitelist.count(n) != 0 || kWhitelistB1.count(n) != 0; }
+
+// B3 (wave 7b step 4 part B3): the request line is not exactly `METHOD SP target SP HTTP/1.x` (webReqParse: WRQ_BAD_REQUEST_LINE /
+// WRQ_BAD_VERSION). The live entry answers 400 right after the guard in EVERY profile (also with a session, also behind the
+// AU session), the frozen record answers whatever the legacy indexOf() chain made of it (a handler, the scaffold, 404, 405,
+// the login page, 401). Rows carry only the reason: profiles are all of kProfiles, the status is 400 with the JSON body
+// {"ok":false,"err":"bad request"}.
+static const char *const kWhyB3Version = "B3: version other than HTTP/1.0 or HTTP/1.1: 400";
+static const char *const kWhyB3Line = "B3: request line without method, version or single blanks (no version, tab, blank prefix, double blank, no target): 400";
+static const char *const kWhyB3Blank = "B3: raw blank inside the target (query, page name): 400";
+static const std::map<std::string, const char *> kWhitelistB3 = {
+    {"js-018-pageq-info", kWhyB3Blank},
+    {"js-020-pageq-position", kWhyB3Blank},
+    {"js-022-pageq-wx", kWhyB3Blank},
+    {"js-024-pageq-setup", kWhyB3Blank},
+    {"js-026-pageq-messages", kWhyB3Blank},
+    {"js-028-pageq-mailbox", kWhyB3Blank},
+    {"js-030-pageq-rxlog", kWhyB3Blank},
+    {"js-032-pageq-path", kWhyB3Blank},
+    {"js-034-pageq-mheard", kWhyB3Blank},
+    {"js-036-pageq-neighbours", kWhyB3Blank},
+    {"js-038-pageq-spectrum", kWhyB3Blank},
+    {"js-040-pageq-mcp23017", kWhyB3Blank},
+    {"js-042-pageq-pins", kWhyB3Blank},
+    {"js-044-pageq-remote", kWhyB3Blank},
+    {"js-046-pageq-nosuchpage", kWhyB3Blank},
+    {"js-048-pageq", kWhyB3Blank},
+    {"js-255-setval", kWhyB3Blank},
+    {"mut-005-http-2-0", kWhyB3Version},
+    {"mut-007-http-1-1x", kWhyB3Version},
+    {"mut-009-nover", kWhyB3Line},
+    {"mut-014-page-info-http-2-0", kWhyB3Version},
+    {"mut-016-page-info-http-1-1x", kWhyB3Version},
+    {"mut-018-page-info-nover", kWhyB3Line},
+    {"mut-023-setparam-onewire-on-http-2-0", kWhyB3Version},
+    {"mut-025-setparam-onewire-on-http-1-1x", kWhyB3Version},
+    {"mut-027-setparam-onewire-on-nover", kWhyB3Line},
+    {"mut-033-getparam-gateway-http-2-0", kWhyB3Version},
+    {"mut-035-getparam-gateway-http-1-1x", kWhyB3Version},
+    {"mut-037-getparam-gateway-nover", kWhyB3Line},
+    {"mut-042-callfunction-sendpos-http-2-0", kWhyB3Version},
+    {"mut-044-callfunction-sendpos-http-1-1x", kWhyB3Version},
+    {"mut-046-callfunction-sendpos-nover", kWhyB3Line},
+    {"mut-052-sendmessage-tocall-9999-message-hi-20the", kWhyB3Version},
+    {"mut-054-sendmessage-tocall-9999-message-hi-20the", kWhyB3Version},
+    {"mut-056-sendmessage-tocall-9999-message-hi-20the", kWhyB3Line},
+    {"mut-062-pinstatus-http-2-0", kWhyB3Version},
+    {"mut-064-pinstatus-http-1-1x", kWhyB3Version},
+    {"mut-066-pinstatus-nover", kWhyB3Line},
+    {"mut-072-rmstatus-http-2-0", kWhyB3Version},
+    {"mut-074-rmstatus-http-1-1x", kWhyB3Version},
+    {"mut-076-rmstatus-nover", kWhyB3Line},
+    {"mut-082-mc-js-http-2-0", kWhyB3Version},
+    {"mut-084-mc-js-http-1-1x", kWhyB3Version},
+    {"mut-086-mc-js-nover", kWhyB3Line},
+    {"mut-123-meth-none", kWhyB3Line},
+    {"mut-124-meth-none-page-info", kWhyB3Line},
+    {"mut-125-meth-none-setparam-x-1", kWhyB3Line},
+    {"mut-126-meth-none-rmsend", kWhyB3Line},
+    {"mut-127-meth-none-config", kWhyB3Line},
+    {"mut-188-route-post-config", kWhyB3Line},
+    {"mut-426-space-prefix", kWhyB3Line},
+    {"mut-427-double-space", kWhyB3Line},
+    {"mut-428-tab-sep", kWhyB3Line},
+    {"mut-432-http-in-msg-raw", kWhyB3Blank},
+    {"mut-435-setparam-no-http", kWhyB3Line},
+    {"mut-436-setparam-http-first", kWhyB3Line},
+    {"mut-437-path-only", kWhyB3Line},
+};
+
+static bool isWhitelisted(const std::string &n) { return kWhitelist.count(n) != 0 || kWhitelistB1.count(n) != 0 || kWhitelistB3.count(n) != 0; }
 
 static const WebProfile kProfiles[] = {
     {"open", "", "", false, false},
@@ -394,7 +463,7 @@ static void test_entries_agree_with_the_first(void)
             }
             TEST_ASSERT_TRUE_MESSAGE(same, n.c_str());
         }
-        TEST_ASSERT_EQUAL_size_t_MESSAGE(kWhitelist.size() + kWhitelistB1.size(), whitelisted, "every whitelist entry must be a corpus request");
+        TEST_ASSERT_EQUAL_size_t_MESSAGE(kWhitelist.size() + kWhitelistB1.size() + kWhitelistB3.size(), whitelisted, "every whitelist entry must be a corpus request");
     }
 }
 
@@ -452,6 +521,13 @@ static void test_whitelist_names_corpus_requests(void)
         TEST_ASSERT_TRUE_MESSAGE(have.count(w.first) == 1, (std::string("B1 whitelist names no corpus request: ") + w.first).c_str());
         TEST_ASSERT_TRUE_MESSAGE(kWhitelist.count(w.first) == 0, (std::string("request in both whitelists: ") + w.first).c_str());
         TEST_ASSERT_TRUE_MESSAGE(strncmp(w.second.why, "B1:", 3) == 0, w.first.c_str());
+        TEST_ASSERT_TRUE_MESSAGE(kWhitelistB3.count(w.first) == 0, (std::string("request in both whitelists: ") + w.first).c_str());
+    }
+    for (const auto &w : kWhitelistB3)
+    {
+        TEST_ASSERT_TRUE_MESSAGE(have.count(w.first) == 1, (std::string("B3 whitelist names no corpus request: ") + w.first).c_str());
+        TEST_ASSERT_TRUE_MESSAGE(kWhitelist.count(w.first) == 0, (std::string("request in both whitelists: ") + w.first).c_str());
+        TEST_ASSERT_TRUE_MESSAGE(strncmp(w.second, "B3:", 3) == 0, w.first.c_str());
     }
 }
 
@@ -542,6 +618,28 @@ static void test_whitelist_rows_differ_exactly_where_listed(void)
                 TEST_ASSERT_TRUE_MESSAGE(head.find(std::string("\r\n") + w.second.allow + "\r\n") != std::string::npos, am.c_str());
             else
                 TEST_ASSERT_TRUE_MESSAGE(head.find("Allow:") == std::string::npos, am.c_str());
+        }
+    }
+}
+
+// B3 rows: live differs from frozen in every profile and answers 400 with the bad-request JSON body
+static void test_b3_rows_answer_400_in_every_profile(void)
+{
+    for (const auto &w : kWhitelistB3)
+    {
+        std::map<std::string, std::string> live;
+        const std::set<std::string> got = differingProfiles(w.first, &live);
+        std::set<std::string> all;
+        for (size_t p = 0; p < kProfileCount; p++)
+            all.insert(kProfiles[p].name);
+        const std::string m = "B3 " + w.first + ": live differs from frozen in [" + joinSet(got) + "], the row lists [" + joinSet(all) + "]";
+        TEST_ASSERT_TRUE_MESSAGE(got == all, m.c_str());
+        for (const std::string &prof : all)
+        {
+            const std::string &out = live[prof];
+            const std::string am = "B3 " + w.first + " [" + prof + "]: " + webRigEsc(out.substr(0, 300));
+            TEST_ASSERT_TRUE_MESSAGE(out.compare(0, 12, "HTTP/1.1 400") == 0, am.c_str());
+            TEST_ASSERT_TRUE_MESSAGE(out.find("{\"ok\":false,\"err\":\"bad request\"}") != std::string::npos, am.c_str());
         }
     }
 }
@@ -721,6 +819,7 @@ int main(int, char **)
     RUN_TEST(test_entries_agree_with_the_first);
     RUN_TEST(test_whitelist_names_corpus_requests);
     RUN_TEST(test_whitelist_rows_differ_exactly_where_listed);
+    RUN_TEST(test_b3_rows_answer_400_in_every_profile);
     RUN_TEST(test_live_leaves_no_request_bytes);
     RUN_TEST(test_live_copy_is_current);
     RUN_TEST(test_corpus_reaches_the_handlers);

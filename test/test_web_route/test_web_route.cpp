@@ -1079,8 +1079,9 @@ static const Delta kDeltas[] = {
 static const size_t kDeltaCount = sizeof(kDeltas) / sizeof(kDeltas[0]);
 
 
-// Requests that route like today but that webReqParse refuses: the wiring answers 400 before any route (B3 bad
-// version / bad request line, B6 bad Content-Length, CORPUS a request no browser sends). Exact: no unlisted entry.
+// Requests that route like today but that webReqParse refuses (B3 bad version / bad request line, B6 bad Content-Length,
+// CORPUS a request no browser sends). Since wave 7b step 4 part B3 the wiring answers 400 right after the guard for every
+// code webRouteBadRequest accepts (B3 and CORPUS rows); B6 rows keep the legacy chain until part B6. Exact: no unlisted entry.
 struct Refused
 {
     const char *name, *bid;
@@ -1133,6 +1134,15 @@ static const Refused kRefused[] = {
 };
 static const size_t kRefusedCount = sizeof(kRefused) / sizeof(kRefused[0]);
 
+static void test_bad_request_codes(void)
+{
+    TEST_ASSERT_FALSE(webRouteBadRequest(WRQ_OK));
+    TEST_ASSERT_TRUE(webRouteBadRequest(WRQ_BAD_REQUEST_LINE));
+    TEST_ASSERT_TRUE(webRouteBadRequest(WRQ_BAD_VERSION));
+    TEST_ASSERT_FALSE(webRouteBadRequest(WRQ_BAD_CONTENT_LENGTH)); // B6: legacy chain until part B6
+    TEST_ASSERT_FALSE(webRouteBadRequest(200));                    // an unknown code is not a 400
+}
+
 static void test_corpus_refused_requests_are_listed(void)
 {
     Corpus c = runCorpus();
@@ -1145,6 +1155,8 @@ static void test_corpus_refused_requests_are_listed(void)
         TEST_ASSERT_TRUE_MESSAGE(it != c.refusedSame.end(), kRefused[k].name); // no stale entry
         TEST_ASSERT_EQUAL_INT_MESSAGE(kRefused[k].pr, it->second, kRefused[k].name);
         const std::string b = kRefused[k].bid;
+        // B3 and CORPUS rows are refused -> 400; B6 rows stay on the legacy chain (until part B6)
+        TEST_ASSERT_EQUAL_INT_MESSAGE(b != "B6", webRouteBadRequest((uint8_t)it->second) ? 1 : 0, kRefused[k].name);
         if (b == "B3")
         {
             b3++;
@@ -1297,6 +1309,7 @@ int main(int, char **)
     RUN_TEST(test_exact_other_ignores_unbuilt_rows);
     RUN_TEST(test_built_guards_mirror_the_switch);
     RUN_TEST(test_corpus_equals_todays_router_except_listed_deltas);
+    RUN_TEST(test_bad_request_codes);
     RUN_TEST(test_corpus_refused_requests_are_listed);
     RUN_TEST(test_corpus_reaches_every_route);
     RUN_TEST(test_corpus_dump);

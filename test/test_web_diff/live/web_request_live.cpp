@@ -252,7 +252,7 @@ WebHeadAcc *web_head_acc_get(void)
     return web_head_acc;
 }
 
-// ==== webRouteLegacy + webRouteDecide (web_functions.cpp) lines 1067-1253 (working tree) ====
+// ==== webRouteLegacy + webRouteDecide (web_functions.cpp) lines 1067-1255 (working tree) ====
 static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header)
 {
     if (web_header.startsWith("POST /rmsend"))
@@ -390,6 +390,7 @@ struct WebRouteVerdict
     uint8_t allow;
     bool parsed;
     bool page_shaped;
+    uint8_t wrq; // webReqParse's code (WRQ_OK when parsed); webRouteBadRequest(wrq) answers 400 right after the guard
 };
 
 /**
@@ -407,7 +408,8 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
     v.page_shaped = false;
     WebReq wr;
     uint8_t table = WR_NONE;
-    v.parsed = webReqParse(acc->head, acc->head_len, (acc->flags & WEB_HF_CUT) != 0, &wr) == WRQ_OK;
+    v.wrq = webReqParse(acc->head, acc->head_len, (acc->flags & WEB_HF_CUT) != 0, &wr);
+    v.parsed = v.wrq == WRQ_OK;
     if (v.parsed)
         table = webRouteMatch(wr.method, wr.path, wr.query);
     // the legacy id decides only a request the parser refuses
@@ -441,7 +443,7 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
     return v.route;
 }
 
-// ==== work_webpage (web_functions.cpp) lines 1255-1715 (working tree) ====
+// ==== work_webpage (web_functions.cpp) lines 1257-1727 (working tree) ====
 void work_webpage_live(void)
 {
     // RAM-Rueckgewinn (2026-09-20): der 1-kB-Sammelpuffer web_header_collect
@@ -563,6 +565,20 @@ void work_webpage_live(void)
                         continue;
                     }
 
+                    // B1/B3: the router decides once, here (parse, table, refusal); the no-session gate below reads the same
+                    // verdict. A request line the parser refuses (B3) is a 400 -- after the guard (its 403 stays first), before
+                    // the AU-busy 503, assets, login and every route, with or without a session.
+                    WebRouteVerdict web_verdict;
+                    webRouteDecide(web_acc, web_header, &web_verdict);
+                    if (webRouteBadRequest(web_verdict.wrq))
+                    {
+                        web_wipe_request(web_header, wg_path);
+                        send_http_header_live(400, RESPONSE_TYPE_JSON);
+                        web_client.println("{\"ok\":false,\"err\":\"bad request\"}");
+                        web_client.stop();
+                        continue;
+                    }
+
 #if defined(ESP32)
                     // OTA-LOWHEAP-01 A4: while an AU session runs (gate to TLS end) only /austatus and the GUI assets
                     // are served; every other request, the 10 s mailbox refresh included, would take heap the TLS
@@ -675,10 +691,6 @@ void work_webpage_live(void)
                     // WEB-AUTH-01: a password is set and the request carries no live session cookie
                     const bool bget_password = strlen(meshcom_settings.node_webpwd) > 0 &&
                                                !webAuthSessionValid(web_cookie, web_cookie_len, millis());
-
-                    // B1: the router decides first (parse, table, refusal), so the no-session gate sees the same verdict
-                    WebRouteVerdict web_verdict;
-                    webRouteDecide(web_acc, web_header, &web_verdict);
 
                     // in every other case, we check if authentication is required but not yet provided
                     if (bget_password)
@@ -904,7 +916,7 @@ void work_webpage_live(void)
     memset(web_acc->line, 0, sizeof(web_acc->line));
 }
 
-// ==== decodeURLPercentCoding (web_functions.cpp) lines 1717-1727 (working tree) ====
+// ==== decodeURLPercentCoding (web_functions.cpp) lines 1729-1739 (working tree) ====
 /**
  * ###########################################################################################################################
  * decodes Percent-Coded Strings (e.g. URLs and its parameters)
@@ -917,7 +929,7 @@ String decodeURLPercentCoding_live(const String &input)
     return String(buf.data());
 }
 
-// ==== send_http_header (web_functions.cpp) lines 4884-4938 (working tree) ====
+// ==== send_http_header (web_functions.cpp) lines 4896-4950 (working tree) ====
 /**
  * ###########################################################################################################################
  * Sends a valid HTTP header. Takes care of the status code.
@@ -974,7 +986,7 @@ void send_http_header_live(uint16_t http_status_code, uint8_t content_type, cons
     webTxBeginChunked(web_client);                                            // WEB-TX-01: every flush from here on is one chunk
 }
 
-// ==== send_message (web_functions.cpp) lines 5042-5124 (working tree) ====
+// ==== send_message (web_functions.cpp) lines 5054-5136 (working tree) ====
 /**
  * ###########################################################################################################################
  * handles incoming sendmessage request
@@ -1059,7 +1071,7 @@ void send_message_live(String web_header)
     web_client.println(); // The HTTP response ends with another blank line
 }
 
-// ==== call_function (web_functions.cpp) lines 5198-5270 (working tree) ====
+// ==== call_function (web_functions.cpp) lines 5210-5282 (working tree) ====
 /**
  * ###########################################################################################################################
  * Tries to execute a Web-API function call.
@@ -1134,7 +1146,7 @@ void call_function_live(String web_header)
     web_client.println();
 }
 
-// ==== setparam (web_functions.cpp) lines 5272-5389 (working tree) ====
+// ==== setparam (web_functions.cpp) lines 5284-5401 (working tree) ====
 /**
  * ###########################################################################################################################
  * Set the Value of a parameter (if known)
@@ -1254,7 +1266,7 @@ void setparam_live(String web_header)
     web_client.println();
 }
 
-// ==== getparam (web_functions.cpp) lines 5391-5448 (working tree) ====
+// ==== getparam (web_functions.cpp) lines 5403-5460 (working tree) ====
 /**
  * ###########################################################################################################################
  * Get the Value of a parameter (if known)
@@ -1651,6 +1663,7 @@ struct WebRouteVerdict
     uint8_t allow;
     bool parsed;
     bool page_shaped;
+    uint8_t wrq; // webReqParse's code (WRQ_OK when parsed); webRouteBadRequest(wrq) answers 400 right after the guard
 };
 
 /**
@@ -1668,7 +1681,8 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
     v.page_shaped = false;
     WebReq wr;
     uint8_t table = WR_NONE;
-    v.parsed = webReqParse(acc->head, acc->head_len, (acc->flags & WEB_HF_CUT) != 0, &wr) == WRQ_OK;
+    v.wrq = webReqParse(acc->head, acc->head_len, (acc->flags & WEB_HF_CUT) != 0, &wr);
+    v.parsed = v.wrq == WRQ_OK;
     if (v.parsed)
         table = webRouteMatch(wr.method, wr.path, wr.query);
     // the legacy id decides only a request the parser refuses
@@ -1822,6 +1836,20 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
                         continue;
                     }
 
+                    // B1/B3: the router decides once, here (parse, table, refusal); the no-session gate below reads the same
+                    // verdict. A request line the parser refuses (B3) is a 400 -- after the guard (its 403 stays first), before
+                    // the AU-busy 503, assets, login and every route, with or without a session.
+                    WebRouteVerdict web_verdict;
+                    webRouteDecide(web_acc, web_header, &web_verdict);
+                    if (webRouteBadRequest(web_verdict.wrq))
+                    {
+                        web_wipe_request(web_header, wg_path);
+                        send_http_header(400, RESPONSE_TYPE_JSON);
+                        web_client.println("{\"ok\":false,\"err\":\"bad request\"}");
+                        web_client.stop();
+                        continue;
+                    }
+
 #if defined(ESP32)
                     // OTA-LOWHEAP-01 A4: while an AU session runs (gate to TLS end) only /austatus and the GUI assets
                     // are served; every other request, the 10 s mailbox refresh included, would take heap the TLS
@@ -1934,10 +1962,6 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
                     // WEB-AUTH-01: a password is set and the request carries no live session cookie
                     const bool bget_password = strlen(meshcom_settings.node_webpwd) > 0 &&
                                                !webAuthSessionValid(web_cookie, web_cookie_len, millis());
-
-                    // B1: the router decides first (parse, table, refusal), so the no-session gate sees the same verdict
-                    WebRouteVerdict web_verdict;
-                    webRouteDecide(web_acc, web_header, &web_verdict);
 
                     // in every other case, we check if authentication is required but not yet provided
                     if (bget_password)
