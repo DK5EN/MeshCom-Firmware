@@ -5,13 +5,21 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-7 committed on `fork-dev`, not pushed. Wave 8 step 9 committed so far: 9b `3657932e` (MSS glue to
-`src/nrf52/eth_mss.cpp`), 9c `168ec015` (`mcRandomFill`), B8 `e4b8bcd6` (spectrum on "Scan now"), 9d `9fbbfccc` (pin rows
-to `pin_board.cpp`), 9e `8025a723` (`src/esp32/au_web.cpp`), 9f `55f2d728` (mbox actions in `webFunctionCall`), 9g
-`5cceb18a` (`web_config.cpp`). In flight: 9h = B9 (shared `src/reboot_defer.{h,cpp}`, config upload reboots 500 ms later
-from the loop; RM keeps its own 8 s deferred reboot for now). Then steps 10 (guard on `WebReq`, optional) and 11 (docs),
-full host gate, wave 8 closes. Start a fresh session with `/orchestrate-waves` on this doc.
+**State:** waves 1-8 committed on `fork-dev`, not pushed (wave 8 closed with `ddbdfee2`). Full host gate green after
+wave 8 (143 envs, 4,478 ok, 1 skipped, 0 failed; pytest 1,857; five board links). Next is wave 9 (heap work for NimBLE
+F3), then wave 10 (big bench test incl. the B8/B9 checks). Start a fresh session with `/orchestrate-waves` on this doc.
 
+- **Wave 8 result:** step 9 moves 9b `3657932e` (`src/nrf52/eth_mss.cpp`), 9c `168ec015` (`mcRandomFill`), 9d `9fbbfccc`
+  (`pin_board.cpp`), 9e `8025a723` (`src/esp32/au_web.cpp`), 9f `55f2d728` (mbox in `webFunctionCall`), 9g `5cceb18a`
+  (`web_config.cpp`); B8 `e4b8bcd6`; B9 `9b7c7735` (shared `src/reboot_defer.{h,cpp}`, reboot 2 s after the answer from
+  the loop; the advisor moved it from the planned 500 ms because ESP32 `stop()` does not linger); step 11 docs `ddbdfee2`.
+  **Step 10 deferred** (optional `webGuardCheck(const WebReq &)`, no behaviour change, most pinned file; recommendation:
+  only together with the `web_guard.h` shared-header split from the carried items). Not moved (not in step 9's list):
+  GPS globals, RM handler merge, asset delivery to `web_io.cpp`, REST handlers to `web_api.cpp`, `web_dispatch.cpp`.
+- **Wave 9 inputs:** plan row in "Next waves"; candidates phone rings dynamic on S3 (~6 KB), UDP hold store only during
+  outages (6 KB), raw LoRa log 20 to 10 slots (~2.6 KB), then NimBLE F3 (pre-allocated attribute values, +600 B). Map
+  owners and measure with `/ram-snapshot` first (ESP32 classic). New since the plan: B8 holds 1.4 KB heap after the
+  first scan; the web accumulator 2.4 kB stays (carried item).
 - **B8 decision (operator 2026-11-27):** "Scan now" button (`/callfunction/?spectrumscan`, guarded like every
   callfunction), ONE blocking run (not stepped across loop passes: that would need a radio fence in the ESP32 loop),
   no `delay(50)`, WDT feed, 1000 ms timeout per step, LoRa RX re-armed after. Page shows the last result (heap store
@@ -91,7 +99,7 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 | Wave | Content                                                                                                                                                                                                                                                                                                                                                                                                                  | Owner files (writer)                                                                                                                           | Parallel with                                  |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
 | 7    | **Done** (`d9566bb4`, full gate green). Web wave B, steps 4-8: route table, REST handlers on `WebReq`, `num_parse.h`, body reader with WDT feed and 408, fixed response heads; B1-B7, B10. B1 needs no `mcau.js` change (checked in step 3, see the wave 7b step 3 archive line). B3/B6 (strict request line and Content-Length, already computed by `web_request.h`, act on nothing yet) land here as their own commits | `web_functions.cpp` is the hotspot: one writer at a time, or carve out new modules (`web_route.h`, `web_query.h`, `num_parse.h`, `web_body.h`) | full host gate after step 5                    |
-| 8    | Web wave C, steps 9-11: spectrum sweep one step per loop pass on explicit action (B8) plus the shading bug, config upload reboot from the loop (B9), relocations, non-blocking send for TDECK-LAG-01, docs                                                                                                                                                                                                               | per relocation, one commit each                                                                                                                | re-measure TDECK-LAG-01 on DK5EN-14 afterwards |
+| 8    | **Done** (`ddbdfee2`, full gate green; step 10 deferred). Web wave C, steps 9-11: spectrum sweep one step per loop pass on explicit action (B8) plus the shading bug, config upload reboot from the loop (B9), relocations, non-blocking send for TDECK-LAG-01, docs                                                                                                                                                     | per relocation, one commit each                                                                                                                | re-measure TDECK-LAG-01 on DK5EN-14 afterwards |
 | 9    | Heap work for NimBLE F3 (+600 B): candidates phone rings dynamic on S3 (~6 KB), UDP hold store only during outages (6 KB), raw LoRa log 20 to 10 slots (~2.6 KB); then F3                                                                                                                                                                                                                                                | to be mapped                                                                                                                                   |                                                |
 | 10   | Large bench test (operator: at the end), full host gate, `regression.sh --formal` on request                                                                                                                                                                                                                                                                                                                             | orchestrator                                                                                                                                   |                                                |
 
