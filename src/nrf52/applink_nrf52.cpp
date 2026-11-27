@@ -320,8 +320,10 @@ static void alIoOnFrame(void *, uint8_t *frame, size_t len)
     // onFrame never nests (readPhoneCommand does not call back into alConnRx), so no re-entry
     static uint8_t buf[MAX_MSG_LEN_PHONE];
     memset(buf, 0, sizeof(buf));
-    memcpy(buf, frame, len < sizeof(buf) ? len : sizeof(buf));
-    readPhoneCommand(buf, PL_NET);
+    if (len > sizeof(buf))
+        len = sizeof(buf);
+    memcpy(buf, frame, len);
+    readPhoneCommand(buf, len, PL_NET);
 }
 
 static void alIoOnAuthed(void *)

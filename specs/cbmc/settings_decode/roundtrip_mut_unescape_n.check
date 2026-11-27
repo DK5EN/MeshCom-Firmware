@@ -1,0 +1,10 @@
+TOOL=esbmc
+# code mutation: the decoder maps the escape \n to a space instead of a newline, so a string holding '\n' no longer round-trips
+mkdir -p gen && sed "s/stored = '\\\\n';/stored = ' ';/" "$ROOT/src/settings_store.cpp" > gen/settings_store.cpp
+cmp -s "$ROOT/src/settings_store.cpp" gen/settings_store.cpp && { echo "  mutation did not apply to settings_store.cpp (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DMODE_ROUNDTRIP -DRT_STRING -DCAPMAX=5 -DMUT_SRC_GEN"
+FLAGS="--unwind 14"
+EXPECT=fail
+CHECKS="code mutation: decoder drops the newline escape -> string round trip differs"
+EXPECT_PROP='assertion'

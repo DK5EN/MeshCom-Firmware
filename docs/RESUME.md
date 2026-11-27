@@ -18,6 +18,13 @@ Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
   by default; filed as #1340; decisions recorded in the concept. BMC jobs over 7 GB are split into slices
   (BACKLOG FORMAL-SPLIT). The release plan line "Safeboot shows MeshCom 4.4" was wrong (the Safeboot page is labelled
   the same in fork and upstream), corrected.
+- **Campaign FORMAL-02 started 2026-11-27 (resume point `docs/campaign-formal-02-20261127.md`):** parsers verifiable
+  (FORMAL01-SEAMS), settings round trip and migration, then BLE task model, NimBLE and the production web server, then
+  a mesh model; all refactors go upstream. Wave 1 committed: `handleACK` core (`src/ack_rx_core.h`), shared id lookups
+  (`src/id_table_find.h`), `readPhoneCommand(buf, len)` with `src/phone_frame.h` (drops frames whose header claims more
+  than received; checked against the app source), settings migration over 25 release fixtures, nan/inf settings values
+  rejected. App bug filed as #1343. Next: wave 1b UDP receive consolidation after the operator's decisions D1-D5
+  (`docs/udp-consolidation-20261127.md`).
 - **FORMAL01-RUN done 2026-11-27, committed `96cd34be` on `fork-dev`:** TLC `--all` 56/56 as expected, BMC `--all --heavy`
   74/74 with 0 unexpected results or tool errors (`specs/tla/RESULTS.md`, `specs/cbmc/RESULTS.md`; local, one runner
   at a time, 15 GB budget, peak 11.3 GB). Every job that ran over 15 GB or into its time limit passes after a

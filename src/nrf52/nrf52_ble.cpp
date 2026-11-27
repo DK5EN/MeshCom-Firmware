@@ -403,7 +403,8 @@ void bleuart_rx_callback(uint16_t conn_handle)
 	// inline in the BLE stack's callback context (CONC-14).
 	BleQueueItem item = {};
 	item.length = g_ble_uart.read(item.data, MAX_MSG_LEN_PHONE);
-	xQueueSend(bleQueue, &item, 0);  // non-blocking, drop on full queue
+	if(item.length > 0)  // FIFO already drained by an earlier callback: nothing to hand over
+		xQueueSend(bleQueue, &item, 0);  // non-blocking, drop on full queue
 
 	// Disconnect if app-layer auth failed
 	if(ble_disconnect_requested)

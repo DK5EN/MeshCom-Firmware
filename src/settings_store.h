@@ -101,7 +101,8 @@
 //      - the key matches a descriptor, but the value cannot be decoded for
 //        that field's type: a numeric value with trailing garbage or that
 //        does not fit the integer width and has no descriptor range to
-//        clamp into (behaviour below), a bool value that is not exactly "0"
+//        clamp into (behaviour below), a FLOAT/DOUBLE value that is not
+//        finite (nan, inf, -inf), a bool value that is not exactly "0"
 //        or "1", or a STRING escape sequence that is invalid or truncated;
 //      - the key matches a CFG_STR-equivalent (STRING) descriptor, but the
 //        unescaped value is longer than the field can hold. **This is
@@ -183,12 +184,10 @@
 // it will eventually be wired into has no locale support to change that
 // assumption in the first place.
 //
-// NaN and +-Infinity: encode()/decode() round-trip them too (a C99 printf
-// emits "nan"/"inf"/"-inf" for %g on those values and strtod parses them
-// back), as a consequence of using the standard formatting/parsing
-// functions rather than a special-case guard -- not a separately hand-built
-// feature, so there is little to get wrong, but it is real coverage and one
-// round-trip test exercises it.
+// NaN and +-Infinity: encode() writes them ("nan", "inf", "-inf" from %g),
+// but decode() rejects them as malformed (behaviour 4), so the field keeps
+// what it had. No setting means a non-finite value, and a NaN coordinate
+// would reach the APRS position encoder. FORMAL-02, 2026-11-27.
 //
 // ---------------------------------------------------------------------------
 // ENCODE CONTRACT

@@ -396,7 +396,7 @@ def malformed_frames(group: str = "9") -> list[MalformedFrame]:
         MalformedFrame(
             "len-too-big",
             bytes([0x40]) + info[1:],
-            "declared 64, actual 8; msg_len-2 bytes are copied from a zeroed buffer",
+            "declared 64, actual 8: dropped (header claims more than received), no reply",
         ),
         MalformedFrame(
             "len-zero", bytes([0x00]) + info[1:], "msg_len < 2: dropped, no reply"

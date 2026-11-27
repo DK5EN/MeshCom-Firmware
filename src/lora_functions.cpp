@@ -12,6 +12,7 @@
 #include "txring_functions.h"
 #include "ack_functions.h"
 #include "ack_attribution.h"
+#include "ack_rx_core.h"    // FORMAL-02: ackRxDecide(), the pure decision part of handleACK()
 #include "gw_ack_frame.h"   // GWACK-01: the gateway's double ACK, one id for both copies
 #include "capture_functions.h"
 #include "dedup_functions.h"
@@ -566,17 +567,18 @@ static uint32_t gwAckMillis(void)
  */
 static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
 {
-    if(payload[0] != MSG_TYPE_ACK)
-        return false;
+    // FORMAL-02: decisions in ackRxDecide() (ack_rx_core.h, pure, differential test test_ack_rx_core),
+    // the side effects below run in the order the former inline code had.
+    AckRxVerdict v = ackRxDecide(payload, size, ringBufferLoraRX, own_msg_id, _GW_ID, bAckInfo, bMESH);
 
-    if(size < 12)
+    if(v.action == ACK_RX_NOT_ACK)
         return false;
 
     // Plausibilitaetspruefung vor jeder weiteren Verarbeitung: 0x41 ist als
     // ASCII der Buchstabe 'A', ohne diese Pruefung laeuft jedes Bruchstueck,
     // das damit beginnt, durch den ACK-Pfad und wird mit Prio 1 weitergesendet.
     // Begruendung und Feldmessung siehe ack_functions.h.
-    if(!isPlausibleAckFrame(payload, size, MAX_HOP_LIMIT))
+    if(v.action == ACK_RX_IMPLAUSIBLE)
     {
         if(bLORADEBUG)
             printfdeb("[MC-DBG] ACK_REJECT b5=%02X len=%u\n", payload[5], (unsigned)size);
@@ -584,17 +586,24 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
         return false;
     }
 
-    uint8_t print_buff[30];
-
-    uint8_t n = ackWireAppendixLen(payload, size);
-    memcpy(print_buff, payload, 12 + n);
+    uint8_t print_buff[ACK_WIRE_MAX_LEN];
+    memcpy(print_buff, v.frame, v.frameLen);
+    const uint8_t n = v.n;
 
     if(n == ACK_WIRE_APPENDIX_LEN && bLORADEBUG)
-        printfdeb("[MC-DBG] ACK_APPENDIX hash=%06X len=%u\n", ackWireHash(payload), (unsigned)size);
+        printfdeb("[MC-DBG] ACK_APPENDIX hash=%06X len=%u\n", v.appendixHash, (unsigned)size);
 
     // SL-01: Dedup-Verdikt vor dem Druck, damit die [LOG]-Zeile `DUP:` fuehren
-    // kann. is_new_packet() ist eine reine Suche ohne Seiteneffekt.
-    bool bIsNew = setlogCountDedup(is_new_packet(print_buff+1));
+    // kann. Die Suche im Dedup-Ring ist reine Lesesicht (v.isNew), is_new_packet()
+    // loggt dasselbe unter bLORADEBUG.
+    if(bLORADEBUG)
+    {
+        if(v.isNew)
+            printfdeb("[MC-DBG] RX_DEDUP_NEW msg_id=%08X\n", v.rxId);
+        else
+            printfdeb("[MC-DBG] RX_DEDUP_DUP msg_id=%08X slot=%d\n", v.rxId, v.dedupSlot);
+    }
+    bool bIsNew = setlogCountDedup(v.isNew);
 
     if(bDisplayLog)
     {
@@ -604,75 +613,65 @@ static bool handleACK(uint8_t *payload, uint16_t size, int rssi, int snr)
         printBuffer_ack((char*)"[LOG]", payload, (int16_t)size, tail);
     }
 
-    bool bServerFlag = false;
-    if((print_buff[5] & 0x80) == 0x80)
-        bServerFlag=true;
-
-    unsigned msg_id = print_buff[6] | (print_buff[7] << 8) | (print_buff[8] << 16) | (print_buff[9] << 24);
-
     // PN-Wiederholung (XOR, pn_retry.h): quittiert ein Relay oder Gateway eine
     // Retry-Kopie, traegt das ACK deren id (Bits 10-11 gekippt). own_msg_id[]
     // kennt nur die Original-id -- ohne Zurueckfalten fand checkOwnTx() nichts:
     // kein 0x01-Frame ans Telefon, kein Stopp der Wiederholung, und das ACK
-    // wurde als fremdes weitergesendet. Ab hier gilt die Original-id.
-    msg_id = pnOwnTxLookupId(msg_id, _GW_ID);
-    int itxcheck = checkOwnTx(msg_id);
-    if(itxcheck < 0)
+    // wurde als fremdes weitergesendet. Ab hier gilt die Original-id (v.ackedId).
+    const unsigned msg_id = v.ackedId;
+    const int itxcheck = v.ownSlot;
+    if(itxcheck >= 0 && bDisplayInfo)
+        printfdeb("%s checkOwnTx:%08X own_msg_id:%08X <%02X%02X%02X%02X> %02X\n", getTimeString().c_str(), msg_id, msg_id, own_msg_id[itxcheck][3], own_msg_id[itxcheck][2], own_msg_id[itxcheck][1], own_msg_id[itxcheck][0], own_msg_id[itxcheck][4]);
+    if(v.lateAck)
         ownMsgStatusSet(msg_id, 0x02);   // late ACK (a held DM is acked hours later): the ring slot is gone, the durable status row is not
 
-    if(bIsNew || itxcheck >= 0)
+    if(v.addRx)
+        addLoraRxBuffer(v.rxId, v.serverFlag);
+
+    if(itxcheck >= 0)
     {
-        // add rcvMsg to forward to LoRa TX
-        if(bIsNew)
+        // Status frame to the phone is origin-gated: own_msg_id[] also holds
+        // foreign msg_ids that a gateway only forwarded from the server to LoRa
+        // (see docs/ack-heard-foreign-msgids-fix.md). The state write below stays
+        // unconditional so the web rxlog heard/ACK ticks keep working as today.
+        if(v.phoneStatus)   // bAckInfo || status 00...not heard, 01...heard (< 02...ACK)
         {
-            unsigned int mid=(print_buff[1]) | (print_buff[2]<<8) | (print_buff[3]<<16) | (print_buff[4]<<24);
-            addLoraRxBuffer(mid, bServerFlag);
-        }
-
-        if(itxcheck >= 0)
-        {
-            // Status frame to the phone is origin-gated: own_msg_id[] also holds
-            // foreign msg_ids that a gateway only forwarded from the server to LoRa
-            // (see docs/ack-heard-foreign-msgids-fix.md). The state write below stays
-            // unconditional so the web rxlog heard/ACK ticks keep working as today.
-            if(bAckInfo || own_msg_id[itxcheck][4] < 2)   // 00...not heard, 01...heard, 02...ACK
+            if(v.phoneFrame)
             {
-                if(ackMsgIdFromNode(msg_id, _GW_ID))
-                {
-                    uint8_t phone_buff[ACK_PHONE_MAX_LEN];
-                    uint16_t plen = buildAckPhoneFrame(phone_buff, msg_id, 0x01, "");
-                    addBLEOutBuffer(phone_buff, plen);
-                    dmstat_gw_ack.fetch_add(1);   // 0.3: itxcheck >= 0 already gates this block
-
-                    if(bDisplayInfo)
-                    {
-                        printfdeb("\n%s", getTimeString().c_str());
-                        printfdeb(" ACK to Phone  %02X %02X%02X%02X%02X %02X %02X", phone_buff[0], phone_buff[4], phone_buff[3], phone_buff[2], phone_buff[1], phone_buff[5], phone_buff[6]);
-                    }
-                }
-
-                setOwnMsgStatus(itxcheck, 0x02);   // 02...ACK
-            }
-
-            // stop retransmission in ring buffer for this msg_id
-            int ackSlot = findAndStopRingSlotNoRm1(msg_id);
-            if(ackSlot >= 0 && bDisplayRetx)
-                printfdeb("\n[RETX] binary ACK for retid:%i stop retransmit msg-id:%08X\n",
-                              ackSlot, msg_id);
-        }
-        else
-        {
-            // ACK nur weitersenden wenn es eine neue MSG-ID ist && MESH = on && nicht eine MSG-ID ist welche nicht selbst ausgesendet wurde
-            if((print_buff[5] & 0x7F) > 0x00 && meshTxAllowed(MESH_TX_FOREIGN_RELAY, bMESH) && itxcheck < 0 && !checkServerRx(print_buff+6))
-            {
-                print_buff[5]--;
-
-                addTxRingEntry(print_buff, 12 + n, RING_STATUS_DONE, "rx_ack_fwd", 0);
+                uint8_t phone_buff[ACK_PHONE_MAX_LEN];
+                uint16_t plen = buildAckPhoneFrame(phone_buff, msg_id, 0x01, "");
+                addBLEOutBuffer(phone_buff, plen);
+                dmstat_gw_ack.fetch_add(1);   // 0.3: itxcheck >= 0 already gates this block
 
                 if(bDisplayInfo)
                 {
-                    printfdeb(" This packet to mesh");
+                    printfdeb("\n%s", getTimeString().c_str());
+                    printfdeb(" ACK to Phone  %02X %02X%02X%02X%02X %02X %02X", phone_buff[0], phone_buff[4], phone_buff[3], phone_buff[2], phone_buff[1], phone_buff[5], phone_buff[6]);
                 }
+            }
+
+            setOwnMsgStatus(itxcheck, 0x02);   // 02...ACK
+        }
+
+        // stop retransmission in ring buffer for this msg_id
+        int ackSlot = findAndStopRingSlotNoRm1(msg_id);
+        if(ackSlot >= 0 && bDisplayRetx)
+            printfdeb("\n[RETX] binary ACK for retid:%i stop retransmit msg-id:%08X\n",
+                          ackSlot, msg_id);
+    }
+    else if(v.fwdCandidate)
+    {
+        // ACK nur weitersenden wenn es eine neue MSG-ID ist && MESH = on && nicht eine MSG-ID ist welche nicht selbst ausgesendet wurde.
+        // checkServerRx() stays here: it must see the ring after addLoraRxBuffer() above.
+        if(!checkServerRx(print_buff+6))
+        {
+            print_buff[5]--;
+
+            addTxRingEntry(print_buff, v.frameLen, RING_STATUS_DONE, "rx_ack_fwd", 0);
+
+            if(bDisplayInfo)
+            {
+                printfdeb(" This packet to mesh");
             }
         }
     }

@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DMODE_ROUNDTRIP -DRT_I32 "
+FLAGS="--unwind 14"
+EXPECT=pass
+CHECKS="encode->decode identity for I32 inside range/allowed set"

@@ -1,5 +1,6 @@
 #include "ble_phone_frame.h"
 #include "ble_phone_drain.h"
+#include "phone_frame.h"
 #include <loop_functions.h>
 #include <loop_functions_extern.h>
 #include <phone_commands.h>
@@ -288,7 +289,10 @@ void phoneSessionEnded(PhoneLinkOwner who)
 	}
 }
 
-void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE], PhoneLinkOwner src)
+static_assert(PHONE_FRAME_MAX == MAX_MSG_LEN_PHONE, "phone_frame.h bound out of sync with the phone buffer");
+static_assert(PHONE_FRAME_SSID_CAP >= sizeof(meshcom_settings.node_ssid) && PHONE_FRAME_PWD_CAP >= sizeof(meshcom_settings.node_pwd), "phone_frame.h wifi caps");
+
+void readPhoneCommand(const uint8_t *conf_data, size_t len, PhoneLinkOwner src)
 {
 	/**
 	 * Config Messages
@@ -321,42 +325,43 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE], PhoneLinkOwner src)
      *  */ 
 
 
-	uint8_t msg_len = conf_data[0];
-	uint8_t msg_type = conf_data[1];
-	uint8_t msg_payload_len = conf_data[2];
+	// Every read below is bounded by len, the bytes the BLE stack / AppLink actually delivered
+	// (src/phone_frame.h). A header that claims more than that is dropped: reading on used to
+	// run past the received data.
+	PhoneFrame fr;
+	phoneFrameDecode(conf_data, len, &fr);
 
-	bool save_setting = false;		//flag to save when positions from phone. config or periodic positions
-	float lat_phone = 0.0;
-	float long_phone = 0.0;
+	if(fr.status != PF_OK)
+	{
+		Serial.printf("[BLE] Frame dropped: %s len %u msg_len %u\n",
+			fr.status == PF_TOO_SHORT ? "too short" : fr.status == PF_TOO_LONG ? "too long" : fr.status == PF_CLAIMS_MORE ? "header claims more than received" : "field past end",
+			(unsigned)len, (unsigned)fr.msg_len);
+		return;
+	}
+
+	bool save_setting = fr.save_flag;		//flag to save when positions from phone. config or periodic positions
 
 	if(bBLEDEBUG)
 	{
-		printBuffer(conf_data, msg_len);
+		printBuffer((uint8_t *)conf_data, fr.msg_len);
 		Serial.println();
-	}
-
-	// get save settings flag if position setting
-	if(msg_type == 0x70 || msg_type == 0x80 || msg_type == 0x90)
-	{
-
-		if(conf_data[6] == 0x0A)  save_setting = true;
-		if(conf_data[6] == 0x0B)  save_setting = false;
 	}
 
 	//Serial.printf("msg_type:%02x\n", msg_type);
 
-	switch (msg_type)
+	switch (fr.cmd)
 	{
-		case 0x10: {
+		case PFC_HELLO: {
 
-			if(conf_data[2] == 0x20 && conf_data[3] == 0x30){
+			{
 
 				if(bBLEDEBUG)
 					Serial.println("BLE Hello Msg from phone");
 
 				// App-layer PIN authentication.
 				// If bt_code is set (> 0), the phone must send the SHA-256 hash
-				// of the zero-padded 6-digit PIN string at conf_data[4..35] (32 bytes).
+				// of the zero-padded 6-digit PIN string at conf_data[4..35] (32 bytes, only
+				// when the frame really carries them: fr.has_hash).
 				// If bt_code == 0 the original open hello is accepted.
 				bool auth_ok = false;
 				if(src == PL_NET)
@@ -366,12 +371,12 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE], PhoneLinkOwner src)
 				}
 				else if(meshcom_settings.bt_code > 0 && meshcom_settings.bt_code <= 999999)
 				{
-					if(msg_len >= 35)
+					if(fr.has_hash)
 					{
 						uint8_t device_hash[32];
 						uint8_t recv_hash[32];
 						hash_pin((uint32_t)meshcom_settings.bt_code, device_hash);
-						memcpy(recv_hash, conf_data + 4, 32);
+						memcpy(recv_hash, fr.u.hash, 32);
 						if(memcmp(recv_hash, device_hash, 32) == 0)
 						{
 							auth_ok = true;
@@ -416,11 +421,10 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE], PhoneLinkOwner src)
 			break;
 		}
 
-		case 0x20: {
+		case PFC_TIME: {
 
 			// 4B Timestamp
-			uint32_t timestamp = 0;
-			memcpy(&timestamp, conf_data + 2, sizeof(timestamp));
+			uint32_t timestamp = fr.ts;
 
 			String strDateTime = convertUNIXtoString(timestamp);
 			
@@ -481,18 +485,13 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE], PhoneLinkOwner src)
 			break;
 		}
 
-		case 0x50:
+		case PFC_CALL:
 		{
 
 			DEBUG_MSG("BLE", "Callsing Setting from phone");
 
-			char call_arr[msg_payload_len + 1];
-
-			for (int i = 0; i < msg_payload_len; i++)
-			{
-				call_arr[i] = conf_data[i + 3];
-				call_arr[i+1] = 0x00;
-			}
+			// fr.u.data: NUL-terminated copy of the payload, at most 255 bytes
+			const char *call_arr = (const char *)fr.u.data;
 
 
 			String sVar = call_arr;
@@ -530,11 +529,11 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE], PhoneLinkOwner src)
 			break;
 		}
 
-		case 0x70:
+		case PFC_LAT:
 		{
 
 			DEBUG_MSG("BLE", "Latitude Setting from phone");
-			memcpy(&lat_phone, conf_data + 2, sizeof(lat_phone));
+			float lat_phone = fr.fval;
 			
 			d_lat = (double)lat_phone;
 			
@@ -543,12 +542,12 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE], PhoneLinkOwner src)
 			break;
 		}
 
-		case 0x80:
+		case PFC_LON:
 		{
 
 			DEBUG_MSG("BLE", "Longitude Setting from phone");
 
-			memcpy(&long_phone, conf_data + 2, sizeof(long_phone));
+			float long_phone = fr.fval;
 			d_lon = (double)long_phone;
 		
 			nodeSetLon(d_lon); // DRY-01: range-checked, an out-of-range value from the phone is ignored
@@ -556,10 +555,9 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE], PhoneLinkOwner src)
 			break;
 		}
 
-		case 0x90:
+		case PFC_ALT:
 		{
-			int altitude = 0;
-			memcpy(&altitude, conf_data + 2, sizeof(altitude));
+			int altitude = fr.ival;
 			if(bBLEDEBUG)
 				Serial.printf("[BLE]...Altitude from phone: %i\n", altitude);
 
@@ -585,10 +583,10 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE], PhoneLinkOwner src)
 			break;
 		}
 
-		case 0x95: {
+		case PFC_SYMBOL: {
 
-			char aprs_pri_sec = conf_data[2];
-			char aprs_symbol = conf_data[3];
+			char aprs_pri_sec = fr.sym[0];
+			char aprs_symbol = fr.sym[1];
 
 			if(bBLEDEBUG)
 				Serial.printf("aprs_pri_sec:%c aprs_symbol:%c\n", aprs_pri_sec, aprs_symbol);
@@ -604,32 +602,26 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE], PhoneLinkOwner src)
 			break;
 		}
 
-		case 0xA0: {
+		case PFC_TEXT: {
 			// length 1B - Msg ID 1B - Text
+			// (msg_len < 2 never gets here: the decoder ignores it, avoiding the unsigned underflow)
 
-			if(msg_len < 2)
-			{
-				// malformed frame: declared length too short for the length+type
-				// header, avoid unsigned underflow of txt_msg_len_phone below
-				break;
-			}
-
-			txt_msg_len_phone = msg_len - 2;	// now zero escape for lora TX
+			txt_msg_len_phone = fr.dlen;	// now zero escape for lora TX
 
 			// Spin-wait removed: readPhoneCommand now runs in Main Loop,
 			// no cross-core conflict with sendToPhone() possible
 
 			if (bBLEDEBUG)
-				Serial.printf("Text from phone: %s\n", conf_data + 2);
+				Serial.printf("Text from phone: %s\n", fr.u.data);
 
 			// kopieren der message in buffer fuer main
 			int iposn=0;
-			if(memcmp(conf_data + 2, "--", 2) != 0)
+			if(!fr.dash)
 			{
 				textbuff_phone[0] = ':';
 				iposn=1;
 			}
-			memcpy(textbuff_phone+iposn, conf_data + 2, txt_msg_len_phone);
+			memcpy(textbuff_phone+iposn, fr.u.data, txt_msg_len_phone);
 			textbuff_phone[txt_msg_len_phone+iposn]=0x00;
 
 			// flag für main neue msg von phone
@@ -637,59 +629,30 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE], PhoneLinkOwner src)
 			break;
 		}
 
-		case 0x55: {
+		case PFC_WIFI: {
 			// 1B - SSID Length - SSID - 1B PWD Length - PWD
 
 			DEBUG_MSG("BLE", "Wifi Setting from phone");
 
-			uint8_t ssid_len = conf_data[2];
-
-			// bound ssid_len against the declared frame length before reading
-			// the pwd length byte that follows the SSID field
-			if((unsigned)(4 + ssid_len) > msg_len)
+			// the decoder bounded ssid_len and pwd_len against the frame length and cut both
+			// copies at the capacity of meshcom_settings.node_ssid/node_pwd (NUL-terminated)
 			{
-				break;
-			}
-
-			uint8_t pwd_len = conf_data[ssid_len + 3];
-
-			// bound the full frame (len+type+ssid_len+SSID+pwd_len+PWD) against
-			// the declared frame length before touching the password bytes
-			if((unsigned)(4 + ssid_len + pwd_len) > msg_len)
-			{
-				break;
-			}
-
-			if(ssid_len > 0 && pwd_len > 0)
-			{
-				// fixed-size buffers matching meshcom_settings.node_ssid/node_pwd;
-				// avoids VLAs sized directly from untrusted input and clamps the
-				// copy length to the destination capacity
-				char ssid_arr [sizeof(meshcom_settings.node_ssid)] = {0};
-				char pwd_arr [sizeof(meshcom_settings.node_pwd)] = {0};
-
-				uint8_t ssid_copy_len = (ssid_len < sizeof(ssid_arr) - 1) ? ssid_len : (sizeof(ssid_arr) - 1);
-				uint8_t pwd_copy_len = (pwd_len < sizeof(pwd_arr) - 1) ? pwd_len : (sizeof(pwd_arr) - 1);
-
-				memcpy(ssid_arr, conf_data + 3, ssid_copy_len);
-				memcpy(pwd_arr, conf_data + (4 + ssid_len), pwd_copy_len);
-
-				String s_SSID = ssid_arr;
-				String s_PWD = pwd_arr;
+				String s_SSID = fr.u.wifi.ssid;
+				String s_PWD = fr.u.wifi.pwd;
 
 				snprintf(meshcom_settings.node_ssid, sizeof(meshcom_settings.node_ssid),"%s", s_SSID.c_str());
 				snprintf(meshcom_settings.node_pwd, sizeof(meshcom_settings.node_pwd),"%s", s_PWD.c_str());
 
 				if(bBLEDEBUG)
 					Serial.println("Wifi Setting from phone set");
-				
+
 				// Node will reset after saving settings. Settings back are coming on ble reconnect.
 
 			}
 			break;
 		}
 
-		case 0xF0: {
+		case PFC_SAVE_RESET: {
 			
 			if(bBLEDEBUG)
 				Serial.println("Save Settings");
@@ -711,5 +674,8 @@ void readPhoneCommand(uint8_t conf_data[MAX_MSG_LEN_PHONE], PhoneLinkOwner src)
 				ESP.restart();
 			#endif
 		}
+
+		default:
+			break;	// PFC_NONE: unknown type or an ignored frame
 	}
 }

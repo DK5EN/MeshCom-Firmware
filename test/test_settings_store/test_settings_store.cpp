@@ -230,30 +230,27 @@ static void test_roundtrip_float_double_honesty(void) {
     }
 }
 
-static void test_roundtrip_nan_and_infinity(void) {
-    TestState in;
-    default_state(in);
-    in.float_val = NAN;
-    in.double_val = INFINITY;
-
-    char buf[512];
-    long n = settings_store::encode(kFields, kFieldCount, &in, buf, sizeof(buf));
-    TEST_ASSERT_GREATER_THAN(0, n);
-    TestState out;
-    default_state(out);
-    settings_store::decode(kFields, kFieldCount, &out, buf, (size_t)n);
-    TEST_ASSERT_TRUE(std::isnan(out.float_val));
-    TEST_ASSERT_TRUE(std::isinf(out.double_val));
-    TEST_ASSERT_TRUE(out.double_val > 0);
-
-    default_state(in);
-    in.double_val = -INFINITY;
-    n = settings_store::encode(kFields, kFieldCount, &in, buf, sizeof(buf));
-    TEST_ASSERT_GREATER_THAN(0, n);
-    default_state(out);
-    settings_store::decode(kFields, kFieldCount, &out, buf, (size_t)n);
-    TEST_ASSERT_TRUE(std::isinf(out.double_val));
-    TEST_ASSERT_TRUE(out.double_val < 0);
+// A non-finite REAL (nan, inf, -inf) is a malformed value: the field keeps what it had. Such a value never comes
+// from a setting a person chose; a NaN latitude would reach the APRS position encoder (float-to-int cast).
+static void test_nan_and_infinity_are_rejected(void) {
+    const float fs[] = {NAN, INFINITY, -INFINITY};
+    const double ds[] = {INFINITY, NAN, -INFINITY};
+    for (int k = 0; k < 3; k++) {
+        TestState in;
+        default_state(in);
+        in.float_val = fs[k];
+        in.double_val = ds[k];
+        char buf[512];
+        long n = settings_store::encode(kFields, kFieldCount, &in, buf, sizeof(buf));
+        TEST_ASSERT_GREATER_THAN(0, n);
+        TestState out, def;
+        default_state(out);
+        default_state(def);
+        settings_store::DecodeStats st = settings_store::decode(kFields, kFieldCount, &out, buf, (size_t)n);
+        TEST_ASSERT_EQUAL_MEMORY(&def.float_val, &out.float_val, sizeof(float));
+        TEST_ASSERT_EQUAL_MEMORY(&def.double_val, &out.double_val, sizeof(double));
+        TEST_ASSERT_EQUAL_size_t(2, st.malformed_lines);
+    }
 }
 
 static void test_roundtrip_string_edges(void) {
@@ -629,7 +626,7 @@ int main(int, char **) {
     RUN_TEST(test_roundtrip_integer_edges);
     RUN_TEST(test_encoded_integers_are_plain_decimal_text);
     RUN_TEST(test_roundtrip_float_double_honesty);
-    RUN_TEST(test_roundtrip_nan_and_infinity);
+    RUN_TEST(test_nan_and_infinity_are_rejected);
     RUN_TEST(test_roundtrip_string_edges);
     RUN_TEST(test_roundtrip_string_needs_escaping);
     RUN_TEST(test_field_order_is_not_observable);

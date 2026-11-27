@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DMODE_ROUNDTRIP -DRT_BOOL "
+FLAGS="--unwind 4"
+EXPECT=pass
+CHECKS="encode->decode identity for BOOL"

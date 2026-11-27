@@ -2658,6 +2658,29 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_ack_rx": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I test/support",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
+  ],
+  "platform": "native",
+  "test_filter": [
+   "test_ack_rx_core"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_applink_auth": {
   "build_flags": [
    "-std=gnu++17",
@@ -4859,6 +4882,29 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_phone_frame": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I test/support",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
+  ],
+  "platform": "native",
+  "test_filter": [
+   "test_phone_frame"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_phone_link": {
   "build_flags": [
    "-std=gnu++17",
@@ -5449,6 +5495,41 @@
   "test_build_src": "True",
   "test_filter": [
    "test_settings_members"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_settings_migration": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-D ESP32",
+   "-D BOARD_T_DECK=1",
+   "-D TX_POWER_MIN=-9",
+   "-D TX_POWER_MAX=22",
+   "-D MAX_HOP_TEXT_DEFAULT=4",
+   "-I test/support",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<settings_store.cpp>",
+   "+<settings_schema.cpp>",
+   "+<settings_sanitize.cpp>"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_settings_migration"
   ],
   "test_framework": "unity"
  },

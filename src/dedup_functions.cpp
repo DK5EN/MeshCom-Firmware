@@ -7,6 +7,7 @@
 #include <printfdeb_functions.h>
 
 #include "dedup_functions.h"
+#include "id_table_find.h"
 
 // Der RX-Mitschnitt und die [MC-DBG]-Zeilen haengen an bLORADEBUG
 // (Definition in loop_functions.cpp). Hier nur deklariert statt ueber
@@ -22,33 +23,16 @@ ring_index_t loraWrite{0};
  */
 bool is_new_packet(uint8_t compBuffer[4])
 {
-    for(int ib=0; ib<MAX_DEDUP_RING; ib++)
-    {
-            if (memcmp(compBuffer, ringBufferLoraRX[ib], 4) == 0)
-            {
-                if(bLORADEBUG)
-                {
-                    uint32_t dup_id = (uint32_t)compBuffer[0] |
-                                      ((uint32_t)compBuffer[1] << 8) |
-                                      ((uint32_t)compBuffer[2] << 16) |
-                                      ((uint32_t)compBuffer[3] << 24);
-                    if(bLORADEBUG)
-                        printfdeb("[MC-DBG] RX_DEDUP_DUP msg_id=%08X slot=%d\n",dup_id, ib);
-                }
-                return false;
-            }
-    }
-
+    const int ib = idTableFind(ringBufferLoraRX, MAX_DEDUP_RING, compBuffer);
     if(bLORADEBUG)
     {
-        uint32_t new_id = (uint32_t)compBuffer[0] |
-                          ((uint32_t)compBuffer[1] << 8) |
-                          ((uint32_t)compBuffer[2] << 16) |
-                          ((uint32_t)compBuffer[3] << 24);
-        if(bLORADEBUG)
-            printfdeb("[MC-DBG] RX_DEDUP_NEW msg_id=%08X\n", new_id);
+        const uint32_t id = idTableRowId(compBuffer);
+        if(ib >= 0)
+            printfdeb("[MC-DBG] RX_DEDUP_DUP msg_id=%08X slot=%d\n", id, ib);
+        else
+            printfdeb("[MC-DBG] RX_DEDUP_NEW msg_id=%08X\n", id);
     }
-    return true;
+    return ib < 0;
 }
 
 /**@brief Function adding messages into outgoing UDP ringbuffer
@@ -79,28 +63,12 @@ void addLoraRxBuffer(unsigned int msg_id, bool bserver)
 
 int checkOwnRx(uint8_t compBuffer[4])
 {
-    for(int ilo=0; ilo<MAX_DEDUP_RING; ilo++)
-    {
-        if(memcmp(ringBufferLoraRX[ilo], compBuffer, 4) == 0)
-            return ilo;
-    }
-
-    return -1;
+    return idTableFind(ringBufferLoraRX, MAX_DEDUP_RING, compBuffer);
 }
 
 bool checkServerRx(uint8_t compBuffer[4])
 {
-    for(int ilo=0; ilo<MAX_DEDUP_RING; ilo++)
-    {
-        if(memcmp(ringBufferLoraRX[ilo], compBuffer, 4) == 0)
-        {
-            // MSG wurde von einem anderen GW gesendet
-            if(ringBufferLoraRX[ilo][4] == 1)
-                return true;
-
-            break;
-        }
-    }
-
-    return false;
+    // MSG wurde von einem anderen GW gesendet
+    const int ilo = idTableFind(ringBufferLoraRX, MAX_DEDUP_RING, compBuffer);
+    return ilo >= 0 && ringBufferLoraRX[ilo][4] == 1;
 }

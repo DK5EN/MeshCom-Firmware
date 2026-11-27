@@ -20,6 +20,7 @@
 #include "txring_functions.h"
 #include "bp_notice_frame.h"
 #include "dedup_functions.h"
+#include "id_table_find.h"
 #include "beacon_rate.h"
 #include "autosymbol.h"   // GPS-AUTOSYM-02/03
 #include "posinfo_next.h"   // POSINFO-NEXT-01: clamped NEXT countdown
@@ -1103,22 +1104,11 @@ int checkOwnTx(unsigned int msg_id)
     if(msg_id == 0)
         return -1;
 
-    unsigned int own_id=0;
+    const int ilo = idTableFindU32(own_msg_id, MAX_RING, msg_id);
+    if(ilo >= 0 && bDisplayInfo)
+        printfdeb("%s checkOwnTx:%08X own_msg_id:%08X <%02X%02X%02X%02X> %02X\n", getTimeString().c_str(), msg_id, msg_id, own_msg_id[ilo][3], own_msg_id[ilo][2], own_msg_id[ilo][1], own_msg_id[ilo][0], own_msg_id[ilo][4]);
 
-    for(int ilo=0; ilo<MAX_RING; ilo++)
-    {
-        own_id = own_msg_id[ilo][0] | (own_msg_id[ilo][1] << 8) | (own_msg_id[ilo][2] << 16) | (own_msg_id[ilo][3] << 24);
-
-        if(own_id == msg_id)
-        {
-            if(bDisplayInfo)
-                printfdeb("%s checkOwnTx:%08X own_msg_id:%08X <%02X%02X%02X%02X> %02X\n", getTimeString().c_str(), msg_id, own_id, own_msg_id[ilo][3], own_msg_id[ilo][2], own_msg_id[ilo][1], own_msg_id[ilo][0], own_msg_id[ilo][4]);
-
-            return ilo;
-        }
-    }
-
-    return -1;
+    return ilo;
 }
 
 // The ONE write path for the delivery state of an own message

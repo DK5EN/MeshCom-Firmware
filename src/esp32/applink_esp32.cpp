@@ -90,7 +90,7 @@ static void ioOnFrame(void *ctx, uint8_t *frame, size_t len)
     if (len > sizeof(buf))
         len = sizeof(buf);
     memcpy(buf, frame, len);
-    readPhoneCommand(buf, PL_NET);
+    readPhoneCommand(buf, len, PL_NET);   // len clamped to the buffer above
 }
 
 static void ioOnAuthed(void *ctx)

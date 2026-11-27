@@ -149,13 +149,17 @@ class FakeNode:
             tr.muted = True
             return
         msg_len, op = frame[0], frame[1]
+        # src/phone_frame.h: a frame shorter than 2, longer than 300, or whose header claims more than was
+        # received is dropped with a log line and no reply
+        if len(frame) < 2 or len(frame) > 300 or msg_len > len(frame):
+            return
         data = frame + bytes(300)  # the queue item is zero-initialised
         if op == 0x10:
             if data[2:4] != b"\x20\x30":
                 return
             if self.pin is not None:
                 good = hashlib.sha256(f"{self.pin:06d}".encode()).digest()
-                if msg_len < 35 or data[4:36] != good:
+                if msg_len < 35 or len(frame) < 36 or data[4:36] != good:
                     tr.connected = False
                     return
             tr.ready = True
@@ -680,8 +684,8 @@ class TestMalformed(unittest.TestCase):
         sent = [f.frame for f in bs.malformed_frames()]
         for frame in sent:
             self.assertIn(frame, node.writes)
-        # len-too-big really did read as `--info` on the node (replies came back)
-        self.assertTrue(any("len-too-big OK (replies I,IS1)" in ln for ln in lines))
+        # len-too-big is dropped by the node (header claims more than received): no reply
+        self.assertTrue(any("len-too-big OK (replies none)" in ln for ln in lines))
         self.assertEqual(node.texts, [])  # nothing reached the air
 
     def test_a_frame_that_kills_the_link_is_named(self) -> None:

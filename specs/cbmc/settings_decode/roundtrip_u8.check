@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DMODE_ROUNDTRIP -DRT_U8 "
+FLAGS="--unwind 14"
+EXPECT=pass
+CHECKS="encode->decode identity for U8 inside range/allowed set"

@@ -8,6 +8,7 @@
 #include "settings_store.h"
 
 #include <cerrno>
+#include <cmath>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
@@ -326,6 +327,10 @@ bool decode_real(const char *value, size_t value_len, double *out) {
     char *end = nullptr;
     double v = strtod(tmp, &end);
     if (end != tmp + value_len) {
+        return false;
+    }
+    // nan / inf / -inf parse, but no setting means them; a NaN latitude would reach the APRS position encoder.
+    if (!std::isfinite(v)) {
         return false;
     }
     *out = v;

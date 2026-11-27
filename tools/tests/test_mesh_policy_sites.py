@@ -60,11 +60,17 @@ def test_relay_gates_use_policy():
     assert body.count("meshTxAllowed(MESH_TX_FOREIGN_RELAY") == 2, f"checkMesh() gate, see {DOC}"
     assert not re.search(r"^\s*return\s+bMESH\s*;", body, re.M), f"checkMesh() reads bMESH raw, see {DOC}"
 
-    lora = _read("lora_functions.cpp")
-    m = re.search(r"if\(\(print_buff\[5\] & 0x7F\) > 0x00 &&[^\n]*checkServerRx\(print_buff\+6\)\)", lora)
-    assert m, f"rx_ack_fwd statement not found, see {DOC}"
+    # rx_ack_fwd (FORMAL-02 wave 1): the decision moved into the pure ACK core (src/ack_rx_core.h); handleACK passes
+    # the mesh flag in and forwards only on v.fwdCandidate.
+    core = _read("ack_rx_core.h")
+    m = re.search(r"v\.fwdCandidate\s*=\s*\(v\.frame\[5\] & 0x7F\) > 0x00 &&[^\n;]*;", core)
+    assert m, f"rx_ack_fwd decision not found in ack_rx_core.h, see {DOC}"
     assert "meshTxAllowed(MESH_TX_FOREIGN_RELAY" in m.group(0), f"rx_ack_fwd gate, see {DOC}"
-    assert not re.search(r"\bbMESH\b\s*&&", m.group(0))
+    assert not re.search(r"\bbMESH\b", core), f"ack_rx_core.h reads the mesh flag raw, see {DOC}"
+    lora = _read("lora_functions.cpp")
+    assert re.search(r"ackRxDecide\([^;]*\bbMESH\)\s*;", lora), f"handleACK does not pass bMESH to the ACK core, see {DOC}"
+    fwd = re.search(r"else if\(v\.fwdCandidate\)\s*\{[^}]*?checkServerRx\(print_buff\+6\)", lora)
+    assert fwd, f"rx_ack_fwd shell not found, see {DOC}"
 
 
 MESH_TOKENS = re.compile(r"\b(bMESH|checkMesh|meshTxAllowed)\b")

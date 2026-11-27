@@ -2068,7 +2068,7 @@ void nrf52loop()
     {
         BleQueueItem bleItem;
         while (xQueueReceive(bleQueue, &bleItem, 0) == pdTRUE) {
-            { INSTR_SECTION("ble_cmd"); readPhoneCommand(bleItem.data); }
+            { INSTR_SECTION("ble_cmd"); readPhoneCommand(bleItem.data, bleItem.length); }
         }
         // Auth failure: disconnect now, not on the phone's next write.
         extern void nrf52BleServiceDisconnect(void);

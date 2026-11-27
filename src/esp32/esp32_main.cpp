@@ -4853,7 +4853,7 @@ void esp32loop()
     {
         BleQueueItem bleItem;
         while (xQueueReceive(bleQueue, &bleItem, 0) == pdTRUE) {
-            { INSTR_SECTION("ble_cmd"); LOOP_SECTION(LSEC_BLE_CMD); readPhoneCommand(bleItem.data); }
+            { INSTR_SECTION("ble_cmd"); LOOP_SECTION(LSEC_BLE_CMD); readPhoneCommand(bleItem.data, bleItem.length); }
         }
     }
 

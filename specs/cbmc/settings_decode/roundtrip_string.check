@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DMODE_ROUNDTRIP -DRT_STRING -DCAPMAX=5"
+FLAGS="--unwind 14"
+EXPECT=pass
+CHECKS="encode->decode identity for STRING, all byte values except NUL, content < size"
