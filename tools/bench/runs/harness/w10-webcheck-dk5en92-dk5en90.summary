@@ -1,0 +1,58 @@
+######## 192.168.68.61
+== pages
+info        200 3083B 0.186762s
+setup       200 29842B 0.927971s
+messages    200 1716B 0.102833s
+mheard      200 4226B 0.252588s
+neighbours  200 4029B 0.115522s
+path        200 2267B 0.083352s
+position    200 1016B 0.083780s
+wx          200 1040B 0.085092s
+pins        200 3208B 0.183138s
+mcp23017    200 5210B 0.094200s
+remote      200 4699B 0.175945s
+rxlog       200 896B 0.118846s
+mailbox     404 276B 0.151879s
+spectrum    200 279B 0.096615s
+/           200 25150B 0.367701s
+== B1
+GET /nosuchpath          404 32B 0.097462s
+GET /?page=nosuchpage    404 276B 0.089205s
+POST /getparam/          405 41B 0.123861s {"ok":false,"err":"method not allowed"}
+HEAD /                   HTTP/1.1 403 Forbidden 
+== guard
+scan without X-MC        403 32B 0.097909s {"ok":false,"err":"forbidden"}
+== B8 scan
+scan with X-MC           422 27B 0.077815s {"spectrumscan":"failed"}
+spectrum page after      200 279B 0.130163s
+not supported
+rects:        0  opacity values:        0
+######## 192.168.68.69
+== pages
+info        200 2482B 0.147129s
+setup       200 25222B 0.892696s
+messages    200 1643B 0.145410s
+mheard      200 4217B 0.295254s
+neighbours  200 4040B 0.223227s
+path        200 3172B 0.269045s
+position    200 1017B 0.129890s
+wx          200 1005B 0.126722s
+pins        200 3209B 0.250290s
+mcp23017    200 5211B 0.249976s
+remote      200 4700B 0.282454s
+rxlog       200 898B 0.127539s
+mailbox     200 2641B 0.174774s
+spectrum    200 280B 0.210412s
+/           200 24850B 0.904402s
+== B1
+GET /nosuchpath          404 32B 0.101504s
+GET /?page=nosuchpage    404 277B 0.115453s
+POST /getparam/          405 41B 0.106935s {"ok":false,"err":"method not allowed"}
+HEAD /                   HTTP/1.1 403 Forbidden 
+== guard
+scan without X-MC        403 32B 0.107660s {"ok":false,"err":"forbidden"}
+== B8 scan
+scan with X-MC           422 27B 0.105380s {"spectrumscan":"failed"}
+spectrum page after      200 280B 0.112148s
+not supported
+rects:        0  opacity values:        0

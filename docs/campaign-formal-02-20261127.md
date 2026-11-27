@@ -6,9 +6,9 @@ archive section at the end with one line each.
 ## Now (2026-11-27, resume here)
 
 **State:** waves 1-9 committed on `fork-dev`, not pushed. Full host gate green on `3a60b512` (143 envs, 4,484 ok, 0
-failed, 1 skipped; pytest 1,857). Wave 10 bench part 1 done 2026-11-27 (below); an 18 h soak on DK5EN-98 and DK5EN-14
-runs on rpizero until 2026-11-28 18:00. **Resume:** evaluate the soak (below), then close wave 10. DK5EN-1, -92, -90
-were offline: the V3 scan, classic heap and RAK checks stay open for the next bench session.
+failed, 1 skipped; pytest 1,857). Wave 10 bench part 1 done 2026-11-27 (below); an 18 h soak runs on rpizero (DK5EN-98,
+-14, -92) and on the Mac (DK5EN-90, USB) until 2026-11-28 18:00. **Resume:** evaluate the soak (below), then close
+wave 10. DK5EN-1 is offline: the V3 scan comparison stays open.
 
 - **Wave 8 result:** step 9 moves 9b `3657932e` (`src/nrf52/eth_mss.cpp`), 9c `168ec015` (`mcRandomFill`), 9d `9fbbfccc`
   (`pin_board.cpp`), 9e `8025a723` (`src/esp32/au_web.cpp`), 9f `55f2d728` (mbox in `webFunctionCall`), 9g `5cceb18a`
@@ -31,9 +31,19 @@ were offline: the V3 scan, classic heap and RAK checks stay open for the next be
     heap free 97,636 / largest block 86,004 one minute after boot (before: 100,020 / 49,140 after about 50 h).
   - Heap DK5EN-14: before (old image, long uptime) `--info` 37,344 / blk 22,516; after (4 min uptime) 58,412 / blk
     49,140. Not comparable across uptimes; the soak gives the same-uptime figure.
-  - Not done: BLE phone session with F3 (needs the operator's phone), web accumulator heap figure, V3 / classic / RAK.
+  - DK5EN-92 (T-Beam, classic) and DK5EN-90 (RAK4631) came up on USB later: flashed with `c7ad9f29` (firmware = `3a60b512`;
+    T-Beam USB at 460800, RAK DFU over the app's serial port), identity guard ok. Same web checks: all pages 200 except
+    `mailbox` 404 on the T-Beam (no `ENABLE_MSGSTORE` there, no menu link: B2 feature mask, correct); 404/405/403 as on
+    DK5EN-14; spectrum "not supported" on both (SX1276; nRF52), scan call 422 at once
+    (`tools/bench/runs/harness/w10-webcheck-dk5en92-dk5en90.summary`). Heap DK5EN-92 one minute after boot: free
+    61,072 / blk 57,332.
+  - Not done: BLE phone session with F3 (needs the operator's phone), web accumulator heap figure, V3 scan comparison
+    (DK5EN-1 offline).
 - **Soak (resume here, 2026-11-28 after 18:00):** `rpizero.local:~/meshlog/dk5en-98-formal02w10-20261127/` and
-  `dk5en-14-formal02w10-20261127/` (meshlogger in screens `w10-98`, `w10-14`; `status.txt` shows running/finished).
+  `dk5en-14-formal02w10-20261127/`, `dk5en-92-formal02w10-20261127/` (meshlogger in screens `w10-98`, `w10-14`,
+  `w10-92`; `status.txt` shows running/finished); DK5EN-90 has no net console: USB serial capture on the Mac, screen
+  `w10-90`, `tools/bench/runs/harness/w10-soak-dk5en90.log` (raw, gitignored). T-Beam: compare the idle STAT heap
+  against `tools/heap_baseline.json` (board ttgo_tbeam).
   Check: no reboot (banner/`BOOT RESET_REASON` once), DK5EN-98 `[GW];hold` never `alloc;failed`, gateway traffic all
   night (`[EXT] Out` / `GWI`), heap trend flat (STAT/`[INSTR-HEAP]` on DK5EN-14), no `spectrum re-init failed`.
 - **Wave 9 result (operator scope 2026-11-27: hold store + F3 on all ESP32):** UDP outage hold store on the heap,
