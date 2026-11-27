@@ -5,7 +5,7 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-9 committed on `fork-dev`, not pushed. Full host gate green on `3a60b512` (143 envs, 4,484 ok, 0
+**State:** waves 1-9 committed and pushed on `fork-dev` (2026-11-28, `64e02c90`). Full host gate green on `3a60b512` (143 envs, 4,484 ok, 0
 failed, 1 skipped; pytest 1,857). Wave 10 bench part 1 done 2026-11-27 (below); an 18 h soak runs on rpizero (DK5EN-98,
 -14, -92) and on the Mac (DK5EN-90, USB) until 2026-11-28 18:00. **Resume:** evaluate the soak (below), then close
 wave 10. DK5EN-1 is offline: the V3 scan comparison stays open.
