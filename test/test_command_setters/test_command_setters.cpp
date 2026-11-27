@@ -1304,14 +1304,16 @@ static void test_au_web_gate_and_status_wiring_pins()
     // /austatus phone flag and pct come from the shared sources, not from a private copy of the expression
     const size_t st = pin_find(wf, "static void sub_au_status()\n{", 0, "no sub_au_status body");
     const size_t st_end = pin_find(wf, "\n}\n", st, "sub_au_status has no end");
-    const std::string body = wf.substr(st, st_end - st);
+    const std::string route_body = wf.substr(st, st_end - st);
+    TEST_ASSERT_TRUE_MESSAGE(route_body.find("auWebStatusJson(body, sizeof(body))") != std::string::npos, "sub_au_status does not call auWebStatusJson");
+    const std::string body = read_repo_file("src/esp32/au_web.cpp"); // the JSON assembly lives in auWebStatusJson (9e)
     TEST_ASSERT_TRUE_MESSAGE(body.find("in.phone = fwNetPhoneHeld()") != std::string::npos, "/austatus phone is not fwNetPhoneHeld()");
     TEST_ASSERT_TRUE_MESSAGE(body.find("isPhoneReady") == std::string::npos, "/austatus reads isPhoneReady directly again");
     TEST_ASSERT_TRUE_MESSAGE(body.find("fwProgressPct(au.bytesDone, au.progLen)") != std::string::npos, "/austatus pct does not use progLen");
     TEST_ASSERT_TRUE_MESSAGE(body.find("fwJsonAppendUp(") != std::string::npos, "/austatus carries no up key");
-    TEST_ASSERT_TRUE_MESSAGE(body.find("fwJsonAppendImg(body, sizeof(body), n, d->app_elf_sha256") != std::string::npos, "/austatus carries no img key from the app ELF SHA-256");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("fwJsonAppendImg(buf, cap, n, d->app_elf_sha256") != std::string::npos, "/austatus carries no img key from the app ELF SHA-256");
     TEST_ASSERT_TRUE_MESSAGE(body.find("const esp_app_desc_t *d = MC_RUNNING_APP_DESC();") != std::string::npos, "/austatus img does not read the running image description");
-    TEST_ASSERT_TRUE_MESSAGE(wf.find("#define MC_RUNNING_APP_DESC() esp_ota_get_app_description()") != std::string::npos, "IDF 4.4 (Arduino 2.x) has no esp_app_get_description()");
+    TEST_ASSERT_TRUE_MESSAGE(body.find("#define MC_RUNNING_APP_DESC() esp_ota_get_app_description()") != std::string::npos, "IDF 4.4 (Arduino 2.x) has no esp_app_get_description()");
 
     const std::string net = read_repo_file("src/esp32/fw_update_net.cpp");
     // STAGELAN must not overwrite the CHECK's zlen (runDownload reads it as the expected asset size).

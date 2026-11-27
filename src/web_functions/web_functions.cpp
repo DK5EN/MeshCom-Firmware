@@ -82,16 +82,7 @@
 static bool web_cors_ok = true;
 #if defined(ESP32)
 #include "esp32/fw_update_net.h" // AU-09 (#1187): FwNetStatus/fwNetGetStatus for the info row and the update banner
-#include <esp_timer.h>    // AU web GUI: /austatus "up" (seconds since boot)
-#include <esp_idf_version.h>
-#if ESP_IDF_VERSION_MAJOR >= 5
-#include <esp_app_desc.h> // AU web GUI: /austatus "img" (running image ELF SHA-256)
-#define MC_RUNNING_APP_DESC() esp_app_get_description()
-#else
-#include <esp_ota_ops.h>  // AU web GUI: /austatus "img" (running image ELF SHA-256); IDF 4.4 name
-#define MC_RUNNING_APP_DESC() esp_ota_get_app_description()
-#endif
-#include "au_ui_state.h"  // AU web GUI: AuUiIn/auStatusJson for GET /austatus, auEtaS
+#include "esp32/au_web.h"  // AU web GUI: auWebStatusJson for GET /austatus
 #include "safeboot/safeboot_ver.h" // AU-12: AU_SAFEBOOT_MIN for the Firmware Update card footnote (header-only)
 #ifndef MC_ENV_NAME
 #define MC_ENV_NAME ""
@@ -4749,63 +4740,8 @@ void send_message(const WebReq &wr)
  */
 static void sub_au_status()
 {
-    FwNetStatus au;
-    fwNetGetStatus(au);
-    AuUiIn in;
-    memset(&in, 0, sizeof(in));
-    const char *stn = "idle";
-    if (au.state == FWS_BUSY)
-        stn = "busy";
-    else if (au.state == FWS_DONE_OK)
-        stn = "ok";
-    else if (au.state == FWS_DONE_FAIL)
-        stn = "fail";
-    const char *jobn = "none";
-    if (au.job == FWJ_CHECK)
-        jobn = "check";
-    else if (au.job == FWJ_DOWNLOAD)
-        jobn = "download";
-    else if (au.job == FWJ_STAGELAN)
-        jobn = "stagelan";
-    snprintf(in.st, sizeof(in.st), "%s", stn);
-    snprintf(in.job, sizeof(in.job), "%s", jobn);
-    snprintf(in.run, sizeof(in.run), "%.23s", MC_BUILD_TAG[0] ? MC_BUILD_TAG : "local");
-    snprintf(in.avail, sizeof(in.avail), "%.23s", au.availTag);
-    snprintf(in.staged, sizeof(in.staged), "%.23s", au.staged ? au.stagedTag : "");
-    snprintf(in.err, sizeof(in.err), "%.23s", au.state == FWS_BUSY ? "" : au.lastErr);
-    snprintf(in.mode, sizeof(in.mode), "%s", meshcom_settings.node_autoupd == 2 ? "auto" : "notify"); // never "off" (D1)
-    snprintf(in.chan, sizeof(in.chan), "%s", meshcom_settings.node_updchan ? "dev" : "prod");
-    in.newer = (au.availNewer && au.availTag[0]) ? 1 : 0;
-    in.inst = au.installable ? 1 : 0;
-    // pct: compressed bytes written / the length the running job stages (progLen), only while a download runs
-    const bool dl = au.state == FWS_BUSY && (au.job == FWJ_DOWNLOAD || au.job == FWJ_STAGELAN);
-    if (dl)
-        in.pct = fwProgressPct(au.bytesDone, au.progLen);
-    in.phone = fwNetPhoneHeld() ? 1 : 0; // same expression as the lowheap_phone token
-    in.guard = auBleGuardActive() ? 1 : 0; // BLE guard (campaign-au-webgui-ux section 7)
-    in.sbok = fwNetSafebootCapable() ? 1 : 0;
-    snprintf(in.sbwhy, sizeof(in.sbwhy), "%s", fwNetSafebootWhy()); // ok|old|dio, tells the page why the install is blocked
-    in.etaS = auEtaS(au.stagedIlen);
-    fwNetHeapNow(&in.ifree, &in.iblk);
-
     char body[832];
-    size_t n = auStatusJson(in, body, sizeof(body));
-    { // install schedule: the countdown notice rides outside auStatusJson (its golden strings stay as they are)
-        FwSchedView sv;
-        fwNetSchedGet(sv);
-        n = auAppendSched(body, sizeof(body), n, sv.text);
-    }
-    // AU-30 "vpend": the staged record's dry run was deferred to the install (the page says "checked at install").
-    // One NVS read, only while a record is staged.
-    n = auAppendVpend(body, sizeof(body), n, (au.staged && fwNetVerifyPending(au.stagedTag)) ? 1 : 0);
-    // "up": seconds since boot, appended outside auStatusJson. The page compares it across the install restart
-    // when the build tag cannot be compared (an image built without MC_BUILD_TAG reports run "local").
-    n = fwJsonAppendUp(body, sizeof(body), n, (uint32_t)(esp_timer_get_time() / 1000000));
-    // "img": first 8 hex of the running image's ELF SHA-256. With run "local" the page counts the install as done
-    // only when it changed: a Safeboot fallback restarts the node too (uptime drops) but keeps the old image.
-    const esp_app_desc_t *d = MC_RUNNING_APP_DESC();
-    if (d != NULL)
-        n = fwJsonAppendImg(body, sizeof(body), n, d->app_elf_sha256, sizeof(d->app_elf_sha256));
+    const size_t n = auWebStatusJson(body, sizeof(body));
     send_http_header(n ? 200 : 500, RESPONSE_TYPE_JSON);
     if (n)
         web_client.println(body);

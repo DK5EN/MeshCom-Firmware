@@ -49,6 +49,7 @@ function extractJs(src, fn) {
 }
 
 const cpp = fs.readFileSync(SRC, 'utf8');
+const auWebCpp = fs.readFileSync(path.join(ROOT, 'src', 'esp32', 'au_web.cpp'), 'utf8'); // the /austatus JSON assembly (auWebStatusJson)
 const JS = loadAssets().MC_AU_JS;
 check('the page JS was read from the mcau.js blob', JS.length > 2000 && /function auPageInit/.test(JS), String(JS.length));
 
@@ -725,7 +726,7 @@ async function mkPage(node, opts) {
     check('the notice is inserted as text', tx.d.querySelectorAll('#au_row img').length === 0 && /<img src=x/.test(sc(tx)));
     tx.w.auPageLeave();
     // C++ side: the JSON key and the Setup fields exist, same validation server side, X-MC for the setter names
-    check('/austatus appends "sched" outside auStatusJson (goldens unchanged)', /auAppendSched\(body, sizeof\(body\), n, sv\.text\)/.test(cpp) && !/w\.key\("sched"\)[\s\S]{0,40}in\./.test(fs.readFileSync(path.join(ROOT, 'src', 'web_functions', 'au_ui_state.h'), 'utf8').split('auAppendSched')[0]));
+    check('/austatus appends "sched" outside auStatusJson (goldens unchanged)', /auAppendSched\(buf, cap, n, sv\.text\)/.test(auWebCpp) && !/w\.key\("sched"\)[\s\S]{0,40}in\./.test(fs.readFileSync(path.join(ROOT, 'src', 'web_functions', 'au_ui_state.h'), 'utf8').split('auAppendSched')[0]));
     check('Setup has the delay field, the weekday select and the time field next to aumode', ['"audelay"', 'id=\\"auday\\"', '"autime"'].every((pat) => cpp.indexOf(pat) > cpp.indexOf('id=\\"aumode\\"') && cpp.indexOf(pat) > 0) && /setvalue\('auday',this\.value,true\)/.test(cpp));
     check('Setup says that automatic install is not active and names Download or Install', /Automatic install is not active in this firmware: the node does not install by itself, use Download or Install on the Info page/.test(cpp));
     const guardH = fs.readFileSync(path.join(ROOT, 'src', 'web_functions', 'web_guard.h'), 'utf8');
@@ -753,7 +754,7 @@ async function mkPage(node, opts) {
     check('AU-30: an answer without "vpend" (older firmware) says "downloaded and verified"', /downloaded and verified/.test(VN.view().msg), JSON.stringify(VN.view()));
     VN.w.auPageLeave();
     check('AU-30: /austatus appends "vpend" outside auStatusJson from fwNetVerifyPending of the staged tag (goldens unchanged)',
-      /auAppendVpend\(body, sizeof\(body\), n, \(au\.staged && fwNetVerifyPending\(au\.stagedTag\)\) \? 1 : 0\)/.test(cpp) &&
+      /auAppendVpend\(buf, cap, n, \(au\.staged && fwNetVerifyPending\(au\.stagedTag\)\) \? 1 : 0\)/.test(auWebCpp) &&
       !/w\.key\("vpend"\)/.test(fs.readFileSync(path.join(ROOT, 'src', 'web_functions', 'au_ui_state.h'), 'utf8').split('auAppendVpend')[0]));
   }
 
