@@ -5,19 +5,18 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-6, 7a and 7b steps 1-7 and 8a committed on `fork-dev`, not pushed; last full host gate green after
-step 6 (141 envs, 4,450 ok, 1 skipped), step 7 gate `--changed` green. `fork-dev` contains all of `upstream/dev`
-(checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; next is 7b step 8b (status line CRLF in
-`send_http_header`, D14).
+**State:** waves 1-6, 7a and 7b steps 1-8 committed on `fork-dev`, not pushed; last full host gate green after
+step 6 (141 envs, 4,450 ok, 1 skipped), steps 7, 8a, 8b gates `--changed` green. `fork-dev` contains all of `upstream/dev`
+(checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; next is the last 7b item: drop
+`webRouteLegacy` and the disagreement counter, then the full host gate (end of wave 7).
 
-- **Step 8b (in flight 2026-11-27):** `send_http_header` status line `"HTTP/1.1 %i %s \n"` -> `"%u %s\r\n"` (D14). Golden
-  files keep the frozen form (~1,212 records); the rig gets one normalisation `d14Norm` (old status line form -> new,
-  first `| ` line of a record only, both sides, every live-vs-frozen/golden comparison; both endings are 2 bytes, so
-  byte counts and close offsets do not move) plus a corpus-wide check that live never emits the old form. Exact pins to
-  update: `test_web_diff.cpp` ~:886, ~:1031, ~:1083, `test_rm_web_parse` ~:681. GUI JS reads only `r.status`/`r.ok`.
+- **Last 7b item inputs (grep, 2026-11-27):** `webRouteLegacy` / disagreement counter references outside frozen/golden:
+  `web_functions.cpp` (5), `web_route.h` (3), `test/test_web_diff/live/extract_live.py` (3), `test_web_route` (1),
+  `test_web_guard` (1); other "disagree" hits in the tree are unrelated words. Scout the exact sites before the brief.
+  Then the full host gate (`tools/regression.sh --stage 1,2`), wave 7 closes.
 - **Wave 7b plan (serial, `web_functions.cpp` is the hotspot, one writer per step, gate + advisor + commit each):**
   step 1 router as classifier + switch, table alongside (`ccdf9260`, done); step 2 B2 exact match (`34fb0a3b`, done,
-  33 rig whitelist rows); step 3 B1 (done); step 4 B3 + B6 (done); step 5 (done); step 6 (done); step 7 (done); step 8a `webSendFixedHead` (done); step 8b status line CRLF; then drop `webRouteLegacy` and the disagreement counter.
+  33 rig whitelist rows); step 3 B1 (done); step 4 B3 + B6 (done); step 5 (done); step 6 (done); step 7 (done); step 8a `webSendFixedHead` (done); step 8b status line CRLF (done); then drop `webRouteLegacy` and the disagreement counter.
 - **Wave 7b mechanics:** `webRouteDecide` (web_functions.cpp) gathers inputs, `webRouteDecideCore` (web_route.h, pure)
   decides; the feature mask `built` (WRB_*) mirrors the switch guards and is pinned by `test_web_route`. Rig whitelist
   `kWhitelist` in `test/test_web_diff/test_web_diff.cpp` must be exact both ways; `WEB_DIFF_DUMP_DIFFS=<file>` on the
@@ -235,6 +234,10 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 
 ## Archive
 
+- Wave 7b step 8b (2026-11-27, `797ed2f2`): D14, `send_http_header` status line `"%u %s\r\n"` (was `" \n"` with a trailing
+  space). Rig: `d14Norm`/`d14NormOut` map the old form on the frozen/golden side only (live compared raw; 3435 frozen
+  records rewritten), `test_d14_norm_is_narrow` corpus-wide. Advisor approved; one-sided normalisation applied after it
+  (old-form live answer: 11 cases red).
 - Wave 7b step 8a (2026-11-27, `a624b296`): `webStatusText` (one reason table, +500/503) and `webSendFixedHead` in
   `web_io.*`; the 8 hand-built heads call it byte-identically except the config download (D14: CRLF, Cache-Control
   before Connection). Rig: old site bytes vs live helper, directory-wide scan for hand-built heads (mutation red).
