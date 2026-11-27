@@ -1,12 +1,16 @@
 # RESUME -- pick up here
 
-**Resume here: campaign FORMAL-02, wave 9 (heap work for NimBLE F3), then wave 10 big bench test; waves 1-8 committed, full host gate green. Start a fresh session with `/orchestrate-waves` on [campaign-formal-02-20261127.md](campaign-formal-02-20261127.md), section "Now" (state, dispatch plan for waves 7-10, run rules). Waves 6, 7 and 8 are committed on `fork-dev`, not pushed; `fork-dev` contains all of `upstream/dev`; no upstream PR open.** Release plan and working checklist: operator's
+**Resume here: campaign FORMAL-02, wave 10 (big bench test); waves 1-9 committed, full host gate green. Start a fresh session with `/orchestrate-waves` on [campaign-formal-02-20261127.md](campaign-formal-02-20261127.md), section "Now" (state, dispatch plan for wave 10, run rules). Waves 6 to 9 are committed on `fork-dev`, not pushed; `fork-dev` contains all of `upstream/dev`; no upstream PR open.** Release plan and working checklist: operator's
 Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).
 
 ## Now (2026-11-27)
 
+- **FORMAL-02 wave 9 (2026-11-27):** the gateway outage hold store moved to the heap, allocated only on the first
+  gateway pass (`3c341d78`): static RAM -6,136 B on S3 boards and RAK4631, -1,016 B on classic ESP32. NimBLE F3
+  (attribute values pre-allocated at 300 B, `71705b36`) on every ESP32 env. Phone rings on S3 and the raw LoRa log were
+  dropped as candidates (no static gain, operator 2026-11-27). Gate `--changed` green.
 - **FORMAL-02 wave 6 (2026-11-27):** web step 3 committed: head parser `src/web_functions/web_request.h`
   (`d528d071`) and `work_webpage` running on it (`d787c11b`, no behaviour change on the 1,247-request corpus, frozen vs
   live rig entry, whitelist empty). Proof groups `web_request` (27 jobs) and `nimble_att_write` (3 active); 13 jobs
@@ -23,8 +27,7 @@ Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
   because the node was in WiFi AP mode). Web request corpus captured (`tools/bench/runs/harness/webcap-dk5en14-20261127.jsonl`).
   T-Deck lag measured: the web server blocks the main loop 2.8-8 s on a weak WiFi link (BACKLOG TDECK-LAG-01).
 - **Upstream issues filed 2026-11-27:** #1342 (APRS position exponent), #1343 (mobile app text length byte wraps).
-- **Deferred by the operator:** power loss during an update, safeboot web proofs; NimBLE F3 (pre-allocated attribute
-  values) waits for heap work (phone rings dynamic on S3, UDP hold store).
+- **Deferred by the operator:** power loss during an update, safeboot web proofs; NimBLE F3 done in FORMAL-02 wave 9.
 
 ## Now (2026-11-26)
 

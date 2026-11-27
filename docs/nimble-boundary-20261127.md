@@ -294,7 +294,7 @@ bleQueueOnSend(g_bleQ, bleQueue != NULL && xQueueSend(bleQueue, &item, 0) == pdT
 The counter name and the loop message ("queue full") should then say "dropped" without the cause, or get a second counter
 (operator choice). The `getLength()` call after a failed copy is the only extra read.
 
-**F3, `platformio.ini` (esp32 `build_flags`).** `-DCONFIG_NIMBLE_CPP_ATT_VALUE_INIT_LENGTH=300`: about 2 x 301 B heap at
+**F3, `platformio.ini` (esp32 `build_flags`), done 2026-11-27 (FORMAL-02 wave 9, `71705b36`, also in every env that replaces the inherited flags).** `-DCONFIG_NIMBLE_CPP_ATT_VALUE_INIT_LENGTH=300`: about 2 x 301 B heap at
 boot for the two characteristics (also any other `NimBLELocalValueAttribute`, which are none in our server).
 
 **F5, `tools/nimble_patch.py` (docstring only).** NB-03: replace "drains the 4-block msys pool" by "waits for a free block of the

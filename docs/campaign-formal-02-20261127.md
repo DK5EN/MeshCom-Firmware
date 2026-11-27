@@ -5,9 +5,9 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-8 committed on `fork-dev`, not pushed (wave 8 closed with `ddbdfee2`). Full host gate green after
-wave 8 (143 envs, 4,478 ok, 1 skipped, 0 failed; pytest 1,857; five board links). Next is wave 9 (heap work for NimBLE
-F3), then wave 10 (big bench test incl. the B8/B9 checks). Start a fresh session with `/orchestrate-waves` on this doc.
+**State:** waves 1-9 committed on `fork-dev`, not pushed (wave 9 closed with the docs commit after `71705b36`). Gate
+`--changed` green after wave 9 (143 envs, 4,484 ok, 1 skipped, 0 failed; board links). Next is wave 10 (big bench test
+incl. the B8/B9 and wave 9 checks, full host gate). Start a fresh session with `/orchestrate-waves` on this doc.
 
 - **Wave 8 result:** step 9 moves 9b `3657932e` (`src/nrf52/eth_mss.cpp`), 9c `168ec015` (`mcRandomFill`), 9d `9fbbfccc`
   (`pin_board.cpp`), 9e `8025a723` (`src/esp32/au_web.cpp`), 9f `55f2d728` (mbox in `webFunctionCall`), 9g `5cceb18a`
@@ -16,10 +16,21 @@ F3), then wave 10 (big bench test incl. the B8/B9 checks). Start a fresh session
   **Step 10 deferred** (optional `webGuardCheck(const WebReq &)`, no behaviour change, most pinned file; recommendation:
   only together with the `web_guard.h` shared-header split from the carried items). Not moved (not in step 9's list):
   GPS globals, RM handler merge, asset delivery to `web_io.cpp`, REST handlers to `web_api.cpp`, `web_dispatch.cpp`.
-- **Wave 9 inputs:** plan row in "Next waves"; candidates phone rings dynamic on S3 (~6 KB), UDP hold store only during
-  outages (6 KB), raw LoRa log 20 to 10 slots (~2.6 KB), then NimBLE F3 (pre-allocated attribute values, +600 B). Map
-  owners and measure with `/ram-snapshot` first (ESP32 classic). New since the plan: B8 holds 1.4 KB heap after the
-  first scan; the web accumulator 2.4 kB stays (carried item).
+- **Wave 9 result (operator scope 2026-11-27: hold store + F3 on all ESP32):** UDP outage hold store on the heap,
+  `udpHoldEnsure()` first on every gateway-on pass (ESP32 ahead of the IP check, nRF52 first in `if(bGATEWAY)`), kept
+  until reboot, failed allocation off + logged once + retried every 60 s, `enabled` published release/acquire
+  (`3c341d78`). Static RAM vs `826b2bdb`: -6,136 B on heltec V3, T-Beam Supreme, T-Deck, T-Deck Plus, RAK4631; -1,016 B
+  on classic ESP32 (E22, ttgo_tbeam); flash +232..+328 B. F3 `-DCONFIG_NIMBLE_CPP_ATT_VALUE_INIT_LENGTH=300` in `[esp32]`
+  and the envs that replace build_flags (`71705b36`; artifact: `NimBLECharacteristic.cpp.o` loads 0x12c). Dropped:
+  phone rings dynamic on S3 (BLE always up on S3, rings allocated at boot anyway: 0 B) and raw LoRa log 20 -> 10 (already
+  heap, allocated at the first rxlog page view). Accepted gap: text captured before the first gateway pass after boot
+  or after a runtime `--gateway on` is not held (one loop pass). Advisor: one rework round (twin stub, atomics, test
+  lock assertion, comments), then approved. New BACKLOG NIMBLE-PREP-VARIANTS-01 (eight envs miss the prepare-write
+  limits).
+- **Wave 10 bench checks from wave 9:** a gateway node prints no `[GW];hold;alloc;failed` and `--udphold` status shows
+  `cap;6144` (S3) / `cap;1024` (classic); free heap of a non-gateway S3 node about 6 KB above the `acc07d31` image; a BLE
+  phone session (config burst, long messages) unchanged with F3. Measure the web accumulator (2.4 kB, carried item) as
+  heap on the bench, not with `/ram-snapshot` (it is heap, not static).
 - **B8 decision (operator 2026-11-27):** "Scan now" button (`/callfunction/?spectrumscan`, guarded like every
   callfunction), ONE blocking run (not stepped across loop passes: that would need a radio fence in the ESP32 loop),
   no `delay(50)`, WDT feed, 1000 ms timeout per step, LoRa RX re-armed after. Page shows the last result (heap store
@@ -100,7 +111,7 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
 | 7    | **Done** (`d9566bb4`, full gate green). Web wave B, steps 4-8: route table, REST handlers on `WebReq`, `num_parse.h`, body reader with WDT feed and 408, fixed response heads; B1-B7, B10. B1 needs no `mcau.js` change (checked in step 3, see the wave 7b step 3 archive line). B3/B6 (strict request line and Content-Length, already computed by `web_request.h`, act on nothing yet) land here as their own commits | `web_functions.cpp` is the hotspot: one writer at a time, or carve out new modules (`web_route.h`, `web_query.h`, `num_parse.h`, `web_body.h`) | full host gate after step 5                    |
 | 8    | **Done** (`ddbdfee2`, full gate green; step 10 deferred). Web wave C, steps 9-11: spectrum sweep one step per loop pass on explicit action (B8) plus the shading bug, config upload reboot from the loop (B9), relocations, non-blocking send for TDECK-LAG-01, docs                                                                                                                                                     | per relocation, one commit each                                                                                                                | re-measure TDECK-LAG-01 on DK5EN-14 afterwards |
-| 9    | Heap work for NimBLE F3 (+600 B): candidates phone rings dynamic on S3 (~6 KB), UDP hold store only during outages (6 KB), raw LoRa log 20 to 10 slots (~2.6 KB); then F3                                                                                                                                                                                                                                                | to be mapped                                                                                                                                   |                                                |
+| 9    | **Done** (`3c341d78`, `71705b36`, gate `--changed` green). UDP hold store on the heap only on gateways (-6,136 B static on S3/RAK, -1,016 B classic), NimBLE F3 on all ESP32; phone rings on S3 and raw log dropped (no static gain)                                                                                                                                                                                     |
 | 10   | Large bench test (operator: at the end), full host gate, `regression.sh --formal` on request                                                                                                                                                                                                                                                                                                                             | orchestrator                                                                                                                                   |                                                |
 
 ### How to run (rules for every wave)
@@ -146,7 +157,8 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 | 4    | 4a NimBLE fixes F1/F2/F6/F10 + `nimble_attvalue` (`acc07d31`); web server: analysis, B1-B10 accepted, corpus captured, wave A steps 0-2 (`28eb83bf`, `1a6c3c63`); `nimble_gatts_write` 7 of 7 (`d8aa2576`)      | done    |
 | 5    | Mesh model `specs/tla/meshrelay.tla` (asymmetric nodes, co-located pair, dedup, ACK TTL): today fails DeafNotFirst/RedundantRelayBound, candidate rule holds (`4f6ab492`); firmware rule waits for the operator | done    |
 | 6    | Web step 3: head parser `web_request.h`, `work_webpage` on it, rig live entry (`d528d071`, `d787c11b`); proofs `web_request` 27, `nimble_att_write` 3 (13 parked over 15 GB)                                    | done    |
-| 7-10 | See "Next waves" under Now: web waves B and C, heap for F3, large bench test                                                                                                                                    | planned |
+| 7-9  | Web waves B and C, heap for F3 (see "Next waves" under Now)                                                                                                                                                     | done    |
+| 10   | Large bench test                                                                                                                                                                                                | planned |
 
 ## Wave 5 input: asymmetric nodes (operator 2026-11-27)
 
@@ -223,7 +235,7 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
   except manualcommand, over 200 bytes refused; spectrum scan step-wise on request; config upload reboot after 500 ms;
   408 on timeout). B1 needed the `mcau.js` fix first; step 3 found no failure case and lifted that gate (archive, wave 7b step 3).
 - Browser request capture for the differential corpus: on bench node DK5EN-14, flash current `fork-dev` and record.
-- NimBLE F3 (pre-allocate 300 B per characteristic, ~600 B heap): deferred; first find where ESP32 heap can be won
+- NimBLE F3 (pre-allocate 300 B per characteristic, ~600 B heap): done in wave 9 (`71705b36`); was deferred: first find where ESP32 heap can be won
   (operator: there are large BLE buffers of about 9 KB already).
 - Heap scan for F3 (scout, 2026-11-27, estimates marked in the report): the BLE-side buffers the operator meant are the
   two phone byte rings (`phoneStore` 3,072 B on S3 / 2,048 B classic, `phoneComStore` 3,072 B; `src/loop_functions.cpp`
@@ -260,13 +272,15 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
   at a NUL, so bytes after a NUL can differ on nRF52 (no read past the buffer). The corpus proves ESP32 only (D-6).
 - Web: a lone CR as the unterminated last line gives `WebReq.blank = 1` (inherited from `web_guard.h` ~:640,
   pinned in the suite and the proofs); BACKLOG WEB-CR-BLANK-01.
-- Web: the server holds the 2.4 kB accumulator permanently on top of the 1 kB `web_header` reserve; measure with
-  `/ram-snapshot` (ESP32 classic) during the heap wave 9.
+- Web: the server holds the 2.4 kB accumulator permanently on top of the 1 kB `web_header` reserve; measure as
+  heap on the bench in wave 10 (`/ram-snapshot` shows static RAM only).
 
 ## Open questions
 
 ## Archive
 
+- Wave 9 (2026-11-27, `3c341d78`, `71705b36`): hold store on the heap for gateways only, NimBLE F3; details under Now.
+- Wave 8 (2026-11-27, `ddbdfee2`): web wave C steps 9 and 11 (relocations, B8 scan on request, B9 reboot from the loop); step 10 deferred; details under Now.
 - Wave 7b end (2026-11-27, `d9566bb4`): `webRouteLegacy`, the disagreement counter, the unparsed no-session gate rules and
   `WRL_RM_SEND_GET` removed (dead since step 4: every refused parse is a 400); `webRouteDecideCore` without the legacy
   argument, ids renumbered. Rig exact with no new rows; three source pins moved to the `web_route.h` rows. Full host gate
