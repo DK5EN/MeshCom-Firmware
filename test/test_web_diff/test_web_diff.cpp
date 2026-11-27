@@ -349,7 +349,33 @@ static const std::map<std::string, WhiteB4> kWhitelistB7 = {
     {"grd-121-setparam-setcall-x-20-update-20install", {"open", "setcall"}},
 };
 
-static bool isWhitelisted(const std::string &n) { return kWhitelistB7.count(n) != 0 || kWhitelistB4.count(n) != 0 || kWhitelist.count(n) != 0 || kWhitelistB1.count(n) != 0 || kWhitelistB3.count(n) != 0 || kWhitelistB3Http10.count(n) != 0 || kWhitelistB6.count(n) != 0; }
+// B10 (wave 7b step 7): a head that never ends (the peer sent bytes, then nothing before the 2 s deadline) answers 408
+// {"ok":false,"err":"timeout"} and closes, in every profile; the frozen record answers nothing and never closes the socket.
+// The corpus rows are the requests that stop before the blank line (a bare CR line end, the trunc-* cuts). A connection that
+// sent no byte at all stays silent (test_b10_head_stalls_answer_408_and_a_silent_connection_stays_silent).
+static const char *const kWhyB10 = "B10: head that never ends, at least one byte received: 408";
+static const std::map<std::string, const char *> kWhitelistB10 = {
+    {"mut-416-bare-cr", kWhyB10},
+    {"mut-442-trunc-002", kWhyB10},
+    {"mut-444-trunc-004", kWhyB10},
+    {"mut-446-trunc-006", kWhyB10},
+    {"mut-448-trunc-008", kWhyB10},
+    {"mut-450-trunc-010", kWhyB10},
+    {"mut-452-trunc-012", kWhyB10},
+    {"mut-454-trunc-014", kWhyB10},
+    {"mut-456-trunc-016", kWhyB10},
+    {"mut-458-trunc-018", kWhyB10},
+    {"mut-460-trunc-020", kWhyB10},
+    {"mut-462-trunc-022", kWhyB10},
+    {"mut-464-trunc-040", kWhyB10},
+    {"mut-465-trunc-060", kWhyB10},
+    {"mut-466-trunc-100", kWhyB10},
+    {"mut-467-trunc-200", kWhyB10},
+    {"mut-468-trunc-416", kWhyB10},
+    {"mut-470-trunc-418", kWhyB10},
+};
+
+static bool isWhitelisted(const std::string &n) { return kWhitelistB7.count(n) != 0 || kWhitelistB4.count(n) != 0 || kWhitelist.count(n) != 0 || kWhitelistB1.count(n) != 0 || kWhitelistB3.count(n) != 0 || kWhitelistB3Http10.count(n) != 0 || kWhitelistB6.count(n) != 0 || kWhitelistB10.count(n) != 0; }
 
 static const WebProfile kProfiles[] = {
     {"open", "", "", false, false},
@@ -536,7 +562,7 @@ static void test_entries_agree_with_the_first(void)
             }
             TEST_ASSERT_TRUE_MESSAGE(same, n.c_str());
         }
-        TEST_ASSERT_EQUAL_size_t_MESSAGE(kWhitelist.size() + kWhitelistB1.size() + kWhitelistB3.size() + kWhitelistB3Http10.size() + kWhitelistB6.size() + kWhitelistB4.size() + kWhitelistB7.size(), whitelisted, "every whitelist entry must be a corpus request");
+        TEST_ASSERT_EQUAL_size_t_MESSAGE(kWhitelist.size() + kWhitelistB1.size() + kWhitelistB3.size() + kWhitelistB3Http10.size() + kWhitelistB6.size() + kWhitelistB4.size() + kWhitelistB7.size() + kWhitelistB10.size(), whitelisted, "every whitelist entry must be a corpus request");
     }
 }
 
@@ -547,6 +573,7 @@ static void test_entries_agree_with_the_first(void)
 static const char *const kLiveSources[] = {
     "src/web_functions/web_functions.cpp",
     "src/web_functions/web_rm_handlers.cpp",
+    "src/web_functions/web_io.cpp",
     "src/url_decode.cpp",
 };
 
@@ -623,6 +650,14 @@ static void test_whitelist_names_corpus_requests(void)
         TEST_ASSERT_TRUE_MESSAGE(have.count(w.first) == 1, (std::string("B6 whitelist names no corpus request: ") + w.first).c_str());
         TEST_ASSERT_TRUE_MESSAGE(kWhitelist.count(w.first) == 0 && kWhitelistB1.count(w.first) == 0 && kWhitelistB3.count(w.first) == 0, (std::string("request in both whitelists: ") + w.first).c_str());
         TEST_ASSERT_TRUE_MESSAGE(strncmp(w.second, "B6:", 3) == 0, w.first.c_str());
+    }
+    for (const auto &w : kWhitelistB10)
+    {
+        TEST_ASSERT_TRUE_MESSAGE(have.count(w.first) == 1, (std::string("B10 whitelist names no corpus request: ") + w.first).c_str());
+        TEST_ASSERT_TRUE_MESSAGE(strncmp(w.second, "B10:", 4) == 0, w.first.c_str());
+        TEST_ASSERT_TRUE_MESSAGE(kWhitelist.count(w.first) + kWhitelistB1.count(w.first) + kWhitelistB3.count(w.first) + kWhitelistB3Http10.count(w.first) +
+                                         kWhitelistB4.count(w.first) + kWhitelistB6.count(w.first) + kWhitelistB7.count(w.first) == 0,
+                                 (std::string("request in both whitelists: ") + w.first).c_str());
     }
     for (const auto &w : kWhitelistB3)
     {
@@ -802,6 +837,68 @@ static void test_b7_rows_answer_422_and_set_nothing(void) { checkRows422("B7", k
 static void test_b3_rows_answer_400_in_every_profile(void) { checkRows400("B3", kWhitelistB3); }
 static void test_b6_rows_answer_400_in_every_profile(void) { checkRows400("B6", kWhitelistB6); }
 
+// the record without the response bytes and the close line: trace, serial, clock and input
+static std::string recordWithoutOutput(const std::string &rec)
+{
+    std::string s;
+    size_t i = 0;
+    while (i < rec.size())
+    {
+        size_t nl = rec.find('\n', i);
+        size_t end = (nl == std::string::npos) ? rec.size() : nl + 1;
+        const std::string line = rec.substr(i, end - i);
+        if (line.compare(0, 4, "out:") != 0 && line.compare(0, 2, "| ") != 0 && line.compare(0, 6, "close:") != 0)
+            s += line;
+        i = end;
+    }
+    return s;
+}
+
+// B10 rows: live differs from frozen in every profile and ONLY by the answer: frozen wrote nothing and closed nothing, live
+// wrote the one 408 timeout answer (the same bytes for every row and profile), closed once and fed the watchdog; trace,
+// serial, clock and input are identical, so nothing else can hide behind a B10 row
+static void test_b10_rows_answer_408_in_every_profile(void)
+{
+    std::string answer; // the live 408 bytes of the first row; every other row and profile must write exactly these
+    for (const auto &w : kWhitelistB10)
+    {
+        std::set<std::string> all;
+        for (size_t p = 0; p < kProfileCount; p++)
+            all.insert(kProfiles[p].name);
+        std::map<std::string, std::string> live;
+        const std::set<std::string> got = differingProfiles(w.first, &live);
+        TEST_ASSERT_TRUE_MESSAGE(got == all, ("B10 " + w.first + ": live differs from frozen in [" + joinSet(got) + "], the row lists [" + joinSet(all) + "]").c_str());
+        for (size_t p = 0; p < kProfileCount; p++)
+        {
+            webRigBegin(readCorpus(w.first), closedVariant(w.first), kProfiles[p]);
+            kEntries[0].run();
+            const std::string frozenRec = webRigRecord();
+            const std::string fm = "B10 " + w.first + " [" + kProfiles[p].name + "] frozen: " + webRigEsc(webRig().out.substr(0, 300));
+            TEST_ASSERT_TRUE_MESSAGE(webRig().out.empty(), fm.c_str());
+            TEST_ASSERT_EQUAL_INT_MESSAGE(0, webRig().stopCalls, fm.c_str());
+
+            webRigBegin(readCorpus(w.first), closedVariant(w.first), kProfiles[p]);
+            kEntries[1].run();
+            const std::string am = "B10 " + w.first + " [" + kProfiles[p].name + "]: " + webRigEsc(webRig().out.substr(0, 300));
+            if (answer.empty())
+            {
+                answer = webRig().out;
+                TEST_ASSERT_TRUE_MESSAGE(answer.compare(0, 29, "HTTP/1.1 408 Request Timeout ") == 0, am.c_str());
+                TEST_ASSERT_TRUE_MESSAGE(answer.find("{\"ok\":false,\"err\":\"timeout\"}") != std::string::npos, am.c_str());
+            }
+            TEST_ASSERT_TRUE_MESSAGE(webRig().out == answer, am.c_str());
+            TEST_ASSERT_EQUAL_INT_MESSAGE(1, webRig().stopCalls, am.c_str());
+            TEST_ASSERT_TRUE_MESSAGE(webRig().wdtFeeds > 0, am.c_str());
+            // the one extra trace line is the answer's own webTxBeginChunked (send_http_header), first in the trace
+            std::string liveRec = recordWithoutOutput(webRigRecord());
+            const std::string chunk = "trace:\n  webTxBeginChunked\n";
+            TEST_ASSERT_TRUE_MESSAGE(liveRec.compare(0, chunk.size(), chunk) == 0, am.c_str());
+            liveRec.erase(7, chunk.size() - 7); // keep "trace:\n"
+            TEST_ASSERT_EQUAL_STRING_MESSAGE(recordWithoutOutput(frozenRec).c_str(), liveRec.c_str(), am.c_str());
+        }
+    }
+}
+
 // B6 past the window: the parser judges only the 1023-byte window, the accumulator every finished head line. A bad
 // Content-Length after the window is a 400 too (web_request.h D-4: B6 acts on the accumulator's judgement); the frozen
 // reference routes both requests with the lenient value. The corpus has no head this long, so the rows are built here.
@@ -965,12 +1062,20 @@ static void test_known_requests(void)
     kEntries[0].run();
     TEST_ASSERT_TRUE(webRig().trace.at(0).find("content_length=12 err=(none) body='hello world!'") != std::string::npos);
 
-    // a head that never ends: no answer, the loop leaves at the 2 s deadline
+    // a head that never ends. Frozen: no answer, no close, the loop leaves at the 2 s deadline
     webRigBegin("GET /?page=info HTTP/1.1\r\nHost: 192.0.2.10\r\n", false, open);
     kEntries[0].run();
     TEST_ASSERT_EQUAL_INT(0, webRig().stopCalls);
     TEST_ASSERT_TRUE(webRig().out.empty());
     TEST_ASSERT_EQUAL_UINT(2002, webRig().now - WEB_RIG_T0); // 2000 ms deadline + the polls of the last two loop checks
+    // live (B10): the same deadline, then 408 {"ok":false,"err":"timeout"}, one close, the watchdog fed on the way
+    webRigBegin("GET /?page=info HTTP/1.1\r\nHost: 192.0.2.10\r\n", false, open);
+    kEntries[1].run();
+    TEST_ASSERT_EQUAL_INT(1, webRig().stopCalls);
+    TEST_ASSERT_TRUE(webRig().out.find("HTTP/1.1 408 Request Timeout") == 0);
+    TEST_ASSERT_TRUE(webRig().out.find("{\"ok\":false,\"err\":\"timeout\"}") != std::string::npos);
+    TEST_ASSERT_TRUE(webRig().wdtFeeds > 0);
+    TEST_ASSERT_EQUAL_UINT(2002, webRig().now - WEB_RIG_T0);
 
     // wrong Host: 403 before any routing
     webRigBegin("GET /?page=info HTTP/1.1\r\nHost: evil.com\r\n\r\n", false, open);
@@ -1236,6 +1341,58 @@ static void test_b7_value_verdicts(void)
     }
 }
 
+// B10 body: a body that stalls (Content-Length larger than the bytes sent, the peer stays connected) makes the live readers
+// return WB_SHORT / "short" (the real handlers answer 408 for it: sub_config_upload, rmAnswer, sub_rm_send; the rig's handlers
+// are stubs, so only the reader result is visible here) and the reader fed the watchdog while it waited
+static void test_b10_stalled_bodies_read_short_and_feed_the_watchdog(void)
+{
+    const WebProfile &open = kProfiles[0];
+    const char *const head = "Host: 192.0.2.10\r\nX-MC: 1\r\n";
+    webRigBegin(std::string("POST /rmsend HTTP/1.1\r\n") + head + "Content-Length: 20\r\n\r\nhello", false, open);
+    kEntries[1].run();
+    TEST_ASSERT_TRUE(webRig().trace.at(0).find("content_length=20 err=short body='hello'") != std::string::npos);
+    const int rmStallFeeds = webRig().wdtFeeds;
+    TEST_ASSERT_TRUE(webRig().now - WEB_RIG_T0 >= 2000);
+
+    webRigBegin(std::string("POST /config HTTP/1.1\r\n") + head + "Content-Length: 40\r\n\r\n{\"a\":1}", false, open);
+    kEntries[1].run();
+    {
+        std::string tr;
+        for (const auto &t : webRig().trace)
+            tr += t + " | ";
+        TEST_ASSERT_TRUE_MESSAGE(tr.find("sub_config_upload content_length=40 rc=-3 data=''") != std::string::npos, tr.c_str());
+    }
+    const int cfgStallFeeds = webRig().wdtFeeds;
+    webRigBegin(std::string("POST /config HTTP/1.1\r\n") + head + "Content-Length: 7\r\n\r\n{\"a\":1}", false, open);
+    kEntries[1].run();
+    // the head loop feeds once per pass as well (~1 per head byte): only the body reader's ~2000 idle polls (1 fake ms
+    // each, one feed per pass) explain a margin of 1000 over the same head with a complete body
+    TEST_ASSERT_TRUE_MESSAGE(cfgStallFeeds >= webRig().wdtFeeds + 1000, ("config: stalled " + std::to_string(cfgStallFeeds) + ", complete " + std::to_string(webRig().wdtFeeds)).c_str());
+
+    // a body that is complete reads as before, the feed does not change the result
+    webRigBegin(std::string("POST /rmsend HTTP/1.1\r\n") + head + "Content-Length: 5\r\n\r\nhello", false, open);
+    kEntries[1].run();
+    TEST_ASSERT_TRUE(webRig().trace.at(0).find("content_length=5 err=(none) body='hello'") != std::string::npos);
+    TEST_ASSERT_TRUE_MESSAGE(rmStallFeeds >= webRig().wdtFeeds + 1000, ("rmsend: stalled " + std::to_string(rmStallFeeds) + ", complete " + std::to_string(webRig().wdtFeeds)).c_str());
+}
+
+// B10 head: a connection that sent no byte (browser preconnect) is closed without an answer; one that sent a single byte and
+// then nothing gets the 408
+static void test_b10_head_stalls_answer_408_and_a_silent_connection_stays_silent(void)
+{
+    const WebProfile &open = kProfiles[0];
+    webRigBegin("", false, open);
+    kEntries[1].run();
+    TEST_ASSERT_TRUE(webRig().out.empty());
+    TEST_ASSERT_EQUAL_INT(0, webRig().stopCalls);
+    TEST_ASSERT_TRUE(webRig().wdtFeeds > 0);
+
+    webRigBegin("G", false, open);
+    kEntries[1].run();
+    TEST_ASSERT_TRUE(webRig().out.find("HTTP/1.1 408 Request Timeout") == 0);
+    TEST_ASSERT_EQUAL_INT(1, webRig().stopCalls);
+}
+
 // every route of the table is built under the macros of this build (ESP32, ENABLE_MSGSTORE, OLED_SHOT_WEB), except the
 // T-Deck bench screenshot (INSTRUMENT_ENABLED and BOARD_T_DECK, which the rig does not model): the router the rig
 // runs can reach every other handler, so a build flag lost from the env cannot hide a route
@@ -1279,6 +1436,9 @@ int main(int, char **)
     RUN_TEST(test_b3_rows_answer_400_in_every_profile);
     RUN_TEST(test_b3_http10_rows_keep_working);
     RUN_TEST(test_b6_rows_answer_400_in_every_profile);
+    RUN_TEST(test_b10_rows_answer_408_in_every_profile);
+    RUN_TEST(test_b10_stalled_bodies_read_short_and_feed_the_watchdog);
+    RUN_TEST(test_b10_head_stalls_answer_408_and_a_silent_connection_stays_silent);
     RUN_TEST(test_b4_rows_answer_422_and_set_nothing);
     RUN_TEST(test_b7_rows_answer_422_and_set_nothing);
     RUN_TEST(test_b6_content_length_past_the_window);

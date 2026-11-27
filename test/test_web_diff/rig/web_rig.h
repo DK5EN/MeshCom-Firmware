@@ -54,6 +54,7 @@ struct WebRigState
     bool stopped = false;     // stop() was called
     int stopCalls = 0;
     int flushCalls = 0;
+    int wdtFeeds = 0;         // meshcom_wdt_feed() calls (stubs/watchdog_feed.h)
     size_t closeAt = 0;       // bytes written when stop() was first called
     std::string out;          // every byte written to the client
     std::vector<std::string> trace;
@@ -80,6 +81,7 @@ public:
 };
 extern CommonWebClient web_client;
 
+void webRigWdtFeed(); // counts one meshcom_wdt_feed() call
 // one trace line (printf style); the handler stubs and the body readers call it
 void webRigTrace(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 // escapes a byte string for a record: printable ASCII as is, \\ \r \n \t, everything else \xNN

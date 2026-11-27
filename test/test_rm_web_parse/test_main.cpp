@@ -17,6 +17,7 @@
 #include <remote_cmd.h>
 #include <rm_sender_policy.h>
 #include <web_functions/web_rm_parse.h>
+#include "../support/repo_file.h" // repo_slurp: the B10 source pins
 
 static_assert(RM_FORM_ARGS_MAX == RM_MAX_ARGS, "the web form args cap must equal the wire args cap");
 
@@ -647,6 +648,108 @@ static void test_every_web_error_token_has_a_server_sentence(void)
     TEST_ASSERT_TRUE(strcmp(rmErrTokenMessage(r.err), generic) != 0);
 }
 
+
+// ------------------------------------------------------------------------------------------ B10 (408)
+
+// FORMAL-02 7b step 7: a stalled head or body answers HTTP 408. The handlers are compiled by no native env, so their
+// status codes are pinned in the source text; b10PinsHold() is the pin, test_b10_pins_catch_mutations() proves each
+// pin red against a mutated copy of the text (the files themselves are never touched). The runtime side of the head
+// and of the body readers is test/test_web_diff (B10 rows, stalled bodies).
+struct B10Src
+{
+    std::string wf, rh, io;
+};
+
+static bool has(const std::string &hay, const char *needle) { return hay.find(needle) != std::string::npos; }
+
+// returns nullptr when every pin holds, else the text of the first pin that does not
+static const char *b10PinsHold(const B10Src &s)
+{
+    // sub_config_upload: WB_SHORT -> 408, the other reader codes stay 400, same text and serial line
+    if (!has(s.wf, "send_http_header(n == WB_SHORT ? 408 : 400, RESPONSE_TYPE_TEXT);"))
+        return "sub_config_upload: WB_SHORT must answer 408";
+    if (!has(s.wf, "\"incomplete upload\");") || !has(s.wf, "Serial.printf(\"[CONFIG];upload;rc;%d;len;%ld\\n\", n, content_length);"))
+        return "sub_config_upload: text and serial line of the upload failure";
+    // sub_rm_send / rmAnswer: the token "short" -> 408, every other refusal 422
+    if (!has(s.wf, "send_http_header(ok ? 200 : (strcmp(err, \"short\") == 0 ? 408 : 422), RESPONSE_TYPE_JSON);"))
+        return "sub_rm_send: the token short must answer 408";
+    if (!has(s.rh, "send_http_header(err == nullptr ? 200 : (strcmp(err, \"short\") == 0 ? 408 : 422), RESPONSE_TYPE_JSON);"))
+        return "rmAnswer: the token short must answer 408";
+    // send_http_header knows the status
+    if (!has(s.wf, "case 408:\n        status_text = \"Request Timeout\";"))
+        return "send_http_header: case 408 Request Timeout";
+    // work_webpage: head that never ends, at least one byte, still connected after the deadline
+    if (!has(s.wf, "if (web_head_bytes && web_client.connected() && (web_currentTime - web_previousTime) > WEB_TIMEOUT_TIME)\n"
+                   "    {\n        web_cors_ok = false;\n        send_http_header(408, RESPONSE_TYPE_JSON);\n"
+                   "        web_client.println(\"{\\\"ok\\\":false,\\\"err\\\":\\\"timeout\\\"}\");\n        web_client.stop();"))
+        return "work_webpage: the stalled head must answer 408 {timeout} and close";
+    if (!has(s.wf, "yield();\n        meshcom_wdt_feed(); // B10: bounded by WEB_TIMEOUT_TIME\n        web_currentTime = millis();"))
+        return "work_webpage: the head loop must feed the watchdog";
+    // the two body readers are thin wrappers over webReadBody, with their deadlines and the 3-line token mapping
+    if (!has(s.wf, "return webReadBody(web_cfg_buf, CONFIG_JSON_MAX + 1, content_length, WEB_TIMEOUT_TIME, 4000);"))
+        return "web_read_body: wrapper over webReadBody";
+    if (!has(s.rh, "const int n = webReadBody(buf, cap, content_length, RM_BODY_TIMEOUT_MS, RM_BODY_TOTAL_MS);\n"
+                   "    if (n == WB_NOLEN || n == WB_SIZE)\n        return \"size\";\n    return n == WB_SHORT ? \"short\" : nullptr;"))
+        return "rmReadBody: wrapper over webReadBody and the size/short mapping";
+    // the glue itself: watchdog in the loop, WB_SHORT handed back
+    if (!has(s.io, "yield();\n        meshcom_wdt_feed();\n"))
+        return "webReadBody: the loop must feed the watchdog";
+    if (!has(s.io, "return e == 0 ? (int)a.got : e;"))
+        return "webReadBody: WB_SHORT must reach the caller";
+    return nullptr;
+}
+
+static std::string mutate(const std::string &text, const char *from, const char *to)
+{
+    const size_t at = text.find(from);
+    TEST_ASSERT_TRUE_MESSAGE(at != std::string::npos, from); // a mutation that finds nothing would test nothing
+    std::string m = text;
+    m.replace(at, strlen(from), to);
+    return m;
+}
+
+static B10Src b10Load(void)
+{
+    return {repo_slurp("src/web_functions/web_functions.cpp"), repo_slurp("src/web_functions/web_rm_handlers.cpp"),
+            repo_slurp("src/web_functions/web_io.cpp")};
+}
+
+static void test_b10_sources_answer_408(void)
+{
+    const char *why = b10PinsHold(b10Load());
+    TEST_ASSERT_NULL_MESSAGE(why, why);
+}
+
+static void test_b10_pins_catch_mutations(void)
+{
+    const B10Src base = b10Load();
+    TEST_ASSERT_NULL(b10PinsHold(base));
+    struct Mut
+    {
+        int file; // 0 web_functions.cpp, 1 web_rm_handlers.cpp, 2 web_io.cpp
+        const char *from, *to;
+    };
+    static const Mut muts[] = {
+        {0, "n == WB_SHORT ? 408 : 400", "n == WB_SHORT ? 400 : 400"},                             // config upload back to 400
+        {0, "(strcmp(err, \"short\") == 0 ? 408 : 422)", "(strcmp(err, \"short\") == 0 ? 422 : 422)"}, // sub_rm_send back to 422
+        {1, "(strcmp(err, \"short\") == 0 ? 408 : 422)", "(strcmp(err, \"short\") == 0 ? 422 : 422)"}, // rmAnswer back to 422
+        {0, "case 408:", "case 409:"},
+        {0, "send_http_header(408, RESPONSE_TYPE_JSON);", "send_http_header(400, RESPONSE_TYPE_JSON);"}, // stalled head
+        {0, "if (web_head_bytes && ", "if ("},                                                           // zero bytes would answer too
+        {0, "meshcom_wdt_feed(); // B10", "// B10"},                                                      // head loop without the feed
+        {1, "return n == WB_SHORT ? \"short\" : nullptr;", "return nullptr;"},
+        {2, "meshcom_wdt_feed();", ""},
+        {2, "return e == 0 ? (int)a.got : e;", "return e == 0 ? (int)a.got : WB_NOLEN;"},
+    };
+    for (const Mut &m : muts)
+    {
+        B10Src x = base;
+        std::string &t = m.file == 0 ? x.wf : m.file == 1 ? x.rh : x.io;
+        t = mutate(t, m.from, m.to);
+        TEST_ASSERT_NOT_NULL_MESSAGE(b10PinsHold(x), m.from);
+    }
+}
+
 // ------------------------------------------------------------------------------------------ main
 
 // WEB-PWD-01: POST /rmwebpwd takes 1..19 printable characters (the RM password: 1..14), same act/form rules
@@ -740,5 +843,7 @@ int main(int, char **)
     RUN_TEST(test_leak_positive_control);
     RUN_TEST(test_every_web_error_token_has_a_server_sentence);
     RUN_TEST(test_decode_matches_frozen_decoder);
+    RUN_TEST(test_b10_sources_answer_408);
+    RUN_TEST(test_b10_pins_catch_mutations);
     return UNITY_END();
 }

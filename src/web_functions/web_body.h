@@ -23,16 +23,18 @@
 // into a small accepted length. Only a value < cap (cap <= 65535) is stored in the int32 want.
 // cap is clamped to 65535 (uint16_t fields); cap == 0 leaves no room for the NUL and is WB_SIZE.
 //
-// Contract of the later I/O glue (web_io.cpp, NOT written here):
+// The I/O glue (web_io.cpp, since 7b step 7):
 //   int webReadBody(char *buf, size_t cap, long content_length, uint32_t idle_ms, uint32_t total_ms)
 //     1. webBodyBegin; on a negative code return it (buf[0] is already '\0').
 //     2. loop while a.got < a.want and (now - last_byte) <= idle_ms and (now - start) <= total_ms:
-//        feed the WDT / yield; if a byte is available read it (a negative read breaks the loop),
+//        yield() and meshcom_wdt_feed(); if a byte is available read it (a negative read breaks the loop),
 //        webBodyPush, last_byte = now; else if the client is no longer connected break.
-//        Deadlines are inclusive (<=) as today. Today: web_read_body idle WEB_TIMEOUT_TIME, total 4000 ms;
-//        rmReadBody idle 2000 ms, total 3000 ms.
+//        Deadlines are inclusive (<=) as before. web_read_body: idle WEB_TIMEOUT_TIME, total 4000 ms;
+//        rmReadBody: idle RM_BODY_TIMEOUT_MS (2000), total RM_BODY_TOTAL_MS (3000).
 //     3. webBodyEnd: 0 -> return a.got (bytes read); WB_SHORT -> return WB_SHORT (B10: the HTTP layer
-//        answers 408 for a stalled body). Callers map the code to their own error (see table above).
+//        answers 408 for a stalled body). Callers map the code to their own error (see table above):
+//        web_read_body returns it as is (sub_config_upload: 408 "incomplete upload"), rmReadBody maps
+//        NOLEN/SIZE -> "size", SHORT -> "short" (rmAnswer / sub_rm_send: 408 for "short", else 422).
 #pragma once
 
 #include <stddef.h>

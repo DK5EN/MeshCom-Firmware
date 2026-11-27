@@ -18,6 +18,7 @@
 #include "web_rm_util.h"
 #include "web_rm_parse.h"
 #include "web_rm_handlers.h"
+#include "web_io.h"            // webReadBody: the shared body reader
 #include "web_auth.h"           // WEB-PWD-01: webAuthSetPassword()
 
 #include <loop_functions.h>  // save_settings(): esp32_flash.h on ESP32, WisBlock-API.h on nRF52 (bool there)
@@ -43,30 +44,10 @@ static_assert(RM_FORM_SLOTS == RM_NODES_SLOTS, "parser and store disagree on the
 
 const char *rmReadBody(char *buf, size_t cap, long content_length)
 {
-    buf[0] = '\0';
-    if (content_length <= 0 || (size_t)content_length >= cap)
+    const int n = webReadBody(buf, cap, content_length, RM_BODY_TIMEOUT_MS, RM_BODY_TOTAL_MS);
+    if (n == WB_NOLEN || n == WB_SIZE)
         return "size";
-
-    long got = 0;
-    unsigned long last = millis();
-    const unsigned long start = last;
-    // absolute deadline: a 200-byte body arrives in ms, a slow drip must not stall the loop task
-    while (got < content_length && (millis() - last) <= RM_BODY_TIMEOUT_MS && (millis() - start) <= RM_BODY_TOTAL_MS)
-    {
-        yield();
-        if (web_client.available())
-        {
-            int c = web_client.read();
-            if (c < 0)
-                break;
-            buf[got++] = (char)c;
-            last = millis();
-        }
-        else if (!web_client.connected())
-            break;
-    }
-    buf[got] = '\0';
-    return got == content_length ? nullptr : "short";
+    return n == WB_SHORT ? "short" : nullptr;
 }
 
 // RM-NVS-01: a failed rmNodesSave() logs the NVS fill level (ESP32 only; nRF52 has no nvs_get_stats)
@@ -87,11 +68,11 @@ static void rmNodesStoreFailLog(void)
 #endif
 }
 
-/** 200 {"ok":true} or 422 {"ok":false,"err":"<token>","msg":"<sentence>"}; err is a static token, never input,
+/** 200 {"ok":true} or 422 (408 for the token "short": the body stalled, B10) {"ok":false,"err":"<token>","msg":"<sentence>"}; err is a static token, never input,
  *  msg its sentence from rmTokenTable (rm_sender_policy.h), the one place the RM error texts live */
 static void rmAnswer(const char *err)
 {
-    send_http_header(err == nullptr ? 200 : 422, RESPONSE_TYPE_JSON);
+    send_http_header(err == nullptr ? 200 : (strcmp(err, "short") == 0 ? 408 : 422), RESPONSE_TYPE_JSON);
     if (err == nullptr)
         web_client.println("{\"ok\":true}");
     else

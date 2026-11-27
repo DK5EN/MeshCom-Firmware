@@ -18,6 +18,7 @@
 #include "gpio_status_json.h" // GET /gpiostatus: pure JSON formatter (test/test_pin_status)
 #include "gpio_control.h"      // GPIO-01 Part B: state of the free-GPIO control (glue calls ESP32 only)
 #include "web_functions.h"
+#include "web_io.h"      // FORMAL-02 7b step 7: webReadBody, the shared body reader
 #include "web_request.h" // FORMAL-02 web step 3: request-head accumulator of work_webpage()
 #include "web_query.h"   // FORMAL-02 web step 5a: webQueryFirst for setparam / getparam
 #include "web_route.h"   // FORMAL-02 web step 4: route table, computed beside the legacy router
@@ -643,42 +644,8 @@ static void web_cfg_free(void)
  */
 static int web_read_body(long content_length)
 {
-    web_cfg_buf[0] = '\0';
-
-    if (content_length <= 0)
-        return -1;
-
-    if (content_length > (long)CONFIG_JSON_MAX)
-        return -2;
-
-    long          got = 0;
-    unsigned long last = millis();
-    const unsigned long start = last;
-
-    // Total deadline as well as the idle one: a client dripping one byte per
-    // ~2 s would otherwise pin the loop task past the 5 s ESP32 task WDT.
-    while (got < content_length && (millis() - last) <= WEB_TIMEOUT_TIME && (millis() - start) <= 4000UL)
-    {
-        yield();
-
-        if (web_client.available())
-        {
-            int c = web_client.read();
-            if (c < 0)
-                break;
-
-            web_cfg_buf[got++] = (char)c;
-            last = millis();
-        }
-        else if (!web_client.connected())
-        {
-            break;
-        }
-    }
-
-    web_cfg_buf[got] = '\0';
-
-    return (got == content_length) ? (int)got : -3;
+    // the I/O loop (idle WEB_TIMEOUT_TIME, total 4 s, WDT feed) is web_io.cpp; WB_NOLEN/SIZE/SHORT are -1/-2/-3
+    return webReadBody(web_cfg_buf, CONFIG_JSON_MAX + 1, content_length, WEB_TIMEOUT_TIME, 4000);
 }
 
 /**
@@ -744,7 +711,8 @@ static void sub_rm_send(long content_length)
 
     rm_wipe(body, sizeof(body)); // dst/pw/cmd/args point into it: the password is gone from here on
 
-    send_http_header(ok ? 200 : 422, RESPONSE_TYPE_JSON);
+    // B10: a body that stalled before Content-Length bytes arrived is a 408, not a 422
+    send_http_header(ok ? 200 : (strcmp(err, "short") == 0 ? 408 : 422), RESPONSE_TYPE_JSON);
     if (ok)
         web_client.printf("{\"ok\":true,\"ctr\":%lu%s}\n", (unsigned long)ctr, viaSync ? ",\"viaSync\":true" : "");
     else
@@ -923,7 +891,7 @@ static void sub_config_upload(long content_length)
     if (n < 0)
     {
         web_cfg_free();
-        send_http_header(400, RESPONSE_TYPE_TEXT);
+        send_http_header(n == WB_SHORT ? 408 : 400, RESPONSE_TYPE_TEXT); // B10: a stalled body is a 408
         web_client.printf("<p>upload rejected: %s</p>",
                           (n == -2) ? "file too large" : (n == -1) ? "no Content-Length" : "incomplete upload");
         /* own marker: these codes are the body reader's, not configImportJson()'s */
@@ -1311,14 +1279,17 @@ void work_webpage(void)
         Serial.println("New Client."); // print a message out in the serial port
     }
        
+    bool web_head_bytes = false; // B10: at least one byte of the head arrived
     while (web_client.connected() && (web_currentTime - web_previousTime) <= WEB_TIMEOUT_TIME)
     { // loop while the client's connected
         yield();
+        meshcom_wdt_feed(); // B10: bounded by WEB_TIMEOUT_TIME
         web_currentTime = millis();
         if (web_client.available())
         {
             // if there's bytes to read from the client,
             char c = web_client.read(); // read a byte, then
+            web_head_bytes = true;
 
             // the byte enters the window (while < WEB_HEADER_MAX), the line, and the Cookie/Content-Length logic
             const WebHeadRes web_hres = webHeadPush(web_acc, c);
@@ -1717,6 +1688,16 @@ void work_webpage(void)
                 break;
             }
         }
+    }
+    // B10: the loop ran into the deadline with the peer still connected (a completed head and a 431 both stop the
+    // client): the head never ended. Answer 408 when something arrived; a connection that sent nothing at all
+    // (browser preconnect) is closed silently.
+    if (web_head_bytes && web_client.connected() && (web_currentTime - web_previousTime) > WEB_TIMEOUT_TIME)
+    {
+        web_cors_ok = false;
+        send_http_header(408, RESPONSE_TYPE_JSON);
+        web_client.println("{\"ok\":false,\"err\":\"timeout\"}");
+        web_client.stop();
     }
     if (bDEBUG)
     {
@@ -4996,6 +4977,9 @@ void send_http_header(uint16_t http_status_code, uint8_t content_type, const cha
     case 405:
         status_text = "Method Not Allowed";
         break; // W2-1: GET /rmsend (the password must travel in a POST body)
+    case 408:
+        status_text = "Request Timeout";
+        break; // B10: the head or the body of a request stalled
     case 422:
         status_text = "Unprocessable Entity";
         break; // use this if a parameter was not processable (e.g. out of bounds or somehow wrong)

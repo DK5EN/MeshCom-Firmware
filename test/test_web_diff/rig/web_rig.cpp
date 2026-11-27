@@ -77,6 +77,8 @@ void CommonWebClient::stop()
 }
 void CommonWebClient::flush() { webRig().flushCalls++; }
 
+void webRigWdtFeed() { webRig().wdtFeeds++; }
+
 // ---- recorders
 void webRigTrace(const char *fmt, ...)
 {

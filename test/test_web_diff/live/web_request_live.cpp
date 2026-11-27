@@ -14,6 +14,8 @@
 #include <web_functions.h>
 #include <web_request.h>
 #include <web_query.h>
+#include <web_body.h>    // 7b step 7: WB_* codes of webReadBody
+#include <watchdog_feed.h> // rig stub (stubs/watchdog_feed.h): counts meshcom_wdt_feed() calls
 #include <command_dash.h>
 #include <num_parse.h>   // B5: mboxpurge / mboxdeliver slot
 // the rig does not include msgstore_api.h (its stubs declare msgstorePurge(long)); test_web_diff.cpp asserts this value
@@ -49,12 +51,12 @@ void setparam_live(const WebReq &wr, const String &full_header);
 void getparam_live(const WebReq &wr);
 size_t urlDecode_live(char *buf, size_t len, uint8_t policy); // own plumbing: the live decoder (url_decode_live.cpp)
 
-// ==== web_cors_ok (web_functions.cpp) lines 79-81 (working tree) ====
+// ==== web_cors_ok (web_functions.cpp) lines 80-82 (working tree) ====
 // RM GUI W1c: set per request by the guard in work_webpage_live(). No CORS headers are emitted any more
 // (the GUI is same-origin and there is no documented cross-origin consumer); kept for the guard plumbing.
 static bool web_cors_ok = true;
 
-// ==== web_header + clock globals (web_functions.cpp) lines 234-242 (working tree) ====
+// ==== web_header + clock globals (web_functions.cpp) lines 235-243 (working tree) ====
 String web_header;
 // FORMAL-02 web step 3: the head accumulator (~2.4 kB) of work_webpage_live(), one heap block for the life of
 // the server, never on the loop stack. Allocated by startWebserver(); web_head_acc_get() retries.
@@ -65,7 +67,51 @@ unsigned long web_previousTime = 0;       // Previous time
 #define WEB_TIMEOUT_TIME 2000             // Define timeout time in milliseconds (example: 2000ms = 2s)
 bool bweb_server_running = false;
 
-// ==== config buffer + web_read_body (web_functions.cpp) lines 595-682 (working tree) ====
+// ==== webReadBody (web_io.cpp) lines 9-50 (working tree) ====
+/**
+ * Reads the request BODY (the head is read by work_webpage_live()). Bounded by the Content-Length the caller
+ * picked out of the head and by cap, given up on after idle_ms without a byte (a lying Content-Length
+ * cannot pin the loop) and after total_ms absolute (a client dripping one byte per ~2 s would otherwise
+ * pin the loop task past the 5 s ESP32 task WDT; the loop feeds the WDT, so the deadlines are the bound).
+ *
+ * @return bytes read into buf (NUL-terminated), or WB_NOLEN / WB_SIZE / WB_SHORT (a stalled body: B10, the
+ *         callers answer 408).
+ */
+int webReadBody_live(char *buf, size_t cap, long content_length, uint32_t idle_ms, uint32_t total_ms)
+{
+    WebBodyAcc a;
+    const int8_t b = webBodyBegin(&a, buf, cap, content_length);
+    if (b < 0)
+        return b;
+
+    unsigned long last = millis();
+    const unsigned long start = last;
+
+    while ((int32_t)a.got < a.want && (millis() - last) <= idle_ms && (millis() - start) <= total_ms)
+    {
+        yield();
+        meshcom_wdt_feed();
+
+        if (web_client.available())
+        {
+            int c = web_client.read();
+            if (c < 0)
+                break;
+
+            webBodyPush(&a, (char)c);
+            last = millis();
+        }
+        else if (!web_client.connected())
+        {
+            break;
+        }
+    }
+
+    const int8_t e = webBodyEnd(&a);
+    return e == 0 ? (int)a.got : e;
+}
+
+// ==== config buffer + web_read_body (web_functions.cpp) lines 596-649 (working tree) ====
 /**
  * ###########################################################################################################################
  * CS-03: config download / upload
@@ -117,75 +163,21 @@ static void web_cfg_free(void)
  */
 static int web_read_body_live(long content_length)
 {
-    web_cfg_buf[0] = '\0';
-
-    if (content_length <= 0)
-        return -1;
-
-    if (content_length > (long)CONFIG_JSON_MAX)
-        return -2;
-
-    long          got = 0;
-    unsigned long last = millis();
-    const unsigned long start = last;
-
-    // Total deadline as well as the idle one: a client dripping one byte per
-    // ~2 s would otherwise pin the loop task past the 5 s ESP32 task WDT.
-    while (got < content_length && (millis() - last) <= WEB_TIMEOUT_TIME && (millis() - start) <= 4000UL)
-    {
-        yield();
-
-        if (web_client.available())
-        {
-            int c = web_client.read();
-            if (c < 0)
-                break;
-
-            web_cfg_buf[got++] = (char)c;
-            last = millis();
-        }
-        else if (!web_client.connected())
-        {
-            break;
-        }
-    }
-
-    web_cfg_buf[got] = '\0';
-
-    return (got == content_length) ? (int)got : -3;
+    // the I/O loop (idle WEB_TIMEOUT_TIME, total 4 s, WDT feed) is web_io.cpp; WB_NOLEN/SIZE/SHORT are -1/-2/-3
+    return webReadBody_live(web_cfg_buf, CONFIG_JSON_MAX + 1, content_length, WEB_TIMEOUT_TIME, 4000);
 }
 
-// ==== rm body deadlines (web_rm_handlers.cpp) lines 39-40 (working tree) ====
+// ==== rm body deadlines (web_rm_handlers.cpp) lines 40-41 (working tree) ====
 #define RM_BODY_TIMEOUT_MS 2000UL    // no byte for this long
 #define RM_BODY_TOTAL_MS 3000UL      // absolute deadline for the whole body
 
-// ==== rmReadBody (web_rm_handlers.cpp) lines 44-70 (working tree) ====
+// ==== rmReadBody (web_rm_handlers.cpp) lines 45-51 (working tree) ====
 const char *rmReadBody_live(char *buf, size_t cap, long content_length)
 {
-    buf[0] = '\0';
-    if (content_length <= 0 || (size_t)content_length >= cap)
+    const int n = webReadBody_live(buf, cap, content_length, RM_BODY_TIMEOUT_MS, RM_BODY_TOTAL_MS);
+    if (n == WB_NOLEN || n == WB_SIZE)
         return "size";
-
-    long got = 0;
-    unsigned long last = millis();
-    const unsigned long start = last;
-    // absolute deadline: a 200-byte body arrives in ms, a slow drip must not stall the loop task
-    while (got < content_length && (millis() - last) <= RM_BODY_TIMEOUT_MS && (millis() - start) <= RM_BODY_TOTAL_MS)
-    {
-        yield();
-        if (web_client.available())
-        {
-            int c = web_client.read();
-            if (c < 0)
-                break;
-            buf[got++] = (char)c;
-            last = millis();
-        }
-        else if (!web_client.connected())
-            break;
-    }
-    buf[got] = '\0';
-    return got == content_length ? nullptr : "short";
+    return n == WB_SHORT ? "short" : nullptr;
 }
 
 
@@ -197,7 +189,7 @@ const char *rmReadBody_live(char *buf, size_t cap, long content_length)
 #define WEB_RIG_CFG_BUF web_cfg_buf
 #include "../stubs/web_handler_stubs.h"
 
-// ==== deliver_web_asset (web_functions.cpp) lines 979-1028 (working tree) ====
+// ==== deliver_web_asset (web_functions.cpp) lines 947-996 (working tree) ====
 /**
  * ###########################################################################################################################
  * Serves one of the static GUI assets (web_assets.h): gzip blob, own header (send_http_header_live() says no-cache and
@@ -249,7 +241,7 @@ static bool deliver_web_asset_live(const String &req)
     return true;
 }
 
-// ==== web_head_acc_get (web_functions.cpp) lines 244-251 (working tree) ====
+// ==== web_head_acc_get (web_functions.cpp) lines 245-252 (working tree) ====
 // The accumulator, allocated on first use (startWebserver() calls this once at server start); NULL when the
 // heap is exhausted, work_webpage_live() then answers 503 and keeps the server alive.
 WebHeadAcc *web_head_acc_get(void)
@@ -259,7 +251,7 @@ WebHeadAcc *web_head_acc_get(void)
     return web_head_acc;
 }
 
-// ==== webRouteLegacy + webRouteDecide (web_functions.cpp) lines 1071-1260 (working tree) ====
+// ==== webRouteLegacy + webRouteDecide (web_functions.cpp) lines 1039-1228 (working tree) ====
 static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header)
 {
     if (web_header.startsWith("POST /rmsend"))
@@ -451,7 +443,7 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
     return v.route;
 }
 
-// ==== work_webpage (web_functions.cpp) lines 1262-1734 (working tree) ====
+// ==== work_webpage (web_functions.cpp) lines 1230-1715 (working tree) ====
 void work_webpage_live(void)
 {
     // RAM-Rueckgewinn (2026-09-20): der 1-kB-Sammelpuffer web_header_collect
@@ -504,14 +496,17 @@ void work_webpage_live(void)
         Serial.println("New Client."); // print a message out in the serial port
     }
        
+    bool web_head_bytes = false; // B10: at least one byte of the head arrived
     while (web_client.connected() && (web_currentTime - web_previousTime) <= WEB_TIMEOUT_TIME)
     { // loop while the client's connected
         yield();
+        meshcom_wdt_feed(); // B10: bounded by WEB_TIMEOUT_TIME
         web_currentTime = millis();
         if (web_client.available())
         {
             // if there's bytes to read from the client,
             char c = web_client.read(); // read a byte, then
+            web_head_bytes = true;
 
             // the byte enters the window (while < WEB_HEADER_MAX), the line, and the Cookie/Content-Length logic
             const WebHeadRes web_hres = webHeadPush(web_acc, c);
@@ -911,6 +906,16 @@ void work_webpage_live(void)
             }
         }
     }
+    // B10: the loop ran into the deadline with the peer still connected (a completed head and a 431 both stop the
+    // client): the head never ended. Answer 408 when something arrived; a connection that sent nothing at all
+    // (browser preconnect) is closed silently.
+    if (web_head_bytes && web_client.connected() && (web_currentTime - web_previousTime) > WEB_TIMEOUT_TIME)
+    {
+        web_cors_ok = false;
+        send_http_header_live(408, RESPONSE_TYPE_JSON);
+        web_client.println("{\"ok\":false,\"err\":\"timeout\"}");
+        web_client.stop();
+    }
     if (bDEBUG)
     {
         Serial.println("Client disconnected.");
@@ -926,7 +931,7 @@ void work_webpage_live(void)
     memset(web_acc->line, 0, sizeof(web_acc->line));
 }
 
-// ==== decodeURLPercentCoding (web_functions.cpp) lines 1736-1746 (working tree) ====
+// ==== decodeURLPercentCoding (web_functions.cpp) lines 1717-1727 (working tree) ====
 /**
  * ###########################################################################################################################
  * decodes Percent-Coded Strings (e.g. URLs and its parameters)
@@ -939,7 +944,7 @@ String decodeURLPercentCoding_live(const String &input)
     return String(buf.data());
 }
 
-// ==== webDecodeSpan (web_functions.cpp) lines 1748-1762 (working tree) ====
+// ==== webDecodeSpan (web_functions.cpp) lines 1729-1743 (working tree) ====
 /**
  * The same decode as decodeURLPercentCoding_live() for a span of the parsed request (FORMAL-02 web step 5a): URLD_LEGACY, the
  * result is a String (the handlers keep their setupStruct Strings until B7). The temporary decode buffer is wiped before it
@@ -956,7 +961,7 @@ static String webDecodeSpan(WebSpan s)
     return out;
 }
 
-// ==== webCutAtNul (web_functions.cpp) lines 1764-1777 (working tree) ====
+// ==== webCutAtNul (web_functions.cpp) lines 1745-1758 (working tree) ====
 /**
  * The span ends at the first raw NUL: today's String searches (indexOf = strstr) and c_str() decodes stop there, so the
  * text of a handler does too.
@@ -972,7 +977,7 @@ static WebSpan webCutAtNul(WebSpan w)
     return w;
 }
 
-// ==== webFindLit (web_functions.cpp) lines 1779-1789 (working tree) ====
+// ==== webFindLit (web_functions.cpp) lines 1760-1770 (working tree) ====
 /**
  * Offset of the first occurrence of the literal `lit` in the span, or -1 (indexOf on the cut text).
  */
@@ -985,7 +990,7 @@ static int webFindLit(WebSpan w, const char *lit)
     return -1;
 }
 
-// ==== webParamText (web_functions.cpp) lines 1791-1811 (working tree) ====
+// ==== webParamText (web_functions.cpp) lines 1772-1792 (working tree) ====
 /**
  * The text setparam / getparam / call_function take their name and value from: the query. A request without '?'
  * ("GET /setparam/") has no query; today's header scan then cuts the header from byte 10 ("GET /setparam/" minus 10 =
@@ -1008,7 +1013,7 @@ static WebSpan webParamText(const WebReq &wr, bool legacyWindow, uint16_t skip =
     return webCutAtNul(w);
 }
 
-// ==== send_http_header (web_functions.cpp) lines 4968-5022 (working tree) ====
+// ==== send_http_header (web_functions.cpp) lines 4949-5006 (working tree) ====
 /**
  * ###########################################################################################################################
  * Sends a valid HTTP header. Takes care of the status code.
@@ -1040,6 +1045,9 @@ void send_http_header_live(uint16_t http_status_code, uint8_t content_type, cons
     case 405:
         status_text = "Method Not Allowed";
         break; // W2-1: GET /rmsend (the password must travel in a POST body)
+    case 408:
+        status_text = "Request Timeout";
+        break; // B10: the head or the body of a request stalled
     case 422:
         status_text = "Unprocessable Entity";
         break; // use this if a parameter was not processable (e.g. out of bounds or somehow wrong)
@@ -1065,7 +1073,7 @@ void send_http_header_live(uint16_t http_status_code, uint8_t content_type, cons
     webTxBeginChunked(web_client);                                            // WEB-TX-01: every flush from here on is one chunk
 }
 
-// ==== send_message (web_functions.cpp) lines 5126-5226 (working tree) ====
+// ==== send_message (web_functions.cpp) lines 5110-5210 (working tree) ====
 /**
  * ###########################################################################################################################
  * handles incoming sendmessage request
@@ -1168,7 +1176,7 @@ void send_message_live(const WebReq &wr)
     web_client.println(); // The HTTP response ends with another blank line
 }
 
-// ==== call_function (web_functions.cpp) lines 5300-5394 (working tree) ====
+// ==== call_function (web_functions.cpp) lines 5284-5378 (working tree) ====
 /**
  * ###########################################################################################################################
  * Tries to execute a Web-API function call.
@@ -1265,7 +1273,7 @@ void call_function_live(const WebReq &wr, const String &full_header)
     rm_wipe_string(functionData.functionName);
 }
 
-// ==== webSetparamValueVerdict (web_functions.cpp) lines 5396-5431 (working tree) ====
+// ==== webSetparamValueVerdict (web_functions.cpp) lines 5380-5415 (working tree) ====
 /**
  * B7 (step 5b): may this decoded setparam value reach the setter? 0 = yes, else a refusal (1 too long, 2 "--", 3 leading
  * "&&"). A value over 200 bytes is refused for every name (the setters' own buffers may still cut a value near that
@@ -1303,7 +1311,7 @@ static uint8_t webSetparamValueVerdict(const char *name, const char *value, size
     return dashes ? 2 : 0;
 }
 
-// ==== setparam (web_functions.cpp) lines 5433-5577 (working tree) ====
+// ==== setparam (web_functions.cpp) lines 5417-5561 (working tree) ====
 /**
  * ###########################################################################################################################
  * Set the Value of a parameter (if known)
@@ -1450,7 +1458,7 @@ void setparam_live(const WebReq &wr, const String &full_header)
     rm_wipe_string(setupData.returnValue);
 }
 
-// ==== getparam (web_functions.cpp) lines 5579-5644 (working tree) ====
+// ==== getparam (web_functions.cpp) lines 5563-5628 (working tree) ====
 /**
  * ###########################################################################################################################
  * Get the Value of a parameter (if known)
@@ -1543,6 +1551,48 @@ unsigned long web_currentTime = millis(); // Current time
 unsigned long web_previousTime = 0;       // Previous time
 #define WEB_TIMEOUT_TIME 2000             // Define timeout time in milliseconds (example: 2000ms = 2s)
 bool bweb_server_running = false;)LIVESRC"},
+    {"src/web_functions/web_io.cpp", "webReadBody", R"LIVESRC(/**
+ * Reads the request BODY (the head is read by work_webpage()). Bounded by the Content-Length the caller
+ * picked out of the head and by cap, given up on after idle_ms without a byte (a lying Content-Length
+ * cannot pin the loop) and after total_ms absolute (a client dripping one byte per ~2 s would otherwise
+ * pin the loop task past the 5 s ESP32 task WDT; the loop feeds the WDT, so the deadlines are the bound).
+ *
+ * @return bytes read into buf (NUL-terminated), or WB_NOLEN / WB_SIZE / WB_SHORT (a stalled body: B10, the
+ *         callers answer 408).
+ */
+int webReadBody(char *buf, size_t cap, long content_length, uint32_t idle_ms, uint32_t total_ms)
+{
+    WebBodyAcc a;
+    const int8_t b = webBodyBegin(&a, buf, cap, content_length);
+    if (b < 0)
+        return b;
+
+    unsigned long last = millis();
+    const unsigned long start = last;
+
+    while ((int32_t)a.got < a.want && (millis() - last) <= idle_ms && (millis() - start) <= total_ms)
+    {
+        yield();
+        meshcom_wdt_feed();
+
+        if (web_client.available())
+        {
+            int c = web_client.read();
+            if (c < 0)
+                break;
+
+            webBodyPush(&a, (char)c);
+            last = millis();
+        }
+        else if (!web_client.connected())
+        {
+            break;
+        }
+    }
+
+    const int8_t e = webBodyEnd(&a);
+    return e == 0 ? (int)a.got : e;
+})LIVESRC"},
     {"src/web_functions/web_functions.cpp", "config buffer + web_read_body", R"LIVESRC(/**
  * ###########################################################################################################################
  * CS-03: config download / upload
@@ -1594,71 +1644,17 @@ static void web_cfg_free(void)
  */
 static int web_read_body(long content_length)
 {
-    web_cfg_buf[0] = '\0';
-
-    if (content_length <= 0)
-        return -1;
-
-    if (content_length > (long)CONFIG_JSON_MAX)
-        return -2;
-
-    long          got = 0;
-    unsigned long last = millis();
-    const unsigned long start = last;
-
-    // Total deadline as well as the idle one: a client dripping one byte per
-    // ~2 s would otherwise pin the loop task past the 5 s ESP32 task WDT.
-    while (got < content_length && (millis() - last) <= WEB_TIMEOUT_TIME && (millis() - start) <= 4000UL)
-    {
-        yield();
-
-        if (web_client.available())
-        {
-            int c = web_client.read();
-            if (c < 0)
-                break;
-
-            web_cfg_buf[got++] = (char)c;
-            last = millis();
-        }
-        else if (!web_client.connected())
-        {
-            break;
-        }
-    }
-
-    web_cfg_buf[got] = '\0';
-
-    return (got == content_length) ? (int)got : -3;
+    // the I/O loop (idle WEB_TIMEOUT_TIME, total 4 s, WDT feed) is web_io.cpp; WB_NOLEN/SIZE/SHORT are -1/-2/-3
+    return webReadBody(web_cfg_buf, CONFIG_JSON_MAX + 1, content_length, WEB_TIMEOUT_TIME, 4000);
 })LIVESRC"},
     {"src/web_functions/web_rm_handlers.cpp", "rm body deadlines", R"LIVESRC(#define RM_BODY_TIMEOUT_MS 2000UL    // no byte for this long
 #define RM_BODY_TOTAL_MS 3000UL      // absolute deadline for the whole body)LIVESRC"},
     {"src/web_functions/web_rm_handlers.cpp", "rmReadBody", R"LIVESRC(const char *rmReadBody(char *buf, size_t cap, long content_length)
 {
-    buf[0] = '\0';
-    if (content_length <= 0 || (size_t)content_length >= cap)
+    const int n = webReadBody(buf, cap, content_length, RM_BODY_TIMEOUT_MS, RM_BODY_TOTAL_MS);
+    if (n == WB_NOLEN || n == WB_SIZE)
         return "size";
-
-    long got = 0;
-    unsigned long last = millis();
-    const unsigned long start = last;
-    // absolute deadline: a 200-byte body arrives in ms, a slow drip must not stall the loop task
-    while (got < content_length && (millis() - last) <= RM_BODY_TIMEOUT_MS && (millis() - start) <= RM_BODY_TOTAL_MS)
-    {
-        yield();
-        if (web_client.available())
-        {
-            int c = web_client.read();
-            if (c < 0)
-                break;
-            buf[got++] = (char)c;
-            last = millis();
-        }
-        else if (!web_client.connected())
-            break;
-    }
-    buf[got] = '\0';
-    return got == content_length ? nullptr : "short";
+    return n == WB_SHORT ? "short" : nullptr;
 })LIVESRC"},
     {"src/web_functions/web_functions.cpp", "deliver_web_asset", R"LIVESRC(/**
  * ###########################################################################################################################
@@ -1960,14 +1956,17 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
         Serial.println("New Client."); // print a message out in the serial port
     }
        
+    bool web_head_bytes = false; // B10: at least one byte of the head arrived
     while (web_client.connected() && (web_currentTime - web_previousTime) <= WEB_TIMEOUT_TIME)
     { // loop while the client's connected
         yield();
+        meshcom_wdt_feed(); // B10: bounded by WEB_TIMEOUT_TIME
         web_currentTime = millis();
         if (web_client.available())
         {
             // if there's bytes to read from the client,
             char c = web_client.read(); // read a byte, then
+            web_head_bytes = true;
 
             // the byte enters the window (while < WEB_HEADER_MAX), the line, and the Cookie/Content-Length logic
             const WebHeadRes web_hres = webHeadPush(web_acc, c);
@@ -2367,6 +2366,16 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
             }
         }
     }
+    // B10: the loop ran into the deadline with the peer still connected (a completed head and a 431 both stop the
+    // client): the head never ended. Answer 408 when something arrived; a connection that sent nothing at all
+    // (browser preconnect) is closed silently.
+    if (web_head_bytes && web_client.connected() && (web_currentTime - web_previousTime) > WEB_TIMEOUT_TIME)
+    {
+        web_cors_ok = false;
+        send_http_header(408, RESPONSE_TYPE_JSON);
+        web_client.println("{\"ok\":false,\"err\":\"timeout\"}");
+        web_client.stop();
+    }
     if (bDEBUG)
     {
         Serial.println("Client disconnected.");
@@ -2484,6 +2493,9 @@ void send_http_header(uint16_t http_status_code, uint8_t content_type, const cha
     case 405:
         status_text = "Method Not Allowed";
         break; // W2-1: GET /rmsend (the password must travel in a POST body)
+    case 408:
+        status_text = "Request Timeout";
+        break; // B10: the head or the body of a request stalled
     case 422:
         status_text = "Unprocessable Entity";
         break; // use this if a parameter was not processable (e.g. out of bounds or somehow wrong)
