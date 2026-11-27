@@ -176,6 +176,7 @@ Functions available so far:
 	/callfunction/?updcheck			(ESP32 only) Check for a newer release now (same as --update check; 200 if the job started, 422 if busy or WiFi is down; read the result on the info page)
 	/callfunction/?updinstall		(ESP32 only) Download and stage the newest release (same as --update install; 200 if the job started or the image is already staged, 422 otherwise)
 	/callfunction/?updapply			(ESP32 only) Apply the staged image now (same as --update apply): the node reboots into Safeboot; 422 if nothing is staged
+	/callfunction/?spectrumscan	(ESP32 SX126x boards only) Run one spectrum sweep now (the Spectrum page button "Scan now"). The call blocks for the whole sweep (a few seconds) and takes LoRa off the air meanwhile; the radio is restored exactly as at boot and RX re-armed afterwards. 200 {"spectrumscan":"ok"}: the sweep finished and the result is stored; 422: failed (a packet or a TX in flight, no radio, init or step timeout, no memory, unsupported board, or the radio could not be restored: then see the serial log line "spectrum re-init failed" and reboot). The page shows the reason of the last run; opening the page never starts a scan.
 
 
 

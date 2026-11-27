@@ -873,24 +873,32 @@ static void test_real_nrf52_ble_blob_apply_path_stays_removed()
 }
 
 // The web spectrum page must not write the node_spec* settings (it used to overwrite and persist them,
-// which broke the locked 432/434/0.025/2048). Any assignment to them in web_functions.cpp is a failure.
+// which broke the locked 432/434/0.025/2048). Since B8 (FORMAL-02 wave 8) the sweep lives in
+// src/spectral_sweep.{h,cpp}: any assignment to them in the page or the sweep is a failure, and the sweep
+// takes its window from the local specSweepRangeFor().
 static void test_real_web_spectrum_page_writes_no_spec_settings()
 {
-    const std::string src = read_whole_file(repo_root() + "/src/web_functions/web_functions.cpp");
-    const size_t page = src.find("void sub_page_spectrum()");
-    TEST_ASSERT_TRUE_MESSAGE(page != std::string::npos, "sub_page_spectrum() not found");
-    size_t pos = 0;
-    int writes = 0;
-    while ((pos = src.find("meshcom_settings.node_spec", pos)) != std::string::npos)
+    const std::string wf = read_whole_file(repo_root() + "/src/web_functions/web_functions.cpp");
+    TEST_ASSERT_TRUE_MESSAGE(wf.find("void sub_page_spectrum()") != std::string::npos, "sub_page_spectrum() not found");
+    const std::string sh = read_whole_file(repo_root() + "/src/spectral_sweep.h");
+    const std::string sc = read_whole_file(repo_root() + "/src/spectral_sweep.cpp");
+    for (const std::string *src : {&wf, &sh, &sc})
     {
-        size_t e = src.find_first_not_of("abcdefghijklmnopqrstuvwxyz_0123456789", pos + 18);
-        e = src.find_first_not_of(" \t", e);
-        if (e != std::string::npos && src[e] == '=' && src[e + 1] != '=')
-            writes++;
-        pos += 18;
+        size_t pos = 0;
+        int writes = 0;
+        while ((pos = src->find("meshcom_settings.node_spec", pos)) != std::string::npos)
+        {
+            size_t e = src->find_first_not_of("abcdefghijklmnopqrstuvwxyz_0123456789", pos + 18);
+            e = src->find_first_not_of(" \t", e);
+            if (e != std::string::npos && (*src)[e] == '=' && (*src)[e + 1] != '=')
+                writes++;
+            pos += 18;
+        }
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, writes, "the spectrum page or sweep assigns meshcom_settings.node_spec*: it must use locals");
     }
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, writes, "web_functions.cpp assigns meshcom_settings.node_spec*: the spectrum page must use locals");
-    TEST_ASSERT_TRUE_MESSAGE(src.find("float spec_start", page) != std::string::npos, "spectrum page lost its local scan window");
+    TEST_ASSERT_TRUE_MESSAGE(sh.find("SpecSweepRange r = {432.0f, 434.0f, 0.025f, 2048};") != std::string::npos,
+                             "spectrum sweep lost its local scan window");
+    TEST_ASSERT_TRUE_MESSAGE(sc.find("specSweepRangeFor(getFreq())") != std::string::npos, "the sweep does not take its window from specSweepRangeFor");
 }
 
 // LoRa {SET}: both fields go through prod_lock.h, and the position field is applied only behind

@@ -23,6 +23,8 @@
 #include "spectral_scan.h"
 #include "lora_setchip.h"
 #include "esp32/esp32_flash.h"
+#include "esp32/esp32_main.h"
+#include "watchdog_feed.h"
 
 #if defined(ESP32)
 #include "esp_task_wdt.h"
@@ -35,6 +37,8 @@
 #include <RadioLib.h>
 
 using namespace std;
+
+#define SPECTRAL_STEP_TIMEOUT_MS 1000UL
 
 
 // include the library
@@ -92,10 +96,34 @@ int sx126x_spectral_init_scan(float freq)
  * We need to set back our default LoRa Modem configuration
  * 
  */
-void sx126x_spectral_finish_scan()
+int sx126x_spectral_finish_scan()
 {
-  radio.begin(); // Set modem back to LoRa mode
-  lora_setchip_meshcom();
+  // Chip reset back to LoRa mode, then everything setup applied: the begin as setup does it (per board),
+  // TCXO / boosted gain / current limit (lost with the reset, not part of lora_setchip_meshcom()), then
+  // freq/BW/SF/CR/sync/preamble/power/CRC. Failures are logged and returned, never swallowed.
+  // Only a failed begin stops the restore. An extras error is logged and reported like at setup (which
+  // carries on as well), but the node's channel and LoRa parameters are applied regardless: otherwise RX
+  // would come back on the begin() defaults.
+  const char *step = "begin";
+  int rc = loraChipBegin();
+  if (rc == RADIOLIB_ERR_NONE)
+  {
+    const int extras = loraApplyChipExtras();
+    const bool setchip_ok = lora_setchip_meshcom();
+    if (extras != RADIOLIB_ERR_NONE)
+    {
+      step = "extras";
+      rc = extras;
+    }
+    else if (!setchip_ok)
+    {
+      step = "setchip";
+      rc = RADIOLIB_ERR_UNKNOWN;
+    }
+  }
+  if (rc != RADIOLIB_ERR_NONE)
+    Serial.printf("[LoRa] spectrum re-init failed rc=%d step=%s\n", rc, step);
+  return rc;
 }
 
 
@@ -115,7 +143,15 @@ uint16_t *sx126x_spectral_scan_freq(float freq, uint16_t samples)
     // start spectral scan
     if (radio.spectralScanStart(samples) == RADIOLIB_ERR_NONE)
     { // if scan started without an error, wait for spectral scan to finish
+      // Bounded poll (FORMAL-02 B8): one step takes a few ms; a stuck chip must not hang the loop task.
+      const unsigned long t0 = millis();
       while (radio.spectralScanGetStatus() != RADIOLIB_ERR_NONE){
+        if ((unsigned long)(millis() - t0) > SPECTRAL_STEP_TIMEOUT_MS)
+        {
+          delete[] results;
+          return nullptr;   // callers handle nullptr (timeout)
+        }
+        meshcom_wdt_feed();
         delay(10);
       }
 
@@ -163,6 +199,11 @@ void sx126x_spectral_scan()
     // get the results
     uint16_t *res;
     res = sx126x_spectral_scan_freq(freqStart, samples);
+    if (res == nullptr)
+    {
+      Serial.println("SCAN TIMEOUT");
+      break;
+    }
 
 		esp_task_wdt_reset();
 
@@ -190,7 +231,9 @@ void sx126x_spectral_scan()
   }
   Serial.println("SCAN END");
 
-  sx126x_spectral_finish_scan();
+  // Legacy serial console scan: a failed restore is already logged by finish_scan; the console has no
+  // caller to hand the status to, so it is ignored here on purpose.
+  (void)sx126x_spectral_finish_scan();
 }
 
 int init_scan(float freq)

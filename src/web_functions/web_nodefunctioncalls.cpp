@@ -8,6 +8,7 @@ This file contains all web-based remotely callable functions
 #include <loop_functions_extern.h>
 #include <batt_functions.h> // QA-AU-09: battHardwarePresent
 #include <string> 
+#include <spectral_sweep.h> // B8: spectrumscan
 #ifdef ESP32
 #include <esp_partition.h> // updapply: Safeboot partition present
 #include "esp32/fw_update_net.h" // AU-09 (#1187): FwNetStatus for the update callfunctions
@@ -23,6 +24,12 @@ void webFunctionCall(funCallStruct* functionData) {
     bool bPhoneReady = (isPhoneReady == 1);
 
     //Serial.printf("##### Executing: %s with param: %s\n", functionData->functionName, functionData->functionParameter);
+    // B8 (FORMAL-02 wave 8): the spectrum sweep runs only on this explicit, guarded action (X-MC or same
+    // origin, like every /callfunction/), never on the page GET. One blocking run; LoRa is off air meanwhile.
+    if(functionData->functionName.compareTo("spectrumscan")==0) {
+        functionData->returnCode = spectralSweepRun() == SPS_OK ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+        return;
+    } else
     if(functionData->functionName.compareTo("sendpos")==0) {
         functionData->returnCode = WF_RETURNCODE_OKAY;
         if(bDisplayTrack) {

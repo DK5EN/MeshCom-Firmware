@@ -1146,6 +1146,138 @@ void setFlagSent(void)
     }
 }
 
+// A packet is mid-air: header or preamble IRQ set. The RX-timeout path and the TX gate use these two
+// tests; the spectrum sweep hand-over refuses on the same condition.
+static inline bool loraIrqPacketActive(uint32_t irqFlags)
+{
+    return (irqFlags & (RADIOLIB_SX126X_IRQ_HEADER_VALID | RADIOLIB_SX126X_IRQ_PREAMBLE_DETECTED)) != 0;
+}
+
+// RSSI at or above the stale floor: a signal is really present (below it the IRQ flags are stale).
+static inline bool loraRssiIsSignal(float rssi)
+{
+    return !(rssi < -126.0f);
+}
+
+static bool loraPacketMidAir(void)
+{
+    return loraIrqPacketActive(radio.getIrqFlags()) && loraRssiIsSignal(radio.getRSSI(false));
+}
+
+#if !defined(BOARD_T5_EPAPER)
+// The one place that begins the RF chip (setup and the spectrum sweep's return from FSK use it, so the
+// chip comes back exactly as setup brought it up). Returns the first RadioLib error or 0.
+int loraChipBegin(void)
+{
+    #if defined(BOARD_E220)
+        return radio.begin(434.0F, 125.0F, 9, 7, SYNC_WORD_SX127x, 10, LORA_PREAMBLE_LENGTH, /*float tcxoVoltage = 0*/ 1.6F, /*bool useRegulatorLDO = false*/ false);
+    #elif defined(EXTERNAL_RADIO)
+        return RADIOLIB_ERR_NONE;   // the bridge owns the RF chip
+    #elif defined(BOARD_T_ETH_ELITE)
+        int state = radio.begin(433.175);
+        const int dio2 = radio.setDio2AsRfSwitch(true);
+        const int tcxo = radio.setTCXO(1.8);
+        if(state == RADIOLIB_ERR_NONE) state = dio2;
+        if(state == RADIOLIB_ERR_NONE) state = tcxo;
+        return state;
+    #else
+        return radio.begin(433.175);
+    #endif
+}
+
+// Chip settings that setup applies after begin() and that setchip (lora_setchip_meshcom) does not
+// restore: TCXO voltage, RX boosted gain, over-current limit. A chip reset (radio.begin()) loses them.
+// Returns the first RadioLib error or 0.
+int loraApplyChipExtras(void)
+{
+    int rc = RADIOLIB_ERR_NONE;
+    int st;
+
+    #if defined(BOARD_WIRELESS_PAPER) || defined(BOARD_E290) || defined(BOARD_E213)
+    st = radio.setTCXO(1.8);
+    if(st != RADIOLIB_ERR_NONE)
+    {
+        printlndeb(F("[LoRa]...TCXO 1.8V konnte nicht gesetzt werden"));
+        if(rc == RADIOLIB_ERR_NONE) rc = st;
+    }
+    else
+        printlndeb(F("[LoRa]...TCXO DIO3 = 1.8V (Wireless Paper / E213)"));
+    #endif
+
+    // set boosted gain
+    #if defined(SX1262_V3) || defined(SX126x_V3) || defined(SX1262_E290) || defined(SX1262X) || defined(SX126X) || defined(USING_SX1262) || defined(SX1262_V4)
+    printfdeb("[LoRa]...RX_BOOSTED_GAIN: %d\n", (meshcom_settings.node_sset2 &  0x0800) == 0x0800);
+    st = radio.setRxBoostedGainMode(bBOOSTEDGAIN);
+    if(st != RADIOLIB_ERR_NONE) {
+        printlndeb(F("Boosted Gain is not available for this module!"));
+        if(rc == RADIOLIB_ERR_NONE) rc = st;
+    }
+    #endif
+
+    // set over current protection limit (accepted range is 0 - 140 mA)
+    // NOTE: set value to 0 to disable overcurrent protection
+    st = radio.setCurrentLimit(CURRENT_LIMIT);
+    if(st == RADIOLIB_ERR_INVALID_CURRENT_LIMIT) {
+        printlndeb(F("Selected current limit is invalid for this module!"));
+        Serial.printf("[LoRa] radio config failed, restarting\n");
+        esp_restart();
+    }
+    if(st != RADIOLIB_ERR_NONE && rc == RADIOLIB_ERR_NONE)
+        rc = st;
+
+    return rc;
+}
+#endif
+
+// FORMAL-02 B8: spectrum sweep hand-over (spectral_sweep.cpp). Disarm refuses while no radio came up, a
+// TX, a read, a pending RX flag or a packet mid-air exists; on true the RX interrupt is gated off and the
+// chip may be taken over.
+bool loraRxDisarmForScan(void)
+{
+    if(!bRadio)
+        return false;
+
+    if(serialLoraTxBusy() || is_receiving || receiveFlag || loraPacketMidAir())
+        return false;
+
+    bEnableInterruptReceive = false;
+    radio.clearPacketReceivedAction();
+    return true;
+}
+
+// Back to RX after the scan returned the chip from FSK to LoRa (sx126x_spectral_finish_scan()).
+// The TX-watchdog recovery restricted to what a returning radio needs: no finishTransmit (no TX was
+// active, loraRxDisarmForScan() refused otherwise), same startReceive / setPacketReceivedAction calls.
+// false: startReceive failed (logged); the interrupt is wired anyway so the RX-timeout path retries.
+bool loraRxRearmAfterScan(void)
+{
+    bEnableInterruptReceive  = false;
+    bEnableInterruptTransmit = false;
+    receiveFlag      = false;
+    transmittedFlag  = false;
+    radio.clearPacketSentAction();
+    radio.clearPacketReceivedAction();
+
+    #ifdef RADIO_CTRL
+        digitalWrite(RADIO_CTRL, HIGH);  // RX Mode
+        delay(2);
+    #endif
+
+    const int state = radio.startReceive(RADIOLIB_SX126X_RX_TIMEOUT_INF, RADIOLIB_IRQ_RX_DEFAULT_FLAGS | (1UL << RADIOLIB_IRQ_PREAMBLE_DETECTED), RADIOLIB_IRQ_RX_DEFAULT_MASK, 0);
+    radio.setPacketReceivedAction(setFlagReceive);
+    bEnableInterruptReceive = true;
+
+    iReceiveTimeOutTime = millis();
+    csma_reset();
+
+    if(state != RADIOLIB_ERR_NONE)
+    {
+        Serial.printf("[LoRa] spectrum re-init failed rc=%d step=rx\n", state);
+        return false;
+    }
+    return true;
+}
+
 asm(".global _scanf_float");
 asm(".global _printf_float");
 
@@ -2137,7 +2269,7 @@ void esp32setup()
     // extra source
     #elif defined(BOARD_E220)
         printdeb(F(" Initializing ... "));
-        int state = radio.begin(434.0F, 125.0F, 9, 7, SYNC_WORD_SX127x, 10, LORA_PREAMBLE_LENGTH, /*float tcxoVoltage = 0*/ 1.6F, /*bool useRegulatorLDO = false*/ false);
+        int state = loraChipBegin();
     #else
         printdeb(F(" Initializing ... "));
 
@@ -2188,12 +2320,8 @@ void esp32setup()
         // RX/CAD/TX path runs.
         int state = RADIOLIB_ERR_NONE;
         (void)state;
-        #elif defined(BOARD_T_ETH_ELITE)
-        int state = radio.begin(433.175);
-        radio.setDio2AsRfSwitch(true);
-        radio.setTCXO(1.8);
         #else
-        int state = radio.begin(433.175);
+        int state = loraChipBegin();   // T-ETH-Elite: begin + DIO2 RF switch + TCXO 1.8 V, see loraChipBegin()
         #endif
 
     #endif
@@ -2280,20 +2408,8 @@ void esp32setup()
     {
         g_rxs.init(millis());   // LRF W2b: RX-silence tracker starts with the local radio
 
-        #if defined(BOARD_WIRELESS_PAPER) || defined(BOARD_E290) || defined(BOARD_E213)
-        if(radio.setTCXO(1.8) != RADIOLIB_ERR_NONE)
-            printlndeb(F("[LoRa]...TCXO 1.8V konnte nicht gesetzt werden"));
-        else
-            printlndeb(F("[LoRa]...TCXO DIO3 = 1.8V (Wireless Paper / E213)"));
-        #endif
-
-        // set boosted gain
-        #if defined(SX1262_V3) || defined(SX126x_V3) || defined(SX1262_E290) || defined(SX1262X) || defined(SX126X) || defined(USING_SX1262) || defined(SX1262_V4)
-        printfdeb("[LoRa]...RX_BOOSTED_GAIN: %d\n", (meshcom_settings.node_sset2 &  0x0800) == 0x0800);
-        if (radio.setRxBoostedGainMode(bBOOSTEDGAIN)  != RADIOLIB_ERR_NONE ) {
-            printlndeb(F("Boosted Gain is not available for this module!"));
-        }
-        #endif
+        // TCXO 1.8 V, RX boosted gain, over-current limit: one helper, also used after a spectrum sweep
+        loraApplyChipExtras();
 
         // set carrier frequency
         printfdeb("[LoRa]...RF_FREQUENCY: %.3f MHz\n", meshcom_settings.node_freq);
@@ -2353,14 +2469,6 @@ void esp32setup()
 
         if (rfApplyOutputPower(radio, tx_power) == RADIOLIB_ERR_INVALID_OUTPUT_POWER) {
             printlndeb(F("Selected output power is invalid for this module!"));
-            Serial.printf("[LoRa] radio config failed, restarting\n");
-            esp_restart();
-        }
-
-        // set over current protection limit (accepted range is 0 - 140 mA)
-        // NOTE: set value to 0 to disable overcurrent protection
-        if (radio.setCurrentLimit(CURRENT_LIMIT) == RADIOLIB_ERR_INVALID_CURRENT_LIMIT) {
-            printlndeb(F("Selected current limit is invalid for this module!"));
             Serial.printf("[LoRa] radio config failed, restarting\n");
             esp_restart();
         }
@@ -3946,15 +4054,14 @@ void esp32loop()
                 {
                     bool shouldDefer = false;
                     uint32_t irqFlags = radio.getIrqFlags();
-                    bool irq_active = irqFlags & (RADIOLIB_SX126X_IRQ_HEADER_VALID |
-                                                   RADIOLIB_SX126X_IRQ_PREAMBLE_DETECTED);
+                    bool irq_active = loraIrqPacketActive(irqFlags);
 
                     if(irq_active)
                     {
                         bool header_valid = irqFlags & RADIOLIB_SX126X_IRQ_HEADER_VALID;
                         float currentRSSI = radio.getRSSI(false);
 
-                        if(currentRSSI < -126.0f)
+                        if(!loraRssiIsSignal(currentRSSI))
                         {
                             // No signal present — IRQ flags are stale
                             if(bLORADEBUG)
@@ -4217,8 +4324,7 @@ void esp32loop()
                 bool irq_rx_active = false;
                 {
                     uint32_t irqStatus = radio.getIrqFlags();
-                    if(irqStatus & (RADIOLIB_SX126X_IRQ_HEADER_VALID |
-                                    RADIOLIB_SX126X_IRQ_PREAMBLE_DETECTED))
+                    if(loraIrqPacketActive(irqStatus))
                     {
                         // RX-DEAF-01: the receive flag is not set here. irq_rx_active aborts the TX;
                         // the flag is owned by the read path (checkRXRead() returns while it is set),

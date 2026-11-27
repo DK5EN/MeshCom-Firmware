@@ -18,6 +18,7 @@
 #include "gpio_status_json.h" // GET /gpiostatus: pure JSON formatter (test/test_pin_status)
 #include "gpio_control.h"      // GPIO-01 Part B: state of the free-GPIO control (glue calls ESP32 only)
 #include "web_functions.h"
+#include "spectral_sweep.h" // B8: spectrum sweep on "Scan now", last result rendered by the page
 #include "web_io.h"      // FORMAL-02 7b step 7: webReadBody, the shared body reader
 #include "web_request.h" // FORMAL-02 web step 3: request-head accumulator of work_webpage()
 #include "web_query.h"   // FORMAL-02 web step 5a: webQueryFirst for setparam / getparam
@@ -34,7 +35,6 @@
 #include <lora_setchip.h>
 #include <rtc_functions.h>
 #include <time_functions.h>
-#include <spectral_scan.h>
 #include <maxhop.h>         // CS-02: drop-down values for the text hop limit
 #include <config_json.h>   // CS-03: config download/upload as one JSON object
 #include <loop_breadcrumb.h> // INS-05: loopCrumbClear() before a deliberate reboot
@@ -3993,115 +3993,30 @@ void sub_page_spectrum()
 {
     _create_meshcom_subheader("Spectrum Scan");
     web_client.println("<div id=\"content_inner\">");
-#if defined(SX1262X) || defined(SX126X) || defined(SX1262_V3) || defined(SX1262_E290) || defined(USING_SX1262)
-
-    // Local values only: the page used to overwrite (and persist) the node_spec* settings, which
-    // broke the production-locked 432/434/0.025/2048 (docs/production-locked-settings.md).
-    float spec_start = 432.0;
-    float spec_end = 434.0;
-    float spec_step = 0.025;
-    int spec_samples = 2048;
-
-    if(getFreq() > 860)
+    // B8 (FORMAL-02 wave 8, operator 2026-11-27): opening the page shows the last result only; the sweep runs on
+    // "Scan now" (/callfunction/?spectrumscan, guarded like every state-changing request) as one blocking run in
+    // src/spectral_sweep.cpp, which also re-arms LoRa RX afterwards. The page reloads itself when the scan returns.
+    if (spectralSweepSupported())
     {
-        spec_start = 863.0;
-        spec_end = 870.0;
-        spec_step = 0.100;
-        spec_samples = 2048;
+        web_client.println("<p><button onclick=\"this.disabled=true;this.textContent='Scanning ...';"
+                           "fetch('/callfunction/?spectrumscan=').then(function(r){return r.json();}).catch(function(){})"
+                           ".then(function(){if(cpage=='spectrum')loadPage('spectrum',csender,false);});\">Scan now</button> "
+                           "LoRa is off the air while the scan runs.</p>");
+        const int8_t rc = spectralSweepLastRc();
+        if (rc == SPS_BUSY)
+            web_client.println("<p>The radio was busy with a packet. Try again.</p>");
+        else if (rc == SPS_INIT)
+            web_client.println("<p>unable to initialize spectrum scan</p>");
+        else if (rc == SPS_TIMEOUT)
+            web_client.println("<p>The scan timed out.</p>");
+        else if (rc == SPS_NOMEM)
+            web_client.println("<p>Not enough memory for the scan.</p>");
+        else if (rc == SPS_REINIT)
+            web_client.println("<p>The radio could not be restored after the scan (see the serial log). Reboot the node.</p>");
+        else if (rc == SPS_NORADIO)
+            web_client.println("<p>No radio.</p>");
     }
-
-    float spec_curr_freq = spec_start; // scan start frequency
-
-    uint16_t step_pixel_width = 10;  // the amout of pixel we use for a single frequency step
-    uint16_t step_pixel_height = 10; // the amout of pixel we use for a single frequency step
-
-    uint16_t num_fsteps = roundf((spec_end - spec_curr_freq) / spec_step);
-    #if not defined(BOARD_T_DECK_PRO)
-    uint16_t current_fStep = 0;                                       // current iteration  counter
-    #endif
-    uint16_t start_x = 60;                                            // x-position where the diagramm starts
-    uint16_t start_y = 10;                                            // y-position where the diagramm starts
-    uint16_t end_x = start_x + ((num_fsteps + 1) * step_pixel_width); // calculate the end. Use one more fstep as the last frequency step also starts a scan and giving a result
-    uint16_t end_y = start_y + (RADIOLIB_SX126X_SPECTRAL_SCAN_RES_SIZE * step_pixel_height);
-
-    uint16_t own_freq_marker_width = round(((meshcom_settings.node_bw / 1000) / spec_step) * step_pixel_width);
-    uint16_t own_freq_marker_center = start_x + (((meshcom_settings.node_freq - spec_curr_freq) / spec_step) * step_pixel_width);
-    uint16_t own_freq_marker_start = own_freq_marker_center - (own_freq_marker_width / 2);
-
-
-
-    #if defined(BOARD_T_DECK_PRO)
-        web_client.println("<p>unable to initialize spectrum scan</p>");
-    #else
-    if (sx126x_spectral_init_scan(spec_curr_freq) != RADIOLIB_ERR_NONE)
-    {
-        web_client.println("<p>unable to initialize spectrum scan</p>");
-    }
-    else
-    #endif
-    {
-        web_client.printf("<svg viewbox=\"0, 0, %d, %d\" id=\"spectrum_display\" style=\"font-size:var(--fs-s);\">", end_x + 40, end_y + 60);
-
-        web_client.printf("<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" style=\"stroke:black;stroke-width:1\"/>\n", start_x, end_y, end_x, end_y);                    // X-Line at bottom
-        web_client.printf("<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" style=\"stroke:black;stroke-width:1\"/>\n", start_x, start_y, start_x, end_y);                // Y-Line at left
-        web_client.printf("<text x=\"%d\" y=\"%d\" style=\"color: black;\">Freq [MHz]</text>\n", start_x, end_y + 40);                                // caption for X-Line (frequency)
-        web_client.printf("<text x=\"0\" y=\"0\" f style=\"color: black;\" transform=\"translate(10, %d) rotate(-90)\")>RSSI [dBm]</text>\n", end_y); // caption for Y-Line (power bins)
-
-        web_client.printf("<rect width=\"%d\" height=\"%d\" x=\"%d\" y=\"%d\" fill=\"rgba(0, 110, 129, 0.2)\" />", own_freq_marker_width, end_y - start_y, own_freq_marker_start, start_y); // mark the frequency we are on
-        web_client.printf("<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" style=\"stroke:rgba(114, 0, 129, 0.2); stroke-width:1\"/>\n", own_freq_marker_center, start_y, own_freq_marker_center, end_y);
-
-        // draw y axis titles and lines
-        for (uint8_t i = 0; i < RADIOLIB_SX126X_SPECTRAL_SCAN_RES_SIZE; i++)
-        {
-            if (i % 3 == 0)
-            {                                                                                                                                                                                                            // print frequency value every 3 steps
-                web_client.printf("<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" style=\"stroke:grey; stroke-width:1\"/>\n", start_x - 10, start_y + (i * step_pixel_height), end_x, start_y + (i * step_pixel_height)); // axis lines for Y axis
-                web_client.printf("<text x=\"%d\" y=\"%d\" style=\"color: black;\">-%d</text>\n", start_x - 40, start_y + (i * step_pixel_height) + 6, 11 + (i * 4));                                   // axis title for Y-axis (power)
-            }
-        }
-
-        #if not defined(BOARD_T_DECK_PRO)
-        while (spec_curr_freq < spec_end)
-        {                                                                                                 // loop through the frequency range
-            uint16_t *res = sx126x_spectral_scan_freq(spec_curr_freq, spec_samples); // get spectrum analysis for this given frequency
-            for (uint8_t i = 0; i < RADIOLIB_SX126X_SPECTRAL_SCAN_RES_SIZE; i++)
-            { // loop through the power bins (usually 33)
-                if (res[i] > 0)
-                {                                                               // did the scan found anything above zero?
-                    float alpha = (res[i] / spec_samples); // calculate the alpha-value (transperancy) ranging 0.0 - 1.0
-                    if (alpha < 0.2)
-                        alpha = 0.2; // use a minimum of alpha. Smaller values might be hard to see
-                    web_client.printf("<rect width=\"%d\" height=\"%d\" x=\"%d\" y=\"%d\" fill=\"rgba(0,0,0,%0.3f)\"/>", step_pixel_width, step_pixel_height, start_x + (current_fStep * step_pixel_width), start_y + (i * step_pixel_height), alpha);
-                }
-            }
-
-            delete[] res; // WEB-SPECTRUM-LEAK-01: sx126x_spectral_scan_freq() returns a new[] array per step
-
-            // draw scale values
-            if (current_fStep % 5 == 0)                                                                                                                                                                                                      // draw axis line every 5 steps
-                web_client.printf("<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" style=\"stroke:grey; stroke-width:1\"/>\n", start_x + (current_fStep * step_pixel_width), end_y, start_x + (current_fStep * step_pixel_width), end_y + 10); // axis lines for X-axis
-            if (current_fStep % 10 == 0)                                                                                                                                                                                                     // draw axis title every 10 steps
-                web_client.printf("<text x=\"%d\" y=\"%d\" style=\"color: black;\">%.3f</text>\n", start_x + (current_fStep * step_pixel_width) - 10, end_y + 25, spec_curr_freq);                                          // axis title for X-axis (frequency)
-
-            delay(50); // lets wait for a moment (the example code used 100ms but 50ms seems to work, too)
-            yield();   // this loop runs for a long time, pet the watchdog and give other tasks a chance to operate
-            current_fStep++;
-            spec_curr_freq += spec_step;
-        }
-        #endif
-
-        web_client.println("</svg>");
-
-        #if not defined(BOARD_T_DECK_PRO)
-        sx126x_spectral_finish_scan(); // finish scan, return to normale lora operation
-        #endif
-    }
-
-    web_client.printf("<p>The Node scans the frequency range (%.3fMHz - %.3fMHz) in small steps using a given scan bandwith (%.3fMHz).</p>\n", spec_start, spec_end, spec_step);
-    web_client.printf("<p>It performs %i measurements each step and puts them into %i power-bins. That is why you will see several measurement-dots for each step. The darker the dot, the more measurements have been put into that certain power bin.</p>", spec_samples, RADIOLIB_SX126X_SPECTRAL_SCAN_RES_SIZE);
-#else
-    web_client.println("<p>Spectrum scan is not supported on this device.</p>");
-#endif
+    spectralSweepRender(web_client);
     web_client.println("</div>");
 }
 
