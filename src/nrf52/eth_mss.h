@@ -42,3 +42,7 @@ static inline void ethPrewriteClosedMss(uint16_t mss, uint8_t nsock)
         SPI.endTransaction();
     }
 }
+
+// W5100S MSS glue of the web server (src/nrf52/eth_mss.cpp). Call after
+// server.begin() and after every server.available().
+void ethApplyWebServerMss(EthernetServer &server);
