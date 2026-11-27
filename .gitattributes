@@ -6,3 +6,6 @@
 # normalization so the committed bytes are the captured bytes.
 docs/bench/**/*.json -text
 docs/bench/**/*.txt  -text
+
+# Web request corpus: raw HTTP requests, CRLF is part of the protocol under test (test/test_web_diff).
+test/test_web_diff/corpus/*.req -text
