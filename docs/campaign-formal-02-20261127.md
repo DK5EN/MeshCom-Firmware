@@ -7,9 +7,9 @@ archive section at the end with one line each.
 
 **State:** waves 1-7 committed on `fork-dev`, not pushed. Wave 8 in progress: 9b `3657932e` (W5100S MSS glue to
 `src/nrf52/eth_mss.cpp`), 9c `168ec015` (`mcRandomFill`, `src/hw_random.h`; nRF52 seed and AppLink nonce stay separate,
-they differ) committed. B8 implemented but in advisor rework (uncommitted). Next after B8: 9d pin rows, 9e
-`au_web.cpp`, 9f mbox actions, 9g `web_config.cpp` + B9, then steps 10-11. Start a fresh session with
-`/orchestrate-waves` on this doc.
+they differ), B8 `e4b8bcd6` (spectrum scan on "Scan now", radio restored as setup left it) committed. 9d (pin rows to
+`pin_board.cpp`) in flight; then 9e `au_web.cpp`, 9f mbox actions, 9g `web_config.cpp` + B9, then steps 10-11. Start a
+fresh session with `/orchestrate-waves` on this doc.
 
 - **B8 decision (operator 2026-11-27):** "Scan now" button (`/callfunction/?spectrumscan`, guarded like every
   callfunction), ONE blocking run (not stepped across loop passes: that would need a radio fence in the ESP32 loop),
@@ -17,11 +17,14 @@ they differ) committed. B8 implemented but in advisor rework (uncommitted). Next
   1.4 KB, allocated at the first scan). Shading fixed (15 levels, min alpha 0.2). T-Deck Pro now says "not supported".
   Module `src/spectral_sweep.{h,cpp}`, helpers `loraRxDisarmForScan` / `loraRxRearmAfterScan` in `esp32_main.cpp`,
   suite `native_spectral_sweep`.
-- **B8 advisor rework (in flight):** `sx126x_spectral_finish_scan`'s `radio.begin()` loses setup's TCXO 1.8 V, RX boosted
-  gain and the 140 mA current limit until reboot (pre-existing with the old page too): one chip-init helper shared by
-  setup and the scan finish; re-init failures logged and shown (`SPS_REINIT`); disarm refuses a packet mid-air and
-  `!bRadio`; button reloads only if still on the page; vacuous step-count assert; Web-API doc entry. Bench after commit:
-  scan on DK5EN-14 or a heltec V3, then a group 9999 message both ways at 2 dBm, TX power/current unchanged.
+- **B8 done after two advisor rounds:** setup's per-board begin and post-begin chip settings are `loraChipBegin()` /
+  `loraApplyChipExtras()` (esp32_main.cpp), shared with the scan finish; re-init failures log `[LoRa] spectrum re-init
+failed` and show `SPS_REINIT`; disarm refuses mid-air packets (`loraIrqPacketActive` / `loraRssiIsSignal`, shared with the
+  RX-timeout path and the TX gate) and `!bRadio`. **Bench check deferred to wave 10** (operator: big bench test at the
+  end): scan on a heltec V3 bench node, then a group 9999 message both ways at 2 dBm, TX power and RX unchanged; a
+  scan on a non-V3 SX126x board (DIO1 wiring as after the TX-watchdog recovery). Not covered, pre-existing: the console
+  `--spectrum` (command_functions.cpp ~:1694, `sx126x_spectral_scan()`) has no disarm/busy check/re-arm; candidate to
+  route through `spectralSweepRun()` later.
 - **Wave 8 inputs (scout, 2026-11-27, design `docs/web-server-seams-20261127.md` 7.3 :428-430, B8/B9 :404-405, 6.7
   :329-334):**
   - Step 9 = relocations, one commit per move (web_functions.cpp -520, new files +450): spectral sweep out with B8 (sweep
