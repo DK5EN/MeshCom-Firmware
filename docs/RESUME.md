@@ -1,6 +1,6 @@
 # RESUME -- pick up here
 
-**Resume here: campaign FORMAL-02, wave 7b step 7 (one body reader, WDT feed, 408 = B10; steps 1-6 committed, full host gate green). Start a fresh session with `/orchestrate-waves` on [campaign-formal-02-20261127.md](campaign-formal-02-20261127.md), section "Now" (state, dispatch plan for waves 7-10, run rules). Waves 6, 7a and 7b steps 1-2 are committed on `fork-dev`, not pushed; `fork-dev` contains all of `upstream/dev`; no upstream PR open.** Release plan and working checklist: operator's
+**Resume here: campaign FORMAL-02, wave 7b step 8 (fixed response heads, `webSendFixedHead`; steps 1-7 committed, step 7 gate green). Start a fresh session with `/orchestrate-waves` on [campaign-formal-02-20261127.md](campaign-formal-02-20261127.md), section "Now" (state, dispatch plan for waves 7-10, run rules). Waves 6, 7a and 7b steps 1-7 are committed on `fork-dev`, not pushed; `fork-dev` contains all of `upstream/dev`; no upstream PR open.** Release plan and working checklist: operator's
 Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).

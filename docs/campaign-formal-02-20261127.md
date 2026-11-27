@@ -5,27 +5,23 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-6, 7a and 7b steps 1-6 committed on `fork-dev`, not pushed; last full host gate green after
-step 6 (141 envs, 4,450 ok, 1 skipped). `fork-dev` contains all of `upstream/dev` (checked 2026-11-27). Start a fresh
-session with `/orchestrate-waves` on this doc; next is 7b step 7 (one body reader with WDT feed and 408, B10).
+**State:** waves 1-6, 7a and 7b steps 1-7 committed on `fork-dev`, not pushed; last full host gate green after
+step 6 (141 envs, 4,450 ok, 1 skipped), step 7 gate `--changed` green. `fork-dev` contains all of `upstream/dev`
+(checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; next is 7b step 8 (fixed response
+heads, `webSendFixedHead`).
 
-- **Step 7 inputs (scout, 2026-11-27):** `src/web_functions/web_body.h` is the pure accumulator (`webBodyBegin` /
-  `webBodyPush` / `webBodyEnd`, codes `WB_NOLEN -1`, `WB_SIZE -2`, `WB_SHORT -3`); its comment names the glue
-  `int webReadBody(char *buf, size_t cap, long content_length, uint32_t idle_ms, uint32_t total_ms)` in a new
-  `web_io.cpp` (not written). Readers to replace: `web_read_body` (`web_functions.cpp` ~:643, 2 s idle / 4 s total,
-  caller `sub_config_upload` answers 400 "file too large" / "no Content-Length" / "incomplete upload") and `rmReadBody`
-  (`web_rm_handlers.cpp` ~:44, declared in `web_rm_handlers.h:27`, 2 s / 3 s, returns nullptr / "size" / "short";
-  callers `sub_rm_send` and three in `web_rm_handlers.cpp`). Neither feeds the WDT (only `yield()`); the feed helper is
-  `meshcom_wdt_feed()` (`src/watchdog_feed.h`, empty on nRF52). Head timeout: the `work_webpage` head loop leaves
-  silently after `WEB_TIMEOUT_TIME` 2 s (pinned by `test_web_diff` ~:967 "no output, stopCalls 0"); B10 makes it 408.
-  Tests: `test/test_web_body` (accumulator vs reference copies of both readers), `test/test_rm_web_parse` (wipe
-  contract, "size"/"short" tokens), rig stubs call both readers (`stubs/web_handler_stubs.h`), the rig clock adds 1 ms
-  per empty poll; `frozen/extract.sh` renames the frozen readers. `rmReadBody` is exported: keep a one-line wrapper or
-  rename both files at once.
+- **Step 8 inputs (scout, 2026-11-27):** plan row `docs/web-server-seams-20261127.md` :427 (`webSendFixedHead(status,
+type, len, extra)` in `web_io.cpp`, the 7 hand-built heads, 6 Content-Length prints, 500 reason text, CRLF on the
+  status line = D14; identical bytes otherwise; webgui_* and `test_web_txbuf` header pins to update). The doc's D14 line
+  refs (:106 cites :4748/:5015) are stale: `send_http_header` is `web_functions.cpp` ~:4960, declared
+  `web_functions.h:50`, `String status_text`, status line `"HTTP/1.1 %i %s \n"` (trailing space, LF only), knows
+  200/400/401/403/404/405/408/422/431; 500 is missing, so the 4 `n ? 200 : 500` sites send "500 Unknown". Hand-built
+  status lines: `web_functions.cpp` 6 (200 config download with trailing space, 200 x2, 503 x3 incl. the no-heap
+  accumulator path), `web_oled_shot.cpp` 2 (503, 200). Call sites: 56 in `web_functions.cpp`, 4 in
+  `web_rm_handlers.cpp`. `web_io.cpp` now exists (step 7) and is the home for the new helper.
 - **Wave 7b plan (serial, `web_functions.cpp` is the hotspot, one writer per step, gate + advisor + commit each):**
   step 1 router as classifier + switch, table alongside (`ccdf9260`, done); step 2 B2 exact match (`34fb0a3b`, done,
-  33 rig whitelist rows); step 3 B1 (done); step 4 B3 + B6 (done); step 5 (done); step 6 (done); step 7 web_body.h + body reader
-  with WDT feed and 408 (B10); step 8 fixed response heads; then drop `webRouteLegacy` and the disagreement counter.
+  33 rig whitelist rows); step 3 B1 (done); step 4 B3 + B6 (done); step 5 (done); step 6 (done); step 7 (done); step 8 fixed response heads; then drop `webRouteLegacy` and the disagreement counter.
 - **Wave 7b mechanics:** `webRouteDecide` (web_functions.cpp) gathers inputs, `webRouteDecideCore` (web_route.h, pure)
   decides; the feature mask `built` (WRB_*) mirrors the switch guards and is pinned by `test_web_route`. Rig whitelist
   `kWhitelist` in `test/test_web_diff/test_web_diff.cpp` must be exact both ways; `WEB_DIFF_DUMP_DIFFS=<file>` on the
@@ -243,6 +239,11 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 
 ## Archive
 
+- Wave 7b step 7 (2026-11-27, `6ec0bfcd`): B10, `webReadBody` in new `web_io.cpp` (WDT feed per pass), `web_read_body`
+  and `rmReadBody` are wrappers; stalled body 408 (config upload was 400, rm "short" was 422, bodies unchanged); stalled
+  head 408 only if at least one byte arrived, zero-byte preconnect stays silent (orchestrator decision); head loop feeds
+  the WDT. Rig `kWhitelistB10` 18 rows (frozen silent, live exactly the 408, rest of the record equal), source pins with
+  10 mutations in `test_rm_web_parse`. Advisor approved src/, two test hardenings applied and mutation-checked.
 - Wave 7b step 6 (2026-11-27, `56e99fe7`): B5, `num_parse.h` at the 9 sites (trim, strict whole input, site ranges;
   windcal/tempoff back through `mcFormatDec3`; no console line on a refusal). web_setup.cpp rungs checked by the real
   parser over their extracted ranges and source pins (console line from the parsed value inside the parse guard,
