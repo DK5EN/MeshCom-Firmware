@@ -5,10 +5,23 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-6 and 7a committed on `fork-dev`, not pushed. `fork-dev` contains all of `upstream/dev` (checked
-2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; the next wave is 7b (wiring of the wave-7a
-modules into `work_webpage`, then B1-B7/B10 one commit each).
+**State:** waves 1-6, 7a and 7b steps 1-2 committed on `fork-dev` (last `34fb0a3b`), not pushed. `fork-dev` contains
+all of `upstream/dev` (checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; next is 7b
+step 3 (B1).
 
+- **Wave 7b plan (serial, `web_functions.cpp` is the hotspot, one writer per step, gate + advisor + commit each):**
+  step 1 router as classifier + switch, table alongside (`ccdf9260`, done); step 2 B2 exact match (`34fb0a3b`, done,
+  33 rig whitelist rows); step 3 B1: `WR_NONE` -> 404, method outside the row -> 405 with `Allow` from the row mask,
+  page-shaped requests without a session keep the login page, `GET /rmsend` and `/rmsendx` join the generic 405, wipe
+  head and line on every exit; step 4 B3 + B6 (400 on a refused parse, one commit each); step 5 web_query.h in
+  setparam/callfunction/getparam/send_message (B4, B7; B11 only after the operator's yes, else today's swapped-order
+  behaviour stays); step 6 num_parse.h at the 9 sites (B5, trim first, `mcFormatDec3`); step 7 web_body.h + body reader
+  with WDT feed and 408 (B10); step 8 fixed response heads; then drop `webRouteLegacy` and the disagreement counter.
+- **Wave 7b mechanics:** `webRouteDecide` (web_functions.cpp) gathers inputs, `webRouteDecideCore` (web_route.h, pure)
+  decides; the feature mask `built` (WRB_*) mirrors the switch guards and is pinned by `test_web_route`. Rig whitelist
+  `kWhitelist` in `test/test_web_diff/test_web_diff.cpp` must be exact both ways; `WEB_DIFF_DUMP_DIFFS=<file>` on the
+  test binary lists differing requests (the run then fails on purpose). Run every `pio` through the lock; the gate
+  takes the lock dir itself (`mkdir /tmp/formal02/pio.lock` around `tools/regression.sh`).
 - **Wave 7a result (building blocks, not wired):** `src/web_functions/web_route.h` (43 routes, exact match; corpus:
   777 identical, 40 refused by the parser before routing (B3 19, B6 20, CORPUS 1), 136 deltas B1 59 / B2 39 / B3 21 /
   ENV 1 / CORPUS 16, all pinned), `web_query.h` (field extractor, streams through the new `urlDecodeTo`, no stack
@@ -214,6 +227,11 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 ## Open questions
 
 ## Archive
+
+- Wave 7b steps 1-2 (2026-11-27): router as classifier + switch with the table alongside (`ccdf9260`); B2 exact match
+  (`34fb0a3b`) with build-feature mask (a route not built on a board counts as no route). Advisor caught two board-
+  variant defects the rig cannot see (unbuilt route served the scaffold; include-order trap for OLED_SHOT_WEB); fixed
+  with regression tests.
 
 - Wave 7a (2026-11-27): route table, query extractor (+ `urlDecodeTo`, `URLD_TRUNC`), strict number parser, body
   accumulator, B3 request-line shape rule in `webReqParse`; four native envs. Advisor: rework on labels, stack temp,
