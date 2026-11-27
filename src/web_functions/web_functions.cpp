@@ -144,92 +144,6 @@ static void __attribute__((noinline)) sub_pin_status();
 static void __attribute__((noinline)) sub_pin_assign();
 static void __attribute__((noinline)) sub_gpio_status();
 
-// GPIO-01 Part B: the pins the board lists as free (PIN_FREE when no function claims anything), at most `max`. A pin that an
-// enabled function or the board LED claims right now gets that owner (pinFuncName() / "led") and no switch; the others come with
-// the gpio control state. ESP32 only: nRF52 has no gpio control, the count is 0 and the code compiles away.
-static size_t gpioStatusCollect(GpioStatusPin *out, size_t max)
-{
-#if defined(ESP32)
-    PinContext base = pinBoardContext(PIN_FN_COUNT);
-    const uint64_t claimedAll = pinBoardClaimed(PIN_FN_COUNT);
-    base.claimed = 0;
-    GpioPinRow rows[GPIO_STATUS_MAX_PINS];
-    const size_t nr = out ? gpioCtlSnapshot(rows, GPIO_STATUS_MAX_PINS) : 0;
-    size_t n = 0;
-    for (int p = 0; p <= pinChipMax(base.chip) && p < 64; p++)
-    {
-        if (pinClassify(base, p) != PIN_FREE) continue;
-        if (!out) return 1; // only asked whether there is any
-        if (n >= max) break;
-        GpioStatusPin &o = out[n++];
-        o.pin = p;
-        o.own = "";
-        o.dir = 0;
-        o.level = -1;
-        if (claimedAll & pinBit(p))
-        {
-            o.own = "fn"; // two functions on one pin
-            for (int f = 0; f < (int)PIN_FN_COUNT; f++)
-                if (!(pinBoardClaimed((PinFunc)f) & pinBit(p)))
-                {
-                    o.own = pinFuncName((PinFunc)f);
-                    break;
-                }
-#if defined(BOARD_LED)
-            if (p == (int)(BOARD_LED + 0) && o.own[0] == 'f') o.own = "led";
-#endif
-            continue;
-        }
-        for (size_t i = 0; i < nr; i++)
-            if (rows[i].pin == p)
-            {
-                o.dir = (int)rows[i].dir;
-                o.level = (int)rows[i].level;
-            }
-    }
-    return n;
-#else
-    (void)out;
-    (void)max;
-    return 0;
-#endif
-}
-
-// GPIO-01 W2: may the Pins page change this assignment on this build? The same guards as the wsParams rows of
-// web_setup.cpp (writable rows only). Used by GET /pinassign and by the nav button, so the page is reachable
-// whenever it has something to offer.
-static bool pinAssignAvail(PinFunc f)
-{
-    switch (f)
-    {
-    case PIN_FN_ONEWIRE:
-#if defined(OneWire_GPIO)
-        return true;
-#else
-        return false;
-#endif
-    case PIN_FN_BUTTON:
-#if !defined(BOARD_T_DECK_PRO)
-        return true;
-#else
-        return false;
-#endif
-    case PIN_FN_ANALOG:
-#if defined(ANALOG_PIN)
-        return true;
-#else
-        return false;
-#endif
-    case PIN_FN_WIND:
-#if defined(ENABLE_WIND) && defined(ESP32)
-        return true;
-#else
-        return false;
-#endif
-    default:
-        return false;
-    }
-}
 
 
 String web_header;
@@ -1625,7 +1539,7 @@ void deliver_scaffold(bool bget_password)
         bool pinAsg = false;
         for (int i = 0; i < (int)PIN_FN_COUNT; i++)
             pinAsg = pinAsg || pinAssignAvail((PinFunc)i);
-        if (pinHw.board || pinHw.charge || bMCP23017 || pinAsg || gpioStatusCollect(NULL, 0))
+        if (pinHw.board || pinHw.charge || bMCP23017 || pinAsg || pinFreeRows(NULL, 0))
             web_client.println("<Button class=\"nav_button\" title=\"Pins\" aria-label=\"Pins\" onclick=\"loadPage('pins',this,true)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"><circle cx=\"7\" cy=\"7\" r=\"2.5\"></circle><circle cx=\"17\" cy=\"7\" r=\"2.5\" fill=\"currentColor\"></circle><circle cx=\"7\" cy=\"17\" r=\"2.5\" fill=\"currentColor\"></circle><circle cx=\"17\" cy=\"17\" r=\"2.5\"></circle></g></svg></Button>\n");
     }
     web_client.println("<Button class=\"nav_button\" onclick=\"loadPage('position',this,true)\"><svg viewBox=\"0 0 512 512\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"currentColor\" stroke=\"currentColor\"><g stroke-width=\"0\"></g><g istroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g><path fill=\"currentColor\" d=\"M256 17.108c-75.73 0-137.122 61.392-137.122 137.122.055 23.25 6.022 46.107 11.58 56.262L256 494.892l119.982-274.244h-.063c11.27-20.324 17.188-43.18 17.202-66.418C393.122 78.5 331.73 17.108 256 17.108zm0 68.56a68.56 68.56 0 0 1 68.56 68.562A68.56 68.56 0 0 1 256 222.79a68.56 68.56 0 0 1-68.56-68.56A68.56 68.56 0 0 1 256 85.67z\"></path></g></svg></Button>\n");
@@ -4528,7 +4442,7 @@ static void __attribute__((noinline)) sub_gpio_status()
 #if defined(ESP32)
     GpioStatusPin pins[GPIO_STATUS_MAX_PINS];
     GpioStatusIn in = {false, false, pins, 0};
-    in.n = gpioStatusCollect(pins, GPIO_STATUS_MAX_PINS);
+    in.n = pinFreeRows(pins, GPIO_STATUS_MAX_PINS);
     in.avail = in.n > 0;
     in.master = gpioCtlMaster();
     char body[GPIO_STATUS_JSON_MAX];

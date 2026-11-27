@@ -3,6 +3,7 @@
 // gets the same answer whatever it included before. Include this header anywhere in a firmware TU, in any order; never
 // from host tests (the .cpp is not part of the native envs).
 #pragma once
+#include <stddef.h>
 #include <stdint.h>
 #include "pin_policy.h"
 
@@ -27,3 +28,10 @@ uint64_t pinBoardSetterRefused(PinFunc f);
 PinContext pinBoardContext(PinFunc except);
 // A stored pin the loader may keep (not forbidden, and for the wind input not input-only).
 bool pinBoardLoadedUsable(PinFunc f, int pin);
+
+struct GpioStatusPin;   // gpio_status_json.h
+// The pins the board lists as free, with owner / direction / level (GET /gpiostatus), at most `max`; out == NULL only
+// asks whether there is any (returns 1 or 0). ESP32 only, 0 on nRF52.
+size_t pinFreeRows(GpioStatusPin *out, size_t max);
+// May the Pins page change this assignment on this build (GET /pinassign, nav button)?
+bool pinAssignAvail(PinFunc f);
