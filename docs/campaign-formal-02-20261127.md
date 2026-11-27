@@ -5,23 +5,40 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-6, 7a and 7b steps 1-8 committed on `fork-dev`, not pushed; last full host gate green after
-step 6 (141 envs, 4,450 ok, 1 skipped), steps 7, 8a, 8b gates `--changed` green. `fork-dev` contains all of `upstream/dev`
-(checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; next is the last 7b item: drop
-`webRouteLegacy` and the disagreement counter, then the full host gate (end of wave 7).
+**State:** waves 1-7 committed on `fork-dev`, not pushed (wave 7 closed with `d9566bb4`). Full host gate green after
+wave 7 (141 envs, 4,459 ok, 1 skipped, 0 failed; pytest 1,857; five board links). `fork-dev` contains all of `upstream/dev`
+(checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; next is wave 8 (web wave C, steps
+9-11).
 
-- **Last 7b item inputs (grep, 2026-11-27):** `webRouteLegacy` / disagreement counter references outside frozen/golden:
-  `web_functions.cpp` (5), `web_route.h` (3), `test/test_web_diff/live/extract_live.py` (3), `test_web_route` (1),
-  `test_web_guard` (1); other "disagree" hits in the tree are unrelated words. Scout the exact sites before the brief.
-  Then the full host gate (`tools/regression.sh --stage 1,2`), wave 7 closes.
-- **Wave 7b plan (serial, `web_functions.cpp` is the hotspot, one writer per step, gate + advisor + commit each):**
-  step 1 router as classifier + switch, table alongside (`ccdf9260`, done); step 2 B2 exact match (`34fb0a3b`, done,
-  33 rig whitelist rows); step 3 B1 (done); step 4 B3 + B6 (done); step 5 (done); step 6 (done); step 7 (done); step 8a `webSendFixedHead` (done); step 8b status line CRLF (done); then drop `webRouteLegacy` and the disagreement counter.
-- **Wave 7b mechanics:** `webRouteDecide` (web_functions.cpp) gathers inputs, `webRouteDecideCore` (web_route.h, pure)
-  decides; the feature mask `built` (WRB_*) mirrors the switch guards and is pinned by `test_web_route`. Rig whitelist
-  `kWhitelist` in `test/test_web_diff/test_web_diff.cpp` must be exact both ways; `WEB_DIFF_DUMP_DIFFS=<file>` on the
-  test binary lists differing requests (the run then fails on purpose). Run every `pio` through the lock; the gate
-  takes the lock dir itself (`mkdir /tmp/formal02/pio.lock` around `tools/regression.sh`).
+- **Wave 8 inputs (scout, 2026-11-27, design `docs/web-server-seams-20261127.md` 7.3 :428-430, B8/B9 :404-405, 6.7
+  :329-334):**
+  - Step 9 = relocations, one commit per move (web_functions.cpp -520, new files +450): spectral sweep out with B8 (sweep
+    only on an explicit "Scan now", one step per loop pass, no `delay`; the page shows the last result until pressed),
+    `eth_mss.cpp`, `mcRandomFill`, pin rows, `au_web.cpp`, mbox actions, `web_config.cpp` with B9 (config upload answers,
+    then reboots 500 ms later from the loop instead of `delay(2000)`). Risk: RAK4631 build (eth_mss, RNG); bench look at the
+    spectrum page and a config restore. `web_dispatch.cpp` / `web_api.cpp` are the 6.1 targets (dispatcher after the head,
+    the four REST handlers).
+  - Step 10 = optional `webGuardCheck(const WebReq &, ...)`, text scan kept as a second implementation for one wave,
+    identical behaviour; `web_guard.h` is the most pinned file. Carried item: `web_guard.h` helpers move into a small
+    shared header first (include cycle), keep the D-5 host/origin order.
+  - Step 11 = docs (Web-API doc, test-suite-map, drift matrix, cbmc group, RESUME, BACKLOG); `specs/selftest.sh` lints the
+    manifest in every gate.
+  - Code today (`web_functions.cpp`): `sub_page_spectrum` ~:4105 (called ~:1497), step loop ~:4167, `delay(50)` + `yield()`
+    per step ~:4199 (70-80 steps, at least 4 s, unmeasured; `spectral_scan.cpp` polls with `delay(10)`); shading bug ~:4184
+    is an integer division `res[i] / spec_samples` (alpha always 0, clamped to 0.2; display only). `sub_config_upload`
+    ~:873: answer ~:924, `delay(2000)` ~:930, `ESP.restart()` / `NVIC_SystemReset()` ~:933-938. The seams doc's sweep
+    line refs (:4016-4133, D1 :93) are stale.
+  - BACKLOG: TDECK-LAG-01 (:341, open: web server blocks GPS/display/LoRa on weak WiFi; plan web_txbuf pieces across loop
+    passes plus B8), WEB-SPECTRUM-LEAK-01 (:347, leak fixed, blocking sweep and shading open). B8/B9 live only in the seams
+    doc.
+- **Wave 7b mechanics (still valid for wave 8):** `webRouteDecide` (web_functions.cpp) gathers inputs, `webRouteDecideCore`
+  (web_route.h, pure) decides; feature mask `built` (WRB_*) pinned by `test_web_route`. Rig whitelists in
+  `test/test_web_diff/test_web_diff.cpp` exact both ways; `WEB_DIFF_DUMP_DIFFS=<file>` lists differing requests; D14
+  normalisation `d14Norm` maps the frozen/golden side only. Every relocated function the rig extracts needs its new file in
+  `live/extract_live.py`. Run every `pio` through the lock; the gate takes the lock dir itself (`mkdir
+/tmp/formal02/pio.lock` around `tools/regression.sh`). Before a full gate, run the source-pin consumers of a touched file
+  (`node tools/webgui_*_test.js` with `NODE_PATH=$HOME/.cache/meshcom-jsdom/node_modules`, `native_command_setters`): they
+  pin text in `web_functions.cpp` / `web_route.h`.
 - **Wave 7a result (building blocks, not wired):** `src/web_functions/web_route.h` (43 routes, exact match; corpus:
   777 identical, 40 refused by the parser before routing (B3 19, B6 20, CORPUS 1), 136 deltas B1 59 / B2 39 / B3 21 /
   ENV 1 / CORPUS 16, all pinned), `web_query.h` (field extractor, streams through the new `urlDecodeTo`, no stack
@@ -234,6 +251,11 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 
 ## Archive
 
+- Wave 7b end (2026-11-27, `d9566bb4`): `webRouteLegacy`, the disagreement counter, the unparsed no-session gate rules and
+  `WRL_RM_SEND_GET` removed (dead since step 4: every refused parse is a 400); `webRouteDecideCore` without the legacy
+  argument, ids renumbered. Rig exact with no new rows; three source pins moved to the `web_route.h` rows. Full host gate
+  green. Wave 7 closed (steps 1-8: router as table, B1-B7, B10, D14, `web_io.*`). No advisor for this item (dead-code
+  removal, rig byte-identity is the proof).
 - Wave 7b step 8b (2026-11-27, `797ed2f2`): D14, `send_http_header` status line `"%u %s\r\n"` (was `" \n"` with a trailing
   space). Rig: `d14Norm`/`d14NormOut` map the old form on the frozen/golden side only (live compared raw; 3435 frozen
   records rewritten), `test_d14_norm_is_narrow` corpus-wide. Advisor approved; one-sided normalisation applied after it
