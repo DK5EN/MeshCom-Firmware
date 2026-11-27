@@ -118,6 +118,9 @@ archive section at the end with one line each.
 - NimBLE F10 FIFO size: the nRF52 RX FIFO stays at 256 B (overflow now counted); a 512 B FIFO (+256 B RAM on RAK4631)
   is deferred until the RAK RAM headroom is checked. An overflow still hands a cut frame to `readPhoneCommand`, which
   rejects it by its length check.
+- Bench 2026-11-27: browser request corpus captured on DK5EN-14 (34 requests, all 13 pages, scripts, status, RM,
+  getparam, /config, one message to group 9999) in `tools/bench/runs/harness/webcap-dk5en14-20261127.jsonl`.
+  DK5EN-14 now runs the INSTRUMENT image of `acc07d31` (BACKLOG TDECK-LAG-01 has the loop measurements).
 - NimBLE F6: drop the WRITE property of the node's TX characteristic (6E400003); the app only subscribes to it.
 
 ## Carried items (from the advisor passes)
