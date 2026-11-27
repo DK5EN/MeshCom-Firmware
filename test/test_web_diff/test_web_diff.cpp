@@ -12,7 +12,7 @@
 // The unit under test is a function pointer table. Every corpus request (corpus/*.req, built by tools/web_corpus.py)
 // runs under every profile through every entry; the record of the run (handler trace, every byte written, the close,
 // the fake clock) is compared with golden/<name>.txt, and the live record with the frozen one. Intended deltas
-// (B1-B10 of docs/web-server-seams-20261127.md 7.2) go into kWhitelist, keyed by corpus name (B2 in kWhitelist, B1 in kWhitelistB1, B3 in kWhitelistB3 and B6 in kWhitelistB6: all profiles, 400), each row naming the profiles where the live record differs.
+// (B1-B10 of docs/web-server-seams-20261127.md 7.2) go into kWhitelist, keyed by corpus name (B2 in kWhitelist, B1 in kWhitelistB1, B3 in kWhitelistB3 and B6 in kWhitelistB6: all profiles, 400; B4 in kWhitelistB4: 422), each row naming the profiles where the live record differs.
 #include <unity.h>
 
 #include "web_route.h" // reads no build macro: the feature mask is computed in web_functions.cpp
@@ -319,7 +319,22 @@ static const std::map<std::string, WhiteB3Http10> kWhitelistB3Http10 = {
     {"mut-030-getparam-gateway-http-1-0-nohdr", {kWhyB3Http10, "open,password,password+session", "webSetup_getParam name='gateway'"}},
 };
 
-static bool isWhitelisted(const std::string &n) { return kWhitelist.count(n) != 0 || kWhitelistB1.count(n) != 0 || kWhitelistB3.count(n) != 0 || kWhitelistB3Http10.count(n) != 0 || kWhitelistB6.count(n) != 0; }
+// B4 (wave 7b step 5b): /setparam/?<query> without '=' (also "?" and a request without '?') answers 422 with
+// {"returncode":1,"<name>":""} and calls no setter; `profiles` as in B1 (a password profile without a session answers 401 in both
+// entries, so it is not listed); `name` is the key of the answer (the decoded, lower-cased query, empty for none).
+struct WhiteB4
+{
+    const char *profiles;
+    const char *name;
+};
+static const std::map<std::string, WhiteB4> kWhitelistB4 = {
+    {"js-001-tmpl-setparam", {"open", ""}},
+    {"mut-128-noeq-setparam-webserver", {"open", "webserver"}},
+    {"mut-129-noeq-setparam", {"open", ""}},
+    {"mut-130-noeq-setparam", {"open", ""}},
+};
+
+static bool isWhitelisted(const std::string &n) { return kWhitelistB4.count(n) != 0 || kWhitelist.count(n) != 0 || kWhitelistB1.count(n) != 0 || kWhitelistB3.count(n) != 0 || kWhitelistB3Http10.count(n) != 0 || kWhitelistB6.count(n) != 0; }
 
 static const WebProfile kProfiles[] = {
     {"open", "", "", false, false},
@@ -506,7 +521,7 @@ static void test_entries_agree_with_the_first(void)
             }
             TEST_ASSERT_TRUE_MESSAGE(same, n.c_str());
         }
-        TEST_ASSERT_EQUAL_size_t_MESSAGE(kWhitelist.size() + kWhitelistB1.size() + kWhitelistB3.size() + kWhitelistB3Http10.size() + kWhitelistB6.size(), whitelisted, "every whitelist entry must be a corpus request");
+        TEST_ASSERT_EQUAL_size_t_MESSAGE(kWhitelist.size() + kWhitelistB1.size() + kWhitelistB3.size() + kWhitelistB3Http10.size() + kWhitelistB6.size() + kWhitelistB4.size(), whitelisted, "every whitelist entry must be a corpus request");
     }
 }
 
@@ -574,6 +589,12 @@ static void test_whitelist_names_corpus_requests(void)
         TEST_ASSERT_TRUE_MESSAGE(kWhitelist.count(w.first) == 0 && kWhitelistB1.count(w.first) == 0 && kWhitelistB3.count(w.first) == 0 && kWhitelistB6.count(w.first) == 0,
                                  (std::string("request in both whitelists: ") + w.first).c_str());
         TEST_ASSERT_TRUE_MESSAGE(strncmp(w.second.why, "B3:", 3) == 0, w.first.c_str());
+    }
+    for (const auto &w : kWhitelistB4)
+    {
+        TEST_ASSERT_TRUE_MESSAGE(have.count(w.first) == 1, (std::string("B4 whitelist names no corpus request: ") + w.first).c_str());
+        TEST_ASSERT_TRUE_MESSAGE(kWhitelist.count(w.first) == 0 && kWhitelistB1.count(w.first) == 0 && kWhitelistB3.count(w.first) == 0 && kWhitelistB3Http10.count(w.first) == 0 && kWhitelistB6.count(w.first) == 0,
+                                 (std::string("request in both whitelists: ") + w.first).c_str());
     }
     for (const auto &w : kWhitelistB6)
     {
@@ -727,6 +748,33 @@ static void test_b3_http10_rows_keep_working(void)
         }
     }
 }
+// B4 rows: live differs from frozen in exactly the listed profiles and answers 422 with the empty-value JSON, no setter call
+static void test_b4_rows_answer_422_and_set_nothing(void)
+{
+    for (const auto &w : kWhitelistB4)
+    {
+        const std::set<std::string> want = profileSet(w.second.profiles, w.first);
+        std::map<std::string, std::string> live;
+        const std::set<std::string> got = differingProfiles(w.first, &live);
+        const std::string m = "B4 " + w.first + ": live differs from frozen in [" + joinSet(got) + "], the row lists [" + joinSet(want) + "]";
+        TEST_ASSERT_TRUE_MESSAGE(want == got, m.c_str());
+        for (const std::string &prof : want)
+        {
+            const std::string am = "B4 " + w.first + " [" + prof + "]: " + webRigEsc(live[prof].substr(0, 300));
+            TEST_ASSERT_TRUE_MESSAGE(live[prof].compare(0, 12, "HTTP/1.1 422") == 0, am.c_str());
+            TEST_ASSERT_TRUE_MESSAGE(live[prof].find(std::string("{\"returncode\":1,\"") + w.second.name + "\":\"\"}") != std::string::npos, am.c_str());
+        }
+        for (size_t p = 0; p < kProfileCount; p++)
+        {
+            if (want.count(kProfiles[p].name) == 0)
+                continue;
+            webRigBegin(readCorpus(w.first), closedVariant(w.first), kProfiles[p]);
+            kEntries[1].run();
+            for (const std::string &t : webRig().trace)
+                TEST_ASSERT_TRUE_MESSAGE(t.find("webSetup_setParam") == std::string::npos, ("B4 " + w.first + ": setter called").c_str());
+        }
+    }
+}
 static void test_b3_rows_answer_400_in_every_profile(void) { checkRows400("B3", kWhitelistB3); }
 static void test_b6_rows_answer_400_in_every_profile(void) { checkRows400("B6", kWhitelistB6); }
 
@@ -877,6 +925,11 @@ static void test_known_requests(void)
     webRigBegin(std::string("GET /setparam/?webserver HTTP/1.1\r\n") + head, false, open);
     kEntries[0].run();
     TEST_ASSERT_EQUAL_STRING("webSetup_setParam name='webserver' value='webserver'", webRig().trace.at(0).c_str());
+    // live: refused with 422, no setter (B4)
+    webRigBegin(std::string("GET /setparam/?webserver HTTP/1.1\r\n") + head, false, open);
+    kEntries[1].run();
+    TEST_ASSERT_TRUE(webRig().out.find("HTTP/1.1 422") == 0);
+    TEST_ASSERT_TRUE(webRig().out.find("{\"returncode\":1,\"webserver\":\"\"}") != std::string::npos);
 
     // route token in the Referer reaches a handler (D4)
     webRigBegin(std::string("GET /nothing HTTP/1.1\r\nHost: 192.0.2.10\r\nReferer: http://192.0.2.10/?page=info\r\n\r\n"), false, open);
@@ -913,14 +966,15 @@ static void test_known_requests(void)
 // step 5a: setparam / getparam read name and value from the parsed query. For every request below the live entry hands the
 // handler exactly what the frozen copy does (frozen == live), and the text is pinned: the value is everything after the
 // first '=' (a further '&' stays), no '=' makes name and value the whole query (D2), a getparam name stops at the first
-// '=' unless that is its first byte, a request without '?' keeps the legacy "ram/" window (5b/B4 changes it), the name is
+// '=' unless that is its first byte, a request without '?' keeps the legacy "ram/" window (getparam; setparam refuses it, B4), the name is
 // lower-cased and both are percent-decoded (LEGACY).
 static void test_param_extraction_live_equals_frozen(void)
 {
     struct Case
     {
         const char *line;
-        const char *trace;
+        const char *trace;       // the frozen entry (and the live one unless `refused` is set)
+        const char *refused = nullptr; // B4: the live entry answers 422 with this body and calls no setter
     };
     static const Case cases[] = {
         {"GET /setparam/?atxt=a&b=c HTTP/1.1", "webSetup_setParam name='atxt' value='a&b=c'"},
@@ -928,9 +982,10 @@ static void test_param_extraction_live_equals_frozen(void)
         {"GET /setparam/?ATxt=x=y HTTP/1.1", "webSetup_setParam name='atxt' value='x=y'"},
         {"GET /setparam/?atxt= HTTP/1.1", "webSetup_setParam name='atxt' value=''"},
         {"GET /setparam/?=x HTTP/1.1", "webSetup_setParam name='' value='x'"},
-        {"GET /setparam/?webserver HTTP/1.1", "webSetup_setParam name='webserver' value='webserver'"},
-        {"GET /setparam/? HTTP/1.1", "webSetup_setParam name='' value=''"},
-        {"GET /setparam/ HTTP/1.1", "webSetup_setParam name='ram/' value='ram/'"},
+        {"GET /setparam/?webserver HTTP/1.1", "webSetup_setParam name='webserver' value='webserver'", "{\"returncode\":1,\"webserver\":\"\"}"},
+        {"GET /setparam/?WebServer%20x HTTP/1.1", "webSetup_setParam name='webserver x' value='WebServer x'", "{\"returncode\":1,\"webserver x\":\"\"}"},
+        {"GET /setparam/? HTTP/1.1", "webSetup_setParam name='' value=''", "{\"returncode\":1,\"\":\"\"}"},
+        {"GET /setparam/ HTTP/1.1", "webSetup_setParam name='ram/' value='ram/'", "{\"returncode\":1,\"\":\"\"}"},
         {"GET /getparam/?gateway HTTP/1.1", "webSetup_getParam name='gateway'"},
         {"GET /getparam/?Gateway=1&x=2 HTTP/1.1", "webSetup_getParam name='gateway'"},
         {"GET /getparam/?=x HTTP/1.1", "webSetup_getParam name='=x'"},
@@ -944,24 +999,38 @@ static void test_param_extraction_live_equals_frozen(void)
         {
             webRigBegin(req, false, kProfiles[0]);
             kEntries[e].run();
-            TEST_ASSERT_EQUAL_STRING_MESSAGE(c.trace, webRig().trace.at(0).c_str(), (std::string(kEntries[e].name) + ": " + c.line).c_str());
+            const std::string m = std::string(kEntries[e].name) + ": " + c.line;
+            if (c.refused != nullptr && e == 1)
+            {
+                for (const std::string &t : webRig().trace)
+                    TEST_ASSERT_TRUE_MESSAGE(t.find("webSetup_setParam") == std::string::npos, m.c_str());
+                TEST_ASSERT_TRUE_MESSAGE(webRig().out.compare(0, 12, "HTTP/1.1 422") == 0, (m + ": " + webRigEsc(webRig().out.substr(0, 200))).c_str());
+                TEST_ASSERT_TRUE_MESSAGE(webRig().out.find(c.refused) != std::string::npos, (m + ": " + webRigEsc(webRig().out.substr(0, 200))).c_str());
+            }
+            else
+                TEST_ASSERT_EQUAL_STRING_MESSAGE(c.trace, webRig().trace.at(0).c_str(), m.c_str());
         }
     }
     // a raw NUL in the query before the first '=': today's String searches (strstr) stop at the NUL, so the text ends
     // there; the span must end there too (advisor 5a)
     const std::string nul(1, '\0');
-    const std::pair<std::string, const char *> nul_cases[] = {
-        {"GET /setparam/?atxt" + nul + "=x HTTP/1.1", "webSetup_setParam name='atxt' value='atxt'"},
-        {"GET /getparam/?gate" + nul + "way=1 HTTP/1.1", "webSetup_getParam name='gate'"},
-    };
-    for (const auto &c : nul_cases)
     {
-        const std::string req = c.first + "\r\nHost: 192.0.2.10\r\nX-MC: 1\r\n\r\n";
+        const std::string req = "GET /setparam/?atxt" + nul + "=x HTTP/1.1\r\nHost: 192.0.2.10\r\nX-MC: 1\r\n\r\n";
+        webRigBegin(req, false, kProfiles[0]);
+        kEntries[0].run();
+        TEST_ASSERT_EQUAL_STRING("webSetup_setParam name='atxt' value='atxt'", webRig().trace.at(0).c_str());
+        webRigBegin(req, false, kProfiles[0]); // live: the text ends at the NUL, no '=' left (B4)
+        kEntries[1].run();
+        TEST_ASSERT_TRUE(webRig().out.compare(0, 12, "HTTP/1.1 422") == 0);
+        TEST_ASSERT_TRUE(webRig().out.find("{\"returncode\":1,\"atxt\":\"\"}") != std::string::npos);
+    }
+    {
+        const std::string req = "GET /getparam/?gate" + nul + "way=1 HTTP/1.1\r\nHost: 192.0.2.10\r\nX-MC: 1\r\n\r\n";
         for (size_t e = 0; e < kEntryCount; e++)
         {
             webRigBegin(req, false, kProfiles[0]);
             kEntries[e].run();
-            TEST_ASSERT_EQUAL_STRING_MESSAGE(c.second, webRig().trace.at(0).c_str(), (std::string(kEntries[e].name) + ": NUL case").c_str());
+            TEST_ASSERT_EQUAL_STRING_MESSAGE("webSetup_getParam name='gate'", webRig().trace.at(0).c_str(), (std::string(kEntries[e].name) + ": NUL case").c_str());
         }
     }
 }
@@ -1006,6 +1075,7 @@ int main(int, char **)
     RUN_TEST(test_b3_rows_answer_400_in_every_profile);
     RUN_TEST(test_b3_http10_rows_keep_working);
     RUN_TEST(test_b6_rows_answer_400_in_every_profile);
+    RUN_TEST(test_b4_rows_answer_422_and_set_nothing);
     RUN_TEST(test_b6_content_length_past_the_window);
     RUN_TEST(test_live_leaves_no_request_bytes);
     RUN_TEST(test_live_copy_is_current);

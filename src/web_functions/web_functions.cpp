@@ -1763,12 +1763,13 @@ static String webDecodeSpan(WebSpan s)
  * no query; today's header scan then cuts the header from byte 10 ("GET /setparam/" minus 10 = "ram/") up to the HTTP
  * version, and the name becomes "ram/" (a 422 answer). That window is kept in step 5a so no answer changes; the
  * target of such a request is exactly "/setparam/" or "/getparam/" (the route table matches nothing else), 6 bytes
- * before its end the text starts. TODO(B4, 5b): an absent query is an empty name.
+ * before its end the text starts. getparam keeps that window; setparam (B4, step 5b) takes an absent query as empty
+ * (legacyWindow = false) and refuses it, like any query without '='.
  */
-static WebSpan webParamText(const WebReq &wr)
+static WebSpan webParamText(const WebReq &wr, bool legacyWindow)
 {
     WebSpan w = wr.query;
-    if (wr.path.n == wr.target.n && wr.target.n > 6)
+    if (legacyWindow && wr.path.n == wr.target.n && wr.target.n > 6)
     {
         w = wr.target;
         w.p += 6;
@@ -5336,10 +5337,11 @@ void setparam(const WebReq &wr, const String &full_header)
 {
     // full_header: the guard below needs the header lines (X-MC); name and value come from the parsed query
     // name = up to the first '=', value = everything after it (a further '&' stays in the value); no '=': both are the whole query (D2)
-    const WebSpan text = webParamText(wr);
+    const WebSpan text = webParamText(wr, false);
     WebSpan nspan = text, vspan = text;
     WebSpan k, v;
-    if (webQueryFirst(text, &k, &v))
+    const bool hasEq = webQueryFirst(text, &k, &v);
+    if (hasEq)
     {
         nspan = k;
         vspan = v;
@@ -5361,6 +5363,18 @@ void setparam(const WebReq &wr, const String &full_header)
         send_http_header(403, RESPONSE_TYPE_JSON);
         web_client.println("{\"ok\":false,\"err\":\"forbidden\"}");
         rm_wipe_string(param_value); // WEB-WIPE-COPIES-01: a setpwd value must not stay in freed heap
+        return;
+    }
+
+    if (!hasEq)
+    { // B4: a query without '=' (also "?" and no query) sets nothing; the guard above saw name = value = the query as before
+        send_http_header(422, RESPONSE_TYPE_JSON);
+        JsonDocument refused;
+        refused["returncode"] = WS_RETURNCODE_FAIL;
+        refused[param_name] = "";
+        serializeJson(refused, web_client);
+        web_client.println();
+        rm_wipe_string(param_value);
         return;
     }
 
@@ -5482,7 +5496,7 @@ void getparam(const WebReq &wr)
     // FORMAL-02 web step 5a: the name comes from the parsed query (no header scan). Up to the first '=' when that is not
     // the first byte (maybe there is an unintended "=" or anything more. We only do need the parameter Name), else the
     // whole query (D2); trimmed like String::trim() before the decode.
-    const WebSpan text = webParamText(wr);
+    const WebSpan text = webParamText(wr, true);
     WebSpan nspan = text;
     WebSpan k, v;
     if (webQueryFirst(text, &k, &v) && k.n > 0)
