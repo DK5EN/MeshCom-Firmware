@@ -493,14 +493,20 @@ class CharacteristicCallbacks : public NimBLECharacteristicCallbacks {
         // host task (never re-entered, one connection) and xQueueSend copies the item before
         // returning, so one static item is race free.
         static BleQueueItem item;
-        item = {};
-        item.length = pCharacteristic->getLength();
-        if (item.length <= 0 || item.length > MAX_MSG_LEN_PHONE)
+        // An empty live value (its buffer was never allocated) would make getValue() copy from NULL: nothing to queue.
+        if(pCharacteristic->getLength() == 0)
             return;
-        memcpy(item.data, pCharacteristic->getValue(), item.length);
+        // F1: ONE copy gives length and data; getValue() returns a heap copy that is empty when its allocation fails
+        const NimBLEAttValue v = pCharacteristic->getValue();
+        if (!bleItemFromWrite(item, v.data(), v.size())) {
+            // the copy failed while the live value holds data: a write was lost, count it (loop logs it)
+            if (v.data() == nullptr && pCharacteristic->getLength() > 0)
+                bleQueueOnNoCopy(g_bleQ);
+            return;
+        }
         bleItemStamp(item, g_bleQ);
-        // non-blocking; a full queue loses the frame, counted here and logged by the loop (BLE-QDROP-01)
-        bleQueueOnSend(g_bleQ, xQueueSend(bleQueue, &item, 0) == pdTRUE);
+        // non-blocking; a full or missing queue loses the frame, counted here and logged by the loop (BLE-QDROP-01)
+        bleQueueOnSend(g_bleQ, bleQueue != NULL && xQueueSend(bleQueue, &item, 0) == pdTRUE);
     }
 
 } chrCallbacks;
@@ -618,7 +624,7 @@ static bool bleStackStart(bool startAdv)
     if(pTxCharacteristic == NULL)
         pTxCharacteristic = pService->createCharacteristic(
                         CHARACTERISTIC_UUID_TX,
-                        NIMBLE_PROPERTY::WRITE  |
+                        // No WRITE (F6, FORMAL-02 2026-11-27): the phone only subscribes to TX; writes go to RX.
                         // Require a secure connection for read and write access
                         //NIMBLE_PROPERTY::WRITE_AUTHEN |  // only allow writing if paired / encrypted
                         //NIMBLE_PROPERTY::WRITE_ENC |  // only allow writing if paired / encrypted
@@ -2567,6 +2573,8 @@ void esp32setup()
     printfdeb("[BLE ]...Device started with BLE-Name <%s>\n", strBLEName.c_str());
 
     bleQueue = xQueueCreate(5, sizeof(BleQueueItem));
+    if(bleQueue == NULL)   // phone writes are counted as dropped, the loop drain skips a missing queue
+        printfdeb("[BLE ]...phone queue: no memory, phone frames dropped until next boot\n");
 
     // Phone rings on the heap (classic ESP32 with the AU BLE pause only; no-op elsewhere). Allocated
     // with BLE start, released by esp32BlePause(). A failure here leaves the rings empty (frames for
@@ -4857,14 +4865,15 @@ void esp32loop()
     // BLE Queue: process data from NimBLE task in Main Loop context
     {
         BleQueueItem bleItem;
-        while (xQueueReceive(bleQueue, &bleItem, 0) == pdTRUE) {
+        while (bleQueue != NULL && xQueueReceive(bleQueue, &bleItem, 0) == pdTRUE) {
             if(!bleQueueAccept(g_bleQ, bleItem))   // BLE-STALE-01: frame of an earlier connection
                 continue;
             { INSTR_SECTION("ble_cmd"); LOOP_SECTION(LSEC_BLE_CMD); readPhoneCommand(bleItem.data, bleItem.length); }
         }
         {
-            uint32_t nd = bleQueueTakeDropped(g_bleQ), ns = bleQueueTakeStale(g_bleQ);
-            if(nd) Serial.printf("[BLE] %lu phone frame(s) dropped: queue full\n", (unsigned long)nd);
+            uint32_t nd = bleQueueTakeDropped(g_bleQ), ns = bleQueueTakeStale(g_bleQ), nc = bleQueueTakeNoCopy(g_bleQ);
+            if(nd) Serial.printf("[BLE] %lu phone frame(s) dropped: queue full or missing\n", (unsigned long)nd);
+            if(nc) Serial.printf("[BLE] %lu phone frame(s) dropped: no data from the stack\n", (unsigned long)nc);
             if(ns) Serial.printf("[BLE] %lu phone frame(s) dropped: earlier connection\n", (unsigned long)ns);
         }
     }

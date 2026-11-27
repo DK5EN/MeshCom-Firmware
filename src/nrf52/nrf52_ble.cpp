@@ -70,6 +70,7 @@ void connect_callback(uint16_t conn_handle);
 void disconnect_callback(uint16_t conn_handle, uint8_t reason);
 // Uart RX callback
 void bleuart_rx_callback(uint16_t conn_handle);
+void bleuart_rx_overflow_callback(uint16_t conn_handle, uint16_t leftover);
 
 /** Flag if BLE UART is connected */
 bool g_ble_uart_is_connected = false;
@@ -93,6 +94,8 @@ void init_ble(void)
 	// Create the BLE RX queue before starting BLE so the RX callback can
 	// enqueue into it as soon as connections are possible (CONC-14).
 	bleQueue = xQueueCreate(5, sizeof(BleQueueItem));
+	if(bleQueue == NULL)
+		Serial.println("[BLE] phone queue not created: phone frames will be dropped");
 
 	// Config the peripheral connection with maximum bandwidth
 	// more SRAM required by SoftDevice
@@ -163,6 +166,7 @@ void init_ble(void)
 	// Start the UART service
 	g_ble_uart.begin();
 	g_ble_uart.setRxCallback(bleuart_rx_callback);
+	g_ble_uart.setRxOverflowCallback(bleuart_rx_overflow_callback);   // F10: count truncated writes
 
 	// Secondary Scan Response packet (optional)
   	// Since there is no room for 'Name' in Advertising packet
@@ -389,6 +393,14 @@ uint16_t nrf52_ble_mtu()
 	return conn ? conn->getMtu() : 0;
 }
 
+// F10: the FIFO (256 B) cut a write; counter only, no Serial in this context (the loop logs it).
+void bleuart_rx_overflow_callback(uint16_t conn_handle, uint16_t leftover)
+{
+	(void)conn_handle;
+	(void)leftover;
+	bleQueueOnOverflow(g_bleQ);
+}
+
 /**
  * Callback if data has been sent from the connected client
  * @param conn_handle
@@ -411,7 +423,7 @@ void bleuart_rx_callback(uint16_t conn_handle)
 		bleItemStamp(item, g_bleQ);
 		// non-blocking; the FIFO bytes are consumed, so a full queue loses the frame: count it,
 		// the loop logs it (BLE-QDROP-01; no Serial in this callback)
-		bleQueueOnSend(g_bleQ, xQueueSend(bleQueue, &item, 0) == pdTRUE);
+		bleQueueOnSend(g_bleQ, bleQueue != NULL && xQueueSend(bleQueue, &item, 0) == pdTRUE);
 	}
 
 	// Disconnect if app-layer auth failed

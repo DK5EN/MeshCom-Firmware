@@ -50,7 +50,8 @@ NB-03, esp_nimble_hci.c (upstream 83d43378, 2.3.7):
 What: the retry loop in ble_hci_rx_acl() waits pdMS_TO_TICKS(10) instead of vTaskDelay(1)
 while the host has no free ACL mbuf.
 Why: the loop runs in the controller callback; a one tick wait is 1 ms at a 1000 Hz tick and
-spins the VHCI task while the host drains the 4-block msys pool (MSYS1_BLOCK_COUNT=4).
+spins the VHCI task while it waits for a free block of the 10-block transport ACL pool
+(TR/transport.c:146).
 Remove when the pin includes upstream 83d43378 (2.3.7 or later).
 
 NB-04, NimBLEDevice.cpp, NimBLEDevice::deinit(clearAll) (FORMAL-01 NimBLE review #2), three anchors:

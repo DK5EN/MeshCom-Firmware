@@ -2064,14 +2064,15 @@ void nrf52loop()
     // BLE Queue: process data from the BLE task in Main Loop context (CONC-14)
     {
         BleQueueItem bleItem;
-        while (xQueueReceive(bleQueue, &bleItem, 0) == pdTRUE) {
+        while (bleQueue != NULL && xQueueReceive(bleQueue, &bleItem, 0) == pdTRUE) {
             if(!bleQueueAccept(g_bleQ, bleItem))   // BLE-STALE-01: frame of an earlier connection
                 continue;
             { INSTR_SECTION("ble_cmd"); readPhoneCommand(bleItem.data, bleItem.length); }
         }
         {
-            uint32_t nd = bleQueueTakeDropped(g_bleQ), ns = bleQueueTakeStale(g_bleQ);
-            if(nd) Serial.printf("[BLE] %lu phone frame(s) dropped: queue full\n", (unsigned long)nd);
+            uint32_t nd = bleQueueTakeDropped(g_bleQ), ns = bleQueueTakeStale(g_bleQ), no = bleQueueTakeOverflow(g_bleQ);
+            if(nd) Serial.printf("[BLE] %lu phone frame(s) dropped: queue full or missing\n", (unsigned long)nd);
+            if(no) Serial.printf("[BLE] %lu phone write(s) truncated: RX FIFO overflow\n", (unsigned long)no);
             if(ns) Serial.printf("[BLE] %lu phone frame(s) dropped: earlier connection\n", (unsigned long)ns);
         }
         // Auth failure: disconnect now, not on the phone's next write.

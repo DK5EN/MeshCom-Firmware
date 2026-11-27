@@ -494,11 +494,58 @@ static void test_item_helpers(void)
 static void test_queue_format(void)
 {
     BleQueueCounters c;
-    c.dropped.store(3); c.stale.store(4);
+    c.dropped.store(3); c.stale.store(4); c.nocopy.store(5); c.overflow.store(6);
     char buf[64];
     bleQueueFormat(c, buf, sizeof(buf));
-    TEST_ASSERT_EQUAL_STRING("BLE: qdrop=3 qstale=4", buf);
+    TEST_ASSERT_EQUAL_STRING("BLE: qdrop=3 qstale=4 nocopy=5 ovfl=6", buf);
 }
+
+// F1 (NIMBLE): old onWrite pattern, length from the live value and data from a copy that can be NULL.
+// The helper takes both from one source and refuses a NULL source (the old code would memcpy from NULL).
+static bool oldOnWriteWouldReadNull(const uint8_t *copyData, size_t liveLen)
+{
+    return liveLen > 0 && liveLen <= MAX_MSG_LEN_PHONE && copyData == nullptr;   // memcpy(item.data, NULL, n)
+}
+
+static void test_item_from_write_null_source_rejected(void)
+{
+    BleQueueItem it; memset(&it, 0x5A, sizeof(it));
+    TEST_ASSERT_TRUE(oldOnWriteWouldReadNull(nullptr, 20));   // the old pattern faults here
+    TEST_ASSERT_FALSE(bleItemFromWrite(it, nullptr, 20));     // the helper does not
+    TEST_ASSERT_EQUAL_UINT32(0, (uint32_t)it.length);
+    TEST_ASSERT_EQUAL_UINT8(0, it.data[0]);                   // item cleared, nothing stale
+}
+
+static void test_item_from_write_bounds(void)
+{
+    static uint8_t src[MAX_MSG_LEN_PHONE + 1];
+    for(size_t i = 0; i < sizeof(src); i++) src[i] = (uint8_t)(i + 1);
+    BleQueueItem it;
+    TEST_ASSERT_FALSE(bleItemFromWrite(it, src, 0));
+    TEST_ASSERT_FALSE(bleItemFromWrite(it, src, MAX_MSG_LEN_PHONE + 1));
+    TEST_ASSERT_EQUAL_UINT32(0, (uint32_t)it.length);
+    TEST_ASSERT_TRUE(bleItemFromWrite(it, src, MAX_MSG_LEN_PHONE));
+    TEST_ASSERT_EQUAL_UINT32(MAX_MSG_LEN_PHONE, (uint32_t)it.length);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(src, it.data, MAX_MSG_LEN_PHONE);
+    TEST_ASSERT_TRUE(bleItemFromWrite(it, src, 1));
+    TEST_ASSERT_EQUAL_UINT32(1, (uint32_t)it.length);
+    TEST_ASSERT_EQUAL_UINT8(0, it.data[1]);                   // rest cleared
+}
+
+static void test_nocopy_and_overflow_counters(void)
+{
+    BleQueueCounters c;
+    c.nocopy.store(0); c.overflow.store(0); c.nocopyLogged = 0; c.overflowLogged = 0;
+    bleQueueOnNoCopy(c); bleQueueOnNoCopy(c); bleQueueOnOverflow(c);
+    TEST_ASSERT_EQUAL_UINT32(2, bleQueueTakeNoCopy(c));
+    TEST_ASSERT_EQUAL_UINT32(0, bleQueueTakeNoCopy(c));       // logged once per pass
+    TEST_ASSERT_EQUAL_UINT32(1, bleQueueTakeOverflow(c));
+    TEST_ASSERT_EQUAL_UINT32(0, bleQueueTakeOverflow(c));
+    bleQueueOnNoCopy(c);
+    TEST_ASSERT_EQUAL_UINT32(1, bleQueueTakeNoCopy(c));       // only the delta
+    TEST_ASSERT_EQUAL_UINT32(0, bleQueueTakeOverflow(c));
+}
+
 
 
 int main(int, char **)
@@ -527,5 +574,8 @@ int main(int, char **)
     RUN_TEST(test_new_connection_items_still_applied);
     RUN_TEST(test_item_helpers);
     RUN_TEST(test_queue_format);
+    RUN_TEST(test_item_from_write_null_source_rejected);
+    RUN_TEST(test_item_from_write_bounds);
+    RUN_TEST(test_nocopy_and_overflow_counters);
     return UNITY_END();
 }

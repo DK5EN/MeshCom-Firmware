@@ -15,6 +15,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <atomic>
 
 // Same value as src/configuration_global.h (an identical redefinition is legal).
@@ -123,10 +124,14 @@ struct BleQueueItem
 struct BleQueueCounters
 {
     std::atomic<uint32_t> gen;       // session generation
-    std::atomic<uint32_t> dropped;   // frames lost to a full queue (BLE-QDROP-01)
+    std::atomic<uint32_t> dropped;   // frames lost to a full queue or a missing queue (BLE-QDROP-01)
     std::atomic<uint32_t> stale;     // frames of an earlier connection, dropped by the loop (BLE-STALE-01)
+    std::atomic<uint32_t> nocopy;    // ESP32: the library's value copy failed, write lost (NIMBLE F1/F2)
+    std::atomic<uint32_t> overflow;  // nRF52: Bluefruit RX FIFO truncated a write, bytes lost (F10)
     uint32_t droppedLogged;          // loop task only: last value already logged
     uint32_t staleLogged;
+    uint32_t nocopyLogged;
+    uint32_t overflowLogged;
 };
 
 extern BleQueueCounters g_bleQ;
@@ -147,6 +152,21 @@ inline void bleQueueOnSend(BleQueueCounters &c, bool queued)
 {
     if(!queued) c.dropped.fetch_add(1, std::memory_order_relaxed);
 }
+
+// Producer (ESP32 onWrite): one ATT write -> queue item. False = nothing to queue: empty, too long, or no data
+// (p == NULL: the allocation of the library's value copy failed). Length and data must come from the SAME copy.
+inline bool bleItemFromWrite(BleQueueItem &it, const uint8_t *p, size_t n)
+{
+    it = {};
+    if(p == nullptr || n == 0 || n > MAX_MSG_LEN_PHONE) return false;
+    memcpy(it.data, p, n);
+    it.length = n;
+    return true;
+}
+
+// Producer: a write was lost because the library gave no data (nocopy) or the FIFO truncated it (overflow).
+inline void bleQueueOnNoCopy(BleQueueCounters &c)   { c.nocopy.fetch_add(1, std::memory_order_relaxed); }
+inline void bleQueueOnOverflow(BleQueueCounters &c) { c.overflow.fetch_add(1, std::memory_order_relaxed); }
 
 // Loop, right before readPhoneCommand: true = apply; a stale item is counted and must be skipped.
 inline bool bleQueueAccept(BleQueueCounters &c, const BleQueueItem &it)
@@ -173,10 +193,28 @@ inline uint32_t bleQueueTakeStale(BleQueueCounters &c)
     return d;
 }
 
-// "BLE: qdrop=<n> qstale=<n>" for the --bledebug stat line.
+inline uint32_t bleQueueTakeNoCopy(BleQueueCounters &c)
+{
+    uint32_t n = c.nocopy.load(std::memory_order_relaxed);
+    uint32_t d = n - c.nocopyLogged;
+    c.nocopyLogged = n;
+    return d;
+}
+
+inline uint32_t bleQueueTakeOverflow(BleQueueCounters &c)
+{
+    uint32_t n = c.overflow.load(std::memory_order_relaxed);
+    uint32_t d = n - c.overflowLogged;
+    c.overflowLogged = n;
+    return d;
+}
+
+// "BLE: qdrop=<n> qstale=<n> nocopy=<n> ovfl=<n>" for the --bledebug stat line.
 inline int bleQueueFormat(const BleQueueCounters &c, char *buf, size_t n)
 {
-    return snprintf(buf, n, "BLE: qdrop=%lu qstale=%lu",
+    return snprintf(buf, n, "BLE: qdrop=%lu qstale=%lu nocopy=%lu ovfl=%lu",
                     (unsigned long)c.dropped.load(std::memory_order_relaxed),
-                    (unsigned long)c.stale.load(std::memory_order_relaxed));
+                    (unsigned long)c.stale.load(std::memory_order_relaxed),
+                    (unsigned long)c.nocopy.load(std::memory_order_relaxed),
+                    (unsigned long)c.overflow.load(std::memory_order_relaxed));
 }

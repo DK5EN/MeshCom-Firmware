@@ -1,0 +1,16 @@
+// Declaration-only stand-in for <vector>, see stubs/string.
+#pragma once
+#include <stddef.h>
+#include <utility>
+#include <initializer_list>
+namespace std {
+template <class T> class vector {
+  public:
+    vector();
+    vector(const T *, const T *);
+    size_t size() const;
+    const T *data() const;
+    T &operator[](size_t);
+    const T &operator[](size_t) const;
+};
+}

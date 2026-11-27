@@ -1,0 +1,21 @@
+// Declaration-only stand-in for <string>: NimBLEAttValue.h only uses std::string in inline constructors and conversion
+// operators the harness never calls. The real <string> pulls libc++'s allocator machinery (no body for allocator_arg_t).
+#pragma once
+#include <stddef.h>
+#include <utility>
+#include <type_traits>
+#include <initializer_list>
+namespace std {
+template <class T> T min(T a, T b) { return b < a ? b : a; }   // the only <algorithm> use of NimBLEAttValue.cpp
+class string {
+  public:
+    string();
+    string(const char *, size_t);
+    size_t length() const;
+    size_t size() const;
+    const char *data() const;
+    const char *c_str() const;
+    char &operator[](size_t);
+    const char &operator[](size_t) const;
+};
+}

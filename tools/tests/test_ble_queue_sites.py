@@ -39,7 +39,37 @@ def test_esp32_producer_checks_send_and_stamps():
     _no_ignored_send(t, "esp32_main.cpp")
     body = _body(t, "void onWrite(NimBLECharacteristic* pCharacteristic", "\n    }")
     assert "bleItemStamp(item, g_bleQ)" in body
-    assert re.search(r"bleQueueOnSend\(g_bleQ,\s*xQueueSend\(bleQueue", body)
+    assert re.search(r"bleQueueOnSend\(g_bleQ,\s*bleQueue != NULL && xQueueSend\(bleQueue", body)
+
+
+def test_esp32_onwrite_uses_one_copy_and_the_seam():
+    t = _read("esp32/esp32_main.cpp")
+    body = _body(t, "void onWrite(NimBLECharacteristic* pCharacteristic", "\n    }")
+    assert "bleItemFromWrite(item, v.data(), v.size())" in body
+    assert "const NimBLEAttValue v = pCharacteristic->getValue()" in body
+    assert "memcpy" not in body, "onWrite must not copy by hand (length and data from different sources, F1)"
+    assert "bleQueueOnNoCopy(g_bleQ)" in body
+
+
+def test_esp32_queue_create_is_checked_and_drain_skips_missing_queue():
+    t = _read("esp32/esp32_main.cpp")
+    i = t.index("bleQueue = xQueueCreate(")
+    assert "if(bleQueue == NULL)" in t[i:i + 300]
+    assert "while (bleQueue != NULL && xQueueReceive(bleQueue" in t
+
+
+def test_nrf52_overflow_callback_registered_and_counts_only():
+    t = _read("nrf52/nrf52_ble.cpp")
+    assert "g_ble_uart.setRxOverflowCallback(bleuart_rx_overflow_callback)" in t
+    body = _body(t, "void bleuart_rx_overflow_callback(uint16_t conn_handle, uint16_t leftover)\n{")
+    assert "bleQueueOnOverflow(g_bleQ)" in body
+    assert "Serial" not in body and "printf" not in body
+
+
+def test_drains_log_nocopy_and_overflow():
+    assert "bleQueueTakeNoCopy(g_bleQ)" in _read("esp32/esp32_main.cpp")
+    assert "no data from the stack" in _read("esp32/esp32_main.cpp")
+    assert "bleQueueTakeOverflow(g_bleQ)" in _read("nrf52/nrf52_main.cpp")
 
 
 def test_nrf52_producer_checks_send_and_stamps():
@@ -47,7 +77,7 @@ def test_nrf52_producer_checks_send_and_stamps():
     _no_ignored_send(t, "nrf52_ble.cpp")
     body = _body(t, "void bleuart_rx_callback(uint16_t conn_handle)\n{")
     assert "bleItemStamp(item, g_bleQ)" in body
-    assert re.search(r"bleQueueOnSend\(g_bleQ,\s*xQueueSend\(bleQueue", body)
+    assert re.search(r"bleQueueOnSend\(g_bleQ,\s*bleQueue != NULL && xQueueSend\(bleQueue", body)
 
 
 def _drain_checks_before_apply(t, rel):
@@ -92,3 +122,13 @@ def test_queue_item_defined_once_in_ble_session_h():
             if re.search(r"^\s*struct\s+BleQueueItem\s*\{", p.read_text(errors="replace"), re.M):
                 defs.append(p.relative_to(SRC).as_posix())
     assert defs == ["ble_session.h"], f"BleQueueItem must be defined once in ble_session.h: {defs}"
+
+
+def test_esp32_tx_characteristic_has_no_write_property():
+    # F6 (FORMAL-02): the phone only subscribes to TX (6E400003); a WRITE property there was an unused entry point.
+    t = _read("esp32/esp32_main.cpp")
+    start = t.index("createCharacteristic(\n                        CHARACTERISTIC_UUID_TX")
+    end = t.index(");", start)
+    props = "\n".join(ln.split("//")[0] for ln in t[start:end].splitlines())
+    assert "NIMBLE_PROPERTY::WRITE" not in props
+    assert "NIMBLE_PROPERTY::NOTIFY" in props

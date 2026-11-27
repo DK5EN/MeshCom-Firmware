@@ -22,14 +22,14 @@ archive section at the end with one line each.
 
 ## Waves
 
-| Wave | Content                                                                                                                                 | State       |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| 1    | Seams: `handleACK` core, `readPhoneCommand` with explicit length, settings round trip + migration; UDP twin analysis, web_functions map | done        |
-| 1b   | UDP receive consolidated into `src/udp_frame.cpp` (part 1 `f4f541d5`; part 2 applies operator decisions D1/D2/D3/D5)                    | done        |
-| 2    | Bounded proofs: ACK core and phone frame done (`ce013112`); UDP parse core after 1b part 2                                              | partly done |
-| 3    | BLE host task vs main loop model `specs/tla/bletask.tla`; fixed BLE-QDROP-01 and BLE-STALE-01 (wave 3b)                                 | done        |
-| 4    | NimBLE boundary and library; production web server seams and proofs                                                                     | open        |
-| 5    | Mesh model: relay, dedup ring, ACK and retries across nodes                                                                             | open        |
+| Wave | Content                                                                                                                                                                                                              | State   |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1    | Seams: `handleACK` core, `readPhoneCommand` with explicit length, settings round trip + migration; UDP twin analysis, web_functions map                                                                              | done    |
+| 1b   | UDP receive consolidated into `src/udp_frame.cpp` (part 1 `f4f541d5`; part 2 applies operator decisions D1/D2/D3/D5)                                                                                                 | done    |
+| 2    | Bounded proofs: ACK core, phone frame (`ce013112`), UDP parse core (`5b692faa`); differential strips tightened                                                                                                       | done    |
+| 3    | BLE host task vs main loop model `specs/tla/bletask.tla`; fixed BLE-QDROP-01 and BLE-STALE-01 (wave 3b)                                                                                                              | done    |
+| 4    | 4a NimBLE boundary fixes F1/F2/F6/F10 + proofs `specs/cbmc/nimble_attvalue` (done); web server seams (analysis done, operator accepted B1-B10; corpus capture on DK5EN-14 next); NimBLE ATT/GATT library proofs next | running |
+| 5    | Mesh model: relay, dedup ring, ACK and retries across nodes                                                                                                                                                          | open    |
 
 ## Wave 5 input: asymmetric nodes (operator 2026-11-27)
 
@@ -40,8 +40,30 @@ archive section at the end with one line each.
   heard by 24 stations, hears 9; partners reach it at -105..-119 dBm (SNR -0.4..-8 dB), it reaches them at -125..-127
   dBm (SNR -12.6..-20 dB); gap 12..15 dB on the strong links, control pairs 0.2..5.9 dB (median 3.7). German side:
   only the Freising pairs (`docs/archive/verdict-auto-via-routing-20260916.de.md` section 3.2, 5..12 dB, no PA); the
-  German 1-2 W node document is not in the repo yet (asked the operator). Related design note: mheard measures who I
-  hear, not who hears me (`docs/adr-nc-importance-backoff.md`).
+  German node named by the operator: DO1FE-19 (gateway, digipeater, T-Beam 1 W, near Laupheim). 7-day link data
+  (2026-11-27): it hears HB9CU-5 at -84 dBm with SNR +1.2 dB, HB9CU-5 hears it at -86 dBm with SNR -17.1 dB; it hears
+  DO2RS-20 at -107 dBm with SNR -17.9 dB, DO2RS-20 hears it at -127 dBm (SNR -17.6); HB9SWR-3 both ways about -101
+  dBm / -11..-13 dB (symmetric). Reading: with SNR roughly RSSI minus noise, its own receiver sits at a noise level of about -85 to -90 dBm (normal
+  is around -115 to -120 dBm at 125 kHz): 25 to 30 dB deaf, while its 1 W transmitter is heard well. The HB9CU-5 side
+  (strong RSSI, SNR -17) is not explained by this. Not verified on site.
+- Second Swiss example named by the operator: HB9MM-2 (digipeater, T-Beam 1 W, firmware 4.35p, via gateway HB9TOB-12).
+  7-day link data (2026-11-27): it hears its partners at -103..-108 dBm with SNR -12..-16 dB, i.e. a noise level of
+  about -87..-92 dBm at its receiver; partners hear it with normal noise levels (-110..-116 dBm). Pairs: HB9TOB-12 to
+  it -85 dBm / +2.1 dB, it to HB9TOB-12 -103.5 dBm / +7.2 dB (18 dB stronger at HB9MM-2, yet 5 dB worse SNR); HB9DOZ-1
+  to it -105.5 / -13.6, it to HB9DOZ-1 -119 / -3.6; HB9TJM-4 to it -105 / -13.7, it to HB9TJM-4 -121 / -10.3. About 20
+  to 25 dB effectively deaf, same pattern as DO1FE-19.
+- Third case named by the operator: DB0TAW-14 (repeater tower, Heltec Wireless Stick V3, 835 m, Rhoen, gateway
+  DK3RW-12), 7-day link data (2026-11-27), noise level = RSSI minus SNR:
+  - Its own receiver sits at about -103 dBm (10 to 15 dB above a quiet site) for every partner, from -93 dBm
+    (DB0KH-11) down to -125 dBm; it hears about 35 stations, most of them at the edge (-120..-125 dBm, SNR -17..-20).
+  - It is co-located with DB0TAW-13 (both ways about -40 dBm, SNR +6): two nodes on one tower, each the other's
+    strongest neighbour; while one transmits the other is blocked.
+  - Towards its own gateway DK3RW-12 it is the weak side: it hears DK3RW-12 at -104 / -1.2, DK3RW-12 hears it at
+    -119 / -14.7 (15 dB weaker, 13.5 dB worse SNR), the reverse of the 1-2 W pattern.
+  - Several partners have very noisy receivers themselves (DG0OPK-10, DM9PT-20, DL2IAS-10, DB0DOL-1: noise level -87
+    to -93 dBm), so links look asymmetric from both ends.
+  - Log recordings in ~/meshlog are being scanned for its relay behaviour. Related design note: mheard measures who I
+    hear, not who hears me (`docs/adr-nc-importance-backoff.md`).
 - The mesh model (relay, dedup, ACK and retries across nodes) therefore needs asymmetric links (A hears B, B does not
   hear A, or only with a large margin loss) and must show what such a node does to relay choice, ACK delivery and
   retries, and which firmware rule keeps it from dominating.
@@ -76,6 +98,27 @@ archive section at the end with one line each.
 - D1: every GATE frame from the server stamps server liveness, like nRF.
 - D5: datagrams under 4 bytes are class OTHER; a 4-byte GATE frame carries no type.
 - Not asked, taken: UDP gets its own receive buffer (no shared LoRa `RcvBuffer`, D6); entry points renamed at once.
+
+## Operator decisions for wave 4 (2026-11-27)
+
+- Web server (`docs/web-server-seams-20261127.md` section 7.2): behaviour changes B1 to B10 accepted (404/405 for
+  unknown paths, exact route match, strict request line, numbers and Content-Length; B7 values with `--`/`&&` refused
+  except manualcommand, over 200 bytes refused; spectrum scan step-wise on request; config upload reboot after 500 ms;
+  408 on timeout). B1 needs the `mcau.js` fix first.
+- Browser request capture for the differential corpus: on bench node DK5EN-14, flash current `fork-dev` and record.
+- NimBLE F3 (pre-allocate 300 B per characteristic, ~600 B heap): deferred; first find where ESP32 heap can be won
+  (operator: there are large BLE buffers of about 9 KB already).
+- Heap scan for F3 (scout, 2026-11-27, estimates marked in the report): the BLE-side buffers the operator meant are the
+  two phone byte rings (`phoneStore` 3,072 B on S3 / 2,048 B classic, `phoneComStore` 3,072 B; `src/loop_functions.cpp`
+  ~:835-838) plus the NimBLE host stack (3,072 B) and MSYS pool (~1,168 B). On classic ESP32 the rings are already
+  allocated only while BLE is up (`PHONE_RINGS_DYNAMIC`); on S3 (T-Deck) and RAK they are static. Candidates: phone rings
+  dynamic on S3 (~6 KB), UDP hold store only during a server outage (6,144 B on S3), raw LoRa log 20 -> 10 slots on
+  classic (~2.6 KB). Latest T-Deck Plus measurement: free 60 KB, largest block 51 KB
+  (`docs/campaign-ota-lowheap-01-20261122.md`).
+- NimBLE F10 FIFO size: the nRF52 RX FIFO stays at 256 B (overflow now counted); a 512 B FIFO (+256 B RAM on RAK4631)
+  is deferred until the RAK RAM headroom is checked. An overflow still hands a cut frame to `readPhoneCommand`, which
+  rejects it by its length check.
+- NimBLE F6: drop the WRITE property of the node's TX characteristic (6E400003); the app only subscribes to it.
 
 ## Carried items (from the advisor passes)
 

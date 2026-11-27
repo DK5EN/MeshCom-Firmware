@@ -1,0 +1,14 @@
+TOOL=esbmc
+# Library under test: the patched NimBLE-Arduino 2.2.3 copy of the ESP32 env used by heltec_wifi_lora_32_V3
+# (platformio.ini lib_deps; the other ESP32 envs resolve to the same version and patch set, tools/nimble_patch.py).
+# Run `pio run -e heltec_wifi_lora_32_V3` once so .pio/libdeps holds the patched copy (NB-01, NB-02).
+LIB="$ROOT/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src"
+[ -f "$LIB/NimBLEAttValue.cpp" ] || { echo "  NimBLE library missing under .pio/libdeps (run pio run -e heltec_wifi_lora_32_V3)"; TOOL=none; }
+INC="-Istubs -Istubs/nimble -I$LIB -I$ROOT/src -DCONFIG_NIMBLE_CPP_LOG_LEVEL=0 -DCONFIG_BT_ENABLED"
+G=gen/lib; mkdir -p $G && cp "$LIB/NimBLEAttValue.cpp" $G/attvalue_impl.cpp   # the library source, #included by harness.cpp
+SOURCES="harness.cpp"
+CFLAGS="-I$G $INC -DMAXLEN=300 -DWLEN=301 -DMODE_OOM0"
+FLAGS="--unwind 310"
+EXPECT=fail
+CHECKS="witness: a failed grow leaves length 0 after setValue(len > 0), the silent drop path"
+EXPECT_PROP="live.size\\(\\) == 0"
