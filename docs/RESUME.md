@@ -18,7 +18,7 @@ Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
   by default; filed as #1340; decisions recorded in the concept. BMC jobs over 7 GB are split into slices
   (BACKLOG FORMAL-SPLIT). The release plan line "Safeboot shows MeshCom 4.4" was wrong (the Safeboot page is labelled
   the same in fork and upstream), corrected.
-- **FORMAL01-RUN done 2026-11-27, working tree, not committed:** TLC `--all` 56/56 as expected, BMC `--all --heavy`
+- **FORMAL01-RUN done 2026-11-27, committed `96cd34be` on `fork-dev`:** TLC `--all` 56/56 as expected, BMC `--all --heavy`
   74/74 with 0 unexpected results or tool errors (`specs/tla/RESULTS.md`, `specs/cbmc/RESULTS.md`; local, one runner
   at a time, 15 GB budget, peak 11.3 GB). Every job that ran over 15 GB or into its time limit passes after a
   verifiability refactor or a proof split (operator rule; BACKLOG FORMAL-SPLIT): B-APRS-PATH-01 (`decodeAPRS` path and
@@ -29,8 +29,8 @@ Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
   `test_aprs_path_scan`, `test_aprs_pos_scan`, `test_rm_range`, `test_applink_ws_range`; old/new drivers with MeshMap,
   corpus and generated data). Found and fixed: APRS-POS-RANGE-01 (lat/lon such as `1e99` reached an undefined
   float-to-int cast; regression test red before, green after). Gate PASS (4,292 host cases). Upstream issue for
-  APRS-POS-RANGE-01: operator decision.
-- **FORMAL-NETCON-MARK fixed 2026-11-26 (working tree, #1339):** mark/free only by the current holder under
+  APRS-POS-RANGE-01: [#1342](https://github.com/icssw-org/MeshCom-Firmware/issues/1342).
+- **FORMAL-NETCON-MARK fixed 2026-11-26 (`96cd34be`, #1339):** mark/free only by the current holder under
   `s_hs_mux`; regression test red before, green after; `netconsole.cfg` with `MarkGuard = TRUE`, old state in
   `netconsole_was_*.cfg`. Bench with several connections open.
 - **SLEEP-PULLUP-01 (2026-11-26):** `--deepsleep` with `--button off` on a board without external pull-up wakes at once
