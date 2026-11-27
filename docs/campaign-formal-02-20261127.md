@@ -7,7 +7,7 @@ archive section at the end with one line each.
 
 **State:** waves 1-9 committed and pushed on `fork-dev` (2026-11-28, `64e02c90`). Full host gate green on `3a60b512` (143 envs, 4,484 ok, 0
 failed, 1 skipped; pytest 1,857). Wave 10 bench part 1 done 2026-11-27 (below); an 18 h soak runs on rpizero (DK5EN-98,
--14, -92) and on the Mac (DK5EN-90, USB) until 2026-11-28 18:00. **Resume:** evaluate the soak (below), then close
+-14, -92) and on the Mac (DK5EN-90, USB) until 2026-11-28 18:00. **Resume (about 08:00):** evaluate the soak (below), then close
 wave 10. DK5EN-1 is offline: the V3 scan comparison stays open.
 
 - **Wave 8 result:** step 9 moves 9b `3657932e` (`src/nrf52/eth_mss.cpp`), 9c `168ec015` (`mcRandomFill`), 9d `9fbbfccc`
@@ -40,7 +40,10 @@ wave 10. DK5EN-1 is offline: the V3 scan comparison stays open.
   - BLE with F3: the operator's phone (McMap) is connected to DK5EN-98 for the whole soak, next to the gateway UDP
     traffic (`...BLE: con=1`, MTU 255, at logger start).
   - Not done: web accumulator heap figure, V3 scan comparison (DK5EN-1 offline).
-- **Soak (resume here, 2026-11-28 after 18:00):** `rpizero.local:~/meshlog/dk5en-98-formal02w10-20261127/` and
+- **Soak (resume here, 2026-11-28 about 08:00 on the operator's word; loggers keep running to 18:00, read their files, do
+  not open the consoles):** also check the overnight AU check on every ESP32 node (`AU` lines: check time, result, heap and
+  largest block around the TLS session, no reboot) and the operator's morning greetings sent from the phone via DK5EN-98
+  (BLE in, LoRa out, gateway UDP to the server). `rpizero.local:~/meshlog/dk5en-98-formal02w10-20261127/` and
   `dk5en-14-formal02w10-20261127/`, `dk5en-92-formal02w10-20261127/` (meshlogger in screens `w10-98`, `w10-14`,
   `w10-92`; `status.txt` shows running/finished); DK5EN-90 has no net console: USB serial capture on the Mac, screen
   `w10-90`, `tools/bench/runs/harness/w10-soak-dk5en90.log` (raw, gitignored). T-Beam: compare the idle STAT heap
