@@ -1,12 +1,16 @@
 # RESUME -- pick up here
 
-**Resume here: campaign FORMAL-02, wave 6. Start a fresh session with `/orchestrate-waves` on [campaign-formal-02-20261127.md](campaign-formal-02-20261127.md), section "Now" (state, dispatch plan for waves 6-10, run rules). `fork-dev` is pushed and clean and contains all of `upstream/dev`; no upstream PR open.** Release plan and working checklist: operator's
+**Resume here: campaign FORMAL-02, wave 7 (web wave B). Start a fresh session with `/orchestrate-waves` on [campaign-formal-02-20261127.md](campaign-formal-02-20261127.md), section "Now" (state, dispatch plan for waves 7-10, run rules). Wave 6 is committed on `fork-dev`, not pushed; `fork-dev` contains all of `upstream/dev`; no upstream PR open.** Release plan and working checklist: operator's
 Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).
 
 ## Now (2026-11-27)
 
+- **FORMAL-02 wave 6 (2026-11-27):** web step 3 committed: head parser `src/web_functions/web_request.h`
+  (`d528d071`) and `work_webpage` running on it (`d787c11b`, no behaviour change on the 1,247-request corpus, frozen vs
+  live rig entry, whitelist empty). Proof groups `web_request` (27 jobs) and `nimble_att_write` (3 active); 13 jobs
+  over 15 GB parked with a split plan (BACKLOG FORMAL-WREQ-SPLIT, FORMAL-ATTW-SPLIT). Bitwuzla instead of `--z3`.
 - **Campaign FORMAL-02 (resume point `docs/campaign-formal-02-20261127.md`, section "Now"):** committed waves 1 to 4a
   (`3139a4d6` .. `acc07d31`): verifiable ACK and phone-frame parsers, settings migration, one UDP receive handler for
   ESP32 and nRF52 (operator decisions D1/D2/D3/D5), BLE queue fixes from the TLA+ model, NimBLE boundary fixes F1/F2/F6/

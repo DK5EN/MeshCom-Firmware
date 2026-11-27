@@ -14,7 +14,7 @@ Review and plan: [`docs/formal-review-20261123.md`](../docs/formal-review-202611
 
 - **TLA+ track:** 5 models, 57 configurations in `tla/`. Runner `tla/run_tlc.sh`. Proves properties of a model
   written by hand from the C code.
-- **Bounded track:** 8 groups, 69 jobs in `cbmc/`. Runner `cbmc/run_cbmc.sh`. Compiles the real `src/` files, so a
+- **Bounded track:** 15 groups, 157 jobs in `cbmc/`. Runner `cbmc/run_cbmc.sh`. Compiles the real `src/` files, so a
   pass is a statement about the code up to the stated bound.
 - **Always on:** `specs/selftest.sh` in stage 2 of `tools/regression.sh`. It lints the models, checks them for
   drift against `src/` and tests the verdict logic of both runners on canned tool output.

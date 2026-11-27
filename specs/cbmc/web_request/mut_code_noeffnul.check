@@ -1,0 +1,11 @@
+TOOL=esbmc
+# code mutation: the NUL stop of the mcs= search (eff loop of lineDone) is removed from a COPY of the header (WEB_HEAD_MAX=16, WEB_COOKIE_MAX=5)
+G=gen/mut_code_noeffnul; mkdir -p $G
+sed 's/while (eff < n \&\& a->line\[eff\] != 0)/while (eff < n)/' "$ROOT/src/web_functions/web_request.h" > $G/web_request.h
+cmp -s "$ROOT/src/web_functions/web_request.h" $G/web_request.h && { echo "  mutation did not apply to web_request.h (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp"
+CFLAGS="-I$G -I$ROOT/src/web_functions -DWEB_HEAD_MAX=16 -DWEB_COOKIE_MAX=5 -DM_PUSH_COOKIE"
+FLAGS="--unwind 18"
+EXPECT=fail
+CHECKS="code mutation: search no longer stops at a NUL byte -> a mcs= behind a NUL is captured (cookie differs from the reference)"
+EXPECT_PROP='^  assertion '

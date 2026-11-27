@@ -5,18 +5,25 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-5 committed and pushed (`fork-dev`, last code commit `d8aa2576`), working tree clean, `fork-dev`
-contains all of `upstream/dev` (checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc;
-the next wave is 6.
+**State:** waves 1-6 committed on `fork-dev` (last code commit `d787c11b`, proofs and docs in the wave-6 closing
+commit), not pushed yet. `fork-dev` contains all of `upstream/dev` (checked 2026-11-27). Start a fresh session with
+`/orchestrate-waves` on this doc; the next wave is 7 (web wave B).
 
-- **Results so far:** meshrelay 15 of 15 cfgs as expected (today fails DeafNotFirst and RedundantRelayBound, the
-  candidate rule holds both). `nimble_gatts_write` 7 of 7, `nimble_attvalue` 6 of 6. `url_decode` LEGACY 24 B (3 s),
-  STRICT 20 B (113 s). Last gate `--changed`: 4,360 of 4,362 cases, 2 skipped, board links, ruff, pytest, formal
-  self-test green. Advisor on web wave A: ship, rework applied.
-- **Rig status:** `test/test_web_diff` is a baseline snapshot of the frozen request path (`frozen/`, sha256 in
-  `SHA256SUMS`) until wave 6 wires the live entry (TODO `web-diff-live` at the top of `test_web_diff.cpp`). Decoder
-  equivalence rests on `test_url_decode`, `test_rm_web_parse`, `test_hex_digit`. Corpus files keep CRLF
-  (`.gitattributes`).
+- **Wave 6 result:** `src/web_functions/web_request.h` (head accumulator and request-line parser, `d528d071`) and
+  `work_webpage` running on it (`d787c11b`, accumulator one heap block from `startWebserver()`, 503 when the heap is
+  exhausted). The request rig has a live entry (`test/test_web_diff/live/`, cut from the working tree by function
+  name): frozen and live agree on all 1,247 requests under every profile, whitelist empty. Proofs: `web_request` 27
+  jobs with the expected verdict (23 quick, 4 heavy at 5.8-14.3 GB), `nimble_att_write` 3 jobs (one prepare, the leak
+  mutation, `today_prepend_noleading` = F7). Parked over 15 GB: `web_request/parked/pass_parse_hdr`
+  (FORMAL-WREQ-SPLIT), 12 `nimble_att_write/parked/` request-sequence jobs (FORMAL-ATTW-SPLIT).
+- **Solver lesson (wave 6):** ESBMC's default Bitwuzla answers in seconds where `--z3` timed out at 900 s (all new
+  jobs run without `--z3`). Harness rules: no pointer differences, no integer-to-pointer casts at symbolic indices, no
+  division by variables, small byte alphabets through a constant table.
+- **Last gate `--changed` (wave 6'):** 7 envs 186/186, board links (heltec V3, T-Beam, T-Echo, T114, RAK4631), pytest,
+  inventory, specs self-test green. Board flash: heltec V3 +508 B, RAK4631 +592 B (static RAM +8 B).
+- **Rig status:** `test/test_web_diff` compares the frozen copy (`frozen/`, sha256 pinned) with the live copy;
+  regenerate the live copy after every edit of an extracted function: `python3 test/test_web_diff/live/extract_live.py`
+  (`--check` runs in pytest, the suite's staleness case names the command). Corpus files keep CRLF.
 - **Waiting on the operator:** relay candidate rule (RELAY-ORDER-01): firmware change only after a yes.
 
 ### Next waves (dispatch plan)
@@ -24,15 +31,12 @@ the next wave is 6.
 Plan source for the web steps: `docs/web-server-seams-20261127.md` 6.2-6.8 (design) and 7.3 (steps). B1-B10 are
 accepted (operator 2026-11-27); each B change gets its own commit and a counted `kWhitelist` row in the rig.
 
-| Wave | Content                                                                                                                                                                                                                                                                                                                            | Owner files (writer)                                                                                                                                   | Parallel with                                  |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
-| 6a   | Web step 3: `web_request.h` (`WebHeadAcc`, `webHeadPush`, `webReqParse`, explicit lengths, constant loop bounds, allocated once at server start, not on the loop stack); `work_webpage` head loop uses it; router and guard unchanged; live entry of the rig wired, frozen vs live must agree on all 1,247 requests (no whitelist) | `src/web_functions/web_request.h` (+ `.cpp`), `src/web_functions/web_functions.cpp`, `test/test_web_request/`, `test/test_web_diff/` (live entry only) | 6b                                             |
-| 6b   | `nimble_att_write`: prepare/execute write queue of `ble_att_svr.c` (NimBLE 2.2.3 patched copy), same pattern as `nimble_gatts_write` (text extraction into `gen/`, chain length fixed per job, data as a position pattern)                                                                                                         | `specs/cbmc/nimble_att_write/`                                                                                                                         | 6a                                             |
-| 6c   | Proof group `specs/cbmc/web_request` for the head parser (orchestrator runs it after 6a)                                                                                                                                                                                                                                           | `specs/cbmc/web_request/`                                                                                                                              | after 6a                                       |
-| 7    | Web wave B, steps 4-8: route table, REST handlers on `WebReq`, `num_parse.h`, body reader with WDT feed and 408, fixed response heads; B1-B7, B10. B1 needs the `mcau.js` change first (scaffold-as-liveness, seams doc 7.4)                                                                                                       | `web_functions.cpp` is the hotspot: one writer at a time, or carve out new modules (`web_route.h`, `web_query.h`, `num_parse.h`, `web_body.h`)         | full host gate after step 5                    |
-| 8    | Web wave C, steps 9-11: spectrum sweep one step per loop pass on explicit action (B8) plus the shading bug, config upload reboot from the loop (B9), relocations, non-blocking send for TDECK-LAG-01, docs                                                                                                                         | per relocation, one commit each                                                                                                                        | re-measure TDECK-LAG-01 on DK5EN-14 afterwards |
-| 9    | Heap work for NimBLE F3 (+600 B): candidates phone rings dynamic on S3 (~6 KB), UDP hold store only during outages (6 KB), raw LoRa log 20 to 10 slots (~2.6 KB); then F3                                                                                                                                                          | to be mapped                                                                                                                                           |                                                |
-| 10   | Large bench test (operator: at the end), full host gate, `regression.sh --formal` on request                                                                                                                                                                                                                                       | orchestrator                                                                                                                                           |                                                |
+| Wave | Content                                                                                                                                                                                                                                                                                                                                                              | Owner files (writer)                                                                                                                           | Parallel with                                  |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 7    | Web wave B, steps 4-8: route table, REST handlers on `WebReq`, `num_parse.h`, body reader with WDT feed and 408, fixed response heads; B1-B7, B10. B1 needs the `mcau.js` change first (scaffold-as-liveness, seams doc 7.4). B3/B6 (strict request line and Content-Length, already computed by `web_request.h`, act on nothing yet) land here as their own commits | `web_functions.cpp` is the hotspot: one writer at a time, or carve out new modules (`web_route.h`, `web_query.h`, `num_parse.h`, `web_body.h`) | full host gate after step 5                    |
+| 8    | Web wave C, steps 9-11: spectrum sweep one step per loop pass on explicit action (B8) plus the shading bug, config upload reboot from the loop (B9), relocations, non-blocking send for TDECK-LAG-01, docs                                                                                                                                                           | per relocation, one commit each                                                                                                                | re-measure TDECK-LAG-01 on DK5EN-14 afterwards |
+| 9    | Heap work for NimBLE F3 (+600 B): candidates phone rings dynamic on S3 (~6 KB), UDP hold store only during outages (6 KB), raw LoRa log 20 to 10 slots (~2.6 KB); then F3                                                                                                                                                                                            | to be mapped                                                                                                                                   |                                                |
+| 10   | Large bench test (operator: at the end), full host gate, `regression.sh --formal` on request                                                                                                                                                                                                                                                                         | orchestrator                                                                                                                                   |                                                |
 
 ### How to run (rules for every wave)
 
@@ -76,7 +80,8 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 | 3    | BLE host task vs main loop model `specs/tla/bletask.tla`; fixed BLE-QDROP-01 and BLE-STALE-01 (wave 3b)                                                                                                         | done    |
 | 4    | 4a NimBLE fixes F1/F2/F6/F10 + `nimble_attvalue` (`acc07d31`); web server: analysis, B1-B10 accepted, corpus captured, wave A steps 0-2 (`28eb83bf`, `1a6c3c63`); `nimble_gatts_write` 7 of 7 (`d8aa2576`)      | done    |
 | 5    | Mesh model `specs/tla/meshrelay.tla` (asymmetric nodes, co-located pair, dedup, ACK TTL): today fails DeafNotFirst/RedundantRelayBound, candidate rule holds (`4f6ab492`); firmware rule waits for the operator | done    |
-| 6-10 | See "Next waves" under Now: web step 3 + `nimble_att_write`, web waves B and C, heap for F3, large bench test                                                                                                   | planned |
+| 6    | Web step 3: head parser `web_request.h`, `work_webpage` on it, rig live entry (`d528d071`, `d787c11b`); proofs `web_request` 27, `nimble_att_write` 3 (13 parked over 15 GB)                                    | done    |
+| 7-10 | See "Next waves" under Now: web waves B and C, heap for F3, large bench test                                                                                                                                    | planned |
 
 ## Wave 5 input: asymmetric nodes (operator 2026-11-27)
 
@@ -180,10 +185,27 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
   callback (false stale drop); not reproduced. `test_ble_queue_sites.py` checks that the generation bump is called,
   not that it is the first statement.
 - Old nRF52 UDP handler crashed (negative memcpy length) on "GAT" plus a stale byte; fixed by D5 in the merge.
+- Web (wave 6 advisor): the rig always runs with `bDEBUG=false`, so the serial echo and the W2-1/WEB-AUTH-01 quiet
+  logic were checked by reading only; a `bDEBUG=true` profile would test it. The 503 path (no heap for the
+  accumulator) has no test; a rig case with a forced allocation failure would cover it.
+- Web: `WebReq.host`/`origin` are the FIRST value, the guard keeps the LAST; unobservable only while the guard
+  refuses `host_n > 1` / `origin_n > 1` before reading the value (D-5 in `web_request.h`). Step 10 must keep that
+  order. `web_guard.h` helpers move into a small shared header before step 10 (include cycle otherwise).
+- Web: NUL bytes follow ESP32 `String` semantics; the nRF52 core's `concat(char)` is a `strcpy` and its copies stop
+  at a NUL, so bytes after a NUL can differ on nRF52 (no read past the buffer). The corpus proves ESP32 only (D-6).
+- Web: a lone CR as the unterminated last line gives `WebReq.blank = 1` (inherited from `web_guard.h` ~:640,
+  pinned in the suite and the proofs); BACKLOG WEB-CR-BLANK-01.
+- Web: the server holds the 2.4 kB accumulator permanently on top of the 1 kB `web_header` reserve; measure with
+  `/ram-snapshot` (ESP32 classic) during the heap wave 9.
 
 ## Open questions
 
 ## Archive
+
+- Wave 6 (2026-11-27): head parser and `work_webpage` on it (`d528d071`, `d787c11b`), rig live entry, proof groups
+  `web_request` (27) and `nimble_att_write` (3 active, 12 parked). Advisor: three rounds on the parser (NUL semantics
+  of the Cookie line, Content-Length as `long` with exact atol semantics), one on the head loop (include moved into
+  the .cpp). Gate `--changed` PASS.
 
 - Wave 1 (2026-11-27): ACK core, phone frame decoder with explicit length, shared id lookups, settings migration and
   round-trip proof jobs, nan/inf settings reject; advisor rework applied (harness newline loop, fixture generator

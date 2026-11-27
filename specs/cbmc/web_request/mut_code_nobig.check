@@ -1,0 +1,11 @@
+TOOL=esbmc
+# code mutation: the line-too-big check of webHeadPush is removed from a COPY of the header (WEB_HEAD_MAX=8)
+G=gen/mut_code_nobig; mkdir -p $G
+sed 's/if (a->line_len >= WEB_HEAD_MAX)/if (0)/' "$ROOT/src/web_functions/web_request.h" > $G/web_request.h
+cmp -s "$ROOT/src/web_functions/web_request.h" $G/web_request.h && { echo "  mutation did not apply to web_request.h (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp"
+CFLAGS="-I$G -I$ROOT/src/web_functions -DWEB_HEAD_MAX=8 -DWEB_COOKIE_MAX=3 -DM_PUSH_SMALL -DSTREAM=10"
+FLAGS="--unwind 12"
+EXPECT=fail
+CHECKS="code mutation: line_len >= WEB_HEAD_MAX check removed -> write past line[]"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds|^  assertion '

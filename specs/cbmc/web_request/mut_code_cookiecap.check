@@ -1,0 +1,11 @@
+TOOL=esbmc
+# code mutation: the cookie length cap is removed from the copy loop in a COPY of the header (WEB_COOKIE_MAX=5)
+G=gen/mut_code_cookiecap; mkdir -p $G
+sed 's/ \&\& a->cookie_len < WEB_COOKIE_MAX; k++)/; k++)/' "$ROOT/src/web_functions/web_request.h" > $G/web_request.h
+cmp -s "$ROOT/src/web_functions/web_request.h" $G/web_request.h && { echo "  mutation did not apply to web_request.h (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp"
+CFLAGS="-I$G -I$ROOT/src/web_functions -DWEB_HEAD_MAX=16 -DWEB_COOKIE_MAX=5 -DM_PUSH_COOKIE"
+FLAGS="--unwind 18"
+EXPECT=fail
+CHECKS="code mutation: cookie_len < WEB_COOKIE_MAX removed from the capture loop -> write past cookie[]"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds|^  assertion '

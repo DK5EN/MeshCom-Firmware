@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=6 -DWEB_COOKIE_MAX=6 -DM_PARSE_ANY -DPLEN=6 -DALPHA=AL_ANY -DNOHDR -DMODEL_BLANK"
+FLAGS="--unwind 9"
+EXPECT=pass
+CHECKS="webReqParse: 0..6 bytes from {blank TAB CR LF / ? G E T x NUL} (11 symbols, no ':'): memory safety on an exact heap buffer, spans inside the buffer, path/query shape, method in the enum, WRQ_OK only for a terminated request line ending in HTTP/1.0|1.1, no header fact, blank equals the closed-form reference, cut flag copied"

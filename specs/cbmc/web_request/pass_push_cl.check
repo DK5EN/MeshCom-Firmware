@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=20 -DWEB_COOKIE_MAX=3 -DM_PUSH_CL"
+FLAGS="--unwind 23"
+EXPECT=pass
+CHECKS="Content-Length over two lines (2 symbolic value bytes each): lenient value, strict value and bad flag equal a reference model, cl_strict in [-1, WEB_CL_MAX]"

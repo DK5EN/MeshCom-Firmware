@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=9 -DWEB_COOKIE_MAX=6 -DM_PARSE_HDR -DPLEN=9"
+FLAGS="--unwind 16"
+EXPECT=pass
+CHECKS="webReqParse header line: LF + Host: or X-MC: (first letter in either case) + 2 bytes from {blank TAB 1 x CR} + LF: host span exact (final CR dropped, blanks and TABs trimmed), host_n / xmc_n, xmc_bad exact, no other fact; the longer header names are in the corpus jobs"

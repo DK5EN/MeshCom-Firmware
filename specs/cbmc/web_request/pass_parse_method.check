@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=8 -DWEB_COOKIE_MAX=6 -DM_PARSE_METHOD -DPLEN=8"
+FLAGS="--unwind 11"
+EXPECT=pass
+CHECKS="webReqParse method: GET POST HEAD OPTIONS PUT (3..7 bytes) followed by one blank, each word intact or with one byte replaced by x (every position): method is the enum of the word (WM_OTHER for PUT and every damaged word), BAD_REQUEST_LINE, empty target"
+TIER=heavy

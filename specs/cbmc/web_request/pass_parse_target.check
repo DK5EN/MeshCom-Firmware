@@ -1,0 +1,8 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=11 -DWEB_COOKIE_MAX=6 -DM_PARSE_TARGET -DPLEN=11"
+FLAGS="--unwind 14"
+EXPECT=pass
+CHECKS="webReqParse target: 'GET ' + 0..3 bytes from {/ ? a blank} + ' x' + optional CR + LF: target, path and query spans exact (target is everything between the first and the last blank, blanks inside included, path ends at the first ?), BAD_REQUEST_LINE for an empty target else BAD_VERSION"
+TIER=heavy
+MEM=15360

@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=64 -DWEB_COOKIE_MAX=6 -DM_PARSE_CORPUS -DCORPUS=2 -DPLEN=64 -DPLEN_MAX=64"
+FLAGS="--unwind 72"
+EXPECT=pass
+CHECKS="webReqParse concrete corpus 2 (header lines: Host, Origin, X-MC, Sec-Fetch-Site, Sec-Fetch-Dest with duplicates, obs-fold after each, colon-less line, empty name, blank line ends the head, bad request line keeps the facts): all fields of WebReq equal the stated values (enumeration of 41 constant inputs, not a symbolic class)"

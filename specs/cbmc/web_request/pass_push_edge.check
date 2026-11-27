@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=8 -DWEB_COOKIE_MAX=3 -DM_PUSH_EDGE"
+FLAGS="--unwind 12"
+EXPECT=pass
+CHECKS="webHeadPush: lines of cap-1, cap, cap+1 bytes (cap 8): MORE up to the cap (cut flag at 8), LINE_TOO_BIG exactly at the 9th byte"

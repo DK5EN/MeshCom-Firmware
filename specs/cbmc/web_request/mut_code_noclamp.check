@@ -1,0 +1,11 @@
+TOOL=esbmc
+# code mutation: the clamp of len to WEB_HEAD_MAX is removed from a COPY of the header (WEB_HEAD_MAX=4, buffers of up to 6 bytes)
+G=gen/mut_code_noclamp; mkdir -p $G
+sed 's/if (len > (size_t)WEB_HEAD_MAX)/if (0)/' "$ROOT/src/web_functions/web_request.h" > $G/web_request.h
+cmp -s "$ROOT/src/web_functions/web_request.h" $G/web_request.h && { echo "  mutation did not apply to web_request.h (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp"
+CFLAGS="-I$G -I$ROOT/src/web_functions -DWEB_HEAD_MAX=4 -DWEB_COOKIE_MAX=6 -DM_PARSE_ANY -DPLEN=6 -DPMIN=1 -DLEAD_LF -DALPHA=AL_CLAMP -DNOHDR -DMODEL_BLANK"
+FLAGS="--unwind 9"
+EXPECT=fail
+CHECKS="code mutation: len not clamped -> the parser reads the buffer past the window (blank / spans differ from the reference of the 4 byte window)"
+EXPECT_PROP='^  assertion '

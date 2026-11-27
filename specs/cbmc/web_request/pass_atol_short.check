@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=24 -DWEB_COOKIE_MAX=6 -DM_ATOL_SHORT"
+FLAGS="--unwind 9"
+EXPECT=pass
+CHECKS="atolSat: 0..6 any bytes in an exact buffer: no read past n, no signed overflow, equals the 64 bit reference of atol()"

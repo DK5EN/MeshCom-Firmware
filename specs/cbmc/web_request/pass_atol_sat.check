@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=24 -DWEB_COOKIE_MAX=6 -DM_ATOL_SAT"
+FLAGS="--unwind 14"
+EXPECT=pass
+CHECKS="atolSat: sign + 11 digits (--32, long is 32 bit): saturates exactly at LONG_MIN / LONG_MAX, no signed overflow"

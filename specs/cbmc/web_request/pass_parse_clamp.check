@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=4 -DWEB_COOKIE_MAX=6 -DM_PARSE_ANY -DPLEN=6 -DPMIN=1 -DLEAD_LF -DALPHA=AL_CLAMP -DNOHDR -DMODEL_BLANK"
+FLAGS="--unwind 9"
+EXPECT=pass
+CHECKS="webReqParse with len up to 6 > WEB_HEAD_MAX=4: LF + 0..5 bytes from {a blank CR LF}: len is clamped to 4 (spans inside the first 4 bytes), a last line cut mid-line by the full window is judged by nothing (blank equals the closed-form reference for the window of 4)"

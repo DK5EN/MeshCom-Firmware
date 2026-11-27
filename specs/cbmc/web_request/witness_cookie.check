@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=16 -DWEB_COOKIE_MAX=5 -DM_PUSH_COOKIE -DWITNESS_COOKIE"
+FLAGS="--unwind 18"
+EXPECT=fail
+CHECKS="witness: a cookie pair is captured"
+EXPECT_PROP='^  assertion '

@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=4 -DWEB_COOKIE_MAX=6 -DM_PARSE_ANY -DPLEN=4 -DALPHA=AL_COLON -DNOHDR -DMODEL_BLANK"
+FLAGS="--unwind 16"
+EXPECT=pass
+CHECKS="webReqParse: 0..4 bytes from {blank TAB CR LF : x NUL} (7 symbols, the colon reaches the header-name chain, unwind 16 covers the 14 byte literals of ieq): memory safety, spans inside the buffer, no header fact (x cannot spell a name), blank equals the closed-form reference"
+TIER=heavy

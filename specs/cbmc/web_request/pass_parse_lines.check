@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=5 -DWEB_COOKIE_MAX=6 -DM_PARSE_ANY -DPLEN=5 -DPMIN=1 -DLEAD_LF -DALPHA=AL_LINES -DNOHDR -DMODEL_BLANK"
+FLAGS="--unwind 16"
+EXPECT=pass
+CHECKS="webReqParse: LF (empty request line) + 0..4 bytes from {a : blank CR LF}: header-line split (CR drop, blank line, obs-fold, colon-less line, unterminated last line, window not full): spans inside the buffer, no header fact, blank equals the closed-form reference (lone CR as last line included)"
+TIER=heavy

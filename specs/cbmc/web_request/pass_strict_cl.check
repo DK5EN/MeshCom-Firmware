@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=24 -DWEB_COOKIE_MAX=6 -DM_STRICT"
+FLAGS="--unwind 10"
+EXPECT=pass
+CHECKS="strictCl: 0..8 any bytes: -1 or in [0, WEB_CL_MAX], equals the reference (trim, digits only, not empty, <= cap), no signed overflow"

@@ -1,0 +1,11 @@
+TOOL=esbmc
+# code mutation: the secret wipe of WH_LINE_TOO_BIG clears only byte 0 of head and line (COPY of the header, WEB_HEAD_MAX=8)
+G=gen/mut_code_wipe; mkdir -p $G
+sed 's/for (size_t i = 0; i <= (size_t)WEB_HEAD_MAX; i++)/for (size_t i = 0; i < 1; i++)/' "$ROOT/src/web_functions/web_request.h" > $G/web_request.h
+cmp -s "$ROOT/src/web_functions/web_request.h" $G/web_request.h && { echo "  mutation did not apply to web_request.h (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp"
+CFLAGS="-I$G -I$ROOT/src/web_functions -DWEB_HEAD_MAX=8 -DWEB_COOKIE_MAX=3 -DM_PUSH_SMALL -DSTREAM=10"
+FLAGS="--unwind 12"
+EXPECT=fail
+CHECKS="code mutation: wipe after WH_LINE_TOO_BIG clears only byte 0 -> bytes of the old line stay in head[] / line[] (inv checks all WEB_HEAD_MAX + 1 bytes)"
+EXPECT_PROP='^  assertion '

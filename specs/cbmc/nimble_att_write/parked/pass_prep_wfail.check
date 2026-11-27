@@ -1,0 +1,20 @@
+JOB=pass_prep_wfail
+TOOL=esbmc
+# Library under test: NimBLE-Arduino 2.2.3 ble_att_svr.c of the ESP32 env heltec_wifi_lora_32_V3 (never modified).
+LIB="$ROOT/.pio/libdeps/heltec_wifi_lora_32_V3/NimBLE-Arduino/src"
+SRC="$LIB/nimble/nimble/host/src/ble_att_svr.c"
+[ -f "$SRC" ] || { echo "  NimBLE library missing under .pio/libdeps (run pio run -e heltec_wifi_lora_32_V3)"; TOOL=none; }
+G=gen/$JOB; mkdir -p $G
+# prepare/execute queue: from "static void ble_att_svr_prep_free" up to (not including) "int ble_att_svr_rx_notify"
+S=$(grep -n '^ble_att_svr_prep_free(' "$SRC" | head -1 | cut -d: -f1); E=$(grep -n '^ble_att_svr_rx_notify(' "$SRC" | head -1 | cut -d: -f1)
+sed -n "$((S - 1)),$((E - 3))p" "$SRC" > $G/orig.inc
+[ "$(wc -l < $G/orig.inc)" -gt 400 ] && [ "$(wc -l < $G/orig.inc)" -lt 470 ] || { echo "  prepare queue extraction failed (anchor changed?)"; TOOL=none; }
+for FN in prep_free prep_alloc prep_find_prev prep_clear prep_validate prep_extract prep_write insert_prep_entry rx_prep_write rx_exec_write; do
+  [ "$(grep -c "^ble_att_svr_$FN(" $G/orig.inc)" = 1 ] || { echo "  function $FN missing in extraction"; TOOL=none; }
+done
+cp $G/orig.inc $G/prep_part.inc
+SOURCES="harness.c"
+CFLAGS="-I$G -Istubs -DNPREP=2 -DLEN=1 -DBLE_ATT_ATTR_MAX_LEN=2 -DH_LO=1 -DH_HI=2 -DO_LO=0 -DO_HI=0 -DL_LO=1 -DL_HI=1 -DWFAIL=1"
+FLAGS="--unwind 3"
+EXPECT=pass
+CHECKS="two prepares (handles 1..2, offset 0, 1 B), execute-write flags 1 whose attribute write may fail: error UNLIKELY with that handle, no write beyond the failure, entries not yet written freed (no leak)"
