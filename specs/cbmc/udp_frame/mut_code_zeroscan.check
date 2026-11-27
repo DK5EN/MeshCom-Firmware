@@ -1,0 +1,9 @@
+TOOL=esbmc
+mkdir -p gen/zeroscan && sed 's/i + 1 < len \&\& i + 1 < UDP_TX_BUF_SIZE/i + 1 <= len \&\& i + 1 < UDP_TX_BUF_SIZE/' "$ROOT/src/udp_frame_parse.h" > gen/zeroscan/udp_frame_parse.h
+cmp -s "$ROOT/src/udp_frame_parse.h" gen/zeroscan/udp_frame_parse.h && { echo "  mutation did not apply to udp_frame_parse.h (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp"
+CFLAGS="-Igen/zeroscan -I$ROOT/src -DLMAX=12"
+FLAGS="--unwind 20"
+EXPECT=fail
+CHECKS="code mutation: zero scan bound off by one -> buf[len] read"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

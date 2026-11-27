@@ -1,0 +1,6 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DLMAX=12 "
+FLAGS="--unwind 20"
+EXPECT=pass
+CHECKS="no read at or past len, class/type/span/size/zero-run vs independent re-computation; len 0..12, any bytes"

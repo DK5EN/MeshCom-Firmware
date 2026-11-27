@@ -1,0 +1,9 @@
+TOOL=esbmc
+mkdir -p gen/nolen && sed 's/if (len < UDP_MSG_INDICATOR_LEN)/if (0)/' "$ROOT/src/udp_frame_parse.h" > gen/nolen/udp_frame_parse.h
+cmp -s "$ROOT/src/udp_frame_parse.h" gen/nolen/udp_frame_parse.h && { echo "  mutation did not apply to udp_frame_parse.h (source changed?)"; TOOL=none; }
+SOURCES="harness.cpp"
+CFLAGS="-Igen/nolen -I$ROOT/src -DLMAX=12"
+FLAGS="--unwind 20"
+EXPECT=fail
+CHECKS="code mutation: len < 4 guard removed -> indicator read past a short datagram"
+EXPECT_PROP='dereference failure|upper bound|out of bounds|array bounds'

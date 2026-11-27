@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DLMAX=255 "
+FLAGS="--unwind 260"
+EXPECT=pass
+CHECKS="same, full range len 0..255 (UDP_TX_BUF_SIZE)"
+TIER=heavy

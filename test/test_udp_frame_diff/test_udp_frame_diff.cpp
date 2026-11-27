@@ -325,6 +325,44 @@ static bool gate_type_unknown_or_none(const Scenario &sc)
     return t != 0x3A && t != 0x21 && t != 0x40;
 }
 
+// display_dest_path state value ("p1;p2;") back into its entries / joined again
+static std::vector<std::string> split_paths(const std::string &t)
+{
+    std::vector<std::string> v;
+    size_t pos = 0;
+    while (pos < t.size())
+    {
+        size_t e = t.find(';', pos);
+        if (e == std::string::npos) e = t.size();
+        v.push_back(t.substr(pos, e - pos));
+        pos = e + 1;
+    }
+    return v;
+}
+static std::string join_paths(const std::vector<std::string> &v)
+{
+    std::string t;
+    for (const auto &s : v) t += s + ";";
+    return t;
+}
+// D4 precondition: text GATE frame, destination a group or "*", payload holds ":ack" and "{"
+static bool d4_frame(const Scenario &sc)
+{
+    if (!gate_type_is(sc, 0x3A) || sc.bytes.size() <= 4) return false;
+    uint8_t dec[UDP_TX_BUF_SIZE + 8];
+    memset(dec, 0, sizeof(dec));
+    size_t n = sc.bytes.size() - 4;
+    if (n > UDP_TX_BUF_SIZE) n = UDP_TX_BUF_SIZE;
+    memcpy(dec, sc.bytes.data() + 4, n);
+    struct aprsMessage m;
+    initAPRS(m, 0x3A);
+    if (decodeAPRS(dec, (uint16_t)n, m) == 0) return false;
+    const char *dst = m.msg_destination_path;
+    const std::string pl = (const char *)m.msg_payload;
+    return (strcmp(dst, "*") == 0 || CheckGroup(dst) != 0) &&
+           pl.find(":ack") != std::string::npos && pl.find('{') != std::string::npos;
+}
+
 static int count_sink(const std::vector<std::string> &v, const char *name)
 {
     int n = 0;
@@ -392,18 +430,42 @@ static std::string compare_obs(const Obs &fa, const Obs &fb, int side, const Sce
         a.ring_hit = b.ring_hit = -1;
     }
 
-    // D3 (nRF52): exactly one more display call for a text GATE frame
+    // D3 (nRF52): exactly one more display call for a text GATE frame. Only that one call is
+    // removed (its sink line, its destination path, the counter); every other display call and
+    // its destination path is still compared.
     if (side == 1 && gate_type_is(sc, 0x3A) &&
         count_sink(b.sinks, "DISPLAYTEXT") == count_sink(a.sinks, "DISPLAYTEXT") + 1)
     {
-        tg.d3 = true;
-        a.sinks = sinks_without(a.sinks, "DISPLAYTEXT");
-        b.sinks = sinks_without(b.sinks, "DISPLAYTEXT");
-        for (const char *k : {"display_text", "display_dest_path"}) { a.state.erase(k); b.state.erase(k); }
+        std::vector<std::string> bpaths = split_paths(b.state["display_dest_path"]);
+        size_t disp_before = 0;   // display sink lines (text and position) ahead of line p: index into bpaths
+        for (size_t p = 0; p < b.sinks.size(); p++)
+        {
+            const std::string nm = sink_name(b.sinks[p]);
+            if (nm == "DISPLAYTEXT" && disp_before < bpaths.size())
+            {
+                std::vector<std::string> s2 = b.sinks;
+                s2.erase(s2.begin() + p);
+                std::vector<std::string> p2 = bpaths;
+                p2.erase(p2.begin() + disp_before);
+                if (sinks_without(s2, "PRINT") == sinks_without(a.sinks, "PRINT") && join_paths(p2) == a.state["display_dest_path"] &&
+                    atoi(b.state["display_text"].c_str()) == atoi(a.state["display_text"].c_str()) + 1)
+                {
+                    tg.d3 = true;
+                    b.sinks = s2;
+                    b.state["display_dest_path"] = a.state["display_dest_path"];
+                    b.state["display_text"] = a.state["display_text"];
+                    break;
+                }
+            }
+            if (nm == "DISPLAYTEXT" || nm == "DISPLAYPOS")
+                disp_before++;
+        }
     }
 
-    // D4 (nRF52): only the store-node hook sees a different payload
-    if (side == 1 && (a.state["ms_store"] != b.state["ms_store"] || a.state["ms_ack"] != b.state["ms_ack"]))
+    // D4 (nRF52): only the store-node hook sees a different payload. Reachable for a text GATE
+    // frame to a group or `*` whose payload holds both ":ack" and "{" (mboxClassify returns NONE
+    // for group / `*` otherwise); any other ms_store / ms_ack difference stays a failure.
+    if (side == 1 && d4_frame(sc) && (a.state["ms_store"] != b.state["ms_store"] || a.state["ms_ack"] != b.state["ms_ack"]))
     {
         tg.d4 = true;
         for (const char *k : {"ms_store", "ms_ack"}) { a.state.erase(k); b.state.erase(k); }

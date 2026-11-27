@@ -1,9 +1,9 @@
 # Bounded model checking
 
-**104 jobs in 10 groups check parsers and decoders of `src/` with ESBMC. A job compiles the real source, so a pass
+**113 jobs in 11 groups check parsers and decoders of `src/` with ESBMC. A job compiles the real source, so a pass
 holds for the code, up to the stated input length and unwind bound.** Rules, commands and limits:
 [`../README.md`](../README.md). The last complete run (74 jobs, before FORMAL-02) is in [`RESULTS.md`](RESULTS.md);
-the groups `ack_rx`, `phone_frame` and the `settings_decode/roundtrip_*` jobs were added and run one by one on
+the groups `ack_rx`, `phone_frame`, `udp_frame` and the `settings_decode/roundtrip_*` jobs were added and run one by one on
 2026-11-27 (campaign FORMAL-02), all with the expected verdict.
 
 ## Groups
@@ -20,6 +20,7 @@ the groups `ack_rx`, `phone_frame` and the `settings_decode/roundtrip_*` jobs we
 | `remote_cmd`      | `rmParse`, `rmCheck`                                     | 32 B free text, 90 B shaped, two rounds heavy | 13    | 2     |
 | `ack_rx`          | `ackRxDecide` (ACK receive decision)                     | 16 B quick, 255 B heavy, full tables          | 7     | 1     |
 | `phone_frame`     | `phoneFrameDecode` (phone command frames)                | 12-40 B quick, 300 B heavy                    | 11    | 4     |
+| `udp_frame`       | `udpFrameZeroRun`, `udpFrameClassify` (UDP receive)      | 12 B quick, 255 B heavy                       | 8     | 1     |
 
 ## Job names
 

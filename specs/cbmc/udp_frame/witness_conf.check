@@ -1,0 +1,7 @@
+TOOL=esbmc
+SOURCES="harness.cpp"
+CFLAGS="-I$ROOT/src -DLMAX=12 -DWITNESS_CONF"
+FLAGS="--unwind 20"
+EXPECT=fail
+CHECKS="witness: class CONF reachable (assert it never happens must fail)"
+EXPECT_PROP='main.assertion|assertion'
