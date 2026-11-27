@@ -5,19 +5,20 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-- **Committed:** waves 1, 1b, 2, 3, 4a (`3139a4d6` .. `acc07d31`), web corpus and T-Deck measurement (`3b1ce88f`).
-- **In the working tree, not committed (green host tests, gate and advisor pending):**
-  - Web wave A steps 1-2: `src/hex_digit.h` (one hex decoder, 9 call sites incl. `web_guard.h`), `urlDecode(buf, len,
-policy)` in `src/url_decode.*`, `rm_form_decode` removed; spectrum leak fix + pin.
-  - Web wave A step 0: differential rig `test/test_web_diff/` (frozen request path, 1,247 requests, golden in 4
-    profiles), `tools/web_corpus.py`, env `native_web_diff`.
-  - Wave 5 mesh model `specs/tla/meshrelay.tla` + 15 cfgs.
-  - `specs/cbmc/nimble_gatts_write/` (5 jobs, written, not yet run to a verdict).
-- **Running (orchestrator, one task):** all 15 meshrelay cfgs, 5 url_decode jobs, 5 nimble_gatts_write jobs in a row
-  (`/tmp/formal02/run_all.txt`); gate `--changed` for web wave A.
-- **Next:** read the run results; advisor on web wave A steps 0-2; commits (web wave A, mesh model, nimble_gatts_write);
-  register meshrelay in `specs/manifest.json`; then web wave A step 3 (`web_request.h` head parser, live wiring of the
-  rig), `nimble_att_write`, operator decision on the relay candidate rule (RELAY-ORDER-01).
+- **Committed:** waves 1, 1b, 2, 3, 4a (`3139a4d6` .. `acc07d31`), web corpus and T-Deck measurement (`3b1ce88f`),
+  wave 5 mesh model (`4f6ab492`), web wave A steps 0-2 (`28eb83bf`, CRLF fix of the corpus `1a6c3c63`), NimBLE GATT
+  write proofs and per-policy URL decode proofs (`d8aa2576`). Working tree clean.
+- **Results:** meshrelay 15 of 15 cfgs as expected (today fails DeafNotFirst and RedundantRelayBound, the candidate
+  rule holds both). `nimble_gatts_write` 7 of 7 (chain length fixed per job; symbolic chain and data hit 6 GB).
+  `url_decode` LEGACY 24 B in 3 s, STRICT 20 B in 113 s (24 B with a symbolic policy was over 900 s). Gate
+  `--changed` green (4,360 of 4,362 cases, 2 skipped; board links, ruff, pytest, formal self-test). Advisor on web
+  wave A: ship; rework applied (counted whitelist in the rig, zeroed spectral scan buffer, test comments).
+- **Rig status:** `test/test_web_diff` is a baseline snapshot of the frozen request path until step 3 wires the live
+  entry; decoder equivalence rests on `test_url_decode`, `test_rm_web_parse`, `test_hex_digit` (frozen copies).
+- **Next:** web wave A step 3 (`web_request.h` head parser, live entry of the rig), `nimble_att_write`, operator
+  decision on the relay candidate rule (RELAY-ORDER-01), then web waves B and C (route table, REST handlers,
+  non-blocking send for TDECK-LAG-01, step-wise spectrum sweep B8 and its shading bug), heap work for NimBLE F3,
+  the large bench test at the end.
 - **Rule since 2026-11-27 (operator):** agents write code and proof/model files only; every ESBMC/TLC run is started by
   the orchestrator, one at a time, no wait loops (agents spawned 30+ polling loops twice).
 

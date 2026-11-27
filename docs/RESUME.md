@@ -10,8 +10,10 @@ Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 - **Campaign FORMAL-02 (resume point `docs/campaign-formal-02-20261127.md`, section "Now"):** committed waves 1 to 4a
   (`3139a4d6` .. `acc07d31`): verifiable ACK and phone-frame parsers, settings migration, one UDP receive handler for
   ESP32 and nRF52 (operator decisions D1/D2/D3/D5), BLE queue fixes from the TLA+ model, NimBLE boundary fixes F1/F2/F6/
-  F10, bounded proofs for all new cores. In the tree: web wave A steps 0-2 (differential rig, shared hex and percent
-  decoders, spectrum leak fix), mesh model with asymmetric nodes, `nimble_gatts_write` jobs; runs and gate in progress.
+  F10, bounded proofs for all new cores. Since then committed: mesh relay model with loud-but-deaf nodes (`4f6ab492`;
+  candidate relay rule awaits an operator decision), web wave A steps 0-2 (`28eb83bf`, `1a6c3c63`: shared hex and URL
+  decoders, spectrum leak and uninitialised scan buffer fixed, request rig as baseline snapshot), NimBLE GATT write
+  proofs (`d8aa2576`). Tree clean; next is web wave A step 3.
 - **Bench 2026-11-27:** DK5EN-14 runs the INSTRUMENT image of `acc07d31` (USB flash; the earlier OTA attempt failed
   because the node was in WiFi AP mode). Web request corpus captured (`tools/bench/runs/harness/webcap-dk5en14-20261127.jsonl`).
   T-Deck lag measured: the web server blocks the main loop 2.8-8 s on a weak WiFi link (BACKLOG TDECK-LAG-01).
