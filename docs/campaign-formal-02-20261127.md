@@ -5,23 +5,19 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-6, 7a and 7b steps 1-7 committed on `fork-dev`, not pushed; last full host gate green after
+**State:** waves 1-6, 7a and 7b steps 1-7 and 8a committed on `fork-dev`, not pushed; last full host gate green after
 step 6 (141 envs, 4,450 ok, 1 skipped), step 7 gate `--changed` green. `fork-dev` contains all of `upstream/dev`
-(checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; next is 7b step 8 (fixed response
-heads, `webSendFixedHead`).
+(checked 2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; next is 7b step 8b (status line CRLF in
+`send_http_header`, D14).
 
-- **Step 8 inputs (scout, 2026-11-27):** plan row `docs/web-server-seams-20261127.md` :427 (`webSendFixedHead(status,
-type, len, extra)` in `web_io.cpp`, the 7 hand-built heads, 6 Content-Length prints, 500 reason text, CRLF on the
-  status line = D14; identical bytes otherwise; webgui_* and `test_web_txbuf` header pins to update). The doc's D14 line
-  refs (:106 cites :4748/:5015) are stale: `send_http_header` is `web_functions.cpp` ~:4960, declared
-  `web_functions.h:50`, `String status_text`, status line `"HTTP/1.1 %i %s \n"` (trailing space, LF only), knows
-  200/400/401/403/404/405/408/422/431; 500 is missing, so the 4 `n ? 200 : 500` sites send "500 Unknown". Hand-built
-  status lines: `web_functions.cpp` 6 (200 config download with trailing space, 200 x2, 503 x3 incl. the no-heap
-  accumulator path), `web_oled_shot.cpp` 2 (503, 200). Call sites: 56 in `web_functions.cpp`, 4 in
-  `web_rm_handlers.cpp`. `web_io.cpp` now exists (step 7) and is the home for the new helper.
+- **Step 8b (in flight 2026-11-27):** `send_http_header` status line `"HTTP/1.1 %i %s \n"` -> `"%u %s\r\n"` (D14). Golden
+  files keep the frozen form (~1,212 records); the rig gets one normalisation `d14Norm` (old status line form -> new,
+  first `| ` line of a record only, both sides, every live-vs-frozen/golden comparison; both endings are 2 bytes, so
+  byte counts and close offsets do not move) plus a corpus-wide check that live never emits the old form. Exact pins to
+  update: `test_web_diff.cpp` ~:886, ~:1031, ~:1083, `test_rm_web_parse` ~:681. GUI JS reads only `r.status`/`r.ok`.
 - **Wave 7b plan (serial, `web_functions.cpp` is the hotspot, one writer per step, gate + advisor + commit each):**
   step 1 router as classifier + switch, table alongside (`ccdf9260`, done); step 2 B2 exact match (`34fb0a3b`, done,
-  33 rig whitelist rows); step 3 B1 (done); step 4 B3 + B6 (done); step 5 (done); step 6 (done); step 7 (done); step 8 fixed response heads; then drop `webRouteLegacy` and the disagreement counter.
+  33 rig whitelist rows); step 3 B1 (done); step 4 B3 + B6 (done); step 5 (done); step 6 (done); step 7 (done); step 8a `webSendFixedHead` (done); step 8b status line CRLF; then drop `webRouteLegacy` and the disagreement counter.
 - **Wave 7b mechanics:** `webRouteDecide` (web_functions.cpp) gathers inputs, `webRouteDecideCore` (web_route.h, pure)
   decides; the feature mask `built` (WRB_*) mirrors the switch guards and is pinned by `test_web_route`. Rig whitelist
   `kWhitelist` in `test/test_web_diff/test_web_diff.cpp` must be exact both ways; `WEB_DIFF_DUMP_DIFFS=<file>` on the
@@ -239,6 +235,10 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 
 ## Archive
 
+- Wave 7b step 8a (2026-11-27, `a624b296`): `webStatusText` (one reason table, +500/503) and `webSendFixedHead` in
+  `web_io.*`; the 8 hand-built heads call it byte-identically except the config download (D14: CRLF, Cache-Control
+  before Connection). Rig: old site bytes vs live helper, directory-wide scan for hand-built heads (mutation red).
+  Advisor: firmware approved, scan widened to every file of `src/web_functions/`.
 - Wave 7b step 7 (2026-11-27, `6ec0bfcd`): B10, `webReadBody` in new `web_io.cpp` (WDT feed per pass), `web_read_body`
   and `rmReadBody` are wrappers; stalled body 408 (config upload was 400, rm "short" was 422, bodies unchanged); stalled
   head 408 only if at least one byte arrived, zero-byte preconnect stays silent (orchestrator decision); head loop feeds
