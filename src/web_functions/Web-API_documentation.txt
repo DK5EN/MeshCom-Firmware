@@ -15,6 +15,30 @@ Page and JSON responses sent with the standard header (send_http_header) use chu
 
 
 ============================================
+Request handling and error answers
+============================================
+
+Routes match exactly: the path is compared byte for byte (case-sensitive) and, for the routes that have one, the
+FIRST query key selects (page=<name>, sendmessage, ...). Nothing else of the request is read to pick a route.
+
+	404	{"ok":false,"err":"not found"}				unknown path or selector, or a route this build does not have
+	405	{"ok":false,"err":"method not allowed"}		known path, wrong method (HEAD included); the answer carries an
+								"Allow: GET" / "Allow: POST" header (e.g. GET /rmsend, HEAD /)
+	400	{"ok":false,"err":"bad request"}			malformed request line or HTTP version, or a missing, repeated
+								or non-numeric Content-Length (checked after the request guard, so a 403 comes first)
+	408	{"ok":false,"err":"timeout"}				the request head never ended (only when at least one byte arrived;
+								a connection that sent nothing is closed silently), or a body stopped before
+								Content-Length bytes arrived (POST /config, POST /rmsend: 408 instead of 400/422)
+	431	{"ok":false,"err":"header line too large"}	one header line is longer than 1023 bytes
+	503	{"ok":false,"err":"au_session_active"}		(ESP32) a firmware update session is running; only /austatus
+								and the GUI assets are served meanwhile; Retry-After: 10 (a page load gets a
+								self-reloading page)
+	503	{"ok":false,"err":"out of memory"}			the node has no heap for the request head; the server stays up
+
+Every status line ends in CRLF ("HTTP/1.1 200 OK\r\n"); older builds sent a space and a bare LF.
+
+
+============================================
 Login (web password set)
 ============================================
 When a web password is set (--webpwd), every request except the three below needs the session cookie
@@ -38,6 +62,9 @@ Setting Parameters
 ============================================
 To set a parameter to the node, use:
 
+	NOTE (request guard): setparam and callfunction need the header "X-MC: 1" or an Origin header that equals the Host
+	(same origin); without either the node answers 403.
+
 	NOTE (request guard): by default (build flag MC_WEB_GUARD=1; -D MC_WEB_GUARD=0 limits the guard to the
 	remote-management endpoints /rm*, /?page=remote, /setparam/?rm= and /setparam/?rmstrict=) every
 	state-changing request (/setparam, /callfunction, /?sendmessage,
@@ -50,6 +77,10 @@ To set a parameter to the node, use:
 	--webhost <name> or /setparam/?webhost=<name>, exact match, #1323); otherwise, or without X-MC,
 	the node answers 403.
 	Typing a /setparam URL into the browser bar is refused for the same reason. The node sends no CORS headers.
+
+	Numeric values are read strictly: leading and trailing space or tab are trimmed, the WHOLE remaining input must be
+	one number inside the parameter's range (decimals: 1..3 digits, point or comma). "5x", "abc", "+5", "1e1", "nan",
+	an empty value or a number out of range is refused with returncode 1 / HTTP 422 and nothing is changed.
 
 	/setparam/?setcall=AB1CDE-12		Sets the nodes call-sign 
 	/setparam/?onewiregpio=XX			Sets the GPIO to be used for the 1-Wire bus
@@ -176,7 +207,8 @@ Functions available so far:
 	/callfunction/?updcheck			(ESP32 only) Check for a newer release now (same as --update check; 200 if the job started, 422 if busy or WiFi is down; read the result on the info page)
 	/callfunction/?updinstall		(ESP32 only) Download and stage the newest release (same as --update install; 200 if the job started or the image is already staged, 422 otherwise)
 	/callfunction/?updapply			(ESP32 only) Apply the staged image now (same as --update apply): the node reboots into Safeboot; 422 if nothing is staged
-	/callfunction/?spectrumscan	(ESP32 SX126x boards only) Run one spectrum sweep now (the Spectrum page button "Scan now"). The call blocks for the whole sweep (a few seconds) and takes LoRa off the air meanwhile; the radio is restored exactly as at boot and RX re-armed afterwards. 200 {"spectrumscan":"ok"}: the sweep finished and the result is stored; 422: failed (a packet or a TX in flight, no radio, init or step timeout, no memory, unsupported board, or the radio could not be restored: then see the serial log line "spectrum re-init failed" and reboot). The page shows the reason of the last run; opening the page never starts a scan.
+	/callfunction/?spectrumscan	(ESP32 SX126x boards only) Run one spectrum sweep now (the Spectrum page button "Scan now"). The call blocks for the whole sweep (a few seconds) and takes LoRa off the air meanwhile; afterwards the radio is restored exactly as at boot and RX re-armed. Like setparam it needs X-MC: 1 or a same-origin Origin. 200 {"spectrumscan":"ok"}: the sweep finished and the result is stored; 422: failed (a packet or a TX in flight, no radio, init or step timeout, no memory, unsupported board, or the radio could not be restored: then see the serial log line "spectrum re-init failed" and reboot). The page shows the reason of the last run; opening the page never starts a scan.
+	/callfunction/?mboxpurge=<slot> and ?mboxdeliver=<slot>	(mailbox builds) the slot is a whole number 0..49 (strict, see Setting Parameters); mboxpurge also takes "all"; anything else answers 422.
 
 
 
@@ -189,6 +221,9 @@ Send a Message
 To send a message using the Web-API, use:
 
 /?sendmessage&tocall=AB1CDE-12&message=This%20is%20an%20example%20message.
+
+tocall and message are read by name: tocall is the text after "&tocall=" up to the next "&message", so the order of
+the two parameters does not matter.
 
 
 This API call is most likely to be changed soon.
@@ -356,3 +391,16 @@ GET /gpiostatus
 	Levels live in RAM only: nothing is stored, after a reboot every pin is an untouched input. The Pins page shows the
 	table ("Free GPIO") only when the board offers a free pin, polls /gpiostatus after /pinassign every 5 s and, with
 	master 0, lists the rows read-only with the note "GPIO control is off. Turn it on above to switch the pins; every pin returns to input after a restart.".
+
+
+
+============================================
+Configuration backup (GET /config.json, POST /config)
+============================================
+
+POST /config	Restores a configuration file (the body is the file, Content-Length required, needs X-MC: 1).
+		Nothing is written unless every value was accepted.
+		200	imported and saved; the node reboots about 2 s after the answer (the answer is sent first)
+		400	nothing changed: "out of memory", "no Content-Length", "file too large", "incomplete upload" or
+			"config import failed: <reason>" (an HTML page with the reason)
+		408	the body stalled before Content-Length bytes arrived; nothing changed

@@ -124,6 +124,16 @@ runs the one handler as the ESP32 and as the nRF52 board (platform hooks switche
 copies of the two old handlers; the only differences allowed are the counted classes D1, D2, D3, D4, D5, C7 and REORDER.
 `test_udp_frame_twin` +6 (D1, D2, D3, D5 core, D5 handler, C7), `test_regression_udp04_..._on_esp32` is now `_on_both`.
 
+Added 2026-11-27 (FORMAL-02 waves 7 and 8, web server): `test_spectral_sweep` (env `native_spectral_sweep`, 14 cases,
+B8: step counts tied to the old float loop, the shading formula that was red with the old integer division, render bytes,
+source pins on the explicit "Scan now" call and the radio hand-over; Regression) and `test_reboot_defer` (env
+`native_reboot_defer`, 5 cases, B9: deadline due, arm, wrap-around, the earlier deadline wins, source pins for the
+`rebootDeferService()` calls in both main loops and the config upload path; Unit). `test_web_diff` (frozen versus live
+web request path): its live copy is now also cut from `web_io.cpp`, `web_config.cpp` and `web_nodefunctioncalls.cpp`
+(`live/extract_live.py`; `test_live_copy_is_current` checks all three against the tree), the frozen and golden side runs
+through the D14 normalisation (old status line `HTTP/1.1 200 OK \n` rewritten to `...OK\r\n`; the live side is compared
+raw) and the `kWhitelistB10` rows list the requests that stop before the blank line and now answer 408.
+
 The per-suite sums were recomputed from the tree on 2026-10-04 (every
 `RUN_TEST` under `test/test_*`). The totals before that date were stale: the
 old header said 96 suites / 1563 cases, while the table below already listed
