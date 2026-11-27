@@ -1,0 +1,12 @@
+GET /getparam/?setssid HTTP/1.1
+Host: 192.0.2.10
+Connection: keep-alive
+sec-ch-ua-platform: "macOS"
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36
+Accept: */*
+Sec-Fetch-Site: same-origin
+Sec-Fetch-Mode: cors
+Sec-Fetch-Dest: empty
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: de,en;q=0.9,en-US;q=0.8
+

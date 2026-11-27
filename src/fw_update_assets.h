@@ -30,6 +30,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "hex_digit.h"
+
 // ---------------------------------------------------------------------------------------
 // env -> asset name
 // ---------------------------------------------------------------------------------------
@@ -152,17 +154,6 @@ enum : uint8_t
     K_URL
 };
 
-inline int hexVal(char c)
-{
-    if (c >= '0' && c <= '9')
-        return c - '0';
-    if (c >= 'a' && c <= 'f')
-        return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F')
-        return c - 'A' + 10;
-    return -1;
-}
-
 inline bool topIsObject(const FwJsonScan &s)
 {
     return s.depth >= 1 && ((s.objMask >> (s.depth - 1)) & 1u) != 0;
@@ -215,7 +206,7 @@ inline void emit(FwJsonScan &s, char c)
         }
         else if (p < 71)
         {
-            const int v = hexVal(c);
+            const int v = mcHexVal(c);
             if (v < 0)
             {
                 s.dcnt = 255;
@@ -391,7 +382,7 @@ inline void stringChar(FwJsonScan &s, char c)
         return;
     }
     // escState == 2: four hex digits of \uXXXX
-    const int v = hexVal(c);
+    const int v = mcHexVal(c);
     if (v < 0)
     {
         s.err = true;

@@ -1,0 +1,48 @@
+== profile open
+trace:
+  webSetup_setParam name='onewire' value='on\\r\\nHost: 192.0.2.10\\r\\nUser-Agent: curl/8.7.1\\r\\nAccept: */*\\r\\nX-MC: 1\\r\\n\\r\\n'
+  webTxBeginChunked
+serial: 
+out: 292 bytes
+| HTTP/1.1 200 OK \n
+| Content-type:application/json\r\n
+| Transfer-Encoding: chunked\r\n
+| Connection: close\r\n
+| Cache-Control: no-cache, no-store, must-revalidate\r\n
+| Pragma: no-cache\r\n
+| Expires: 0\r\n
+| \r\n
+| {"returncode":0,"onewire":"on\\r\\nHost: 192.0.2.10\\r\\nUser-Agent: curl/8.7.1\\r\\nAccept: */*\\r\\nX-MC: 1\\r\\n\\r\\n"}\r\n
+close: calls=1 at_byte=292 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=93 of 93
+== profile password
+trace:
+  deliver_scaffold password=1
+serial: 00:00:00 WEBServer no session IP:<192.0.2.77> show LOGIN\n
+out: 0 bytes
+close: calls=1 at_byte=0 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=93 of 93
+== profile au-session+webhost
+trace:
+serial: 
+out: 162 bytes
+| HTTP/1.1 503 Service Unavailable\r\n
+| Retry-After: 10\r\n
+| Content-Type: application/json\r\n
+| Content-Length: 38\r\n
+| Connection: close\r\n
+| \r\n
+| {"ok":false,"err":"au_session_active"}
+close: calls=1 at_byte=162 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=93 of 93
+== profile password+session
+trace:
+  deliver_scaffold password=1
+serial: 00:00:00 WEBServer no session IP:<192.0.2.77> show LOGIN\n
+out: 0 bytes
+close: calls=1 at_byte=0 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=93 of 93

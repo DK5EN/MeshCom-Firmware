@@ -1,0 +1,7 @@
+GET /callfunction/?otaupdate HTTP/1.1
+Accept-Encoding: identity
+Host: 192.168.68.71
+User-Agent: Python-urllib/3.12
+X-MC: 1
+Connection: close
+

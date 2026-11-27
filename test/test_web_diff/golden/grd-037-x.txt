@@ -1,0 +1,68 @@
+== profile open
+trace:
+  webTxBeginChunked
+serial: 
+out: 218 bytes
+| HTTP/1.1 403 Forbidden \n
+| Content-type:application/json\r\n
+| Transfer-Encoding: chunked\r\n
+| Connection: close\r\n
+| Cache-Control: no-cache, no-store, must-revalidate\r\n
+| Pragma: no-cache\r\n
+| Expires: 0\r\n
+| \r\n
+| {"ok":false,"err":"forbidden"}\r\n
+close: calls=1 at_byte=218 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=147 of 147
+== profile password
+trace:
+  webTxBeginChunked
+serial: 
+out: 218 bytes
+| HTTP/1.1 403 Forbidden \n
+| Content-type:application/json\r\n
+| Transfer-Encoding: chunked\r\n
+| Connection: close\r\n
+| Cache-Control: no-cache, no-store, must-revalidate\r\n
+| Pragma: no-cache\r\n
+| Expires: 0\r\n
+| \r\n
+| {"ok":false,"err":"forbidden"}\r\n
+close: calls=1 at_byte=218 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=147 of 147
+== profile au-session+webhost
+trace:
+  webTxBeginChunked
+serial: 
+out: 218 bytes
+| HTTP/1.1 403 Forbidden \n
+| Content-type:application/json\r\n
+| Transfer-Encoding: chunked\r\n
+| Connection: close\r\n
+| Cache-Control: no-cache, no-store, must-revalidate\r\n
+| Pragma: no-cache\r\n
+| Expires: 0\r\n
+| \r\n
+| {"ok":false,"err":"forbidden"}\r\n
+close: calls=1 at_byte=218 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=147 of 147
+== profile password+session
+trace:
+  webTxBeginChunked
+serial: 
+out: 218 bytes
+| HTTP/1.1 403 Forbidden \n
+| Content-type:application/json\r\n
+| Transfer-Encoding: chunked\r\n
+| Connection: close\r\n
+| Cache-Control: no-cache, no-store, must-revalidate\r\n
+| Pragma: no-cache\r\n
+| Expires: 0\r\n
+| \r\n
+| {"ok":false,"err":"forbidden"}\r\n
+close: calls=1 at_byte=218 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=147 of 147

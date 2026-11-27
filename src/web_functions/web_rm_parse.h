@@ -1,7 +1,7 @@
 // web_rm_parse.h -- pure parsing and validation of the Remote page POST bodies
 // (docs/rm-gui/impl-plan.md, contract C4, W2a).
 //
-// Header-only, no Arduino, no allocation, C++11, only <stddef.h>/<string.h> and rm_validate.h.
+// Header-only, no Arduino, no allocation, C++11, only <stddef.h>/<string.h>, rm_validate.h and url_decode.h (link url_decode.cpp).
 // Three bodies: POST /rmpasswd, POST /rmnodes, POST /rmsend (dst or slot form).
 //
 // Rules shared by all three:
@@ -27,6 +27,7 @@
 #include <string.h>
 
 #include "../rm_validate.h"
+#include "../url_decode.h" // urlDecode(URLD_STRICT); the unit links url_decode.cpp
 #include "web_auth.h" // WEB-PWD-01: webAuthPasswordProblemN()
 
 #define RM_FORM_BODY_MAX 260 // the handlers' stack buffer is this + 1; dst form, every field %XX: 258
@@ -48,34 +49,10 @@ namespace rmparse
 
 static inline const char *emptyStr() { return ""; }
 
-static inline bool isHex(unsigned char c)
-{
-    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-}
-
-static inline unsigned hexVal(unsigned char c)
-{
-    return c <= '9' ? (unsigned)(c - '0') : (unsigned)((c | 0x20) - 'a' + 10);
-}
-
 // %XX in place ('+' stays literal); false on a control byte (also a decoded %00) or DEL.
 static inline bool decode(char *s)
 {
-    char *w = s;
-    for (const char *r = s; *r; r++)
-    {
-        unsigned char ch = (unsigned char)*r;
-        if (ch == '%' && isHex((unsigned char)r[1]) && isHex((unsigned char)r[2]))
-        {
-            ch = (unsigned char)(hexVal((unsigned char)r[1]) * 16 + hexVal((unsigned char)r[2]));
-            r += 2;
-        }
-        if (ch < 0x20 || ch == 0x7f)
-            return false;
-        *w++ = (char)ch;
-    }
-    *w = '\0';
-    return true;
+    return urlDecode(s, strlen(s), URLD_STRICT) != (size_t)-1;
 }
 
 // Splits "k=v&k=v" in place. keys[0..nkeys) are the accepted names, vals[i] receives the decoded value

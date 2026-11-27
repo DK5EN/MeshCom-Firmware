@@ -1,0 +1,4 @@
+GET /setparam/?manualcommand=--reboot HTTP/1.1
+Host: rebind.attacker.example:8080
+X-MC: 1
+

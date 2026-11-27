@@ -8,6 +8,7 @@
 #include <stdio.h>    // snprintf (alHwLabel)
 #include <string.h>
 #include "hmac_sha256.h"
+#include "hex_digit.h"
 
 #define APPLINK_NONCE_LEN 16
 #define APPLINK_MAC_LABEL "MCAPPLINK1"
@@ -186,17 +187,6 @@ enum AlCtl : uint8_t
     AL_CTL_HB
 };
 
-static inline int alHexVal(char c)
-{
-    if (c >= '0' && c <= '9')
-        return c - '0';
-    if (c >= 'a' && c <= 'f')
-        return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F')
-        return c - 'A' + 10;
-    return -1;
-}
-
 static inline void alSkipWs(const char *j, size_t len, size_t *i)
 {
     while (*i < len && (j[*i] == ' ' || j[*i] == '\t' || j[*i] == '\r' || j[*i] == '\n'))
@@ -310,8 +300,8 @@ static inline AlCtl alCtlParse(const char *json, size_t len, uint8_t mac_out[32]
                     have_mac = true;
                     for (size_t k = 0; k < 32; k++)
                     {
-                        int hi = alHexVal(json[vs + 2 * k]);
-                        int lo = alHexVal(json[vs + 2 * k + 1]);
+                        int hi = mcHexVal(json[vs + 2 * k]);
+                        int lo = mcHexVal(json[vs + 2 * k + 1]);
                         if (hi < 0 || lo < 0)
                         {
                             have_mac = false;

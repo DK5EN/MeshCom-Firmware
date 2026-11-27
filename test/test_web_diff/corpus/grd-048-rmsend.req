@@ -1,0 +1,6 @@
+POST /rmsend HTTP/1.1
+Host: 192.168.68.71
+X-MC: 1
+X-A: b
+ Sec-Fetch-Site: cross-site
+

@@ -1,0 +1,64 @@
+== profile open
+trace:
+  webSetup_setParam name='track' value='on'
+  webTxBeginChunked
+serial: 
+out: 210 bytes
+| HTTP/1.1 200 OK \n
+| Content-type:application/json\r\n
+| Transfer-Encoding: chunked\r\n
+| Connection: close\r\n
+| Cache-Control: no-cache, no-store, must-revalidate\r\n
+| Pragma: no-cache\r\n
+| Expires: 0\r\n
+| \r\n
+| {"returncode":0,"track":"on"}\r\n
+close: calls=1 at_byte=210 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=100 of 100
+== profile password
+trace:
+  webTxBeginChunked
+serial: 
+out: 197 bytes
+| HTTP/1.1 401 Unauthorized \n
+| Content-type:text/html; charset=utf-8\r\n
+| Transfer-Encoding: chunked\r\n
+| Connection: close\r\n
+| Cache-Control: no-cache, no-store, must-revalidate\r\n
+| Pragma: no-cache\r\n
+| Expires: 0\r\n
+| \r\n
+close: calls=1 at_byte=197 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=100 of 100
+== profile au-session+webhost
+trace:
+serial: 
+out: 162 bytes
+| HTTP/1.1 503 Service Unavailable\r\n
+| Retry-After: 10\r\n
+| Content-Type: application/json\r\n
+| Content-Length: 38\r\n
+| Connection: close\r\n
+| \r\n
+| {"ok":false,"err":"au_session_active"}
+close: calls=1 at_byte=162 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=100 of 100
+== profile password+session
+trace:
+  webTxBeginChunked
+serial: 
+out: 197 bytes
+| HTTP/1.1 401 Unauthorized \n
+| Content-type:text/html; charset=utf-8\r\n
+| Transfer-Encoding: chunked\r\n
+| Connection: close\r\n
+| Cache-Control: no-cache, no-store, must-revalidate\r\n
+| Pragma: no-cache\r\n
+| Expires: 0\r\n
+| \r\n
+close: calls=1 at_byte=197 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=100 of 100

@@ -1,0 +1,5 @@
+GET /config.json HTTP/1.1
+Host: 192.168.68.71
+User-Agent: curl/8.7.1
+Accept: */*
+

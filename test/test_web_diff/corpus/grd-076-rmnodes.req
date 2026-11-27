@@ -1,0 +1,4 @@
+POST /rmnodes HTTP/1.1
+Host: [fe80::1]:8080
+Origin: http://[fe80::1]:8080
+

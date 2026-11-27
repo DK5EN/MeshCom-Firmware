@@ -29,6 +29,7 @@
 #endif
 
 #include "gps_filter.h"
+#include "hex_digit.h"
 #include "alt_fusion.h"
 #include "pos_pipeline.h"
 #include "node_position.h"   // nodeSignedLat/Lon for SmartBeaconing (#1279)
@@ -203,14 +204,6 @@ static void nmeaCheckReset(struct NMEAframeCheck *nc)
     nc->len = 0;
 }
 
-static int nmeaHexVal(char ch)
-{
-    if(ch >= '0' && ch <= '9') return ch - '0';
-    if(ch >= 'A' && ch <= 'F') return ch - 'A' + 10;
-    if(ch >= 'a' && ch <= 'f') return ch - 'a' + 10;
-    return -1;
-}
-
 /// @return true, sobald ein vollstaendiger Satz mit gueltiger Pruefsumme endet
 static bool nmeaCheckFeed(struct NMEAframeCheck *nc, char ch)
 {
@@ -247,7 +240,7 @@ static bool nmeaCheckFeed(struct NMEAframeCheck *nc, char ch)
 
         case 2:
         {
-            int v = nmeaHexVal(ch);
+            int v = mcHexVal(ch);
             if(v < 0) { nc->state = 0; break; }
             nc->want = (uint8_t)(v << 4);
             nc->state = 3;
@@ -256,7 +249,7 @@ static bool nmeaCheckFeed(struct NMEAframeCheck *nc, char ch)
 
         case 3:
         {
-            int v = nmeaHexVal(ch);
+            int v = mcHexVal(ch);
             nc->state = 0;
             if(v < 0) break;
             nc->want = (uint8_t)(nc->want | v);

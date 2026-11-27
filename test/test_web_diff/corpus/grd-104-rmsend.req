@@ -1,0 +1,8 @@
+POST /rmsend HTTP/1.1
+Host: rebind.attacker.example
+Connection: keep-alive
+Content-Length: 40
+X-MC: 1
+Content-Type: application/json
+Origin: http://rebind.attacker.example
+

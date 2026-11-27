@@ -1,0 +1,5 @@
+GET /setparam/?display=on HTTP/1.1
+Host: 192.0.2.10
+Connection: keep-alive
+sec-ch-ua-platform: "macOS"
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like G

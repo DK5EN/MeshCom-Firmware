@@ -75,6 +75,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "../hex_digit.h"  // mcHexVal: the one hex-digit decoder of the firmware
+
 #ifndef WEB_GUARD_HEADER_MAX
 #define WEB_GUARD_HEADER_MAX 1023 // WEB_HEADER_MAX in web_functions.cpp
 #endif
@@ -166,10 +168,7 @@ inline bool contains(const char *h, size_t hn, const char *needle)
 
 inline bool isDigit(char c) { return c >= '0' && c <= '9'; }
 
-inline bool isHex(char c)
-{
-    return isDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-}
+inline bool isHex(char c) { return mcHexVal(c) >= 0; }
 
 // four decimal octets 0-255, 1-3 digits each, no leading zeros
 inline bool isIPv4(Span s)
@@ -483,13 +482,7 @@ inline bool isRmSetparam(const char *h, size_t n)
         }
         if (c == '%' && p + 2 < n && isHex(h[p + 1]) && isHex(h[p + 2]))
         {
-            int v = 0;
-            for (int k = 1; k <= 2; k++)
-            {
-                char d = lc(h[p + k]);
-                v = v * 16 + ((d >= '0' && d <= '9') ? d - '0' : d - 'a' + 10);
-            }
-            c = (char)v;
+            c = (char)(mcHexVal(h[p + 1]) * 16 + mcHexVal(h[p + 2]));
             p += 2;
         }
         if (nl >= sizeof(name) - 1)

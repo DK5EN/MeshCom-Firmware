@@ -1,0 +1,6 @@
+GET /setparam/?manualcommand=--info HTTP/1.1
+Host: 192.168.68.71
+User-Agent: curl/8.7.1
+Accept: */*
+X-MC: 1
+

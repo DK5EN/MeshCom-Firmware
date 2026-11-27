@@ -1,0 +1,2 @@
+GET /?sendmessage&tocall=9999&message=hi%20there HTTP/1.1
+

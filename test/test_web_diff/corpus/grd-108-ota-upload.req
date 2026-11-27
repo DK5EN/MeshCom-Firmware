@@ -1,0 +1,6 @@
+POST /ota/upload HTTP/1.1
+Host: dk5en-1.local
+Content-Length: 1234
+Content-Type: multipart/form-data; boundary=x
+X-MC: 1
+

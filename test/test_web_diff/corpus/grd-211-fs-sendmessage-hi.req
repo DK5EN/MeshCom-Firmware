@@ -1,0 +1,7 @@
+GET /?sendmessage=hi HTTP/1.1
+Host: 192.168.68.71
+Sec-Fetch-Site: Cross-Site
+X-MC: 1
+Sec-Fetch-Mode: cors
+Sec-Fetch-Dest: empty
+

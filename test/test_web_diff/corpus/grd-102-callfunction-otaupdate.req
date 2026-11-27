@@ -1,0 +1,4 @@
+GET /callfunction/?otaupdate HTTP/1.1
+Host: 192.168.68.71
+Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8
+

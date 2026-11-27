@@ -109,7 +109,7 @@ void sx126x_spectral_finish_scan()
  */
 uint16_t *sx126x_spectral_scan_freq(float freq, uint16_t samples)
 {
-  uint16_t *results = new uint16_t[RADIOLIB_SX126X_SPECTRAL_SCAN_RES_SIZE]; // initialize array with zeros, we will return the array containing zeros if anything goes wrong
+  uint16_t *results = new uint16_t[RADIOLIB_SX126X_SPECTRAL_SCAN_RES_SIZE](); // () value-initialises: zeros, we will return the array containing zeros if anything goes wrong
   if (radio.setFrequency(freq) == RADIOLIB_ERR_NONE)
   {
     // start spectral scan

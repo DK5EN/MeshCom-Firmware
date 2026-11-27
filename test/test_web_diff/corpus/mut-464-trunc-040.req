@@ -1,0 +1,2 @@
+GET /setparam/?display=on HTTP/1.1
+Host

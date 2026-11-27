@@ -1,0 +1,38 @@
+== profile open
+trace:
+  sub_config_download
+serial: 
+out: 0 bytes
+close: calls=1 at_byte=0 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=122 of 122
+== profile password
+trace:
+  deliver_scaffold password=1
+serial: 00:00:00 WEBServer no session IP:<192.0.2.77> show LOGIN\n
+out: 0 bytes
+close: calls=1 at_byte=0 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=122 of 122
+== profile au-session+webhost
+trace:
+serial: 
+out: 287 bytes
+| HTTP/1.1 503 Service Unavailable\r\n
+| Retry-After: 10\r\n
+| Content-Type: text/html; charset=utf-8\r\n
+| Content-Length: 154\r\n
+| Connection: close\r\n
+| \r\n
+| <!DOCTYPE html><meta charset=utf-8><meta http-equiv=refresh content=10><p>Update l\xc3\xa4uft, die Seite l\xc3\xa4dt in 10 s neu. / Update running, reloading in 10 s.
+close: calls=1 at_byte=287 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=122 of 122
+== profile password+session
+trace:
+  deliver_scaffold password=1
+serial: 00:00:00 WEBServer no session IP:<192.0.2.77> show LOGIN\n
+out: 0 bytes
+close: calls=1 at_byte=0 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=122 of 122

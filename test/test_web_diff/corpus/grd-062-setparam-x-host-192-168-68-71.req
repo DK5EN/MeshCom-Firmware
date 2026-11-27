@@ -1,0 +1,3 @@
+GET /setparam/?x=Host:192.168.68.71 HTTP/1.1
+Host: evil.com
+

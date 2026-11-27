@@ -672,6 +672,56 @@ static void test_webpwd_body(void)
     TEST_ASSERT_EQUAL_STRING("form", rmParseWebPwdBody(f.b).err);
 }
 
+// FORMAL-02: rmparse::decode (now urlDecode STRICT) against the frozen pre-refactor decoder, all strings of
+// 0..4 bytes over an alphabet that reaches every branch (no raw NUL: the old form was a C string).
+static bool frozen_decode(char *s)
+{
+    auto isHex = [](unsigned char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'); };
+    auto hexVal = [](unsigned char c) { return c <= '9' ? (unsigned)(c - '0') : (unsigned)((c | 0x20) - 'a' + 10); };
+    char *w = s;
+    for (const char *r = s; *r; r++)
+    {
+        unsigned char ch = (unsigned char)*r;
+        if (ch == '%' && isHex((unsigned char)r[1]) && isHex((unsigned char)r[2]))
+        {
+            ch = (unsigned char)(hexVal((unsigned char)r[1]) * 16 + hexVal((unsigned char)r[2]));
+            r += 2;
+        }
+        if (ch < 0x20 || ch == 0x7f)
+            return false;
+        *w++ = (char)ch;
+    }
+    *w = '\0';
+    return true;
+}
+
+static void test_decode_matches_frozen_decoder(void)
+{
+    static const unsigned char alpha[] = {'%', '+', '0', '2', '4', 'A', 'f', 'g', '"', '\r', 0x1F, 0x7F, 0x80, 'x'};
+    const size_t na = sizeof(alpha);
+    for (size_t n = 0; n <= 4; n++)
+    {
+        size_t total = 1;
+        for (size_t k = 0; k < n; k++)
+            total *= na;
+        for (size_t idx = 0; idx < total; idx++)
+        {
+            char a[8] = {0}, b[8] = {0};
+            size_t t = idx;
+            for (size_t k = 0; k < n; k++)
+            {
+                a[k] = b[k] = (char)alpha[t % na];
+                t /= na;
+            }
+            const bool ra = frozen_decode(a);
+            const bool rb = rmparse::decode(b);
+            TEST_ASSERT_EQUAL(ra, rb);
+            if (ra)
+                TEST_ASSERT_EQUAL_STRING(a, b);
+        }
+    }
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -689,5 +739,6 @@ int main(int, char **)
     RUN_TEST(test_leak_error_tokens_never_contain_canary);
     RUN_TEST(test_leak_positive_control);
     RUN_TEST(test_every_web_error_token_has_a_server_sentence);
+    RUN_TEST(test_decode_matches_frozen_decoder);
     return UNITY_END();
 }

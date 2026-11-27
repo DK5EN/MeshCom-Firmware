@@ -1,0 +1,6 @@
+GET /callfunction/?%0D%0A=%0D%0A HTTP/1.1
+Host: 192.0.2.10
+User-Agent: curl/8.7.1
+Accept: */*
+X-MC: 1
+

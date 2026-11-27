@@ -1,0 +1,6 @@
+GET /setparam/?manualcommand=--reboot HTTP/1.1
+Host: 192.168.68.71
+Sec-Fetch-Site: cross-site
+Sec-Fetch-Mode: no-cors
+Sec-Fetch-Dest: image
+

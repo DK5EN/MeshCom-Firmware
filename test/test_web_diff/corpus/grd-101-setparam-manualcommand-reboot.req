@@ -1,0 +1,5 @@
+GET /setparam/?manualcommand=--reboot HTTP/1.1
+Host: dk5en-1.local
+Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8
+Referer: http://attacker.example/
+

@@ -1,0 +1,2 @@
+GET /getparam/?gateway HTTP/1.1x
+

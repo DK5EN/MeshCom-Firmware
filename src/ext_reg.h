@@ -27,6 +27,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "hex_digit.h"
+
 // BLE_JSON_PAYLOAD_MAX (configuration_global.h) is 244; command_functions.cpp
 // / extudp_functions.cpp static_assert that it does not exceed this.
 #define EXT_REG_PAYLOAD_MAX 244
@@ -217,17 +219,13 @@ static inline void extRegString(ExtRegCur &c, char *key, size_t keycap, bool *kt
                     char h = c.s[c.i++];
                     extRegPut(c, h);
                     v <<= 4;
-                    if (h >= '0' && h <= '9')
-                        v |= (unsigned)(h - '0');
-                    else if (h >= 'a' && h <= 'f')
-                        v |= (unsigned)(h - 'a' + 10);
-                    else if (h >= 'A' && h <= 'F')
-                        v |= (unsigned)(h - 'A' + 10);
-                    else
+                    const int hv = mcHexVal(h);
+                    if (hv < 0)
                     {
                         c.ok = false;
                         return;
                     }
+                    v |= (unsigned)hv;
                 }
                 dec = (v >= 0x20 && v < 0x80) ? (char)v : '?';
             }

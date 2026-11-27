@@ -1,0 +1,5 @@
+GET / HTTP/1.1
+Host: evil.com
+Sec-Fetch-Site: cross-site
+Sec-Fetch-Dest: document
+

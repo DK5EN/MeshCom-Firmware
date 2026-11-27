@@ -31,6 +31,7 @@
 // consumes a decoded aprsMessage, not bytes off the radio.
 #include "mc_text.h"
 #include "test_inject.h"
+#include "hex_digit.h"
 
 #if MC_INJECT_HOOKS
 
@@ -70,15 +71,6 @@ unsigned int nextInjectMsgId()
 
 // --- TM-06(a): raw-frame RX injection --------------------------------------
 
-// One hex digit -> nibble value, or -1 if not a hex digit.
-int hexNibble(char c)
-{
-    if(c >= '0' && c <= '9') return c - '0';
-    if(c >= 'a' && c <= 'f') return c - 'a' + 10;
-    if(c >= 'A' && c <= 'F') return c - 'A' + 10;
-    return -1;
-}
-
 // Standalone hex-string parser: `hex` must be an even-length string of hex
 // digits decoding to <= outCap bytes. Writes the decoded bytes to `out` and
 // the byte count to `outLen`. Returns false (out/outLen untouched) on an
@@ -95,8 +87,8 @@ bool parseHexBytes(const char *hex, uint8_t *out, size_t outCap, size_t *outLen)
 
     for(size_t i = 0; i < blen; i++)
     {
-        int hi = hexNibble(hex[2 * i]);
-        int lo = hexNibble(hex[2 * i + 1]);
+        int hi = mcHexVal(hex[2 * i]);
+        int lo = mcHexVal(hex[2 * i + 1]);
         if(hi < 0 || lo < 0)
             return false;
         out[i] = (uint8_t)((hi << 4) | lo);

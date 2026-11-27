@@ -1,0 +1,4 @@
+POST /rmpasswd HTTP/1.1
+Host: DK5EN-1.local
+Origin: http://dk5en-1.local
+

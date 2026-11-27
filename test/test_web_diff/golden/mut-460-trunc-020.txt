@@ -1,0 +1,28 @@
+== profile open
+trace:
+serial: 
+out: 0 bytes
+close: calls=0 at_byte=0 flush_calls=0
+clock: elapsed_ms=2002 idle_polls=2002
+input: consumed=20 of 20
+== profile password
+trace:
+serial: 
+out: 0 bytes
+close: calls=0 at_byte=0 flush_calls=0
+clock: elapsed_ms=2002 idle_polls=2002
+input: consumed=20 of 20
+== profile au-session+webhost
+trace:
+serial: 
+out: 0 bytes
+close: calls=0 at_byte=0 flush_calls=0
+clock: elapsed_ms=2002 idle_polls=2002
+input: consumed=20 of 20
+== profile password+session
+trace:
+serial: 
+out: 0 bytes
+close: calls=0 at_byte=0 flush_calls=0
+clock: elapsed_ms=2002 idle_polls=2002
+input: consumed=20 of 20

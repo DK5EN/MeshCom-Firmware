@@ -16,6 +16,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "hex_digit.h"
+
 // Receives decoded payload bytes; false refuses them (the decode then fails).
 typedef bool (*FwSinkFn)(void *ctx, const uint8_t *d, size_t n);
 
@@ -33,17 +35,6 @@ struct FwChunkDec
     uint8_t st = SIZE;
     uint8_t digits = 0;
     uint32_t rem = 0;
-
-    static int hexv(uint8_t c)
-    {
-        if (c >= '0' && c <= '9')
-            return c - '0';
-        if (c >= 'a' && c <= 'f')
-            return c - 'a' + 10;
-        if (c >= 'A' && c <= 'F')
-            return c - 'A' + 10;
-        return -1;
-    }
 
     // 0 = need more input, 1 = final chunk seen, -1 = malformed or the sink refused.
     // After 1 or -1 the decoder is finished; further input is ignored (1) or must not
@@ -96,7 +87,7 @@ struct FwChunkDec
                 }
                 else
                 {
-                    const int v = hexv(c);
+                    const int v = mcHexVal((char)c);
                     if (v < 0 || ++digits > 8)
                         return -1;
                     rem = (rem << 4) | (uint32_t)v;

@@ -26,9 +26,23 @@
  */
 
 #include <stddef.h>
+#include <stdint.h>
 
 /** Decodes buf[0..len) in place and NUL-terminates it (buf needs len+1
  *  bytes). Returns the new length, which is never larger than len. */
 size_t url_percent_decode(char *buf, size_t len);
+
+/** Policies of urlDecode(). LEGACY is the rule set above (WebUI query values);
+ *  STRICT is the Remote-page form decoder: '+' stays a literal '+', %22 is
+ *  kept, a raw control byte or DEL or a decoded one (also %00) rejects the
+ *  whole value. A TRUNC policy (cap on a UTF-8 boundary) is planned for
+ *  webFieldDecode, not here. */
+enum : uint8_t { URLD_LEGACY = 0, URLD_STRICT = 1 };
+
+/** In place on buf[0..len), NUL at buf[ret] (buf needs len+1 bytes). Returns
+ *  the new length (<= len); STRICT returns (size_t)-1 on a reject (the buffer
+ *  content is then unspecified). Any policy value other than URLD_STRICT
+ *  behaves as URLD_LEGACY. url_percent_decode(b, n) == urlDecode(b, n, URLD_LEGACY). */
+size_t urlDecode(char *buf, size_t len, uint8_t policy);
 
 #endif

@@ -1,0 +1,8 @@
+POST /config HTTP/1.1
+Host: 192.0.2.10
+User-Agent: curl/8.7.1
+Accept: */*
+X-MC: 1
+Content-Length:
+
+dst=DK5EN-99&pw=x&cmd=mh&args=5

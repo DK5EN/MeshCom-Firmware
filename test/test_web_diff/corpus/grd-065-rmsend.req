@@ -1,0 +1,7 @@
+POST /rmsend HTTP/1.1
+Host: 192.168.68.71
+Content-Length: 40
+Content-Type: text/plain
+Origin: http://attacker.com
+Referer: http://attacker.com/x
+

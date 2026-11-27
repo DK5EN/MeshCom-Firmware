@@ -65,7 +65,7 @@
 #endif
 #include "web_auth.h"           // WEB-AUTH-01: nonce login + cookie sessions
 #include "web_guard.h"          // RM GUI W1c: Host allowlist (DNS rebinding) and Sec-Fetch-Site (CSRF), header-only
-#include "web_rm_util.h"       // RM GUI G1: rm_wipe / rm_wipe_string / rm_form_decode / rm_json_str shared with web_rm_page.cpp
+#include "web_rm_util.h"       // RM GUI G1: rm_wipe / rm_wipe_string / rm_json_str shared with web_rm_page.cpp
 #include "web_rm_page.h"       // RM GUI W2b: sub_page_remote(), rmScaffoldJs()
 #include "web_rm_handlers.h"   // RM GUI W2a: /rmpasswd, /rmnodes, /rmheard, rmSendBySlot()
 #include "web_rm_parse.h"      // RM GUI W2a: rmParseSendBody()
@@ -1545,11 +1545,11 @@ void work_webpage(void)
  * ###########################################################################################################################
  * decodes Percent-Coded Strings (e.g. URLs and its parameters)
  */
-String decodeURLPercentCoding(String input)
+String decodeURLPercentCoding(const String &input)
 {
     // #1173: full UTF-8 decode instead of a fixed list of escapes -- see url_decode.h
     std::vector<char> buf(input.c_str(), input.c_str() + input.length() + 1);
-    url_percent_decode(buf.data(), input.length()); // NUL-terminates, drops %00
+    urlDecode(buf.data(), input.length(), URLD_LEGACY); // NUL-terminates, drops %00
     return String(buf.data());
 }
 
@@ -4098,6 +4098,8 @@ void sub_page_spectrum()
                     web_client.printf("<rect width=\"%d\" height=\"%d\" x=\"%d\" y=\"%d\" fill=\"rgba(0,0,0,%0.3f)\"/>", step_pixel_width, step_pixel_height, start_x + (current_fStep * step_pixel_width), start_y + (i * step_pixel_height), alpha);
                 }
             }
+
+            delete[] res; // WEB-SPECTRUM-LEAK-01: sx126x_spectral_scan_freq() returns a new[] array per step
 
             // draw scale values
             if (current_fStep % 5 == 0)                                                                                                                                                                                                      // draw axis line every 5 steps

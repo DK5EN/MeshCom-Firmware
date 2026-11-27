@@ -4191,6 +4191,29 @@
   ],
   "test_framework": "unity"
  },
+ "env:native_hex_digit": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-I src",
+   "-Wall",
+   "-Wextra"
+  ],
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
+  ],
+  "platform": "native",
+  "test_build_src": "False",
+  "test_filter": [
+   "test_hex_digit"
+  ],
+  "test_framework": "unity"
+ },
  "env:native_hmac_sha256": {
   "build_flags": [
    "-std=gnu++17",
@@ -5285,6 +5308,10 @@
    "-Wall",
    "-Wextra"
   ],
+  "build_src_filter": [
+   "-<*>",
+   "+<url_decode.cpp>"
+  ],
   "extra_scripts": [
    "pre:tools/mc_build_defines.py",
    "pre:tools/nimble_patch.py",
@@ -5293,7 +5320,7 @@
    "pre:tools/lwip_wrap.py"
   ],
   "platform": "native",
-  "test_build_src": "False",
+  "test_build_src": "True",
   "test_filter": [
    "test_rm_web_parse"
   ],
@@ -6124,6 +6151,48 @@
   "test_build_src": "False",
   "test_filter": [
    "test_web_coord"
+  ],
+  "test_framework": "unity"
+ },
+ "env:native_web_diff": {
+  "build_flags": [
+   "-std=gnu++17",
+   "-D NATIVE_BUILD=1",
+   "-D UNIT_TEST=1",
+   "-D ENABLE_MSGSTORE=1",
+   "-D OLED_SHOT_WEB=1",
+   "-D CONFIG_JSON_MAX=6144",
+   "-I test/test_web_diff/stubs",
+   "-I test/support",
+   "-I src",
+   "-I src/web_functions",
+   "-Wall",
+   "-Wextra",
+   "-g",
+   "-fsanitize=address,undefined",
+   "-fno-omit-frame-pointer"
+  ],
+  "build_src_filter": [
+   "-<*>",
+   "+<hmac_sha256.cpp>",
+   "+<web_functions/web_auth.cpp>",
+   "+<charset_filter.cpp>"
+  ],
+  "build_type": "debug",
+  "extra_scripts": [
+   "pre:tools/mc_build_defines.py",
+   "pre:tools/nimble_patch.py",
+   "pre:tools/w5100s_patch.py",
+   "pre:tools/arduino_esp32_patch.py",
+   "pre:tools/lwip_wrap.py"
+  ],
+  "lib_deps": [
+   "bblanchon/ArduinoJson@^7.4.3"
+  ],
+  "platform": "native",
+  "test_build_src": "True",
+  "test_filter": [
+   "test_web_diff"
   ],
   "test_framework": "unity"
  },

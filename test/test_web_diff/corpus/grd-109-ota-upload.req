@@ -1,0 +1,5 @@
+POST /ota/upload HTTP/1.1
+Host: 192.168.68.75
+Content-Length: 99
+X-MC: 1
+

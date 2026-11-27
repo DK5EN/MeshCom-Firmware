@@ -1,0 +1,60 @@
+== profile open
+trace:
+serial: 
+out: 177 bytes
+| HTTP/1.1 200 OK\r\n
+| Content-type:application/javascript\r\n
+| Content-Encoding: gzip\r\n
+| Content-Length: 7\r\n
+| Cache-Control: public, max-age=31536000, immutable\r\n
+| Connection: close\r\n
+| \r\n
+| JS\x00GZ\x02\x02
+close: calls=1 at_byte=177 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=407 of 407
+== profile password
+trace:
+serial: 
+out: 177 bytes
+| HTTP/1.1 200 OK\r\n
+| Content-type:application/javascript\r\n
+| Content-Encoding: gzip\r\n
+| Content-Length: 7\r\n
+| Cache-Control: public, max-age=31536000, immutable\r\n
+| Connection: close\r\n
+| \r\n
+| JS\x00GZ\x02\x02
+close: calls=1 at_byte=177 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=407 of 407
+== profile au-session+webhost
+trace:
+serial: 
+out: 177 bytes
+| HTTP/1.1 200 OK\r\n
+| Content-type:application/javascript\r\n
+| Content-Encoding: gzip\r\n
+| Content-Length: 7\r\n
+| Cache-Control: public, max-age=31536000, immutable\r\n
+| Connection: close\r\n
+| \r\n
+| JS\x00GZ\x02\x02
+close: calls=1 at_byte=177 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=407 of 407
+== profile password+session
+trace:
+serial: 
+out: 177 bytes
+| HTTP/1.1 200 OK\r\n
+| Content-type:application/javascript\r\n
+| Content-Encoding: gzip\r\n
+| Content-Length: 7\r\n
+| Cache-Control: public, max-age=31536000, immutable\r\n
+| Connection: close\r\n
+| \r\n
+| JS\x00GZ\x02\x02
+close: calls=1 at_byte=177 flush_calls=0
+clock: elapsed_ms=0 idle_polls=0
+input: consumed=407 of 407

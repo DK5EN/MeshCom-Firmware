@@ -1,0 +1,16 @@
+GET /?page=neighbours HTTP/1.1
+Host: 192.0.2.10
+Connection: keep-alive
+sec-ch-ua-platform: "macOS"
+X-MC: 1
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36
+sec-ch-ua: "Chromium";v="158", "Not.A/Brand";v="24", "Google Chrome";v="158"
+sec-ch-ua-mobile: ?0
+Accept: */*
+Sec-Fetch-Site: same-origin
+Sec-Fetch-Mode: cors
+Sec-Fetch-Dest: empty
+Referer: http://192.0.2.10/
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: de,en;q=0.9,en-US;q=0.8
+

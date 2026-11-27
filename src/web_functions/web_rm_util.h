@@ -27,27 +27,6 @@ static inline void rm_wipe_string(String &s)
     s = "";
 }
 
-/** decodes %XX in place (the page sends encodeURIComponent(); '+' stays a literal '+'); false on a control byte */
-static inline bool rm_form_decode(char *s)
-{
-    char *w = s;
-    for (const char *r = s; *r; r++)
-    {
-        unsigned char ch = (unsigned char)*r;
-        if (ch == '%' && isxdigit((unsigned char)r[1]) && isxdigit((unsigned char)r[2]))
-        {
-            const char h[3] = {r[1], r[2], 0};
-            ch = (unsigned char)strtoul(h, nullptr, 16);
-            r += 2;
-        }
-        if (ch < 0x20 || ch == 0x7f)
-            return false;
-        *w++ = (char)ch;
-    }
-    *w = '\0';
-    return true;
-}
-
 /** writes a JSON string literal of printable ASCII only; < > & as \u escapes, anything else '?' */
 static inline void rm_json_str(const char *in)
 {

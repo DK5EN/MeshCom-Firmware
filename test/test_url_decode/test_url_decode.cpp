@@ -8,6 +8,7 @@
 
 #include <unity.h>
 
+#include <stdint.h>
 #include <string.h>
 
 #include <url_decode.h>
@@ -112,6 +113,220 @@ static void test_empty_and_null(void)
     TEST_ASSERT_EQUAL_size_t(0, url_percent_decode(nullptr, 5));
 }
 
+// ---- FORMAL-02: urlDecode policies against the frozen pre-refactor decoders ------------------------
+// Frozen copy of url_percent_decode as of 3b1ce88f (do not edit).
+namespace frozen
+{
+static int hex_value(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    return -1;
+}
+static int escape_at(const char *buf, size_t len, size_t i)
+{
+    if (i + 2 >= len || buf[i] != '%')
+        return -1;
+    int hi = hex_value(buf[i + 1]);
+    int lo = hex_value(buf[i + 2]);
+    if (hi < 0 || lo < 0)
+        return -1;
+    return (hi << 4) | lo;
+}
+static size_t legacy(char *buf, size_t len)
+{
+    if (buf == nullptr)
+        return 0;
+    size_t in = 0, out = 0;
+    while (in < len)
+    {
+        char c = buf[in];
+        if (c == '+')
+        {
+            buf[out++] = ' ';
+            in++;
+            continue;
+        }
+        int b = escape_at(buf, len, in);
+        if (b < 0)
+        {
+            buf[out++] = c;
+            in++;
+            continue;
+        }
+        in += 3;
+        if (b == 0x0D && escape_at(buf, len, in) == 0x0A)
+        {
+            buf[out++] = '-';
+            in += 3;
+        }
+        else if (b == '"' || b < 0x20 || b == 0x7F)
+        {
+        }
+        else
+            buf[out++] = (char)b;
+    }
+    buf[out] = '\0';
+    return out;
+}
+// Frozen rmparse::decode (web_rm_parse.h) on a NUL string; (size_t)-1 = reject.
+static bool isHex(unsigned char c)
+{
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+static unsigned hexVal(unsigned char c)
+{
+    return c <= '9' ? (unsigned)(c - '0') : (unsigned)((c | 0x20) - 'a' + 10);
+}
+static bool strict(char *s)
+{
+    char *w = s;
+    for (const char *r = s; *r; r++)
+    {
+        unsigned char ch = (unsigned char)*r;
+        if (ch == '%' && isHex((unsigned char)r[1]) && isHex((unsigned char)r[2]))
+        {
+            ch = (unsigned char)(hexVal((unsigned char)r[1]) * 16 + hexVal((unsigned char)r[2]));
+            r += 2;
+        }
+        if (ch < 0x20 || ch == 0x7f)
+            return false;
+        *w++ = (char)ch;
+    }
+    *w = '\0';
+    return true;
+}
+} // namespace frozen
+
+// Compares both policies with the frozen decoders on one input of n bytes (no raw NUL inside for STRICT,
+// whose old form was a C string).
+static void diff_one(const unsigned char *in, size_t n)
+{
+    char a[80], b[80];
+    memset(a, 0x55, sizeof(a));
+    memset(b, 0x55, sizeof(b));
+    memcpy(a, in, n);
+    memcpy(b, in, n);
+    const size_t ra = frozen::legacy(a, n);
+    const size_t rb = urlDecode(b, n, URLD_LEGACY);
+    TEST_ASSERT_EQUAL_size_t(ra, rb);
+    TEST_ASSERT_EQUAL_MEMORY(a, b, ra + 1);
+    memset(b, 0x55, sizeof(b));
+    memcpy(b, in, n);
+    TEST_ASSERT_EQUAL_size_t(ra, url_percent_decode(b, n));
+    TEST_ASSERT_EQUAL_MEMORY(a, b, ra + 1);
+
+    bool has_nul = false;
+    for (size_t i = 0; i < n; i++)
+        has_nul |= (in[i] == 0);
+    if (!has_nul)
+    {
+        memset(a, 0x55, sizeof(a));
+        memset(b, 0x55, sizeof(b));
+        memcpy(a, in, n);
+        memcpy(b, in, n);
+        a[n] = b[n] = '\0';
+        const bool ok = frozen::strict(a);
+        const size_t r = urlDecode(b, n, URLD_STRICT);
+        TEST_ASSERT_EQUAL(ok, r != (size_t)-1);
+        if (ok)
+        {
+            TEST_ASSERT_EQUAL_size_t(strlen(a), r);
+            TEST_ASSERT_EQUAL_MEMORY(a, b, r + 1);
+        }
+    }
+}
+
+// Every string of 0..5 bytes over a 17-symbol alphabet that hits each branch (about 1.5M), plus every single byte.
+static void test_policies_exhaustive_short(void)
+{
+    static const unsigned char alpha[] = {'%', '+', '0', '2', 'A', 'f', 'g', 'D', 'a', '"', '\r', '\n', 0x00, 0x1F, 0x7F, 0x80, 'x'};
+    const size_t na = sizeof(alpha);
+    unsigned char in[5];
+    size_t cases = 0;
+    for (int v = 0; v < 256; v++)
+    {
+        in[0] = (unsigned char)v;
+        diff_one(in, 1);
+        cases++;
+    }
+    for (size_t n = 0; n <= 5; n++)
+    {
+        size_t total = 1;
+        for (size_t k = 0; k < n; k++)
+            total *= na;
+        for (size_t idx = 0; idx < total; idx++)
+        {
+            size_t t = idx;
+            for (size_t k = 0; k < n; k++)
+            {
+                in[k] = alpha[t % na];
+                t /= na;
+            }
+            diff_one(in, n);
+            cases++;
+        }
+    }
+    TEST_ASSERT_TRUE(cases > 1000000 / 2);
+}
+
+// 3-byte strings: first two bytes over all 256 values, third byte filtered (multiples of 7 plus % F 0 CR LF).
+static void test_policies_all_three_byte_inputs(void)
+{
+    unsigned char in[3];
+    for (int a = 0; a < 256; a++)
+        for (int b = 0; b < 256; b++)
+            for (int c = 0; c < 256; c += 1)
+            {
+                if (c % 7 != 0 && c != '%' && c != 'F' && c != '0' && c != 0x0A && c != 0x0D)
+                    continue;
+                in[0] = (unsigned char)a;
+                in[1] = (unsigned char)b;
+                in[2] = (unsigned char)c;
+                diff_one(in, 3);
+            }
+}
+
+// Random longer inputs, escape-heavy alphabet and fully random bytes (fixed seed).
+static void test_policies_random_long(void)
+{
+    static const unsigned char alpha[] = {'%', '%', '+', '0', '1', '2', '2', 'A', 'D', 'a', 'F', 'f', 'g', '"', '\r', '\n', 0x00, 0x7F, 0xC4, 0x85, 'x', ' '};
+    uint32_t st = 0x12345678u;
+    auto rnd = [&st]() { st = st * 1664525u + 1013904223u; return st >> 8; };
+    unsigned char in[64];
+    for (int it = 0; it < 200000; it++)
+    {
+        const size_t n = rnd() % 61;
+        const bool heavy = (rnd() & 1) != 0;
+        for (size_t k = 0; k < n; k++)
+            in[k] = heavy ? alpha[rnd() % sizeof(alpha)] : (unsigned char)rnd();
+        diff_one(in, n);
+    }
+}
+
+static void test_urldecode_null_and_unknown_policy(void)
+{
+    TEST_ASSERT_EQUAL_size_t(0, urlDecode(nullptr, 3, URLD_STRICT));
+    char b[8] = "a+%41";
+    TEST_ASSERT_EQUAL_size_t(3, urlDecode(b, 5, 77)); // unknown policy = LEGACY
+    TEST_ASSERT_EQUAL_STRING("a A", b);
+}
+
+static void test_strict_policy_table(void)
+{
+    char b[32] = "a+b%22%41";
+    TEST_ASSERT_EQUAL_size_t(5, urlDecode(b, 9, URLD_STRICT)); // '+' literal, %22 kept
+    TEST_ASSERT_EQUAL_STRING("a+b\"A", b);
+    char c[8] = "a%00";
+    TEST_ASSERT_EQUAL_size_t((size_t)-1, urlDecode(c, 4, URLD_STRICT));
+    char d[8] = "%0D%0A";
+    TEST_ASSERT_EQUAL_size_t((size_t)-1, urlDecode(d, 6, URLD_STRICT));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -129,5 +344,10 @@ int main(void)
     RUN_TEST(test_reserved_ascii_decode);
     RUN_TEST(test_plain_text_unchanged);
     RUN_TEST(test_empty_and_null);
+    RUN_TEST(test_policies_exhaustive_short);
+    RUN_TEST(test_policies_all_three_byte_inputs);
+    RUN_TEST(test_policies_random_long);
+    RUN_TEST(test_urldecode_null_and_unknown_policy);
+    RUN_TEST(test_strict_policy_table);
     return UNITY_END();
 }

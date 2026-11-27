@@ -1,0 +1,2 @@
+GET /setparam/?onewire=on HTTP/1.0
+

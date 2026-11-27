@@ -17,7 +17,7 @@ void stopWebserver();
 
 
 // Common functions
-String decodeURLPercentCoding(String input);
+String decodeURLPercentCoding(const String &input);
 void work_webpage(void);
 
 
