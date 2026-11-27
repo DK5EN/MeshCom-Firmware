@@ -119,6 +119,7 @@ def generate():
     ]
     segs["asset"] = [seg_func(WF, wf, r"^static bool deliver_web_asset\(", "deliver_web_asset")]
     segs["rest"] = [
+        seg_func(WF, wf, r"^WebHeadAcc \*web_head_acc_get\(", "web_head_acc_get"),
         seg_func(WF, wf, r"^void work_webpage\(", "work_webpage"),
         seg_func(WF, wf, r"^String decodeURLPercentCoding\(", "decodeURLPercentCoding"),
         seg_func(WF, wf, r"^void send_http_header\(", "send_http_header"),
@@ -148,7 +149,13 @@ def generate():
     body.append("// Do not edit: functions are cut out by name, the only change is the entry-point rename (*_live) and the namespace.\n")
     body.append("// Regenerate after every edit of an extracted function:  python3 test/test_web_diff/live/extract_live.py\n")
     body.append("// Everything outside the marked ranges is this file's own plumbing, read from frozen/extract.sh.\n")
-    body.append(ren(pre.replace("web_frozen", "web_live").replace("_frozen", "_live")) + "\n")
+    live_pre = pre.replace("web_frozen", "web_live").replace("_frozen", "_live")
+    # web_functions.cpp includes web_request.h itself (the head accumulator); the plumbing copies the
+    # includes of the frozen unit, so the live unit adds it next to web_functions.h (outside the namespace)
+    if live_pre.count("#include <web_functions.h>") != 1:
+        die("plumbing of frozen/extract.sh: expected exactly one #include <web_functions.h>")
+    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>")
+    body.append(ren(live_pre) + "\n")
     body.append("size_t urlDecode_live(char *buf, size_t len, uint8_t policy); // own plumbing: the live decoder (url_decode_live.cpp)\n")
     for s in segs["pre"]:
         body.append(seg(s))

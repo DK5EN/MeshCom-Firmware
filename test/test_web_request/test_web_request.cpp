@@ -272,7 +272,7 @@ static void test_corpus_request_line_split(void)
         size_t nl = w.find('\n');
         if (nl == std::string::npos)
         {
-            TEST_ASSERT_EQUAL_INT(WP_BAD_REQUEST_LINE, pr);
+            TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, pr);
             continue;
         }
         std::string rl = w.substr(0, nl);
@@ -556,7 +556,7 @@ static void test_parse_methods(void)
         P(std::string(t[i].m) + " /x HTTP/1.1\r\n\r\n", &q);
         TEST_ASSERT_EQUAL_INT_MESSAGE(t[i].want, q.method, t[i].m);
     }
-    TEST_ASSERT_EQUAL_INT(WP_OK, P("GET /x HTTP/1.1\r\nHost: h\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, P("GET /x HTTP/1.1\r\nHost: h\r\n\r\n", &q));
     TEST_ASSERT_EQUAL_INT(WM_GET, q.method);
     TEST_ASSERT_EQUAL_INT(1, q.minor);
 }
@@ -564,31 +564,31 @@ static void test_parse_methods(void)
 static void test_parse_versions(void)
 {
     WebReq q;
-    TEST_ASSERT_EQUAL_INT(WP_OK, P("GET /x HTTP/1.0\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, P("GET /x HTTP/1.0\r\n\r\n", &q));
     TEST_ASSERT_EQUAL_INT(0, q.minor);
-    TEST_ASSERT_EQUAL_INT(WP_OK, P("GET /x HTTP/1.1\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, P("GET /x HTTP/1.1\r\n\r\n", &q));
     TEST_ASSERT_EQUAL_INT(1, q.minor);
-    TEST_ASSERT_EQUAL_INT(WP_OK, P("GET /x HTTP/1.1\n\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, P("GET /x HTTP/1.1\n\n", &q));
     for (const char *v : {"HTTP/1.2", "HTTP/2.0", "HTTP/2", "HTTP/0.9", "http/1.1", "HTTP/1.11", "HTTP/1.", "HTTP/1.1 ",
                           "HTTP/1.1x", "HTTP", "1.1", "x"})
     {
-        TEST_ASSERT_EQUAL_INT_MESSAGE(WP_BAD_VERSION, P(std::string("GET /x ") + v + "\r\n\r\n", &q), v);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(WRQ_BAD_VERSION, P(std::string("GET /x ") + v + "\r\n\r\n", &q), v);
     }
     // no version at all: "GET /x"
-    TEST_ASSERT_EQUAL_INT(WP_BAD_VERSION, P("GET /x\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_VERSION, P("GET /x\r\n\r\n", &q));
     TEST_ASSERT_EQUAL_UINT(0, q.target.n); // today's split: no target without a second space
     // no space, nothing, no line end
-    TEST_ASSERT_EQUAL_INT(WP_BAD_REQUEST_LINE, P("GET\r\n\r\n", &q));
-    TEST_ASSERT_EQUAL_INT(WP_BAD_REQUEST_LINE, P("\r\n\r\n", &q));
-    TEST_ASSERT_EQUAL_INT(WP_BAD_REQUEST_LINE, P("", &q));
-    TEST_ASSERT_EQUAL_INT(WP_BAD_REQUEST_LINE, P("GET /x HTTP/1.1", &q)); // never terminated
-    TEST_ASSERT_EQUAL_INT(WP_BAD_REQUEST_LINE, P(" /x HTTP/1.1\r\n\r\n", &q));
-    TEST_ASSERT_EQUAL_INT(WP_BAD_REQUEST_LINE, P("GET  HTTP/1.1\r\n\r\n", &q)); // empty target
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("GET\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("GET /x HTTP/1.1", &q)); // never terminated
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P(" /x HTTP/1.1\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("GET  HTTP/1.1\r\n\r\n", &q)); // empty target
     // the version is after the LAST space: a target with a space keeps the split of web_guard.h
-    TEST_ASSERT_EQUAL_INT(WP_OK, P("GET /a b HTTP/1.1\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, P("GET /a b HTTP/1.1\r\n\r\n", &q));
     TEST_ASSERT_EQUAL_STRING("/a b", S(q.target).c_str());
     // NULL buffer
-    TEST_ASSERT_EQUAL_INT(WP_BAD_REQUEST_LINE, webReqParse(NULL, 0, false, &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, webReqParse(NULL, 0, false, &q));
 }
 
 static void test_parse_target_split(void)
@@ -620,7 +620,7 @@ static void test_parse_target_split(void)
     TEST_ASSERT_EQUAL_INT(1, q.host_n);
     TEST_ASSERT_EQUAL_STRING("good", S(q.host).c_str());
     // bare LF line ends, CR before LF stripped from the version
-    TEST_ASSERT_EQUAL_INT(WP_OK, P("POST /rmsend?a=b HTTP/1.1\nHost: h\n\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, P("POST /rmsend?a=b HTTP/1.1\nHost: h\n\n", &q));
     TEST_ASSERT_EQUAL_INT(WM_POST, q.method);
 }
 
@@ -644,7 +644,7 @@ static void test_parse_cut_and_len(void)
     TEST_ASSERT_TRUE(q.target.p + q.target.n <= g_in.data() + WEB_HEAD_MAX);
     // len is honoured, not the NUL: "Host" hidden behind len
     const char raw[] = "GET /x HTTP/1.1\r\nHost: h\r\n\r\n";
-    TEST_ASSERT_EQUAL_INT(WP_OK, webReqParse(raw, 18, false, &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, webReqParse(raw, 18, false, &q));
     TEST_ASSERT_EQUAL_INT(0, q.host_n);
     // every prefix of a request: no read past len (ASan) and spans inside
     const std::string full = "POST /rmsend?a=1 HTTP/1.1\r\nHost: h\r\nOrigin: http://h\r\nX-MC: 1\r\nContent-Length: 5\r\n\r\n";
@@ -732,7 +732,7 @@ static void test_parse_header_facts(void)
     // a bad request line still reports blank, the facts are filled as far as possible
     P("BADLINE\r\nHost: a\r\n\r\n", &q);
     TEST_ASSERT_EQUAL_UINT8(1, q.blank);
-    TEST_ASSERT_EQUAL_INT(WP_BAD_REQUEST_LINE, webReqParse(NULL, 0, false, &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, webReqParse(NULL, 0, false, &q));
     TEST_ASSERT_EQUAL_UINT8(0, q.blank);
     // counts saturate
     std::string many = base;
@@ -780,7 +780,7 @@ static void test_b6_strict(void)
         TEST_ASSERT_EQUAL_INT_MESSAGE(t[i].strict, sv, t[i].v);
         WebReq q;
         const WebParseRes pr = P(req, &q);
-        TEST_ASSERT_EQUAL_INT_MESSAGE(t[i].strict < 0 ? WP_BAD_CONTENT_LENGTH : WP_OK, pr, t[i].v);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(t[i].strict < 0 ? WRQ_BAD_CONTENT_LENGTH : WRQ_OK, pr, t[i].v);
         TEST_ASSERT_EQUAL_INT_MESSAGE(t[i].strict, q.content_length, t[i].v);
     }
 }
@@ -792,7 +792,7 @@ static void test_b6_duplicates(void)
     std::string r = "POST /x HTTP/1.1\r\nContent-Length: 5\r\nContent-Length: 5\r\n\r\n";
     TEST_ASSERT_EQUAL_INT(5, strict_acc(r, &bad));
     TEST_ASSERT_FALSE(bad);
-    TEST_ASSERT_EQUAL_INT(WP_OK, P(r, &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, P(r, &q));
     r = "POST /x HTTP/1.1\r\nContent-Length: 5\r\ncontent-length: 05\r\n\r\n";
     strict_acc(r, &bad);
     TEST_ASSERT_FALSE(bad); // same value, other spelling
@@ -800,7 +800,7 @@ static void test_b6_duplicates(void)
     TEST_ASSERT_EQUAL_INT(5, strict_acc(r, &bad));
     TEST_ASSERT_TRUE(bad);
     TEST_ASSERT_EQUAL_INT(5, webHeadContentLength(g_acc)); // lenient: first wins, as today
-    TEST_ASSERT_EQUAL_INT(WP_BAD_CONTENT_LENGTH, P(r, &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_CONTENT_LENGTH, P(r, &q));
     TEST_ASSERT_EQUAL_INT(5, q.content_length);
     r = "POST /x HTTP/1.1\r\nContent-Length: 5\r\nContent-Length: x\r\n\r\n";
     strict_acc(r, &bad);
@@ -809,7 +809,7 @@ static void test_b6_duplicates(void)
     strict_acc(r, &bad);
     TEST_ASSERT_TRUE(bad);
     TEST_ASSERT_EQUAL_INT(0, webHeadContentLength(g_acc)); // lenient: "x" read as 0, stays
-    TEST_ASSERT_EQUAL_INT(WP_BAD_CONTENT_LENGTH, P(r, &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_CONTENT_LENGTH, P(r, &q));
     r = "POST /x HTTP/1.1\r\nContent-Length: -1\r\nContent-Length: 5\r\n\r\n";
     strict_acc(r, &bad);
     TEST_ASSERT_TRUE(bad);
@@ -819,14 +819,14 @@ static void test_b6_duplicates(void)
     TEST_ASSERT_EQUAL_INT(-1, strict_acc(r, &bad));
     TEST_ASSERT_FALSE(bad);
     TEST_ASSERT_EQUAL_INT(-1, webHeadContentLength(g_acc));
-    TEST_ASSERT_EQUAL_INT(WP_OK, P(r, &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, P(r, &q));
     TEST_ASSERT_EQUAL_INT(-1, q.content_length);
     // a bad request line wins over a bad Content-Length in the result code
-    TEST_ASSERT_EQUAL_INT(WP_BAD_VERSION, P("POST /x HTTP/2.0\r\nContent-Length: x\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_VERSION, P("POST /x HTTP/2.0\r\nContent-Length: x\r\n\r\n", &q));
     // folded and prefixed names are no Content-Length
-    TEST_ASSERT_EQUAL_INT(WP_OK, P("POST /x HTTP/1.1\r\n Content-Length: x\r\n\r\n", &q));
-    TEST_ASSERT_EQUAL_INT(WP_OK, P("POST /x HTTP/1.1\r\nX-Content-Length: x\r\n\r\n", &q));
-    TEST_ASSERT_EQUAL_INT(WP_OK, P("POST /x HTTP/1.1\r\nContent-Length : x\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, P("POST /x HTTP/1.1\r\n Content-Length: x\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, P("POST /x HTTP/1.1\r\nX-Content-Length: x\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, P("POST /x HTTP/1.1\r\nContent-Length : x\r\n\r\n", &q));
 }
 
 static void test_head_init_wipes(void)

@@ -17,6 +17,7 @@
 #include "gpio_status_json.h" // GET /gpiostatus: pure JSON formatter (test/test_pin_status)
 #include "gpio_control.h"      // GPIO-01 Part B: state of the free-GPIO control (glue calls ESP32 only)
 #include "web_functions.h"
+#include "web_request.h" // FORMAL-02 web step 3: request-head accumulator of work_webpage()
 #include "web_oled_shot.h"
 #include "web_txbuf.h"     // WEB-TX-01: webTxBeginChunked in send_http_header
 #include "esp32/netif_mtu.h" // NMTU-01 (lwIP part ESP32 only)
@@ -226,11 +227,23 @@ static bool pinAssignAvail(PinFunc f)
 
 
 String web_header;
+// FORMAL-02 web step 3: the head accumulator (~2.4 kB) of work_webpage(), one heap block for the life of
+// the server, never on the loop stack. Allocated by startWebserver(); web_head_acc_get() retries.
+static WebHeadAcc *web_head_acc = NULL;
 
 unsigned long web_currentTime = millis(); // Current time
 unsigned long web_previousTime = 0;       // Previous time
 #define WEB_TIMEOUT_TIME 2000             // Define timeout time in milliseconds (example: 2000ms = 2s)
 bool bweb_server_running = false;
+
+// The accumulator, allocated on first use (startWebserver() calls this once at server start); NULL when the
+// heap is exhausted, work_webpage() then answers 503 and keeps the server alive.
+WebHeadAcc *web_head_acc_get(void)
+{
+    if (web_head_acc == NULL)
+        web_head_acc = (WebHeadAcc *)malloc(sizeof(WebHeadAcc));
+    return web_head_acc;
+}
 
 #if defined(BOARD_RAK4630)
 #include "nrf52/eth_mss.h"   // ethMssTarget / ethSockCount / ethPrewriteClosedMss (shared with AppLink)
@@ -416,6 +429,13 @@ void startWebserver()
     #endif
 
     s_noIpLogged = false;               // IP is set now; log again if it goes away
+
+    static bool s_noAccLogged = false; // FORMAL-02 web step 3: request-head accumulator, once per boot; log once
+    if (web_head_acc_get() == NULL && !s_noAccLogged)
+    {
+        s_noAccLogged = true;
+        Serial.println("[WEB]...no heap for the request head accumulator, requests answer 503");
+    }
 
 #ifdef ESP32
     // Check if WiFi is actually connected or AP is active before trying to start MDNS
@@ -1048,25 +1068,37 @@ void work_webpage(void)
     // Byte weniger zur Laufzeit; sie entlastet die Linkregion, die auf den
     // klassischen ESP32 knapp ist.
     static const uint16_t WEB_HEADER_MAX = 1023;
+    static_assert(WEB_HEADER_MAX == WEB_HEAD_MAX, "web_header window and the head accumulator window must match");
     web_header.reserve(WEB_HEADER_MAX + 1);
     web_header = "";
 
+    // FORMAL-02 web step 3: the head loop runs on the accumulator of web_request.h. It holds the 1023-byte
+    // window, the line in progress, the Content-Length (CS-03: picked off the line as it completes, so it
+    // does not depend on the window) and the "mcs=" cookie pair (WEB-AUTH-01). web_header is built from the
+    // window once, when the blank line arrives.
+    WebHeadAcc *web_acc = web_head_acc_get();
+    if (web_acc == NULL)
+    {
+        // no heap for the accumulator: refuse cleanly, the server stays up
+        static const char kNoMem[] = "{\"ok\":false,\"err\":\"out of memory\"}";
+        web_cors_ok = false;
+        web_client.println("HTTP/1.1 503 Service Unavailable");
+        web_client.println("Content-Type: application/json");
+        web_client.print("Content-Length: ");
+        web_client.println((unsigned)(sizeof(kNoMem) - 1));
+        web_client.println("Connection: close");
+        web_client.println();
+        web_client.write((const uint8_t *)kNoMem, sizeof(kNoMem) - 1);
+        web_client.stop();
+        return;
+    }
+    webHeadInit(web_acc);
+
     web_currentTime = millis();
     web_previousTime = web_currentTime;
-    String web_currentLine = ""; // make a String to hold incoming data from the client
 
-    // CS-03: an upload needs its body length, and the header may well be
-    // longer than WEB_HEADER_MAX. Picked off the line as it completes,
-    // so it does not depend on that 1 kB window.
-    long web_content_length = -1;
     bool web_rm_quiet = false; // W2-1: set once the request line is /rmsend, suppresses the bDEBUG echo
                                // (WEB-AUTH-01: also /?login= and the legacy /?nodepassword=)
-    bool web_line_quiet = false; // WEB-AUTH-01: the current line is the Cookie header, not echoed
-    // WEB-AUTH-01: Cookie header value, captured as its line completes (it often arrives behind the
-    // WEB_HEADER_MAX window of web_header)
-    char web_cookie[256];
-    size_t web_cookie_len = 0;
-    web_cookie[0] = 0;
 
     if (bDEBUG)
     {
@@ -1085,30 +1117,35 @@ void work_webpage(void)
             // if there's bytes to read from the client,
             char c = web_client.read(); // read a byte, then
 
-            if (web_header.length() < WEB_HEADER_MAX)
-                web_header += c;
+            // the byte enters the window (while < WEB_HEADER_MAX), the line, and the Cookie/Content-Length logic
+            const WebHeadRes web_hres = webHeadPush(web_acc, c);
 
             // W2-1: nothing of a /rmsend request is echoed to the serial monitor (its body is never
             // read here, but a GET variant would carry the target password in the request line)
-            if (!web_rm_quiet && ((web_header.length() == 8 && web_header.startsWith("POST /rm")) ||
-                                  (web_header.length() == 7 && web_header.startsWith("GET /rm"))))
+            if (!web_rm_quiet && ((web_acc->head_len == 8 && memcmp(web_acc->head, "POST /rm", 8) == 0) ||
+                                  (web_acc->head_len == 7 && memcmp(web_acc->head, "GET /rm", 7) == 0)))
                 web_rm_quiet = true; // /rmsend, /rmpasswd, /rmnodes, ... (RM GUI W2 adds more /rm* paths)
-            if (!web_rm_quiet && ((web_header.length() == 12 && web_header.startsWith("GET /?login=")) ||
-                                  (web_header.length() == 19 && web_header.startsWith("GET /?nodepassword="))))
+            if (!web_rm_quiet && ((web_acc->head_len == 12 && memcmp(web_acc->head, "GET /?login=", 12) == 0) ||
+                                  (web_acc->head_len == 19 && memcmp(web_acc->head, "GET /?nodepassword=", 19) == 0)))
                 web_rm_quiet = true; // WEB-AUTH-01: login argument / legacy plaintext password
-            if (web_currentLine.length() == 7 && web_currentLine.equalsIgnoreCase("cookie:"))
-                web_line_quiet = true; // WEB-AUTH-01: session token
 
-            if (bDEBUG && !web_rm_quiet && (!web_line_quiet || c == '\n'))
+            // WEB-AUTH-01: the Cookie line (session token) is not echoed; the accumulator sets the flag
+            // before the byte after "cookie:" and clears it at the line end, as the old web_line_quiet did
+            if (bDEBUG && !web_rm_quiet && (!(web_acc->flags & WEB_HF_QUIET) || c == '\n'))
                 Serial.write(c); // print it out the serial monitor
 
-            if (c == '\n')
+            if (web_hres == WH_DONE)
             {
-                // if the byte is a newline character
-                // if the current line is blank, you got two newline characters in a row.
-                // that's the end of the client HTTP request, so send a response:
-                if (web_currentLine.length() == 0)
+                // the blank line: the head is complete.
                 {
+                    // the router and the guard keep reading web_header (the 1023-byte window), byte for byte
+                    // (NUL bytes included, the guard gets the length). Appended per byte on purpose: the nRF52
+                    // String::concat(const char *, unsigned) is a strcpy and would stop at a NUL.
+                    for (uint16_t wi = 0; wi < web_acc->head_len; wi++)
+                        web_header += web_acc->head[wi];
+                    const char *const web_cookie = web_acc->cookie;
+                    const size_t web_cookie_len = web_acc->cookie_len;
+                    const long web_content_length = webHeadContentLength(web_acc);
                     // Serial.println(web_header);
 
                     // RM GUI W1c: refuse DNS-rebinding Hosts and cross-site browser requests before any
@@ -1133,7 +1170,6 @@ void work_webpage(void)
                         if (bDEBUG)
                             Serial.printf("[WEB];guard;%s\n", wgv == WG_BAD_HOST ? "bad_host" : "cross_site");
                         rm_wipe_string(web_header);
-                        rm_wipe_string(web_currentLine);
                         web_cors_ok = false;
                         send_http_header(403, RESPONSE_TYPE_JSON);
                         web_client.println("{\"ok\":false,\"err\":\"forbidden\"}");
@@ -1165,7 +1201,6 @@ void work_webpage(void)
                         web_client.println();
                         web_client.write((const uint8_t *)body, blen);
                         rm_wipe_string(web_header);
-                        rm_wipe_string(web_currentLine);
                         web_client.stop();
                         continue;
                     }
@@ -1227,7 +1262,6 @@ void work_webpage(void)
                         rm_wipe_string(wa_arg);
                         rm_wipe_string(wg_path);
                         rm_wipe_string(web_header);
-                        rm_wipe_string(web_currentLine);
                         web_client.stop();
                         continue;
                     }
@@ -1245,7 +1279,6 @@ void work_webpage(void)
                         // legacy plaintext login: refused, the value is neither used nor logged
                         rm_wipe_string(wg_path);
                         rm_wipe_string(web_header);
-                        rm_wipe_string(web_currentLine);
                         send_http_header(403, RESPONSE_TYPE_JSON);
                         web_client.println("{\"ok\":false,\"err\":\"plaintext\"}");
                         web_client.stop();
@@ -1473,62 +1506,20 @@ void work_webpage(void)
 
                     web_client.stop();
                 }
-                else
-                { // if you got a newline, then clear currentLine
-                    if (web_content_length < 0)
-                    {
-                        String hdr_name = web_currentLine;
-                        hdr_name.toLowerCase();
-                        if (hdr_name.startsWith("content-length:"))
-                            web_content_length = web_currentLine.substring(15).toInt();
-                    }
-
-                    if (web_line_quiet)
-                    {
-                        // WEB-AUTH-01: keep our "mcs=" pair of the Cookie header in its own bounded buffer
-                        // (found anywhere in the line, so foreign cookies of the same host cannot push it
-                        // out; a second Cookie header without "mcs=" keeps the first one's value)
-                        web_line_quiet = false;
-                        int k = 6;
-                        while ((k = web_currentLine.indexOf("mcs=", k + 1)) >= 0 &&
-                               !(web_currentLine[k - 1] == ':' || web_currentLine[k - 1] == ' ' || web_currentLine[k - 1] == ';'))
-                            ;
-                        if (k >= 0)
-                        {
-                            web_cookie_len = 0;
-                            for (; k < (int)web_currentLine.length() && web_currentLine[k] != ';' &&
-                                   web_cookie_len < sizeof(web_cookie) - 1; k++)
-                                web_cookie[web_cookie_len++] = web_currentLine[k];
-                            web_cookie[web_cookie_len] = 0;
-                        }
-                        rm_wipe_string(web_currentLine);
-                    }
-
-                    if (web_currentLine.startsWith("GET /rmsend") || web_currentLine.startsWith("GET /?nodepassword=") ||
-                        web_currentLine.startsWith("GET /?login="))
-                        rm_wipe_string(web_currentLine); // W2-1: never leave a password in a freed String
-
-                    web_currentLine = "";
-                }
             }
-            else if (c != '\r')
+            else if (web_hres == WH_LINE_TOO_BIG)
             {
-                if (web_currentLine.length() >= WEB_HEADER_MAX)
-                {
-                    rm_wipe_string(web_currentLine); // a GET /rmsend line may carry the password
-                    rm_wipe_string(web_header);
-                    web_cors_ok = false;
-                    send_http_header(431, RESPONSE_TYPE_JSON);
-                    web_client.println("{\"ok\":false,\"err\":\"header line too large\"}");
-                    web_client.stop();
-                    break;
-                }
-                // if you got anything else but a carriage return character,
-                web_currentLine += c; // add it to the end of the currentLine
+                // a line longer than WEB_HEADER_MAX: the accumulator has wiped its line and window (a GET
+                // /rmsend line may carry the password)
+                rm_wipe_string(web_header);
+                web_cors_ok = false;
+                send_http_header(431, RESPONSE_TYPE_JSON);
+                web_client.println("{\"ok\":false,\"err\":\"header line too large\"}");
+                web_client.stop();
+                break;
             }
         }
     }
-
     if (bDEBUG)
     {
         Serial.println("Client disconnected.");
@@ -1538,7 +1529,10 @@ void work_webpage(void)
         #endif
     }
 
-    memset(web_cookie, 0, sizeof(web_cookie));
+    // the session cookie, and any request line still in the accumulator (a /rmsend or login line)
+    memset(web_acc->cookie, 0, sizeof(web_acc->cookie));
+    memset(web_acc->head, 0, sizeof(web_acc->head));
+    memset(web_acc->line, 0, sizeof(web_acc->line));
 }
 
 /**

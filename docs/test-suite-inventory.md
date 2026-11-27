@@ -229,7 +229,7 @@ proves that a string is present, not that the code behaves.
 | test_url_decode | 19 | native | `Regexp.cpp`, `alt_fusion.cpp`, `charset_filter.cpp`, `dm_dedup.cpp`, `dm_stats.cpp`, `gps_filter.cpp` and 17 more |  |  |
 | test_web_auth | 30 | native_web_auth | `hmac_sha256.cpp`, `hmac_sha256.h`, `web_functions/web_auth.cpp`, `web_functions/web_auth.h` |  |  |
 | test_web_coord | 5 | native_web_coord | `web_functions/web_coord.h` |  |  |
-| test_web_diff | 10 | native_web_diff | `backpressure.h`, `charset_filter.cpp`, `charset_filter.h`, `fw_update.h`, `hex_digit.h`, `hmac_sha256.cpp` and 11 more | yes | yes |
+| test_web_diff | 10 | native_web_diff | `backpressure.h`, `charset_filter.cpp`, `charset_filter.h`, `fw_update.h`, `hex_digit.h`, `hmac_sha256.cpp` and 12 more | yes | yes |
 | test_web_guard | 67 | native_web_guard | `web_functions/web_guard.h` | yes |  |
 | test_web_request | 17 | native_web_request | `web_functions/web_request.h` | yes | yes |
 | test_web_txbuf | 34 | native_web_txbuf | `web_functions/web_txbuf.h` |  |  |

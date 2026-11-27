@@ -37,7 +37,7 @@
 //   D-3. After WH_DONE or WH_LINE_TOO_BIG the accumulator is sticky: further pushes change nothing and
 //        repeat the result. WH_LINE_TOO_BIG wipes line and head, as the 431 branch does today.
 //   D-4. New judgements, computed but acting on nothing yet (B3 / B6 of section 7.2):
-//        webHeadBadContentLength(), WP_BAD_VERSION, WP_BAD_CONTENT_LENGTH, WP_BAD_REQUEST_LINE.
+//        webHeadBadContentLength(), WRQ_BAD_VERSION, WRQ_BAD_CONTENT_LENGTH, WRQ_BAD_REQUEST_LINE.
 //        webReqParse fills every output field it can even when it returns an error code.
 //        The strict Content-Length is judged twice on purpose: the accumulator (cl_strict, WEB_HF_CL_BAD)
 //        sees every finished line of the stream, also past the 1023-byte window, as the head loop does;
@@ -102,10 +102,10 @@ enum WebHeadRes : uint8_t
 };
 enum WebParseRes : uint8_t
 {
-    WP_OK = 0,
-    WP_BAD_REQUEST_LINE,
-    WP_BAD_VERSION,
-    WP_BAD_CONTENT_LENGTH
+    WRQ_OK = 0,
+    WRQ_BAD_REQUEST_LINE,
+    WRQ_BAD_VERSION,
+    WRQ_BAD_CONTENT_LENGTH
 };
 
 // WebHeadAcc::flags
@@ -369,7 +369,7 @@ inline WebParseRes webReqParse(const char *buf, size_t len, bool cut, WebReq *ou
     nil.n = 0;
     out->target = out->path = out->query = out->host = out->origin = nil;
     if (buf == NULL)
-        return WP_BAD_REQUEST_LINE;
+        return WRQ_BAD_REQUEST_LINE;
     if (len > (size_t)WEB_HEAD_MAX)
         len = WEB_HEAD_MAX; // D-5
 
@@ -427,19 +427,19 @@ inline WebParseRes webReqParse(const char *buf, size_t len, bool cut, WebReq *ou
     out->path = toSpan(mk(target.p, q));
     out->query = toSpan(q < target.n ? mk(target.p + q + 1, target.n - q - 1) : mk(target.p + target.n, 0));
 
-    WebParseRes res = WP_OK;
+    WebParseRes res = WRQ_OK;
     if (!rlTerminated || sp1 >= rl.n || method.n == 0)
-        res = WP_BAD_REQUEST_LINE;
+        res = WRQ_BAD_REQUEST_LINE;
     else if (sp2 == sp1)
-        res = WP_BAD_VERSION; // "METHOD target" without a version
+        res = WRQ_BAD_VERSION; // "METHOD target" without a version
     else if (target.n == 0)
-        res = WP_BAD_REQUEST_LINE;
+        res = WRQ_BAD_REQUEST_LINE;
     else if (version.n == 8 && memcmp(version.p, "HTTP/1.0", 8) == 0)
         out->minor = 0;
     else if (version.n == 8 && memcmp(version.p, "HTTP/1.1", 8) == 0)
         out->minor = 1;
     else
-        res = WP_BAD_VERSION;
+        res = WRQ_BAD_VERSION;
 
     // ---- header lines ----
     int last = 0; // 0 other, 1 host, 2 sec-fetch-site, 3 dest, 4 origin, 5 x-mc
@@ -548,8 +548,8 @@ inline WebParseRes webReqParse(const char *buf, size_t len, bool cut, WebReq *ou
                 clBad = true;
         }
     }
-    if (res == WP_OK && clBad)
-        res = WP_BAD_CONTENT_LENGTH;
+    if (res == WRQ_OK && clBad)
+        res = WRQ_BAD_CONTENT_LENGTH;
     return res;
 }
 
