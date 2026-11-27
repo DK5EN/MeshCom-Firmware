@@ -366,7 +366,7 @@ struct Dec
     uint8_t allow;
     bool page_shaped;
 };
-static Dec decideLine(const std::string &rl, uint8_t built, uint8_t legacy)
+static Dec decideLine(const std::string &rl, uint8_t built)
 {
     WebReq rq;
     const bool parsed = webReqParse(rl.data(), rl.size(), false, &rq) == WRQ_OK;
@@ -378,37 +378,37 @@ static Dec decideLine(const std::string &rl, uint8_t built, uint8_t legacy)
         d.page_shaped = webRouteIsPageShaped(rq.method, rq.path, rq.query);
         refusal = webRouteRefusal(rq.path, rq.query, built, &d.allow);
     }
-    d.route = webRouteDecideCore(parsed, table, legacy, d.page_shaped, refusal, built);
+    d.route = webRouteDecideCore(parsed, table, d.page_shaped, refusal, built);
     return d;
 }
-static Dec decideOf(const char *method, const char *target, uint8_t built, uint8_t legacy = WR_SCAFFOLD)
+static Dec decideOf(const char *method, const char *target, uint8_t built)
 {
-    return decideLine(std::string(method) + " " + target + " HTTP/1.1\r\n\r\n", built, legacy);
+    return decideLine(std::string(method) + " " + target + " HTTP/1.1\r\n\r\n", built);
 }
 
 // the decision rules of webRouteDecideCore, with every feature built (a route that is not built is the next test)
 static void test_decide_core_b1_rules(void)
 {
-    // the legacy ids continue the table numbering, the decision ids the legacy ones
-    TEST_ASSERT_EQUAL_UINT8(WR_COUNT, WRL_RM_SEND_GET);
-    TEST_ASSERT_EQUAL_UINT8(WR_COUNT + 1, WRL_PAGE_UNKNOWN);
-    TEST_ASSERT_EQUAL_UINT8(WR_COUNT + 2, WRD_NOT_FOUND);
-    // a table route goes to the table, whatever the legacy chain found
-    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, webRouteDecideCore(true, WR_PAGE_INFO, WR_PAGE_SETUP, true, WRD_NOT_FOUND, WRB_ALL));
-    TEST_ASSERT_EQUAL_UINT8(WR_RM_SEND, webRouteDecideCore(true, WR_RM_SEND, WRL_PAGE_UNKNOWN, false, WRD_NOT_FOUND, WRB_ALL));
+    // the 404-page id continues the table numbering, the decision ids follow it
+    TEST_ASSERT_EQUAL_UINT8(WR_COUNT, WRL_PAGE_UNKNOWN);
+    TEST_ASSERT_EQUAL_UINT8(WR_COUNT + 1, WRD_NOT_FOUND);
+    TEST_ASSERT_EQUAL_UINT8(WR_COUNT + 4, WRD_UNAUTH);
+    // a table route goes to the table, page-shaped or not
+    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, webRouteDecideCore(true, WR_PAGE_INFO, true, WRD_NOT_FOUND, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WR_RM_SEND, webRouteDecideCore(true, WR_RM_SEND, false, WRD_NOT_FOUND, WRB_ALL));
     // GET / is the scaffold, GET /?x=1 is a 404 (never the scaffold)
     TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, decideOf("GET", "/", WRB_ALL).route);
     TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, decideOf("GET", "/?x=1", WRB_ALL).route);
     TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, decideOf("GET", "/favicon.ico", WRB_ALL).route);
-    // a loose legacy match (Referer, query value, longer path) is a 404, whatever the legacy id says
-    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteDecideCore(true, WR_NONE, WR_SETPARAM, false, WRD_NOT_FOUND, WRB_ALL));
-    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, decideOf("GET", "/setparam/x/1x", WRB_ALL, WR_SETPARAM).route);
+    // a loose match of the old router (Referer, query value, longer path) is a 404
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteDecideCore(true, WR_NONE, false, WRD_NOT_FOUND, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, decideOf("GET", "/setparam/x/1x", WRB_ALL).route);
     // page-shaped with an unknown page: the 404 page
     TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, decideOf("GET", "/?page=nosuch", WRB_ALL).route);
     TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, decideOf("GET", "/?page=", WRB_ALL).route);
     TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, decideOf("GET", "/?page", WRB_ALL).route);
     // an exact row for another method: 405 with the union of the rows' masks (HEAD is in no mask)
-    Dec d = decideOf("GET", "/rmsend", WRB_ALL, WRL_RM_SEND_GET); // not the legacy 405 branch
+    Dec d = decideOf("GET", "/rmsend", WRB_ALL); // the generic 405 (B1), not the old router's own 405 branch
     TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, d.route);
     TEST_ASSERT_EQUAL_UINT8(WRM_POST, d.allow);
     d = decideOf("POST", "/rmstatus", WRB_ALL);
@@ -435,16 +435,13 @@ static void test_decide_core_b1_rules(void)
     d = decideOf("POST", "/nosuch", WRB_ALL);
     TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, d.route);
     TEST_ASSERT_EQUAL_UINT8(0, d.allow);
-    // a refused parse keeps the legacy id exactly, including GET /rmsend
-    TEST_ASSERT_EQUAL_UINT8(WR_SETPARAM, webRouteDecideCore(false, WR_NONE, WR_SETPARAM, false, WRD_NOT_FOUND, WRB_ALL));
-    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, webRouteDecideCore(false, WR_NONE, WR_PAGE_INFO, false, WRD_NOT_FOUND, WRB_ALL));
-    TEST_ASSERT_EQUAL_UINT8(WRL_RM_SEND_GET, webRouteDecideCore(false, WR_NONE, WRL_RM_SEND_GET, false, WRD_NOT_FOUND, WRB_ALL));
-    TEST_ASSERT_EQUAL_UINT8(WRL_PAGE_UNKNOWN, webRouteDecideCore(false, WR_NONE, WRL_PAGE_UNKNOWN, false, WRD_NOT_FOUND, WRB_ALL));
-    TEST_ASSERT_EQUAL_UINT8(WR_SCAFFOLD, webRouteDecideCore(false, WR_NONE, WR_SCAFFOLD, false, WRD_NOT_FOUND, WRB_ALL));
-    // real unparsed requests (no version, bad version): the legacy id stands, whatever the table would say
-    TEST_ASSERT_EQUAL_UINT8(WR_PAGE_INFO, decideLine("GET /?page=info\r\n\r\n", WRB_ALL, WR_PAGE_INFO).route);
-    TEST_ASSERT_EQUAL_UINT8(WRL_RM_SEND_GET, decideLine("GET /rmsend\r\n\r\n", WRB_ALL, WRL_RM_SEND_GET).route);
-    TEST_ASSERT_EQUAL_UINT8(WR_SETPARAM, decideLine("GET /nosuch HTTP/9.9\r\n\r\n", WRB_ALL, WR_SETPARAM).route);
+    // a refused parse never routes to a handler: it is a 400 before the router, and the route reads WRD_NOT_FOUND
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteDecideCore(false, WR_NONE, false, WRD_NOT_FOUND, WRB_ALL));
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteDecideCore(false, WR_PAGE_INFO, true, WRD_NOT_ALLOWED, WRB_ALL));
+    // real unparsed requests (no version, bad version)
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, decideLine("GET /?page=info\r\n\r\n", WRB_ALL).route);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, decideLine("GET /rmsend\r\n\r\n", WRB_ALL).route);
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, decideLine("GET /nosuch HTTP/9.9\r\n\r\n", WRB_ALL).route);
 }
 
 // REGRESSION (wave 7b step 2 rework): a table route whose feature is not compiled into the build is answered like
@@ -465,7 +462,7 @@ static void test_decide_core_unbuilt_route_is_none(void)
     TEST_ASSERT_EQUAL_UINT8(WR_AU_STATUS, decideOf("GET", "/austatus", WRB_ESP32).route);
     TEST_ASSERT_EQUAL_UINT8(WRD_NOT_ALLOWED, decideOf("POST", "/austatus", WRB_ESP32).route);
     // not built and a loose legacy match: a 404 as for any unmatched path
-    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteDecideCore(true, WR_AU_STATUS, WR_SETPARAM, false, WRD_NOT_FOUND, 0));
+    TEST_ASSERT_EQUAL_UINT8(WRD_NOT_FOUND, webRouteDecideCore(true, WR_AU_STATUS, false, WRD_NOT_FOUND, 0));
 }
 
 // B1 classifier: 404 vs 405 and the allowed-method mask, built rows only

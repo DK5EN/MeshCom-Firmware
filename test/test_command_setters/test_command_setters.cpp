@@ -1286,7 +1286,10 @@ static void test_au_web_gate_and_status_wiring_pins()
 {
     const std::string wf = read_repo_file("src/web_functions/web_functions.cpp");
     // /austatus: no CORS (node-local), set inside the route itself
-    const size_t route = pin_find(wf, "web_header.startsWith(\"GET /austatus\")", 0, "no GET /austatus route");
+    // the route comes from the table (web_route.h row "/austatus" GET -> WR_AU_STATUS, ESP32-only in webRouteBuiltFor)
+    const std::string wr = read_repo_file("src/web_functions/web_route.h");
+    pin_find(wr, "{\"/austatus\",     NULL,         NULL,         WRM_GET,  WR_AU_STATUS,", 0, "no GET /austatus row in the route table");
+    const size_t route = pin_find(wf, "case WR_AU_STATUS:", 0, "no WR_AU_STATUS case in the router switch");
     const size_t route_end = pin_find(wf, "sub_au_status();", route, "the route does not call sub_au_status()");
     const size_t cors = pin_find(wf, "web_cors_ok = false;", route, "no web_cors_ok = false in the /austatus route");
     TEST_ASSERT_TRUE_MESSAGE(cors < route_end, "web_cors_ok = false is not set inside the /austatus route");

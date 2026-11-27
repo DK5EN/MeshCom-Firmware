@@ -121,10 +121,10 @@ def generate():
         seg_func(RH, rh, r"^const char \*rmReadBody\(", "rmReadBody"),
     ]
     segs["asset"] = [seg_func(WF, wf, r"^static bool deliver_web_asset\(", "deliver_web_asset")]
-    # router of work_webpage: webRouteLegacy (the WRL_* ids and the decision rules live in web_route.h), the disagreement counter and webRouteDecide, one block
-    r0 = only(wf, r"^static uint8_t __attribute__\(\(noinline\)\) webRouteLegacy\(", "webRoute block start")
+    # router of work_webpage: web_send_refusal .. webRouteDecide, one block (the ids and the decision rules live in web_route.h)
+    r0 = only(wf, r"^static void web_send_refusal\(", "webRoute block start")
     rd = only(wf, r"^static uint8_t __attribute__\(\(noinline\)\) webRouteDecide\(", "webRouteDecide")
-    route_seg = (WF, "webRouteLegacy + webRouteDecide", r0, end_brace(wf, rd, "webRouteDecide"))
+    route_seg = (WF, "web_send_refusal .. webRouteDecide", r0, end_brace(wf, rd, "webRouteDecide"))
     segs["rest"] = [
         seg_func(WF, wf, r"^WebHeadAcc \*web_head_acc_get\(", "web_head_acc_get"),
         route_seg,

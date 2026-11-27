@@ -2,9 +2,8 @@
 //
 // Header-only, no String, no Arduino, no heap: compiles natively and on ESP32/nRF52. Wired into work_webpage for a
 // parsed request (B2 exact match, wave 7b step 2; B1 404/405 instead of the scaffold, step 3); a request the parser
-// refuses (B3 request line, B6 Content-Length) is a 400 right after the guard since step 4 and never reaches the router; the
-// legacy indexOf()/startsWith() chain (webRouteLegacy) still runs for a refused parse but its result routes nothing (that request gets the
-// 400 first); kept only until its removal step. The rule (7.2 B1, B2):
+// refuses (B3 request line, B6 Content-Length) is a 400 right after the guard since step 4 and never reaches the router (the
+// legacy indexOf()/startsWith() chain is gone since the end of wave 7b). The rule (7.2 B1, B2):
 //   - the path equals a table path exactly (byte compare, case-sensitive);
 //   - for the rows with a selector the first query pair decides (page=<name>, sendmessage, getmessages, ...);
 //   - the method must be in the row's mask;
@@ -283,10 +282,9 @@ inline uint8_t webRouteFlags(uint8_t route)
     return 0;
 }
 
-// ids of the legacy router (webRouteLegacy in web_functions.cpp) that the table has no row for; they continue the
-// WebRoute numbering after WR_COUNT, so a table id never collides with them
-static constexpr uint8_t WRL_RM_SEND_GET = WR_COUNT;      // GET /rmsend: refused 405 (the table: generic 405, B1)
-static constexpr uint8_t WRL_PAGE_UNKNOWN = WR_COUNT + 1; // "/?page=" with an unknown name: 404 page (the table: WR_NONE, B1)
+// the dispatcher's 404 page, an id the table has no row for (named after the legacy router it came from); it continues
+// the WebRoute numbering after WR_COUNT, so a table id never collides with it
+static constexpr uint8_t WRL_PAGE_UNKNOWN = WR_COUNT; // "/?page=" with an unknown name: 404 page (the table: WR_NONE, B1)
 
 // Is the handler of a route compiled into this build? The table lists every route; a route whose feature is not built
 // is answered like WR_NONE (header comment). Pure part: one flag per feature, so a unit test can set them all.
@@ -339,11 +337,11 @@ inline bool webRouteExactOther(WebSpan path, WebSpan query, uint8_t built)
 }
 
 // Answers of the dispatcher that are no table route (B1 and the no-session gate); they continue the numbering after
-// the two WRL_* ids, so a decision id never collides with a table id.
-static constexpr uint8_t WRD_NOT_FOUND = WR_COUNT + 2;   // 404, JSON {"ok":false,"err":"not found"}
-static constexpr uint8_t WRD_NOT_ALLOWED = WR_COUNT + 3; // 405 + Allow header, JSON {"ok":false,"err":"method not allowed"}
-static constexpr uint8_t WRD_LOGIN_PAGE = WR_COUNT + 4;  // no session: 200 + the login page (decision (a))
-static constexpr uint8_t WRD_UNAUTH = WR_COUNT + 5;      // no session: 401
+// WRL_PAGE_UNKNOWN, so a decision id never collides with a table id.
+static constexpr uint8_t WRD_NOT_FOUND = WR_COUNT + 1;   // 404, JSON {"ok":false,"err":"not found"}
+static constexpr uint8_t WRD_NOT_ALLOWED = WR_COUNT + 2; // 405 + Allow header, JSON {"ok":false,"err":"method not allowed"}
+static constexpr uint8_t WRD_LOGIN_PAGE = WR_COUNT + 3;  // no session: 200 + the login page (decision (a))
+static constexpr uint8_t WRD_UNAUTH = WR_COUNT + 4;      // no session: 401
 
 // B1 refusal of a parsed request no built table route answers: the path (with the selector) has a built exact row for
 // another method -> WRD_NOT_ALLOWED and *allow = the union of those rows' method masks (HEAD is in no mask); no such
@@ -403,17 +401,16 @@ inline size_t webRouteFormatAllow(char *buf, size_t cap, uint8_t mask)
 // Decision of the router for a request (wave 7b step 3, B1), pure; webRouteDecide in web_functions.cpp gathers the inputs.
 //   parsed        the request head parsed (webReqParse == WRQ_OK)
 //   table         webRouteMatch of the parsed request (WR_NONE when not parsed)
-//   legacy        the id of the legacy chain (webRouteLegacy); unreachable since step 4 (a refused parse is a 400 before the router); kept until its removal step
 //   page_shaped   webRouteIsPageShaped (decision (a)): an unknown or unbuilt page is the 404 page
 //   refusal       webRouteRefusal: WRD_NOT_FOUND or WRD_NOT_ALLOWED
 //   built         the build's feature mask (WRB_*), computed in web_functions.cpp
 // Parsed: a table route whose handler is built goes to the table (one that is not built counts as WR_NONE); a
-// page-shaped request is the 404 page (WRL_PAGE_UNKNOWN); anything else is the refusal. The legacy id never decides a
-// parsed request. A refused parse keeps the legacy id exactly (unreachable since step 4: it is a 400 before the router).
-inline uint8_t webRouteDecideCore(bool parsed, uint8_t table, uint8_t legacy, bool page_shaped, uint8_t refusal, uint8_t built)
+// page-shaped request is the 404 page (WRL_PAGE_UNKNOWN); anything else is the refusal. A refused parse is a 400
+// before the router reads the route; should it ever be read, it is WRD_NOT_FOUND, never a handler.
+inline uint8_t webRouteDecideCore(bool parsed, uint8_t table, bool page_shaped, uint8_t refusal, uint8_t built)
 {
     if (!parsed)
-        return legacy;
+        return WRD_NOT_FOUND;
     if (table != WR_NONE && webRouteBuiltMask(table, built))
         return table;
     if (page_shaped)
@@ -423,7 +420,7 @@ inline uint8_t webRouteDecideCore(bool parsed, uint8_t table, uint8_t legacy, bo
 
 // Which refusals of webReqParse the wiring answers 400 (B3 request line / version since wave 7b step 4 part B3, B6 Content-Length
 // since part B6; 400 JSON {"ok":false,"err":"bad request"} right after the guard, before the AU-busy 503 and every route).
-// Every non-OK code is a bad request, so the legacy chain behind a refused parse is unreachable.
+// Every non-OK code is a bad request, so a refused parse never reaches the router.
 inline bool webRouteBadRequest(uint8_t wrq)
 {
     return wrq == WRQ_BAD_REQUEST_LINE || wrq == WRQ_BAD_VERSION || wrq == WRQ_BAD_CONTENT_LENGTH;

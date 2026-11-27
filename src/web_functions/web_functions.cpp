@@ -21,7 +21,7 @@
 #include "web_io.h"      // FORMAL-02 7b step 7: webReadBody, the shared body reader
 #include "web_request.h" // FORMAL-02 web step 3: request-head accumulator of work_webpage()
 #include "web_query.h"   // FORMAL-02 web step 5a: webQueryFirst for setparam / getparam
-#include "web_route.h"   // FORMAL-02 web step 4: route table, computed beside the legacy router
+#include "web_route.h"   // FORMAL-02 web step 4: route table, the router of work_webpage
 #include "web_oled_shot.h"
 #include "web_txbuf.h"     // WEB-TX-01: webTxBeginChunked in send_http_header
 #include "esp32/netif_mtu.h" // NMTU-01 (lwIP part ESP32 only)
@@ -1006,106 +1006,6 @@ static void sub_screen_rgb565(void)
  */
 
 /**
- * FORMAL-02 web step 4: the router of today, moved out of work_webpage() unchanged in behaviour. It decides the
- * handler from the head window (web_header) after the guard and the auth gate and returns a WebRoute id (web_route.h);
- * the two ids WRL_* (web_route.h) are branches the table has no row for. A feature that is not built is not named here, so the
- * request falls through to the next branch exactly as before. noinline: its String temporaries stay out of
- * work_webpage's frame.
- */
-static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header)
-{
-    if (web_header.startsWith("POST /rmsend"))
-        return WR_RM_SEND;
-    else if (web_header.startsWith("GET /rmsend"))
-        return WRL_RM_SEND_GET;
-    else if (web_header.startsWith("GET /rmstatus"))
-        return WR_RM_STATUS;
-    else if (web_header.startsWith("POST /rmpasswd"))
-        return WR_RM_PASSWD;
-    else if (web_header.startsWith("POST /rmwebpwd"))
-        return WR_WEB_PASSWD;
-    else if (web_header.startsWith("GET /pinstatus"))
-        return WR_PIN_STATUS;
-    else if (web_header.startsWith("GET /pinassign"))
-        return WR_PIN_ASSIGN;
-    else if (web_header.startsWith("GET /gpiostatus"))
-        return WR_GPIO_STATUS;
-    else if (web_header.startsWith("GET /rmnodes"))
-        return WR_RM_NODES_GET;
-    else if (web_header.startsWith("POST /rmnodes"))
-        return WR_RM_NODES_POST;
-    else if (web_header.startsWith("GET /rmheard"))
-        return WR_RM_HEARD;
-    else if (web_header.indexOf("/?page=remote") >= 0)
-        return WR_PAGE_REMOTE;
-#if defined(ESP32)
-    else if (web_header.startsWith("GET /austatus"))
-        return WR_AU_STATUS;
-#endif
-    else if (web_header.indexOf("/callfunction/") >= 0)
-        return WR_CALLFUNCTION;
-    else if (web_header.indexOf("/?sendmessage") >= 0)
-        return WR_SENDMESSAGE;
-    else if (web_header.indexOf("/?getmessages") >= 0)
-        return WR_GETMESSAGES;
-    else if (web_header.indexOf("/setparam/") >= 0)
-        return WR_SETPARAM;
-    else if (web_header.indexOf("/getparam/") >= 0)
-        return WR_GETPARAM;
-#if INSTRUMENT_ENABLED && (defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS))
-    else if (web_header.startsWith("GET /screen.rgb565"))
-        return WR_SCREEN_RGB565;
-#endif
-#if OLED_SHOT_WEB
-    else if (web_header.startsWith("GET /screen.oled"))
-        return WR_SCREEN_OLED;
-#endif
-    else if (web_header.indexOf("/config.json") >= 0)
-        return WR_CONFIG_GET;
-    else if (web_header.indexOf("POST /config") >= 0)
-        return WR_CONFIG_POST;
-    else if (web_header.indexOf("/?page=setup") >= 0)
-        return WR_PAGE_SETUP;
-    else if (web_header.indexOf("/?page=position") >= 0)
-        return WR_PAGE_POSITION;
-    else if (web_header.indexOf("/?page=wx") >= 0)
-        return WR_PAGE_WX;
-    else if (web_header.indexOf("/?page=mheard") >= 0)
-        return WR_PAGE_MHEARD;
-    else if (web_header.indexOf("/?page=neighbours") >= 0)
-        return WR_PAGE_NEIGHBOURS;
-    else if (web_header.indexOf("/?page=messages") >= 0)
-        return WR_PAGE_MESSAGES;
-#if defined(ENABLE_MSGSTORE)
-    else if (web_header.indexOf("/?page=mailbox") >= 0)
-        return WR_PAGE_MAILBOX;
-#endif
-    else if (web_header.indexOf("/?page=rxlog") >= 0)
-        return WR_PAGE_RXLOG;
-    else if (web_header.indexOf("/?page=path") >= 0)
-        return WR_PAGE_PATH;
-    else if (web_header.indexOf("/?page=spectrum") >= 0)
-        return WR_PAGE_SPECTRUM;
-    // D9: the second, identical "/?page=mcp23017" branch of the old chain was unreachable (same test, no side
-    // effect in the test) and is gone
-    else if (web_header.indexOf("/?page=mcp23017") >= 0)
-        return WR_PAGE_MCP23017;
-    else if (web_header.indexOf("/?page=pins") >= 0)
-        return WR_PAGE_PINS;
-    else if (web_header.indexOf("/?page=info") >= 0)
-        return WR_PAGE_INFO;
-    else if (web_header.indexOf("/?page=") >= 0)
-        return WRL_PAGE_UNKNOWN;
-    return WR_SCAFFOLD;
-}
-
-// FORMAL-02 web step 4: the number of requests where the route the dispatcher uses differs from the route table's own match
-// (web_route.h, webRouteMatch), counted in webRouteDecide: every request answered 404 / 405 (B1) or 404 page (WRL_PAGE_UNKNOWN),
-// every table route whose feature is not built, and every request the parser refuses (a 400 since step 4; the legacy chain
-// is unreachable). Debug only, no behaviour hangs on it; the later steps drop it.
-uint32_t web_route_disagree = 0;
-
-/**
  * The 404 / 405 answer of a parsed request no built table route serves (B1): a short JSON body, and for 405 an Allow
  * header built from the method mask. Never the scaffold.
  */
@@ -1141,7 +1041,7 @@ static void web_wipe_request(String &head, String &line)
 /**
  * What the router knows about the request in the window (B1, B2): parsed = webReqParse accepted the head;
  * page_shaped = GET "/" whose first query key is "page" (decision (a)); route = webRouteDecideCore's answer (a table
- * route, WRL_PAGE_UNKNOWN, WRD_NOT_FOUND, WRD_NOT_ALLOWED, or for a refused parse the legacy id); allow = the method
+ * route, WRL_PAGE_UNKNOWN, WRD_NOT_FOUND or WRD_NOT_ALLOWED; a refused parse never routes, it is a 400); allow = the method
  * mask of the Allow header of a WRD_NOT_ALLOWED.
  */
 struct WebRouteVerdict
@@ -1158,11 +1058,10 @@ struct WebRouteVerdict
  * The route of the request in the window (B1 + B2, exact match): a parsed request goes to the table's route when its
  * handler is built into this board (feature mask below), to the 404 page when it is page-shaped, else to the 404 / 405
  * refusal (never the scaffold; GET / is the table's scaffold row). A request the parser refuses (B3/B6) is a 400 since
- * step 4 and never gets here; the legacy chain (webRouteLegacy) still runs for a refused parse, but its result routes nothing; kept until its removal step. The rules are webRouteDecideCore / webRouteRefusal (web_route.h, unit-tested);
- * this function only gathers the inputs and returns the route, the whole verdict is in *out. A difference between the
- * decision and the table is still counted (the later steps drop it).
+ * step 4 and never gets here. The rules are webRouteDecideCore / webRouteRefusal (web_route.h, unit-tested); this
+ * function only gathers the inputs and returns the route, the whole verdict is in *out.
  */
-static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, const String &web_header, WebRouteVerdict *out)
+static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, WebRouteVerdict *out)
 {
     WebRouteVerdict &v = *out; // the parse lands in out->req: the router switch reads it, nothing is parsed twice
     v.allow = 0;
@@ -1173,8 +1072,6 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
     v.parsed = v.wrq == WRQ_OK;
     if (v.parsed)
         table = webRouteMatch(wr.method, wr.path, wr.query);
-    // the legacy id decides only a request the parser refuses
-    const uint8_t legacy = v.parsed ? (uint8_t)WR_SCAFFOLD : webRouteLegacy(web_header);
     // the build's features: the same conditions as the guarded cases of the router switch (and deliver_web_asset for
     // /mcau.js), read here, after every include (OLED_SHOT_WEB comes from web_oled_shot.h)
     static constexpr uint8_t built = 0
@@ -1197,9 +1094,7 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
         v.page_shaped = webRouteIsPageShaped(wr.method, wr.path, wr.query);
         refusal = webRouteRefusal(wr.path, wr.query, built, &v.allow);
     }
-    v.route = webRouteDecideCore(v.parsed, table, legacy, v.page_shaped, refusal, built);
-    if (table != v.route)
-        web_route_disagree++;
+    v.route = webRouteDecideCore(v.parsed, table, v.page_shaped, refusal, built);
     return v.route;
 }
 
@@ -1328,7 +1223,7 @@ void work_webpage(void)
                     // -- after the guard (its 403 stays first), before the AU-busy 503, assets, login and every route, with
                     // or without a session.
                     WebRouteVerdict web_verdict;
-                    webRouteDecide(web_acc, web_header, &web_verdict);
+                    webRouteDecide(web_acc, &web_verdict);
                     if (webRouteBadRequest(web_verdict.wrq) || webHeadBadContentLength(web_acc))
                     {
                         web_wipe_request(web_header, wg_path);
@@ -1451,15 +1346,8 @@ void work_webpage(void)
                     // in every other case, we check if authentication is required but not yet provided
                     if (bget_password)
                     {
-                        uint8_t gate;
-                        if (web_verdict.parsed)
-                            gate = webRouteNoSession(web_verdict.page_shaped, web_verdict.route);
-                        else if (web_header.indexOf("/?page=") >= 0) // unreachable since step 4 (a refused parse is a 400 before): legacy gate rule, kept until removal
-                            gate = WRD_LOGIN_PAGE;
-                        else if (web_header.indexOf("/") >= 0 && web_header.indexOf("HTTP/1.1") > web_header.indexOf("/") + 2)
-                            gate = WRD_UNAUTH;
-                        else
-                            gate = WR_SCAFFOLD;
+                        // only a parsed request gets here (a refused parse is a 400 right after the guard)
+                        const uint8_t gate = webRouteNoSession(web_verdict.page_shaped, web_verdict.route);
                         switch (gate)
                         {
                         case WRD_LOGIN_PAGE: // user requested a page ? Send a login page instead.
@@ -1490,11 +1378,6 @@ void work_webpage(void)
                         {
                         case WR_RM_SEND: // W2-1: remote management send, the password is in the BODY, read by the handler
                                 sub_rm_send(web_content_length);
-                                break;
-                        case WRL_RM_SEND_GET: // W2-1: refused, and the request line is wiped in case it carried a password
-                                rm_wipe_string(web_header);
-                                send_http_header(405, RESPONSE_TYPE_JSON);
-                                web_client.println("{\"ok\":false,\"err\":\"use POST\"}");
                                 break;
                         case WR_RM_STATUS: // W2: status + sent list for the remote management card
                                 sub_rm_status();
@@ -1633,7 +1516,7 @@ void work_webpage(void)
                         case WRD_NOT_ALLOWED: // B1: the path has a route for another method, 405 + Allow
                                 web_send_refusal(web_verdict.route, web_verdict.allow);
                                 break;
-                        default: // WR_SCAFFOLD: GET / (and, for a refused parse, the legacy fallback)
+                        default: // WR_SCAFFOLD: GET /
                                 deliver_scaffold(bget_password);
                                 break;
                         }
