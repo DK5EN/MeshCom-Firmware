@@ -49,10 +49,8 @@ extern bool conffin_sent;
 // commandAction()/save_settings() must not run inline in the BLE callback
 // concurrently with the Main Loop; this mirrors the ESP32 bleQueue design
 // (CONC-14). Non-static: nrf52_main.cpp references it via extern.
-struct BleQueueItem {
-	uint8_t data[MAX_MSG_LEN_PHONE];
-	size_t length;
-};
+// BleQueueItem, session generation and drop counters: src/ble_session.h
+BleQueueCounters g_bleQ;
 
 QueueHandle_t bleQueue = NULL;
 
@@ -241,6 +239,7 @@ void connect_callback(uint16_t conn_handle)
 		g_blePhoneStats.last_mtu = conn ? conn->getMtu() : 0;
 	}
 	bleStatsOnConnect(g_bleStats);
+	bleQueueNewSession(g_bleQ);   // BLE-STALE-01: frames of the previous connection become stale
 	Bluefruit.setTxPower(4);
 	DEBUG_MSG("BLE", "Connected");
 
@@ -268,6 +267,7 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason)
 {
 	(void)conn_handle;
 	bleStatsOnDisconnect(g_bleStats, (int)reason);
+	bleQueueNewSession(g_bleQ);
 	s_discReason = reason;
 	s_discPending = true;	// printed by nrf52BleTick() in the Main Loop task
 	g_ble_uart_is_connected = false;
@@ -344,6 +344,9 @@ void nrf52BleTick(void)
 		bleStatsFormat(g_bleStats, buf, sizeof(buf));
 		Serial.print("[BLE ];stat;");
 		Serial.println(buf);
+		bleQueueFormat(g_bleQ, buf, sizeof(buf));
+		Serial.print("[BLE ];stat;");
+		Serial.println(buf);
 	}
 }
 
@@ -404,7 +407,12 @@ void bleuart_rx_callback(uint16_t conn_handle)
 	BleQueueItem item = {};
 	item.length = g_ble_uart.read(item.data, MAX_MSG_LEN_PHONE);
 	if(item.length > 0)  // FIFO already drained by an earlier callback: nothing to hand over
-		xQueueSend(bleQueue, &item, 0);  // non-blocking, drop on full queue
+	{
+		bleItemStamp(item, g_bleQ);
+		// non-blocking; the FIFO bytes are consumed, so a full queue loses the frame: count it,
+		// the loop logs it (BLE-QDROP-01; no Serial in this callback)
+		bleQueueOnSend(g_bleQ, xQueueSend(bleQueue, &item, 0) == pdTRUE);
+	}
 
 	// Disconnect if app-layer auth failed
 	if(ble_disconnect_requested)

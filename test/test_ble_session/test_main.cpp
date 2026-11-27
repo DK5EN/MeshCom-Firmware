@@ -354,6 +354,153 @@ static void test_format_truncates_safely(void)
     TEST_ASSERT_EQUAL_INT(11, (int)strlen(buf));   // NUL-terminated within n
 }
 
+// ---- phone frame queue: drop counting and session tag (BLE-QDROP-01, BLE-STALE-01) ----
+// QSim mirrors the platform code: a bounded FIFO (xQueueCreate(5)), the producer and the loop.
+// BLE_QUEUE_LEGACY=1 builds the code as it was before the fix (xQueueSend result ignored, no
+// session check before readPhoneCommand): the cases below then fail, which is the red run.
+#ifndef BLE_QUEUE_LEGACY
+#define BLE_QUEUE_LEGACY 0
+#endif
+
+BleQueueCounters g_bleQ;   // the platform defines it once; here the test does
+
+struct QSim
+{
+    BleQueueItem q[5];
+    int n;
+    int applied;        // frames that reached readPhoneCommand
+    int appliedStale;   // ... of an earlier connection
+    uint32_t sessionOfApplied[16];
+};
+
+static QSim g_q;
+static uint32_t g_connection;   // which connection the "phone" is in (test truth, not the code's)
+
+static void qReset(void)
+{
+    memset(&g_q, 0, sizeof(g_q));
+    g_connection = 0;
+    g_bleQ.gen.store(0); g_bleQ.dropped.store(0); g_bleQ.stale.store(0);
+    g_bleQ.droppedLogged = 0; g_bleQ.staleLogged = 0;
+}
+
+
+static void qProduce(void)   // onWrite / bleuart_rx_callback
+{
+    BleQueueItem it = {};
+    it.length = 1;
+    it.data[0] = (uint8_t)g_connection;
+    bleItemStamp(it, g_bleQ);
+    bool ok = g_q.n < 5;
+    if(ok) g_q.q[g_q.n++] = it;
+#if !BLE_QUEUE_LEGACY
+    bleQueueOnSend(g_bleQ, ok);
+#endif
+}
+
+static void qConnectCb(void)    { g_connection++; bleQueueNewSession(g_bleQ); }
+static void qDisconnectCb(void) { bleQueueNewSession(g_bleQ); }
+
+// one item dequeued, the loop is "between dequeue and apply" when the connection changes
+static BleQueueItem g_inflight;
+
+static void qApply(const BleQueueItem &it)
+{
+#if !BLE_QUEUE_LEGACY
+    if(!bleQueueAccept(g_bleQ, it)) return;
+#endif
+    if(g_q.applied < 16) g_q.sessionOfApplied[g_q.applied] = it.data[0];
+    g_q.applied++;
+    if(it.data[0] != g_connection) g_q.appliedStale++;
+}
+
+static void qLoopDrain(void)
+{
+    while(g_q.n > 0)
+    {
+        BleQueueItem it = g_q.q[0];
+        memmove(&g_q.q[0], &g_q.q[1], sizeof(g_q.q[0]) * (size_t)(g_q.n - 1));
+        g_q.n--;
+        qApply(it);
+    }
+}
+
+static void test_queue_full_drop_is_counted(void)
+{
+    qReset();
+    for(int i = 0; i < 7; i++) qProduce();   // capacity 5: two frames lost
+    TEST_ASSERT_EQUAL_INT(5, g_q.n);
+    TEST_ASSERT_EQUAL_UINT32(2, g_bleQ.dropped.load());
+    TEST_ASSERT_EQUAL_UINT32(2, bleQueueTakeDropped(g_bleQ));
+    TEST_ASSERT_EQUAL_UINT32(0, bleQueueTakeDropped(g_bleQ));   // logged once per pass
+    qProduce();
+    TEST_ASSERT_EQUAL_UINT32(1, bleQueueTakeDropped(g_bleQ));   // only the delta
+}
+
+static void test_queued_item_of_old_connection_not_applied(void)
+{
+    qReset();
+    qConnectCb();            // connection 1
+    qProduce();              // hello of the old central, still queued
+    qDisconnectCb();
+    qConnectCb();            // connection 2, loop has not run in between
+    qLoopDrain();
+    TEST_ASSERT_EQUAL_INT(0, g_q.appliedStale);
+    TEST_ASSERT_EQUAL_INT(0, g_q.applied);
+    TEST_ASSERT_EQUAL_UINT32(1, bleQueueTakeStale(g_bleQ));
+    TEST_ASSERT_EQUAL_UINT32(0, bleQueueTakeStale(g_bleQ));
+}
+
+static void test_inflight_item_of_old_connection_not_applied(void)
+{
+    // a queue reset in the callbacks cannot catch this one: already dequeued
+    qReset();
+    qConnectCb();
+    qProduce();
+    g_inflight = g_q.q[0]; g_q.n = 0;   // loop dequeued it ...
+    qDisconnectCb();                    // ... the host task reconnects meanwhile
+    qConnectCb();
+    qApply(g_inflight);                 // ... and the loop applies it now
+    TEST_ASSERT_EQUAL_INT(0, g_q.appliedStale);
+    TEST_ASSERT_EQUAL_UINT32(1, g_bleQ.stale.load());
+}
+
+static void test_new_connection_items_still_applied(void)
+{
+    qReset();
+    qConnectCb(); qProduce(); qDisconnectCb(); qConnectCb();
+    qProduce();                          // own hello of the new central
+    qLoopDrain();
+    TEST_ASSERT_EQUAL_INT(1, g_q.applied);
+    TEST_ASSERT_EQUAL_UINT8(2, g_q.sessionOfApplied[0]);
+}
+
+static void test_item_helpers(void)
+{
+    BleQueueItem it = {};
+    BleQueueCounters c;
+    c.gen.store(5);
+    bleItemStamp(it, c);
+    TEST_ASSERT_EQUAL_UINT32(5, it.gen);
+    TEST_ASSERT_TRUE(bleItemIsCurrent(it, 5));
+    TEST_ASSERT_FALSE(bleItemIsCurrent(it, 6));
+    c.gen.store(0xFFFFFFFFu);            // wrap: only equality counts
+    bleItemStamp(it, c);
+    bleQueueNewSession(c);
+    TEST_ASSERT_EQUAL_UINT32(0, c.gen.load());
+    TEST_ASSERT_FALSE(bleItemIsCurrent(it, c.gen.load()));
+}
+
+static void test_queue_format(void)
+{
+    BleQueueCounters c;
+    c.dropped.store(3); c.stale.store(4);
+    char buf[64];
+    bleQueueFormat(c, buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_STRING("BLE: qdrop=3 qstale=4", buf);
+}
+
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -374,5 +521,11 @@ int main(int, char **)
     RUN_TEST(test_format_exact);
     RUN_TEST(test_format_zero_and_max_fit_128);
     RUN_TEST(test_format_truncates_safely);
+    RUN_TEST(test_queue_full_drop_is_counted);
+    RUN_TEST(test_queued_item_of_old_connection_not_applied);
+    RUN_TEST(test_inflight_item_of_old_connection_not_applied);
+    RUN_TEST(test_new_connection_items_still_applied);
+    RUN_TEST(test_item_helpers);
+    RUN_TEST(test_queue_format);
     return UNITY_END();
 }

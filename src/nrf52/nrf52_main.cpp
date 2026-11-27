@@ -345,10 +345,7 @@ bool init_flash_done=false;
 // readPhoneCommand()/commandAction()/save_settings() run in the Main Loop
 // task instead of inline in the BLE callback (CONC-14). Struct layout must
 // stay in sync with the definition in nrf52_ble.cpp.
-struct BleQueueItem {
-    uint8_t data[MAX_MSG_LEN_PHONE];
-    size_t length;
-};
+#include "ble_session.h"   // BleQueueItem, session generation and drop counters (BLE-QDROP-01, BLE-STALE-01)
 extern QueueHandle_t bleQueue;
 
 bool bPosFirst = true;
@@ -2068,7 +2065,14 @@ void nrf52loop()
     {
         BleQueueItem bleItem;
         while (xQueueReceive(bleQueue, &bleItem, 0) == pdTRUE) {
+            if(!bleQueueAccept(g_bleQ, bleItem))   // BLE-STALE-01: frame of an earlier connection
+                continue;
             { INSTR_SECTION("ble_cmd"); readPhoneCommand(bleItem.data, bleItem.length); }
+        }
+        {
+            uint32_t nd = bleQueueTakeDropped(g_bleQ), ns = bleQueueTakeStale(g_bleQ);
+            if(nd) Serial.printf("[BLE] %lu phone frame(s) dropped: queue full\n", (unsigned long)nd);
+            if(ns) Serial.printf("[BLE] %lu phone frame(s) dropped: earlier connection\n", (unsigned long)ns);
         }
         // Auth failure: disconnect now, not on the phone's next write.
         extern void nrf52BleServiceDisconnect(void);

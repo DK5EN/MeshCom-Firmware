@@ -323,11 +323,7 @@ extern bool hb_warn_logged;
 #include "esp_heap_caps.h"
 #include "esp_timer.h"       // AU-20: esp_timer_dump for the bleguardcycle counters
 
-struct BleQueueItem {
-    uint8_t data[MAX_MSG_LEN_PHONE];
-    size_t length;
-};
-
+// BleQueueItem, session generation and drop counters: src/ble_session.h
 static QueueHandle_t bleQueue = NULL;
 
 NimBLEServer *pServer = NULL;
@@ -337,6 +333,7 @@ NimBLEService *pService;
 volatile bool deviceConnected = false;
 bool oldDeviceConnected = false;
 BleStats g_bleStats;               // BLC-01: link counters since boot (src/ble_session.h)
+BleQueueCounters g_bleQ;           // BLE-QDROP-01/BLE-STALE-01: queue drops, session generation
 extern bool g_ble_uart_is_connected;   // defined below; the callbacks reset it
 uint16_t g_ble_conn_handle = 0xFFFF;  // current BLE connection handle
 
@@ -367,6 +364,9 @@ static inline void bleSessionResetAll()
 {
     BleSessionFlags f = { &isPhoneReady, &g_ble_uart_is_connected, &bAckInfo,
                           &config_to_phone_prepare, &conffin_sent, &ble_disconnect_requested };
+    // BLE-STALE-01: connect, disconnect and the stack teardown all pass here; frames of the old
+    // session still queued or in flight are dropped by the loop (bleQueueAccept)
+    bleQueueNewSession(g_bleQ);
     // AppLink owns the phone session: only the BLE link state is reset, the session flags stay.
     bleSessionReset(f, phoneLinkOwnedBy(&g_phoneLink, PL_NET));
 }
@@ -498,7 +498,9 @@ class CharacteristicCallbacks : public NimBLECharacteristicCallbacks {
         if (item.length <= 0 || item.length > MAX_MSG_LEN_PHONE)
             return;
         memcpy(item.data, pCharacteristic->getValue(), item.length);
-        xQueueSend(bleQueue, &item, 0);  // non-blocking, drop on full queue
+        bleItemStamp(item, g_bleQ);
+        // non-blocking; a full queue loses the frame, counted here and logged by the loop (BLE-QDROP-01)
+        bleQueueOnSend(g_bleQ, xQueueSend(bleQueue, &item, 0) == pdTRUE);
     }
 
 } chrCallbacks;
@@ -4841,6 +4843,9 @@ void esp32loop()
             bleStatsFormat(g_bleStats, sb, sizeof(sb));
             Serial.print("[BLE ];stat;");
             Serial.println(sb);
+            bleQueueFormat(g_bleQ, sb, sizeof(sb));
+            Serial.print("[BLE ];stat;");
+            Serial.println(sb);
             // ESP32 only (nRF52 has no NimBLE host task): free stack of the host task, in bytes
             TaskHandle_t hh = xTaskGetHandle("nimble_host");
             if(hh)
@@ -4853,7 +4858,14 @@ void esp32loop()
     {
         BleQueueItem bleItem;
         while (xQueueReceive(bleQueue, &bleItem, 0) == pdTRUE) {
+            if(!bleQueueAccept(g_bleQ, bleItem))   // BLE-STALE-01: frame of an earlier connection
+                continue;
             { INSTR_SECTION("ble_cmd"); LOOP_SECTION(LSEC_BLE_CMD); readPhoneCommand(bleItem.data, bleItem.length); }
+        }
+        {
+            uint32_t nd = bleQueueTakeDropped(g_bleQ), ns = bleQueueTakeStale(g_bleQ);
+            if(nd) Serial.printf("[BLE] %lu phone frame(s) dropped: queue full\n", (unsigned long)nd);
+            if(ns) Serial.printf("[BLE] %lu phone frame(s) dropped: earlier connection\n", (unsigned long)ns);
         }
     }
 

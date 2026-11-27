@@ -15,6 +15,12 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <atomic>
+
+// Same value as src/configuration_global.h (an identical redefinition is legal).
+#ifndef MAX_MSG_LEN_PHONE
+#define MAX_MSG_LEN_PHONE 300
+#endif
 
 // Pointers to the platform's session flags (the flags live in different files).
 // A null member is skipped.
@@ -95,4 +101,82 @@ inline int bleStatsFormat(const BleStats &s, char *buf, size_t n)
                     (unsigned long)s.con, (unsigned long)s.dis, (unsigned long)s.to,
                     (unsigned long)s.rem, (unsigned long)s.loc, (unsigned long)s.fail,
                     (unsigned long)s.adv);
+}
+
+// ---------------------------------------------------------------------------
+// Phone frame queue (bleQueue): item layout, session generation, drop counters.
+// Shared by both platforms (BLE-QDROP-01, BLE-STALE-01; specs/tla/bletask.tla).
+//
+// The producer (NimBLE host task / Bluefruit rx callback) stamps each item with the session
+// generation; the connect/disconnect callbacks bump it. The loop applies an item only if its
+// stamp is still current: an item queued (or already dequeued) during connection k is dropped in
+// k+1. A queue reset in the callbacks alone does not close this (item in flight).
+struct BleQueueItem
+{
+    uint8_t  data[MAX_MSG_LEN_PHONE];
+    size_t   length;
+    uint32_t gen;   // session generation at enqueue time
+};
+
+// Written by the BLE callbacks, read by the loop task: atomics, no Serial in the callbacks.
+// Each platform defines `BleQueueCounters g_bleQ;` exactly once.
+struct BleQueueCounters
+{
+    std::atomic<uint32_t> gen;       // session generation
+    std::atomic<uint32_t> dropped;   // frames lost to a full queue (BLE-QDROP-01)
+    std::atomic<uint32_t> stale;     // frames of an earlier connection, dropped by the loop (BLE-STALE-01)
+    uint32_t droppedLogged;          // loop task only: last value already logged
+    uint32_t staleLogged;
+};
+
+extern BleQueueCounters g_bleQ;
+
+// Connect and disconnect callbacks (and every other session reset).
+inline void bleQueueNewSession(BleQueueCounters &c) { c.gen.fetch_add(1, std::memory_order_relaxed); }
+
+// Producer: stamp before xQueueSend.
+inline void bleItemStamp(BleQueueItem &it, const BleQueueCounters &c)
+{
+    it.gen = c.gen.load(std::memory_order_relaxed);
+}
+
+inline bool bleItemIsCurrent(const BleQueueItem &it, uint32_t gen) { return it.gen == gen; }
+
+// Producer: result of xQueueSend (true = queued). A failed send is a lost frame, count it.
+inline void bleQueueOnSend(BleQueueCounters &c, bool queued)
+{
+    if(!queued) c.dropped.fetch_add(1, std::memory_order_relaxed);
+}
+
+// Loop, right before readPhoneCommand: true = apply; a stale item is counted and must be skipped.
+inline bool bleQueueAccept(BleQueueCounters &c, const BleQueueItem &it)
+{
+    if(bleItemIsCurrent(it, c.gen.load(std::memory_order_relaxed))) return true;
+    c.stale.fetch_add(1, std::memory_order_relaxed);
+    return false;
+}
+
+// Loop, once per pass: counts since the last call (0 = nothing to log).
+inline uint32_t bleQueueTakeDropped(BleQueueCounters &c)
+{
+    uint32_t n = c.dropped.load(std::memory_order_relaxed);
+    uint32_t d = n - c.droppedLogged;
+    c.droppedLogged = n;
+    return d;
+}
+
+inline uint32_t bleQueueTakeStale(BleQueueCounters &c)
+{
+    uint32_t n = c.stale.load(std::memory_order_relaxed);
+    uint32_t d = n - c.staleLogged;
+    c.staleLogged = n;
+    return d;
+}
+
+// "BLE: qdrop=<n> qstale=<n>" for the --bledebug stat line.
+inline int bleQueueFormat(const BleQueueCounters &c, char *buf, size_t n)
+{
+    return snprintf(buf, n, "BLE: qdrop=%lu qstale=%lu",
+                    (unsigned long)c.dropped.load(std::memory_order_relaxed),
+                    (unsigned long)c.stale.load(std::memory_order_relaxed));
 }

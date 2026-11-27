@@ -125,10 +125,10 @@
         "src/byte_fifo.cpp::bf_pop": "3a0f86ca77a8f290",
         "src/byte_fifo.cpp::bf_iter_begin": "4ce18cc757b29ebf",
         "src/byte_fifo.cpp::bf_iter_next": "74d07f70f7940895",
-        "src/esp32/udp_drain_esp32.cpp::*": "6ae19daded6cb749",
+        "src/esp32/udp_drain_esp32.cpp::*": "1da7005e61278243",
         "src/nrf52/udp_drain_nrf52.cpp::*": "7781ee034b54a8c1"
       },
-      "reviewed": "2026-11-23",
+      "reviewed": "2026-11-27",
       "review_depth": "baseline only: anchors checked, model not re-derived from the code"
     },
     {
@@ -188,6 +188,51 @@
       "status": "frozen",
       "reason": "models the Auto Update gate before the reserved 32 KB buffer; kept as the record of why the old gate failed",
       "sources": []
+    },
+    {
+      "id": "bletask",
+      "spec": "specs/tla/bletask.tla",
+      "status": "active",
+      "not_hashed": "NimBLE onConnect/onDisconnect/onWrite (class methods in esp32_main.cpp) and the two loop drains (inline in the loop functions); their gates are pinned by tools/tests/test_ble_queue_sites.py",
+      "sources": [
+        {
+          "file": "src/ble_session.h",
+          "functions": [
+            "bleQueueNewSession",
+            "bleQueueOnSend",
+            "bleQueueAccept",
+            "bleQueueTakeDropped",
+            "bleQueueTakeStale"
+          ]
+        },
+        {
+          "file": "src/esp32/esp32_main.cpp",
+          "functions": [
+            "bleSessionResetAll"
+          ]
+        },
+        {
+          "file": "src/nrf52/nrf52_ble.cpp",
+          "functions": [
+            "connect_callback",
+            "disconnect_callback",
+            "bleuart_rx_callback"
+          ]
+        }
+      ],
+      "hashes": {
+        "src/ble_session.h::bleQueueNewSession": "8da160be6fc011ac",
+        "src/ble_session.h::bleQueueOnSend": "e68488dd6366fcb7",
+        "src/ble_session.h::bleQueueAccept": "f98380b03eb0b90b",
+        "src/ble_session.h::bleQueueTakeDropped": "ef0b96a839a53344",
+        "src/ble_session.h::bleQueueTakeStale": "888d5de628d74c6f",
+        "src/esp32/esp32_main.cpp::bleSessionResetAll": "440e55c2923b5c6f",
+        "src/nrf52/nrf52_ble.cpp::connect_callback": "9b18680f5ac156e9",
+        "src/nrf52/nrf52_ble.cpp::disconnect_callback": "c79ec83925a014d4",
+        "src/nrf52/nrf52_ble.cpp::bleuart_rx_callback": "2bba87a290588c11"
+      },
+      "reviewed": "2026-11-27",
+      "review_depth": "model written from the code 2026-11-27 (FORMAL-02 wave 3), fixes BLE-QDROP-01 and BLE-STALE-01 applied and re-checked"
     }
   ]
 }
