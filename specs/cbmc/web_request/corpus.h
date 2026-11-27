@@ -77,7 +77,7 @@ static void corpus()
     CASE("GET / HTTP/1.0\n\n", false, R_OK, WM_GET, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);
     CASE("POST /a?b=c HTTP/1.1\r\nHost: x\r\n\r\n", false, R_OK, WM_POST, 1, 6, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, -1);
     CASE("HEAD / HTTP/1.1\n", false, R_OK, WM_HEAD, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1);
-    CASE("OPTIONS * HTTP/1.1\r\n\r\n", false, R_OK, WM_OPTIONS, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);
+    CASE("OPTIONS * HTTP/1.1\r\n\r\n", false, R_RL, WM_OPTIONS, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);    // B3: asterisk-form not served
     CASE("PUT /x HTTP/1.1\n\n", false, R_OK, WM_OTHER, 1, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);
     CASE("get / HTTP/1.1\n\n", false, R_OK, WM_OTHER, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);
     CASE("GET / HTTP/1.1", false, R_RL, WM_GET, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1);         // request line never terminated
@@ -100,7 +100,11 @@ static void corpus()
     CASE("GET / HTTP/1x1\n\n", false, R_VER, WM_GET, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);
     CASE("GET / HTTP/1.x\n\n", false, R_VER, WM_GET, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);
     CASE("GET / HTTP/1.1\r\r\n\n", false, R_VER, WM_GET, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1); // only one CR is dropped
-    CASE("GET /a b HTTP/1.1\n\n", false, R_OK, WM_GET, 1, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);   // blank inside the target
+    CASE("GET /a b HTTP/1.1\n\n", false, R_RL, WM_GET, 0, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);   // B3: blank inside the target
+    CASE("GET  /?page=info  HTTP/1.1\n\n", false, R_RL, WM_GET, 0, 13, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1); // B3: double blanks (corpus mut-427)
+    CASE("GET ?page=info HTTP/1.1\n\n", false, R_RL, WM_GET, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);   // B3: target without a leading slash
+    CASE("GET x HTTP/1.1\n\n", false, R_RL, WM_GET, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);
+    CASE("GET / HTTP/1.1 \n\n", false, R_VER, WM_GET, 0, 10, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);    // trailing blank: the version is empty, its verdict wins
     CASE("GET /? HTTP/1.1\n\n", false, R_OK, WM_GET, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);
     CASE("GET /a?b?c HTTP/1.1\n\n", false, R_OK, WM_GET, 1, 6, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);
     CASE("GET /\0a HTTP/1.1\n\n", false, R_OK, WM_GET, 1, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1);  // NUL inside the target

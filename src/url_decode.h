@@ -35,14 +35,21 @@ size_t url_percent_decode(char *buf, size_t len);
 /** Policies of urlDecode(). LEGACY is the rule set above (WebUI query values);
  *  STRICT is the Remote-page form decoder: '+' stays a literal '+', %22 is
  *  kept, a raw control byte or DEL or a decoded one (also %00) rejects the
- *  whole value. A TRUNC policy (cap on a UTF-8 boundary) is planned for
- *  webFieldDecode, not here. */
-enum : uint8_t { URLD_LEGACY = 0, URLD_STRICT = 1 };
+ *  whole value. TRUNC is for urlDecodeTo() (webFieldDecode); urlDecode()
+ *  never reaches a cap, so there it equals LEGACY. */
+enum : uint8_t { URLD_LEGACY = 0, URLD_STRICT = 1, URLD_TRUNC = 2 }; // TRUNC: LEGACY decode, cut at the cap on a UTF-8 boundary (webFieldDecode, web_query.h)
 
 /** In place on buf[0..len), NUL at buf[ret] (buf needs len+1 bytes). Returns
  *  the new length (<= len); STRICT returns (size_t)-1 on a reject (the buffer
  *  content is then unspecified). Any policy value other than URLD_STRICT
  *  behaves as URLD_LEGACY. url_percent_decode(b, n) == urlDecode(b, n, URLD_LEGACY). */
 size_t urlDecode(char *buf, size_t len, uint8_t policy);
+
+/** Same decoder, separate source and destination: decodes src[0..len) into dst, NUL at dst[ret] (dst needs
+ *  cap+1 bytes). src == dst (in place) is safe: the write index never passes the read index. When one more
+ *  output byte would exceed cap: (size_t)-1, or with URLD_TRUNC (LEGACY decode) the output is cut on a UTF-8
+ *  boundary (a started multi-byte character is dropped whole), NUL-terminated, and its length returned.
+ *  STRICT rejects as urlDecode(). urlDecode(b, n, p) == urlDecodeTo(b, n, b, n, p). */
+size_t urlDecodeTo(const char *src, size_t len, char *dst, size_t cap, uint8_t policy);
 
 #endif

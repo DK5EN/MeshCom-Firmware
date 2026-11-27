@@ -5,10 +5,24 @@ archive section at the end with one line each.
 
 ## Now (2026-11-27, resume here)
 
-**State:** waves 1-6 committed on `fork-dev` (last code commit `d787c11b`, proofs and docs in the wave-6 closing
-commit), not pushed yet. `fork-dev` contains all of `upstream/dev` (checked 2026-11-27). Start a fresh session with
-`/orchestrate-waves` on this doc; the next wave is 7 (web wave B).
+**State:** waves 1-6 and 7a committed on `fork-dev`, not pushed. `fork-dev` contains all of `upstream/dev` (checked
+2026-11-27). Start a fresh session with `/orchestrate-waves` on this doc; the next wave is 7b (wiring of the wave-7a
+modules into `work_webpage`, then B1-B7/B10 one commit each).
 
+- **Wave 7a result (building blocks, not wired):** `src/web_functions/web_route.h` (43 routes, exact match; corpus:
+  777 identical, 40 refused by the parser before routing (B3 19, B6 20, CORPUS 1), 136 deltas B1 59 / B2 39 / B3 21 /
+  ENV 1 / CORPUS 16, all pinned), `web_query.h` (field extractor, streams through the new `urlDecodeTo`, no stack
+  temp; tocall keeps today's `&message` stop), `src/num_parse.h` (strict int and 3-digit fixed point, `mcTrimSpan`,
+  `mcFormatDec3`; B5 table against today's site parsers), `web_body.h` (body accumulator, 1:1 with `web_read_body` and
+  `rmReadBody`). `webReqParse` now refuses targets without a leading `/` or with a raw blank (B3 shape rule).
+  Proofs rerun: `url_decode` 6/6, `web_request` 28 (22 quick, 6 heavy up to 8.6 GB).
+- **Wiring decisions for 7b (documented in `web_route.h`):** without a session a page-shaped request (`GET /?page=...`)
+  gets the login page whether the page exists or not; HEAD gets 405 with `Allow` built from the row's method mask; the
+  dispatcher wipes head and line on every exit; `/?nodepassword` is one route, the handler branches on the value; the
+  setparam wiring trims space/tab before `mcParse*`; windcal/tempoff format back with `mcFormatDec3`.
+- **Waiting on the operator:** B11 (proposed, seams 7.2): `send_message` reads `tocall` by name, so a hand-made URL with
+  `&message=` before `&tocall=` goes to the named station instead of a garbage destination. Relay candidate rule
+  (RELAY-ORDER-01).
 - **Wave 6 result:** `src/web_functions/web_request.h` (head accumulator and request-line parser, `d528d071`) and
   `work_webpage` running on it (`d787c11b`, accumulator one heap block from `startWebserver()`, 503 when the heap is
   exhausted). The request rig has a live entry (`test/test_web_diff/live/`, cut from the working tree by function
@@ -24,7 +38,6 @@ commit), not pushed yet. `fork-dev` contains all of `upstream/dev` (checked 2026
 - **Rig status:** `test/test_web_diff` compares the frozen copy (`frozen/`, sha256 pinned) with the live copy;
   regenerate the live copy after every edit of an extracted function: `python3 test/test_web_diff/live/extract_live.py`
   (`--check` runs in pytest, the suite's staleness case names the command). Corpus files keep CRLF.
-- **Waiting on the operator:** relay candidate rule (RELAY-ORDER-01): firmware change only after a yes.
 
 ### Next waves (dispatch plan)
 
@@ -201,6 +214,11 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 ## Open questions
 
 ## Archive
+
+- Wave 7a (2026-11-27): route table, query extractor (+ `urlDecodeTo`, `URLD_TRUNC`), strict number parser, body
+  accumulator, B3 request-line shape rule in `webReqParse`; four native envs. Advisor: rework on labels, stack temp,
+  today-references for B5, sign of negative milli values; second round (refused requests pinned, B3/B11 in 7.2) by
+  the orchestrator; approved. Gate `--changed` PASS (141 envs, 4,423 ok, 1 skipped).
 
 - Wave 6 (2026-11-27): head parser and `work_webpage` on it (`d528d071`, `d787c11b`), rig live entry, proof groups
   `web_request` (27) and `nimble_att_write` (3 active, 12 parked). Advisor: three rounds on the parser (NUL semantics

@@ -30,32 +30,56 @@ size_t url_percent_decode_live(char *buf, size_t len)
     return urlDecode_live(buf, len, URLD_LEGACY);
 }
 
-size_t urlDecode_live(char *buf, size_t len, uint8_t policy)
+namespace
 {
-    if (buf == nullptr)
+    // The output byte c does not fit (dst[0..cap) is full). STRICT/LEGACY: -1. TRUNC: c is parked at dst[cap]
+    // (dst has cap+1 bytes) and the cut backs up to the start of a started UTF-8 sequence, never inside one.
+    size_t over_cap(char *dst, size_t cap, char c, bool trunc)
+    {
+        if (!trunc)
+            return (size_t)-1;
+        size_t out = cap;
+        dst[out] = c;
+        while (out > 0 && ((unsigned char)dst[out] & 0xC0) == 0x80)
+            out--;
+        dst[out] = '\0';
+        return out;
+    }
+}
+
+// urlDecodeTo is defined before urlDecode on purpose: the request rig copies this file into namespace web_live
+// (test/test_web_diff/live), and the in-namespace call must see the in-namespace definition.
+size_t urlDecodeTo(const char *src, size_t len, char *dst, size_t cap, uint8_t policy)
+{
+    if (src == nullptr || dst == nullptr)
         return 0;
 
     const bool strict = (policy == URLD_STRICT);
+    const bool trunc = (policy == URLD_TRUNC);
     size_t in = 0;
     size_t out = 0;
 
     while (in < len)
     {
-        char c = buf[in];
+        char c = src[in];
 
         if (c == '+' && !strict)
         {
-            buf[out++] = ' ';
+            if (out >= cap)
+                return over_cap(dst, cap, ' ', trunc);
+            dst[out++] = ' ';
             in++;
             continue;
         }
 
-        int b = escape_at(buf, len, in);
+        int b = escape_at(src, len, in);
         if (b < 0)
         {
             if (strict && ((unsigned char)c < 0x20 || (unsigned char)c == 0x7F))
                 return (size_t)-1;
-            buf[out++] = c;  // plain byte, or a '%' that starts no escape
+            if (out >= cap)
+                return over_cap(dst, cap, c, trunc);
+            dst[out++] = c;  // plain byte, or a '%' that starts no escape
             in++;
             continue;
         }
@@ -65,11 +89,15 @@ size_t urlDecode_live(char *buf, size_t len, uint8_t policy)
         {
             if (b < 0x20 || b == 0x7F)
                 return (size_t)-1;  // decoded control or DEL
-            buf[out++] = (char)b;
+            if (out >= cap)
+                return over_cap(dst, cap, (char)b, trunc);
+            dst[out++] = (char)b;
         }
-        else if (b == 0x0D && escape_at(buf, len, in) == 0x0A)
+        else if (b == 0x0D && escape_at(src, len, in) == 0x0A)
         {
-            buf[out++] = '-';  // line break -> "-", as before
+            if (out >= cap)
+                return over_cap(dst, cap, '-', trunc);
+            dst[out++] = '-';  // line break -> "-", as before
             in += 3;
         }
         else if (b == '"' || b < 0x20 || b == 0x7F)
@@ -78,12 +106,20 @@ size_t urlDecode_live(char *buf, size_t len, uint8_t policy)
         }
         else
         {
-            buf[out++] = (char)b;
+            if (out >= cap)
+                return over_cap(dst, cap, (char)b, trunc);
+            dst[out++] = (char)b;
         }
     }
 
-    buf[out] = '\0';
+    dst[out] = '\0';
     return out;
+}
+
+size_t urlDecode_live(char *buf, size_t len, uint8_t policy)
+{
+    // In place: the write index never passes the read index, and cap == len is never reached.
+    return urlDecodeTo(buf, len, buf, len, policy);
 }
 
 } // namespace web_live

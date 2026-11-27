@@ -16,7 +16,7 @@
 //   M_PARSE_ANY   webReqParse on PMIN..PLEN symbolic bytes (exact heap buffer) drawn from the small constant alphabet ALPHA (-D, index into a table,
 //                  no 256 value bytes); LEAD_LF fixes byte 0 to LF (empty request line, the rest is header lines). Generic checks (spans inside
 //                  [buf, buf+min(len,WEB_HEAD_MAX)), path/query shape, method in the enum, WRQ_OK only for a terminated request line ending in
-//                  HTTP/1.0|1.1), q.cut == cut; NOHDR: no header fact (alphabet cannot spell a header name); MODEL_BLANK: blank equals a closed-form
+//                  HTTP/1.0|1.1 and a target that starts with '/' without a blank (B3 request-line shape)), q.cut == cut; NOHDR: no header fact (alphabet cannot spell a header name); MODEL_BLANK: blank equals a closed-form
 //                  reference (an empty terminated line after the request line, or a lone CR as unterminated last line below the window)
 //   M_PARSE_METHOD  one of GET POST HEAD OPTIONS PUT, optionally one byte replaced by 'x', then one blank (unterminated): method equals the enum, exact
 //   M_PARSE_TARGET  "GET " + 0..3 symbolic target bytes {/ ? a blank} + " x" + optional CR + LF: target / path / query spans exact, res by target.n
@@ -235,6 +235,12 @@ static void checkReq(const char *buf, size_t len0, const WebReq &q, WebParseRes 
         assert(buf[rl - 1] == '0' || buf[rl - 1] == '1');
         assert(q.minor == (uint8_t)(buf[rl - 1] - '0'));
         assert(q.target.n > 0 && q.method != WM_NONE);
+        // B3 request-line shape: origin-form target (starts with '/', no blank inside); with the exact two-blank layout the version
+        // blank is the only blank after the method's
+        assert(q.target.p[0] == '/');
+        for (size_t i = 0; i < (size_t)PLEN_MAX; i++)
+            if (i < q.target.n)
+                assert(q.target.p[i] != ' ');
     }
 #ifdef WITNESS_OK
     assert(res != WRQ_OK);
@@ -515,7 +521,13 @@ int main()
 
 #elif defined(M_PARSE_TARGET)
     // "GET " + tl target bytes + " x" + optional CR + LF; the last blank of the line is the one before the 'x'
-    const int tl = NDR(0, 3);
+#ifndef TL_LO
+#define TL_LO 0
+#endif
+#ifndef TL_HI
+#define TL_HI 3
+#endif
+    const int tl = NDR(TL_LO, TL_HI); // split across jobs (pass_parse_target 0..2, pass_parse_target3 3): one job over 15 GB
     const bool cr = nondet_int() != 0;
     char tmp[12];
     memcpy(tmp, "GET ", 4);

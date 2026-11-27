@@ -3,4 +3,5 @@ SOURCES="harness.cpp"
 CFLAGS="-I$ROOT/src/web_functions -DWEB_HEAD_MAX=64 -DWEB_COOKIE_MAX=6 -DM_PARSE_CORPUS -DCORPUS=1 -DPLEN=64 -DPLEN_MAX=64"
 FLAGS="--unwind 72"
 EXPECT=pass
-CHECKS="webReqParse concrete corpus 1 (request line: every method, damaged HTTP/1.1 at each of its 8 positions, no version, empty method/target, CR rules, NUL in the target, unterminated, last line cut by the full window): all fields of WebReq equal the stated values, memory safe (enumeration of 35 constant inputs, not a symbolic class)"
+CHECKS="webReqParse concrete corpus 1 (request line: every method, damaged HTTP/1.1 at each of its 8 positions, no version, empty method/target, B3 request-line shapes (double blanks, no leading slash, blank in the target, OPTIONS *), CR rules, NUL in the target, unterminated, last line cut by the full window): all fields of WebReq equal the stated values, memory safe (enumeration of 39 constant inputs, not a symbolic class)"
+TIER=heavy

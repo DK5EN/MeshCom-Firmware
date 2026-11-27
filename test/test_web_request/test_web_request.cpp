@@ -584,11 +584,39 @@ static void test_parse_versions(void)
     TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("GET /x HTTP/1.1", &q)); // never terminated
     TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P(" /x HTTP/1.1\r\n\r\n", &q));
     TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("GET  HTTP/1.1\r\n\r\n", &q)); // empty target
-    // the version is after the LAST space: a target with a space keeps the split of web_guard.h
-    TEST_ASSERT_EQUAL_INT(WRQ_OK, P("GET /a b HTTP/1.1\r\n\r\n", &q));
+    // the version is after the LAST space: the split of web_guard.h stays (target "/a b"), but B3 judges it: 400
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("GET /a b HTTP/1.1\r\n\r\n", &q));
     TEST_ASSERT_EQUAL_STRING("/a b", S(q.target).c_str());
     // NULL buffer
     TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, webReqParse(NULL, 0, false, &q));
+}
+
+// request line shape (header comment of web_request.h): METHOD SP target SP version, exactly two single blanks, the
+// target starts with '/'. B3: a shape that is not that is WRQ_BAD_REQUEST_LINE, never a parse with a skewed path.
+static void test_parse_request_line_shape(void)
+{
+    WebReq q;
+    // corpus mut-427: double blanks
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("GET  /?page=info  HTTP/1.1\r\n\r\n", &q));
+    // relative reference, no browser sends it (corpus artifact js-0xx-pageq-*): path empty
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("GET ?page=info HTTP/1.1\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_UINT(0, q.path.n);
+    // other shapes of the same rule
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("GET  /x HTTP/1.1\r\n\r\n", &q));      // blank before the target
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("GET /x  HTTP/1.1\r\n\r\n", &q));      // blank before the version
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("GET x HTTP/1.1\r\n\r\n", &q));        // no leading slash
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("OPTIONS * HTTP/1.1\r\n\r\n", &q));    // asterisk-form: not served
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("GET http://h/ HTTP/1.1\r\n\r\n", &q)); // absolute-form
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_REQUEST_LINE, P("GET /a b HTTP/1.1\r\n\r\n", &q));
+    // a bad verdict leaves no minor behind
+    TEST_ASSERT_EQUAL_INT(0, q.minor);
+    // the plain shapes stay OK
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, P("GET / HTTP/1.1\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, P("GET /?page=info HTTP/1.0\r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_OK, P("POST /rmsend HTTP/1.1\r\n\r\n", &q));
+    // a wrong version still wins the verdict it has today (the shape is judged after it)
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_VERSION, P("GET /x HTTP/1.1 \r\n\r\n", &q));
+    TEST_ASSERT_EQUAL_INT(WRQ_BAD_VERSION, P("GET ?x HTTP/2\r\n\r\n", &q));
 }
 
 static void test_parse_target_split(void)
@@ -873,6 +901,7 @@ int main(int, char **)
     RUN_TEST(test_generated_totals);
     RUN_TEST(test_parse_methods);
     RUN_TEST(test_parse_versions);
+    RUN_TEST(test_parse_request_line_shape);
     RUN_TEST(test_parse_target_split);
     RUN_TEST(test_parse_cut_and_len);
     RUN_TEST(test_parse_header_facts);

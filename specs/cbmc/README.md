@@ -1,6 +1,6 @@
 # Bounded model checking
 
-**157 jobs in 15 groups check parsers and decoders of `src/` with ESBMC. A job compiles the real source, so a pass
+**158 jobs in 15 groups check parsers and decoders of `src/` with ESBMC. A job compiles the real source, so a pass
 holds for the code, up to the stated input length and unwind bound.** Rules, commands and limits:
 [`../README.md`](../README.md). The last complete run (74 jobs, before FORMAL-02) is in [`RESULTS.md`](RESULTS.md);
 the groups `ack_rx`, `phone_frame`, `udp_frame`, `nimble_attvalue`, `nimble_gatts_write`, `nimble_att_write`,
@@ -27,7 +27,7 @@ Default solver: ESBMC's Bitwuzla. `--z3` timed out on both new groups where Bitw
 | `nimble_attvalue`    | NimBLE `NimBLEAttValue` copy, `bleItemFromWrite`         | 24-28 B, allocation may fail                     | 6     | 0     |
 | `nimble_gatts_write` | NimBLE GATT server write case (mbuf chain to flat)       | 1-3 mbufs of 0..10 B, max 8                      | 7     | 0     |
 | `nimble_att_write`   | NimBLE ATT prepare/execute-write queue (`ble_att_svr.c`) | 1-2 prepares of 0..2 B, queue 2, attr max 2-3    | 3     | 0     |
-| `web_request`        | HTTP head parser `web_request.h` (push, atol, parse)     | push 8-20 B, parse 4-11 B (alphabets), 100 heads | 23    | 4     |
+| `web_request`        | HTTP head parser `web_request.h` (push, atol, parse)     | push 8-20 B, parse 4-11 B (alphabets), 100 heads | 22    | 6     |
 
 ## Job names
 

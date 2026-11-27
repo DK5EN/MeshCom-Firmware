@@ -26,7 +26,15 @@
 //   - Content-Length (lenient): a finished line starting with "content-length:" (any case) is read
 //     with atol() semantics (skip isspace, optional sign, digits, saturating) from byte 15 on, only
 //     while the value so far is < 0 (so a first value of 0 or more wins, a negative one is replaced).
-//   - request line / header facts: the same split and the same line rules as web_guard.h.
+//   - request line / header facts: the same split and the same line rules as web_guard.h (method = up to the FIRST blank,
+//     version = after the LAST blank, target = between them).
+//
+// REQUEST-LINE RULE (B3, 7.2; new, today's router has none): WRQ_OK only for METHOD SP target SP version with exactly two
+// single blanks, a non-empty target that starts with '/' (origin-form; "*" of OPTIONS, absolute-form and a relative
+// reference such as "?page=info" are not served by this node) and a version of HTTP/1.0 or HTTP/1.1. Order of the
+// verdicts: no LF / no blank / empty method -> BAD_REQUEST_LINE; one blank only -> BAD_VERSION; empty target ->
+// BAD_REQUEST_LINE; wrong version -> BAD_VERSION; then the shape: target not starting with '/' or holding a blank (double
+// blanks, a blank before the version) -> BAD_REQUEST_LINE. `minor` is set only for WRQ_OK (0 otherwise).
 //
 // INTENTIONAL DEVIATIONS FROM TODAY (all invisible to a caller that behaves as today):
 //   D-1. (withdrawn) The lenient Content-Length is a `long` with exact atol()/strtol() semantics, negative
@@ -136,6 +144,23 @@ struct WebReq
     int32_t content_length; // strict value of the first Content-Length line, -1 absent
     bool cut;
 };
+
+#ifndef WEB_LIT_MAX
+#define WEB_LIT_MAX 24 // longest literal (route table path/key/value, query key/stop) + 1: constant bound of every literal scan
+#endif
+
+// Length of a NUL-terminated literal, bounded by WEB_LIT_MAX: 0 for NULL, "" or a literal of WEB_LIT_MAX bytes or
+// more. Callers must not pass an over-long literal (a 0 length is an empty key); web_route.h asserts its table
+// literals stay below the bound. Shared by web_route.h and web_query.h.
+inline size_t webLitLen(const char *lit)
+{
+    if (lit == NULL)
+        return 0;
+    for (size_t i = 0; i < (size_t)WEB_LIT_MAX; i++)
+        if (lit[i] == 0)
+            return i;
+    return 0;
+}
 
 namespace webreq_detail
 {
@@ -428,6 +453,7 @@ inline WebParseRes webReqParse(const char *buf, size_t len, bool cut, WebReq *ou
     out->query = toSpan(q < target.n ? mk(target.p + q + 1, target.n - q - 1) : mk(target.p + target.n, 0));
 
     WebParseRes res = WRQ_OK;
+    int minor = 0;
     if (!rlTerminated || sp1 >= rl.n || method.n == 0)
         res = WRQ_BAD_REQUEST_LINE;
     else if (sp2 == sp1)
@@ -435,11 +461,24 @@ inline WebParseRes webReqParse(const char *buf, size_t len, bool cut, WebReq *ou
     else if (target.n == 0)
         res = WRQ_BAD_REQUEST_LINE;
     else if (version.n == 8 && memcmp(version.p, "HTTP/1.0", 8) == 0)
-        out->minor = 0;
+        minor = 0;
     else if (version.n == 8 && memcmp(version.p, "HTTP/1.1", 8) == 0)
-        out->minor = 1;
+        minor = 1;
     else
         res = WRQ_BAD_VERSION;
+    // request-line shape (B3): judged last, so a wrong version keeps its verdict. The target is origin-form: it starts
+    // with '/' and holds no blank (more than the two separating blanks, or a skewed split, is not parsed but refused).
+    if (res == WRQ_OK)
+    {
+        bool shapeOk = target.p[0] == '/';
+        for (size_t i = 0; i < target.n; i++)
+            if (target.p[i] == ' ')
+                shapeOk = false;
+        if (!shapeOk)
+            res = WRQ_BAD_REQUEST_LINE;
+    }
+    if (res == WRQ_OK)
+        out->minor = (uint8_t)minor;
 
     // ---- header lines ----
     int last = 0; // 0 other, 1 host, 2 sec-fetch-site, 3 dest, 4 origin, 5 x-mc

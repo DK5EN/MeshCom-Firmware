@@ -327,6 +327,100 @@ static void test_strict_policy_table(void)
     TEST_ASSERT_EQUAL_size_t((size_t)-1, urlDecode(d, 6, URLD_STRICT));
 }
 
+// urlDecodeTo(): separate source/destination with a cap. Model: decode in place into `full` (urlDecode, pinned above),
+// then LEGACY/STRICT give (size_t)-1 when full is longer than cap, TRUNC cuts full at cap on a UTF-8 boundary
+// (a started multi-byte character is dropped whole). dst has cap+1 bytes; a guard byte behind them must survive.
+static void to_one(const unsigned char *in, size_t n)
+{
+    static const uint8_t pol[3] = {URLD_LEGACY, URLD_STRICT, URLD_TRUNC};
+    for (int pi = 0; pi < 3; pi++)
+    {
+        char full[200];
+        memcpy(full, in, n);
+        full[n] = 0;
+        const size_t L = urlDecode(full, n, pol[pi]);
+        for (size_t cap = 0; cap <= n + 1; cap++)
+        {
+            char dst[200];
+            memset(dst, 0x77, sizeof(dst));
+            dst[cap + 1] = 0x5A; // guard
+            const size_t r = urlDecodeTo((const char *)in, n, dst, cap, pol[pi]);
+            TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x5A, (uint8_t)dst[cap + 1], "write behind dst[cap]");
+            if (L == (size_t)-1)
+            {
+                TEST_ASSERT_EQUAL_size_t((size_t)-1, r); // STRICT reject
+                continue;
+            }
+            if (L <= cap)
+            {
+                TEST_ASSERT_EQUAL_size_t(L, r);
+                TEST_ASSERT_EQUAL_STRING(full, dst);
+            }
+            else if (pol[pi] != URLD_TRUNC)
+            {
+                TEST_ASSERT_EQUAL_size_t((size_t)-1, r);
+            }
+            else
+            {
+                size_t cut = cap;
+                while (cut > 0 && ((uint8_t)full[cut] & 0xC0) == 0x80)
+                    cut--;
+                TEST_ASSERT_EQUAL_size_t(cut, r);
+                if (cut > 0)
+                    TEST_ASSERT_EQUAL_MEMORY(full, dst, cut);
+                TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)dst[cut]);
+            }
+        }
+    }
+}
+
+static void test_urldecode_to_cap_model(void)
+{
+    static const unsigned char alpha[] = {'%', '%', '+', '0', '2', 'A', 'C', '3', '8', 'E', 'F', 'f', 'g', '"', '\r', '\n', 0x00, 0x7F, 0xC3, 0xA4, 0xE2, 0x82, 0xAC, 'x', ' '};
+    uint32_t st = 0x2468ACE1u;
+    auto rnd = [&st]() { st = st * 1664525u + 1013904223u; return st >> 8; };
+    unsigned char in[24];
+    for (int it = 0; it < 20000; it++)
+    {
+        const size_t n = rnd() % 21;
+        for (size_t k = 0; k < n; k++)
+            in[k] = alpha[rnd() % sizeof(alpha)];
+        to_one(in, n);
+    }
+    // fixed cases
+    to_one((const unsigned char *)"ab%C3%A4", 8);
+    to_one((const unsigned char *)"ab%E2%82%AC", 11);
+    to_one((const unsigned char *)"a%0D%0Ab%22c+d", 14);
+}
+
+static void test_urldecode_to_fixed(void)
+{
+    char o[8];
+    // exact fit, one over, per policy
+    TEST_ASSERT_EQUAL_size_t(4, urlDecodeTo("abcd", 4, o, 4, URLD_LEGACY));
+    TEST_ASSERT_EQUAL_STRING("abcd", o);
+    TEST_ASSERT_EQUAL_size_t((size_t)-1, urlDecodeTo("abcde", 5, o, 4, URLD_LEGACY));
+    TEST_ASSERT_EQUAL_size_t((size_t)-1, urlDecodeTo("abcde", 5, o, 4, URLD_STRICT));
+    // dropped bytes do not count against the cap
+    TEST_ASSERT_EQUAL_size_t(2, urlDecodeTo("a%22%00b", 8, o, 2, URLD_LEGACY));
+    TEST_ASSERT_EQUAL_STRING("ab", o);
+    // TRUNC: 2-byte char at the cap is dropped whole, 3-byte too, exact fit kept
+    TEST_ASSERT_EQUAL_size_t(2, urlDecodeTo("ab%C3%A4", 8, o, 3, URLD_TRUNC));
+    TEST_ASSERT_EQUAL_STRING("ab", o);
+    TEST_ASSERT_EQUAL_size_t(4, urlDecodeTo("ab%C3%A4", 8, o, 4, URLD_TRUNC));
+    TEST_ASSERT_EQUAL_size_t(2, urlDecodeTo("ab%E2%82%AC", 11, o, 4, URLD_TRUNC));
+    TEST_ASSERT_EQUAL_size_t(0, urlDecodeTo("a", 1, o, 0, URLD_TRUNC));
+    TEST_ASSERT_EQUAL_UINT8(0, (uint8_t)o[0]);
+    // null source / destination
+    TEST_ASSERT_EQUAL_size_t(0, urlDecodeTo(nullptr, 3, o, 4, URLD_LEGACY));
+    TEST_ASSERT_EQUAL_size_t(0, urlDecodeTo("a", 1, nullptr, 4, URLD_LEGACY));
+    // urlDecode is urlDecodeTo in place with cap == len (TRUNC is LEGACY there)
+    char b[16] = "a+%41%C3%A4";
+    char c[16] = "a+%41%C3%A4";
+    TEST_ASSERT_EQUAL_size_t(urlDecode(b, 11, URLD_LEGACY), urlDecodeTo(c, 11, c, 11, URLD_TRUNC));
+    TEST_ASSERT_EQUAL_STRING(b, c);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -349,5 +443,7 @@ int main(void)
     RUN_TEST(test_policies_random_long);
     RUN_TEST(test_urldecode_null_and_unknown_policy);
     RUN_TEST(test_strict_policy_table);
+    RUN_TEST(test_urldecode_to_fixed);
+    RUN_TEST(test_urldecode_to_cap_model);
     return UNITY_END();
 }
