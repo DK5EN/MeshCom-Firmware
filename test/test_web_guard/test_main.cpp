@@ -921,6 +921,51 @@ void test_setparam_update_names_need_xmc(void)
     TEST_ASSERT_TRUE(webGuardSetparamAllowed("audelayx", "3", without.c_str(), without.size()));
 }
 
+// CMD-DASH-01 bypass: commandAction() folds a look-alike dash run (em/en dash, U+2212, U+FF0D ...) to "--" before
+// it splits, so "<em dash>update install" ran --update without X-MC. The guard treats such a run like "--".
+void test_setparam_lookalike_dash_commands_need_xmc(void)
+{
+    std::string with = req("GET /setparam/?manualcommand=x HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
+    std::string without = req("GET /setparam/?manualcommand=x HTTP/1.1", {"Host: 192.168.68.71"});
+    const char *dashes[] = {"\xE2\x80\x94", "\xE2\x80\x93", "\xE2\x88\x92", "\xE2\x88\x92\xE2\x88\x92", "\xEF\xBC\x8D",
+                            "\xE2\x80\x94\xE2\x80\x94", "-\xE2\x80\x94", "\xEF\xB9\xA3"};
+    const char *toks[] = {"update install", "UPDATE install", "autoupdate auto", "ota-update", "updchan dev", "gpio 13 on", "gpio13 on"};
+    for (size_t d = 0; d < sizeof(dashes) / sizeof(dashes[0]); d++)
+        for (size_t t = 0; t < sizeof(toks) / sizeof(toks[0]); t++)
+        {
+            std::string v1 = std::string(dashes[d]) + toks[t];
+            std::string v2 = std::string("info ") + dashes[d] + toks[t];
+            const std::string vals[] = {v1, v2};
+            for (size_t k = 0; k < 2; k++)
+            {
+                const char *nm[] = {"manualcommand", "setcall"};
+                for (size_t n = 0; n < 2; n++)
+                {
+                    TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed(nm[n], vals[k].c_str(), without.c_str(), without.size()), vals[k].c_str());
+                    TEST_ASSERT_TRUE_MESSAGE(webGuardSetparamAllowed(nm[n], vals[k].c_str(), with.c_str(), with.size()), vals[k].c_str());
+                    TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed(nm[n], vals[k].c_str(), NULL, 0), vals[k].c_str());
+                }
+            }
+        }
+    // gpiocontrol stays refused even with X-MC
+    for (size_t d = 0; d < sizeof(dashes) / sizeof(dashes[0]); d++)
+    {
+        std::string v = std::string(dashes[d]) + "gpiocontrol on";
+        TEST_ASSERT_TRUE_MESSAGE(webGuardHasChainedCommand(v.c_str(), "gpiocontrol"), v.c_str());
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed("manualcommand", v.c_str(), with.c_str(), with.size()), v.c_str());
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed("manualcommand", v.c_str(), without.c_str(), without.size()), v.c_str());
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed("atxt", v.c_str(), with.c_str(), with.size()), v.c_str());
+        TEST_ASSERT_FALSE_MESSAGE(webGuardSetparamAllowed("atxt", v.c_str(), without.c_str(), without.size()), v.c_str());
+    }
+    // negatives: no command token after the dash, or a plain single ASCII hyphen
+    const char *fine[] = {"a \xE2\x80\x94 b", "Max \xE2\x80\x94Moritz", "ein \xE2\x80\x93 text", "x \xE2\x88\x92 5", "-update", "a -update b", "info", "\xE2\x80\x94"};
+    for (size_t i = 0; i < sizeof(fine) / sizeof(fine[0]); i++)
+    {
+        TEST_ASSERT_TRUE_MESSAGE(webGuardSetparamAllowed("manualcommand", fine[i], without.c_str(), without.size()), fine[i]);
+        TEST_ASSERT_TRUE_MESSAGE(webGuardSetparamAllowed("atxt", fine[i], without.c_str(), without.size()), fine[i]);
+    }
+}
+
 void test_setparam_gpio_needs_xmc(void)
 {
     std::string with = req("GET /setparam/?gpio13=on HTTP/1.1", {"Host: 192.168.68.71", "X-MC: 1"});
@@ -1172,6 +1217,7 @@ int main(int, char **)
     RUN_TEST(test_setparam_manualcommand_update_needs_xmc);
     RUN_TEST(test_setparam_any_name_update_value_needs_xmc);
     RUN_TEST(test_setparam_update_names_need_xmc);
+    RUN_TEST(test_setparam_lookalike_dash_commands_need_xmc);
     RUN_TEST(test_setparam_gpio_needs_xmc);
     RUN_TEST(test_setparam_gpio_lookalikes_are_not_gpio_params);
     RUN_TEST(test_setparam_gpioctl_needs_xmc);

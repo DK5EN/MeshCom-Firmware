@@ -50,6 +50,26 @@ inline size_t commandDashLen(const char *s, bool *ascii)
     return 0;
 }
 
+// Non-mutating, boundary- and case-free view for guards: bytes of a dash run at s that commandFoldDashes() could
+// turn into "--" (one or two dash-like characters, at least one non-ASCII), else 0. Over-approximation: ignores the
+// command-boundary and the lowercase-letter conditions, so a guard that treats it like "--" never misses a fold.
+inline size_t commandDashRunLen(const char *s)
+{
+    size_t run = 0;
+    int count = 0;
+    bool anyUnicode = false;
+    bool ascii = false;
+    size_t n;
+    while (count < 2 && (n = commandDashLen(s + run, &ascii)) > 0)
+    {
+        if (!ascii)
+            anyUnicode = true;
+        run += n;
+        count++;
+    }
+    return anyUnicode ? run : 0;
+}
+
 // Rewrites look-alike command dashes to "--" in place. Returns the new length.
 inline size_t commandFoldDashes(char *s)
 {

@@ -75,7 +75,8 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "../hex_digit.h"  // mcHexVal: the one hex-digit decoder of the firmware
+#include "../hex_digit.h"     // mcHexVal: the one hex-digit decoder of the firmware
+#include "../command_dash.h"  // commandDashRunLen: the look-alike dashes commandAction folds to "--" (CMD-DASH-01)
 
 #ifndef WEB_GUARD_HEADER_MAX
 #define WEB_GUARD_HEADER_MAX 1023 // WEB_HEADER_MAX in web_functions.cpp
@@ -853,7 +854,7 @@ inline bool webGuardCallAllowed(const char *fn, const char *header, size_t len)
 // "--x --y" commands. The update commands (--update, --updchan, --autoupdate, --ota-update) inside it need X-MC
 // exactly like the /callfunction upd* actions, or a foreign page could fire --update install/apply through
 // the unguarded /setparam. True if the text carries such a command anywhere (case-insensitive; "&&" is the
-// web alias of "--").
+// web alias of "--", and a look-alike dash run counts as "--" too: commandDashRunLen, CMD-DASH-01).
 inline bool webGuardHasUpdCommand(const char *text)
 {
     using namespace webguard_detail;
@@ -862,12 +863,17 @@ inline bool webGuardHasUpdCommand(const char *text)
     static const char *const kTok[] = {"upd", "autoupd", "ota-update"};
     for (size_t i = 0; text[i] != 0; i++)
     {
+        size_t pre = 2;   // bytes of the "--" / "&&" / look-alike dash run (CMD-DASH-01 folds the latter to "--")
         if (!((text[i] == '-' && text[i + 1] == '-') || (text[i] == '&' && text[i + 1] == '&')))
-            continue;
+        {
+            pre = commandDashRunLen(text + i);
+            if (pre == 0)
+                continue;
+        }
         for (size_t t = 0; t < sizeof(kTok) / sizeof(kTok[0]); t++)
         {
             size_t k = 0;
-            while (kTok[t][k] != 0 && text[i + 2 + k] != 0 && lc(text[i + 2 + k]) == kTok[t][k])
+            while (kTok[t][k] != 0 && text[i + pre + k] != 0 && lc(text[i + pre + k]) == kTok[t][k])
                 k++;
             if (kTok[t][k] == 0)
                 return true;
@@ -902,8 +908,8 @@ inline bool webGuardIsGpioCtlParam(const char *name)
     return name != NULL && strcmp(name, "gpioctl") == 0;
 }
 
-// True if the text carries a chained console command whose name starts with `tok` (lower-case) after a "--" or
-// "&&" prefix, case-insensitive, blanks/tabs between prefix and name skipped. Prefix match on purpose (no
+// True if the text carries a chained console command whose name starts with `tok` (lower-case) after a "--",
+// "&&" or look-alike dash run (commandDashRunLen) prefix, case-insensitive, blanks/tabs between prefix and name skipped. Prefix match on purpose (no
 // end-of-token check): "--gpio13 on", "--gpio<TAB>13" and "--gpiocontrol on" all hit "gpio".
 inline bool webGuardHasChainedCommand(const char *text, const char *tok)
 {
@@ -912,9 +918,14 @@ inline bool webGuardHasChainedCommand(const char *text, const char *tok)
         return false;
     for (size_t i = 0; text[i] != 0; i++)
     {
+        size_t pre = 2;   // see webGuardHasUpdCommand
         if (!((text[i] == '-' && text[i + 1] == '-') || (text[i] == '&' && text[i + 1] == '&')))
-            continue;
-        size_t j = i + 2;
+        {
+            pre = commandDashRunLen(text + i);
+            if (pre == 0)
+                continue;
+        }
+        size_t j = i + pre;
         while (text[j] == ' ' || text[j] == '\t')
             j++;
         size_t k = 0;
@@ -937,7 +948,7 @@ inline bool webGuardHasChainedCommand(const char *text, const char *tok)
 //   name: every setparam branch pastes the value into "--<cmd> %s" and commandAction() splits on each "--" (the web
 //   translates only a leading "&&" of manualcommand into "--", web_setup.cpp), so setcall=X%20--update%20install runs --update install too and setcall=X%20--gpio%2013%20on would
 //   drive a pin.
-// Everything else is unchanged (no "--"/"&&" in the value: untouched).
+// Everything else is unchanged (no "--"/"&&" or look-alike dash run in the value: untouched).
 inline bool webGuardSetparamAllowed(const char *name, const char *value, const char *header, size_t len)
 {
     if (webGuardHasChainedCommand(value, "gpiocontrol"))
