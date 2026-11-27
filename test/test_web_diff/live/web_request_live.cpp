@@ -15,6 +15,11 @@
 #include <web_request.h>
 #include <web_query.h>
 #include <command_dash.h>
+#include <num_parse.h>   // B5: mboxpurge / mboxdeliver slot
+// the rig does not include msgstore_api.h (its stubs declare msgstorePurge(long)); test_web_diff.cpp asserts this value
+#ifndef MSGSTORE_SLOTS_MAX
+#define MSGSTORE_SLOTS_MAX 50
+#endif
 #include <web_setup.h>
 #include <web_nodefunctioncalls.h>
 #include <web_guard.h>
@@ -44,12 +49,12 @@ void setparam_live(const WebReq &wr, const String &full_header);
 void getparam_live(const WebReq &wr);
 size_t urlDecode_live(char *buf, size_t len, uint8_t policy); // own plumbing: the live decoder (url_decode_live.cpp)
 
-// ==== web_cors_ok (web_functions.cpp) lines 78-80 (working tree) ====
+// ==== web_cors_ok (web_functions.cpp) lines 79-81 (working tree) ====
 // RM GUI W1c: set per request by the guard in work_webpage_live(). No CORS headers are emitted any more
 // (the GUI is same-origin and there is no documented cross-origin consumer); kept for the guard plumbing.
 static bool web_cors_ok = true;
 
-// ==== web_header + clock globals (web_functions.cpp) lines 233-241 (working tree) ====
+// ==== web_header + clock globals (web_functions.cpp) lines 234-242 (working tree) ====
 String web_header;
 // FORMAL-02 web step 3: the head accumulator (~2.4 kB) of work_webpage_live(), one heap block for the life of
 // the server, never on the loop stack. Allocated by startWebserver(); web_head_acc_get() retries.
@@ -60,7 +65,7 @@ unsigned long web_previousTime = 0;       // Previous time
 #define WEB_TIMEOUT_TIME 2000             // Define timeout time in milliseconds (example: 2000ms = 2s)
 bool bweb_server_running = false;
 
-// ==== config buffer + web_read_body (web_functions.cpp) lines 594-681 (working tree) ====
+// ==== config buffer + web_read_body (web_functions.cpp) lines 595-682 (working tree) ====
 /**
  * ###########################################################################################################################
  * CS-03: config download / upload
@@ -192,7 +197,7 @@ const char *rmReadBody_live(char *buf, size_t cap, long content_length)
 #define WEB_RIG_CFG_BUF web_cfg_buf
 #include "../stubs/web_handler_stubs.h"
 
-// ==== deliver_web_asset (web_functions.cpp) lines 978-1027 (working tree) ====
+// ==== deliver_web_asset (web_functions.cpp) lines 979-1028 (working tree) ====
 /**
  * ###########################################################################################################################
  * Serves one of the static GUI assets (web_assets.h): gzip blob, own header (send_http_header_live() says no-cache and
@@ -244,7 +249,7 @@ static bool deliver_web_asset_live(const String &req)
     return true;
 }
 
-// ==== web_head_acc_get (web_functions.cpp) lines 243-250 (working tree) ====
+// ==== web_head_acc_get (web_functions.cpp) lines 244-251 (working tree) ====
 // The accumulator, allocated on first use (startWebserver() calls this once at server start); NULL when the
 // heap is exhausted, work_webpage_live() then answers 503 and keeps the server alive.
 WebHeadAcc *web_head_acc_get(void)
@@ -254,7 +259,7 @@ WebHeadAcc *web_head_acc_get(void)
     return web_head_acc;
 }
 
-// ==== webRouteLegacy + webRouteDecide (web_functions.cpp) lines 1070-1259 (working tree) ====
+// ==== webRouteLegacy + webRouteDecide (web_functions.cpp) lines 1071-1260 (working tree) ====
 static uint8_t __attribute__((noinline)) webRouteLegacy(const String &web_header)
 {
     if (web_header.startsWith("POST /rmsend"))
@@ -446,7 +451,7 @@ static uint8_t __attribute__((noinline)) webRouteDecide(const WebHeadAcc *acc, c
     return v.route;
 }
 
-// ==== work_webpage (web_functions.cpp) lines 1261-1733 (working tree) ====
+// ==== work_webpage (web_functions.cpp) lines 1262-1734 (working tree) ====
 void work_webpage_live(void)
 {
     // RAM-Rueckgewinn (2026-09-20): der 1-kB-Sammelpuffer web_header_collect
@@ -921,7 +926,7 @@ void work_webpage_live(void)
     memset(web_acc->line, 0, sizeof(web_acc->line));
 }
 
-// ==== decodeURLPercentCoding (web_functions.cpp) lines 1735-1745 (working tree) ====
+// ==== decodeURLPercentCoding (web_functions.cpp) lines 1736-1746 (working tree) ====
 /**
  * ###########################################################################################################################
  * decodes Percent-Coded Strings (e.g. URLs and its parameters)
@@ -934,7 +939,7 @@ String decodeURLPercentCoding_live(const String &input)
     return String(buf.data());
 }
 
-// ==== webDecodeSpan (web_functions.cpp) lines 1747-1761 (working tree) ====
+// ==== webDecodeSpan (web_functions.cpp) lines 1748-1762 (working tree) ====
 /**
  * The same decode as decodeURLPercentCoding_live() for a span of the parsed request (FORMAL-02 web step 5a): URLD_LEGACY, the
  * result is a String (the handlers keep their setupStruct Strings until B7). The temporary decode buffer is wiped before it
@@ -951,7 +956,7 @@ static String webDecodeSpan(WebSpan s)
     return out;
 }
 
-// ==== webCutAtNul (web_functions.cpp) lines 1763-1776 (working tree) ====
+// ==== webCutAtNul (web_functions.cpp) lines 1764-1777 (working tree) ====
 /**
  * The span ends at the first raw NUL: today's String searches (indexOf = strstr) and c_str() decodes stop there, so the
  * text of a handler does too.
@@ -967,7 +972,7 @@ static WebSpan webCutAtNul(WebSpan w)
     return w;
 }
 
-// ==== webFindLit (web_functions.cpp) lines 1778-1788 (working tree) ====
+// ==== webFindLit (web_functions.cpp) lines 1779-1789 (working tree) ====
 /**
  * Offset of the first occurrence of the literal `lit` in the span, or -1 (indexOf on the cut text).
  */
@@ -980,7 +985,7 @@ static int webFindLit(WebSpan w, const char *lit)
     return -1;
 }
 
-// ==== webParamText (web_functions.cpp) lines 1790-1810 (working tree) ====
+// ==== webParamText (web_functions.cpp) lines 1791-1811 (working tree) ====
 /**
  * The text setparam / getparam / call_function take their name and value from: the query. A request without '?'
  * ("GET /setparam/") has no query; today's header scan then cuts the header from byte 10 ("GET /setparam/" minus 10 =
@@ -1003,7 +1008,7 @@ static WebSpan webParamText(const WebReq &wr, bool legacyWindow, uint16_t skip =
     return webCutAtNul(w);
 }
 
-// ==== send_http_header (web_functions.cpp) lines 4967-5021 (working tree) ====
+// ==== send_http_header (web_functions.cpp) lines 4968-5022 (working tree) ====
 /**
  * ###########################################################################################################################
  * Sends a valid HTTP header. Takes care of the status code.
@@ -1060,7 +1065,7 @@ void send_http_header_live(uint16_t http_status_code, uint8_t content_type, cons
     webTxBeginChunked(web_client);                                            // WEB-TX-01: every flush from here on is one chunk
 }
 
-// ==== send_message (web_functions.cpp) lines 5125-5225 (working tree) ====
+// ==== send_message (web_functions.cpp) lines 5126-5226 (working tree) ====
 /**
  * ###########################################################################################################################
  * handles incoming sendmessage request
@@ -1163,7 +1168,7 @@ void send_message_live(const WebReq &wr)
     web_client.println(); // The HTTP response ends with another blank line
 }
 
-// ==== call_function (web_functions.cpp) lines 5299-5384 (working tree) ====
+// ==== call_function (web_functions.cpp) lines 5300-5394 (working tree) ====
 /**
  * ###########################################################################################################################
  * Tries to execute a Web-API function call.
@@ -1224,12 +1229,21 @@ void call_function_live(const WebReq &wr, const String &full_header)
         }
         else
         {
-            functionData.returnCode = msgstorePurge(functionData.functionParameter.toInt()) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+            // B5: space/tab trimmed, then a whole number 0..MSGSTORE_SLOTS_MAX-1; "abc", "", "1x", "+1" are refused (were slot 0 / 1)
+            const char *ps = functionData.functionParameter.c_str();
+            size_t pn = functionData.functionParameter.length();
+            mcTrimSpan(&ps, &pn);
+            int32_t slot = 0;
+            functionData.returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstorePurge(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
         }
     }
     else if (functionData.functionName.equals("mboxdeliver"))
     {
-        functionData.returnCode = msgstoreDeliverNow(functionData.functionParameter.toInt()) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+        const char *ps = functionData.functionParameter.c_str();
+        size_t pn = functionData.functionParameter.length();
+        mcTrimSpan(&ps, &pn);
+        int32_t slot = 0;
+        functionData.returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstoreDeliverNow(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
     }
     else
 #endif
@@ -1251,7 +1265,7 @@ void call_function_live(const WebReq &wr, const String &full_header)
     rm_wipe_string(functionData.functionName);
 }
 
-// ==== webSetparamValueVerdict (web_functions.cpp) lines 5386-5421 (working tree) ====
+// ==== webSetparamValueVerdict (web_functions.cpp) lines 5396-5431 (working tree) ====
 /**
  * B7 (step 5b): may this decoded setparam value reach the setter? 0 = yes, else a refusal (1 too long, 2 "--", 3 leading
  * "&&"). A value over 200 bytes is refused for every name (the setters' own buffers may still cut a value near that
@@ -1289,7 +1303,7 @@ static uint8_t webSetparamValueVerdict(const char *name, const char *value, size
     return dashes ? 2 : 0;
 }
 
-// ==== setparam (web_functions.cpp) lines 5423-5567 (working tree) ====
+// ==== setparam (web_functions.cpp) lines 5433-5577 (working tree) ====
 /**
  * ###########################################################################################################################
  * Set the Value of a parameter (if known)
@@ -1436,7 +1450,7 @@ void setparam_live(const WebReq &wr, const String &full_header)
     rm_wipe_string(setupData.returnValue);
 }
 
-// ==== getparam (web_functions.cpp) lines 5569-5634 (working tree) ====
+// ==== getparam (web_functions.cpp) lines 5579-5644 (working tree) ====
 /**
  * ###########################################################################################################################
  * Get the Value of a parameter (if known)
@@ -2655,12 +2669,21 @@ void call_function(const WebReq &wr, const String &full_header)
         }
         else
         {
-            functionData.returnCode = msgstorePurge(functionData.functionParameter.toInt()) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+            // B5: space/tab trimmed, then a whole number 0..MSGSTORE_SLOTS_MAX-1; "abc", "", "1x", "+1" are refused (were slot 0 / 1)
+            const char *ps = functionData.functionParameter.c_str();
+            size_t pn = functionData.functionParameter.length();
+            mcTrimSpan(&ps, &pn);
+            int32_t slot = 0;
+            functionData.returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstorePurge(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
         }
     }
     else if (functionData.functionName.equals("mboxdeliver"))
     {
-        functionData.returnCode = msgstoreDeliverNow(functionData.functionParameter.toInt()) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+        const char *ps = functionData.functionParameter.c_str();
+        size_t pn = functionData.functionParameter.length();
+        mcTrimSpan(&ps, &pn);
+        int32_t slot = 0;
+        functionData.returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstoreDeliverNow(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
     }
     else
 #endif

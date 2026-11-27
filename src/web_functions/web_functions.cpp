@@ -4,6 +4,7 @@
  *  @date        2025-12-03
  */
 #include "mc_text.h"
+#include "num_parse.h"   // FORMAL-02 7b step 6 (B5): strict slot number of mboxpurge / mboxdeliver
 #include "msg_body.h"      // CHARS-01: strip only the trailing {NNN ACK marker
 #include "posinfo_next.h"   // POSINFO-NEXT-01: clamped NEXT countdown
 #include "uptime_min.h"   // wrap-safe 16-bit uptime minutes (NBR stamps)
@@ -5356,12 +5357,21 @@ void call_function(const WebReq &wr, const String &full_header)
         }
         else
         {
-            functionData.returnCode = msgstorePurge(functionData.functionParameter.toInt()) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+            // B5: space/tab trimmed, then a whole number 0..MSGSTORE_SLOTS_MAX-1; "abc", "", "1x", "+1" are refused (were slot 0 / 1)
+            const char *ps = functionData.functionParameter.c_str();
+            size_t pn = functionData.functionParameter.length();
+            mcTrimSpan(&ps, &pn);
+            int32_t slot = 0;
+            functionData.returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstorePurge(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
         }
     }
     else if (functionData.functionName.equals("mboxdeliver"))
     {
-        functionData.returnCode = msgstoreDeliverNow(functionData.functionParameter.toInt()) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
+        const char *ps = functionData.functionParameter.c_str();
+        size_t pn = functionData.functionParameter.length();
+        mcTrimSpan(&ps, &pn);
+        int32_t slot = 0;
+        functionData.returnCode = (mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstoreDeliverNow(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL;
     }
     else
 #endif

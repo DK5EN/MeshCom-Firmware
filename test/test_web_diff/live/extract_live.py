@@ -164,7 +164,7 @@ def generate():
     # includes of the frozen unit, so the live unit adds it next to web_functions.h (outside the namespace)
     if live_pre.count("#include <web_functions.h>") != 1:
         die("plumbing of frozen/extract.sh: expected exactly one #include <web_functions.h>")
-    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>\n#include <web_query.h>\n#include <command_dash.h>")
+    live_pre = live_pre.replace("#include <web_functions.h>", "#include <web_functions.h>\n#include <web_request.h>\n#include <web_query.h>\n#include <command_dash.h>\n#include <num_parse.h>   // B5: mboxpurge / mboxdeliver slot\n// the rig does not include msgstore_api.h (its stubs declare msgstorePurge(long)); test_web_diff.cpp asserts this value\n#ifndef MSGSTORE_SLOTS_MAX\n#define MSGSTORE_SLOTS_MAX 50\n#endif")
     # step 5a: setparam / getparam take the parsed request; the plumbing's forward declarations (read from the frozen unit,
     # which still has the String forms) are replaced here
     for old, new in (("void setparam_live(String web_header);", "void setparam_live(const WebReq &wr, const String &full_header);"),

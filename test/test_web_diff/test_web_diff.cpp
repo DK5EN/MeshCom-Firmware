@@ -15,6 +15,7 @@
 // (B1-B10 of docs/web-server-seams-20261127.md 7.2) go into kWhitelist, keyed by corpus name (B2 in kWhitelist, B1 in kWhitelistB1, B3 in kWhitelistB3 and B6 in kWhitelistB6: all profiles, 400; B4 in kWhitelistB4: 422), each row naming the profiles where the live record differs.
 #include <unity.h>
 
+#include "msgstore_api.h" // MSGSTORE_SLOTS_MAX: the live unit defines its own copy (extract_live.py), pinned below
 #include "web_route.h" // reads no build macro: the feature mask is computed in web_functions.cpp
 
 #include "../support/repo_file.h"
@@ -27,6 +28,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+static_assert(MSGSTORE_SLOTS_MAX == 50, "extract_live.py defines MSGSTORE_SLOTS_MAX 50 for the live unit: update it");
 
 namespace web_frozen
 {
@@ -1120,6 +1123,13 @@ static void test_call_and_send_deliberate_deltas(void)
     checkDiffersFromFrozen("GET /?sendmessage&message=m&tocall= HTTP/1.1" + hdr + "\r\n", "sendMessage",
                            "sendMessage len=30 text=':{&MESSAGE=M&TOCALL=}m&tocall='", "sendMessage len=10 text=':m&tocall='",
                            "B11 reversed order, empty tocall");
+    // B5 (step 6): mboxpurge / mboxdeliver take a strict slot number (trimmed, 0..MSGSTORE_SLOTS_MAX-1); before, toInt() read
+    // "abc" and "" as slot 0 and "3x" as 3, so a typo purged the first stored message
+    checkDiffersFromFrozen("GET /callfunction/?mboxpurge=abc HTTP/1.1" + hdr + "\r\n", "msgstorePurge", "msgstorePurge slot=0", "(none)", "B5 mboxpurge=abc");
+    checkDiffersFromFrozen("GET /callfunction/?mboxpurge= HTTP/1.1" + hdr + "\r\n", "msgstorePurge", "msgstorePurge slot=0", "(none)", "B5 mboxpurge=");
+    checkDiffersFromFrozen("GET /callfunction/?mboxdeliver=3x HTTP/1.1" + hdr + "\r\n", "msgstoreDeliverNow", "msgstoreDeliverNow slot=3", "(none)", "B5 mboxdeliver=3x");
+    checkDiffersFromFrozen("GET /callfunction/?mboxpurge=50 HTTP/1.1" + hdr + "\r\n", "msgstorePurge", "msgstorePurge slot=50", "(none)", "B5 mboxpurge out of range");
+    checkSameAsFrozen("GET /callfunction/?mboxpurge=%2049%20 HTTP/1.1" + hdr + "\r\n", "msgstorePurge", "msgstorePurge slot=49", "B5 trimmed, last slot");
 }
 
 static void test_call_and_send_extraction_live_equals_frozen(void)

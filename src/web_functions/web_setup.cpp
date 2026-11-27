@@ -1,6 +1,6 @@
 // Above the board guard on purpose: test_command_setters pins this include outside any guard
-// (boards without ENABLE_MSGSTORE once lost it). Header-only, harmless in the HAS_NRF_ETH=0 TU.
-#include <command_setters.h> // cmdDecimalComma
+// (boards without ENABLE_MSGSTORE once lost the number parser). Header-only, harmless in the HAS_NRF_ETH=0 TU.
+#include "num_parse.h" // FORMAL-02 7b step 6 (B5): strict whole-input number parse, trim first
 #if !defined(NRF52_SERIES) || HAS_NRF_ETH   // web GUI is reachable over Ethernet only on nRF52
 /*
 This file contains all web-based setup functions
@@ -557,12 +557,14 @@ void webSetup_setParam(setupStruct *setupData){
     // WX-01: strict parse, decimal comma and tolerance compare stay explicit
     #if defined(ENABLE_WIND)
     if(setupData->paramName.equals("windpin")) {
-        int pin = 0;
-        char tail = 0;
-        // exactly one integer, nothing after it: "abc" must not read as pin 0 and report OK
-        bool bOneInt = (sscanf(setupData->paramValue.c_str(), "%d %c", &pin, &tail) == 1);
+        // B5: space/tab trimmed, then exactly one whole number 0..48 ("5x", "abc", "+5", "1e1" refuse)
+        const char *ps = setupData->paramValue.c_str();
+        size_t pn = setupData->paramValue.length();
+        mcTrimSpan(&ps, &pn);
+        int32_t pin = 0;
+        bool bOneInt = mcParseInt(ps, pn, 0, 48, &pin);
         if(bOneInt) {
-            snprintf(message_text, sizeof(message_text), "--windpin %d", pin);
+            snprintf(message_text, sizeof(message_text), "--windpin %d", (int)pin);
             commandAction(message_text, bPhoneReady);
         }
         setupData->returnCode = (bOneInt && meshcom_settings.node_wind_pin == pin)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
@@ -571,11 +573,15 @@ void webSetup_setParam(setupStruct *setupData){
     } else
 
     if(setupData->paramName.equals("windcal")) {
-        float cal = 0.0f;
+        // B5: trimmed, 1..3 decimals, comma or point, 0.1..100.0 ("1.5abc", "nan", "1e1", "1.2345" refuse); the console line
+        // gets the value back from the thousandths (mcFormatDec3 keeps the sign of -0.5; a split into integer and fraction loses it)
+        const char *ps = setupData->paramValue.c_str();
+        size_t pn = setupData->paramValue.length();
+        mcTrimSpan(&ps, &pn);
+        int32_t calMilli = 0;
         char value[16];
-        snprintf(value, sizeof(value), "%s", setupData->paramValue.c_str());
-        cmdDecimalComma(value);   // "2,5" -> "2.5", same as the temperature offsets
-        bool bOneFloat = (sscanf(value, "%f", &cal) == 1);
+        bool bOneFloat = mcParseDec3(ps, pn, 100, 100000, &calMilli) && mcFormatDec3(calMilli, value, sizeof(value)) > 0;
+        const float cal = (float)calMilli / 1000.0f;
         if(bOneFloat) {
             snprintf(message_text, sizeof(message_text), "--windcal %s", value);
             commandAction(message_text, bPhoneReady);
@@ -644,17 +650,33 @@ void webSetup_setParam(setupStruct *setupData){
     } else
 
     if(setupData->paramName.equals("storetime")) {
-        snprintf(message_text, sizeof(message_text), "--storetime %s", setupData->paramValue.c_str());
-        commandAction(message_text, bPhoneReady);
-        setupData->returnCode = ((int)msgstoreHoldHours() == setupData->paramValue.toInt())?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        // B5: trimmed whole number 1..MSGSTORE_HOLD_MAX_H; a refusal never reaches the console line
+        const char *ps = setupData->paramValue.c_str();
+        size_t pn = setupData->paramValue.length();
+        mcTrimSpan(&ps, &pn);
+        int32_t hours = 0;
+        const bool bHoursOk = mcParseInt(ps, pn, 1, MSGSTORE_HOLD_MAX_H, &hours);
+        if(bHoursOk) {
+            snprintf(message_text, sizeof(message_text), "--storetime %d", (int)hours);
+            commandAction(message_text, bPhoneReady);
+        }
+        setupData->returnCode = (bHoursOk && (int)msgstoreHoldHours() == (int)hours)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
         setupData->returnValue = String(msgstoreHoldHours());
         return;
     } else
 
     if(setupData->paramName.equals("storeslots")) {
-        snprintf(message_text, sizeof(message_text), "--storeslots %s", setupData->paramValue.c_str());
-        commandAction(message_text, bPhoneReady);
-        setupData->returnCode = ((int)msgstoreSlots() == setupData->paramValue.toInt())?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
+        // B5: trimmed whole number 1..MSGSTORE_SLOTS_MAX; a refusal never reaches the console line
+        const char *ps = setupData->paramValue.c_str();
+        size_t pn = setupData->paramValue.length();
+        mcTrimSpan(&ps, &pn);
+        int32_t slots = 0;
+        const bool bSlotsOk = mcParseInt(ps, pn, 1, MSGSTORE_SLOTS_MAX, &slots);
+        if(bSlotsOk) {
+            snprintf(message_text, sizeof(message_text), "--storeslots %d", (int)slots);
+            commandAction(message_text, bPhoneReady);
+        }
+        setupData->returnCode = (bSlotsOk && (int)msgstoreSlots() == (int)slots)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
         setupData->returnValue = String(msgstoreSlots());
         return;
     } else
@@ -754,14 +776,19 @@ void webSetup_setParam(setupStruct *setupData){
         else if(v.equals("release")) op = GPIO_OP_RELEASE;
         else opOk = false;
         const String num = setupData->paramName.substring(4);
-        if(!opOk || num.length() > 3)
+        // B5: the pin number is a whole number 0..999 (atoi read "5x" as 5 and "" as 0); gpioCtlCommand refuses unknown pins
+        const char *ps = num.c_str();
+        size_t pn = num.length();
+        mcTrimSpan(&ps, &pn);
+        int32_t pinNo = 0;
+        if(!opOk || num.length() > 3 || !mcParseInt(ps, pn, 0, 999, &pinNo))
         {
             setupData->returnCode = WS_RETURNCODE_FAIL;
             return;
         }
         PinClass why = PIN_FREE;
         int lvl = -1;
-        const GpioRes gr = gpioCtlCommand(atoi(num.c_str()), op, &why, &lvl);
+        const GpioRes gr = gpioCtlCommand((int)pinNo, op, &why, &lvl);
         // GPIO_NOT_HELD (release of a pin we do not hold) changed nothing and needs no hardware: the pin is as asked
         setupData->returnCode = (gr == GPIO_OK || gr == GPIO_NOT_HELD)?WS_RETURNCODE_OKAY:WS_RETURNCODE_FAIL;
         setupData->returnValue = v;
@@ -845,13 +872,16 @@ void webSetup_setParam(setupStruct *setupData){
 
     /// ###################################### Indoor Temperature Offset ######################################
     if(setupData->paramName.equals("tempoffsetindoor")) {
-        float offset = 0.0;
+        // B5: trimmed, 1..3 decimals, comma or point, -50.0..50.0 ("-0,5" is -0.5; "1.5abc", "nan", "1e1", "1.2345" refuse)
+        const char *ps = setupData->paramValue.c_str();
+        size_t pn = setupData->paramValue.length();
+        mcTrimSpan(&ps, &pn);
+        int32_t offMilli = 0;
         char value[16];
-        snprintf(value, sizeof(value), "%s", setupData->paramValue.c_str());
-        cmdDecimalComma(value);   // "-0,5" -> "-0.5"
-        bool bOneFloat = (sscanf(value, "%f", &offset) == 1);   //was there exactly ONE float value in this string?
+        bool bOneFloat = mcParseDec3(ps, pn, -50000, 50000, &offMilli) && mcFormatDec3(offMilli, value, sizeof(value)) > 0;
+        const float offset = (float)offMilli / 1000.0f;
         if(bOneFloat) {
-            // same rung as the console: the -50..50 range check and save_settings() live there
+            // same rung as the console: the range check and save_settings() live there too
             snprintf(message_text, sizeof(message_text), "--tempoff in %s", value);
             commandAction(message_text, bPhoneReady);
         }
@@ -861,13 +891,16 @@ void webSetup_setParam(setupStruct *setupData){
     } else
     /// ###################################### Outdoor Temperature Offset ######################################
     if(setupData->paramName.equals("tempoffsetoutdoor")) {
-        float offset = 0.0;
+        // B5: trimmed, 1..3 decimals, comma or point, -50.0..50.0 ("-0,5" is -0.5; "1.5abc", "nan", "1e1", "1.2345" refuse)
+        const char *ps = setupData->paramValue.c_str();
+        size_t pn = setupData->paramValue.length();
+        mcTrimSpan(&ps, &pn);
+        int32_t offMilli = 0;
         char value[16];
-        snprintf(value, sizeof(value), "%s", setupData->paramValue.c_str());
-        cmdDecimalComma(value);   // "-0,5" -> "-0.5"
-        bool bOneFloat = (sscanf(value, "%f", &offset) == 1);   //was there exactly ONE float value in this string?
+        bool bOneFloat = mcParseDec3(ps, pn, -50000, 50000, &offMilli) && mcFormatDec3(offMilli, value, sizeof(value)) > 0;
+        const float offset = (float)offMilli / 1000.0f;
         if(bOneFloat) {
-            // same rung as the console: the -50..50 range check and save_settings() live there
+            // same rung as the console: the range check and save_settings() live there too
             snprintf(message_text, sizeof(message_text), "--tempoff out %s", value);
             commandAction(message_text, bPhoneReady);
         }

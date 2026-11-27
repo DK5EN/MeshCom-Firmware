@@ -22,6 +22,8 @@
 
 #include "command_setters.h"
 #include "command_match.h"
+#include "num_parse.h"    // FORMAL-02 7b step 6 (B5): the strict parser the web setting sites call
+#include "msgstore_api.h" // MSGSTORE_SLOTS_MAX, MSGSTORE_HOLD_MAX_H (macros only)
 #include "batt_charge.h"    // BAT-04 C5: worst-case IS2 size from the real state names
 #include "esp32/fw_update_net.h" // fwLanUrlParse() (AU-08), the pure part outside the ESP32 guard
 
@@ -1049,16 +1051,179 @@ static void test_web_temp_offset_takes_comma_and_leading_zero()
     TEST_ASSERT_TRUE_MESSAGE(web.find("\"tempoffsetindoor\", 6,") != std::string::npos, "indoor offset input too short");
     TEST_ASSERT_TRUE_MESSAGE(web.find("\"tempoffsetoutdoor\", 6,") != std::string::npos, "outdoor offset input too short");
 
-    // both setparam handlers normalise before they parse and before they build the console command
+    // B5 (FORMAL-02 7b step 6): the web sites trim and parse with num_parse.h; the decimal comma is the parser's own
+    // (no cmdDecimalComma in web_setup.cpp any more). The include must not sit inside a board guard: boards without
+    // ENABLE_MSGSTORE (T-Beam) once failed to compile when a header sat inside it.
     const std::string set = read_repo_file("src/web_functions/web_setup.cpp");
-    // the include must not sit inside a board guard: boards without ENABLE_MSGSTORE (T-Beam) failed to compile
-    const size_t inc = set.find("#include <command_setters.h>");
+    const size_t inc = set.find("#include \"num_parse.h\"");
     const size_t guard = set.find("#if");
-    TEST_ASSERT_TRUE_MESSAGE(inc != std::string::npos && inc < guard, "command_setters.h include missing or inside an #if");
+    TEST_ASSERT_TRUE_MESSAGE(inc != std::string::npos && inc < guard, "num_parse.h include missing or inside an #if");
+    TEST_ASSERT_TRUE_MESSAGE(set.find("cmdDecimalComma") == std::string::npos, "web_setup.cpp still calls the lax cmdDecimalComma");
     size_t n = 0;
-    for (size_t at = set.find("cmdDecimalComma(value);"); at != std::string::npos; at = set.find("cmdDecimalComma(value);", at + 1))
+    for (size_t at = set.find("mcParseDec3(ps, pn,"); at != std::string::npos; at = set.find("mcParseDec3(ps, pn,", at + 1))
         ++n;
     TEST_ASSERT_EQUAL_INT(3, (int)n);   // indoor/outdoor offset + WX-01 windcal
+}
+
+// FORMAL-02 7b step 6, behaviour change B5: the nine web setting sites parse with num_parse.h. web_setup.cpp and
+// call_function() are not compiled by this env (Arduino String, commandAction), so the sites are NOT run here: the
+// range and helper are read out of the real rung text and the REAL helper then runs over the B5 inputs with exactly
+// those arguments. "verified by source pin + real parser", not by running the rung (the rig runs the mbox sites).
+static size_t pin_find(const std::string &t, const char *needle, size_t from, const char *what);
+
+static int32_t b5_bound(const std::string &tok)
+{
+    if (tok == "MSGSTORE_HOLD_MAX_H") return MSGSTORE_HOLD_MAX_H;
+    if (tok == "MSGSTORE_SLOTS_MAX") return MSGSTORE_SLOTS_MAX;
+    if (tok == "MSGSTORE_SLOTS_MAX - 1") return MSGSTORE_SLOTS_MAX - 1;
+    return (int32_t)atol(tok.c_str());
+}
+
+struct B5Site { const char *begin; const char *end; const char *helper; int32_t lo, hi; };
+
+static std::string b5_rung(const std::string &src, const B5Site &st)
+{
+    const size_t a = pin_find(src, st.begin, 0, st.begin);
+    const size_t b = pin_find(src, st.end, a + 1, st.end);
+    return src.substr(a, b - a);
+}
+
+// the arguments of the one call "<helper>(ps, pn, <lo>, <hi>, &"; fails the test when the rung has no such call
+static void b5_args(const std::string &rung, const char *helper, int32_t *lo, int32_t *hi)
+{
+    const std::string needle = std::string(helper) + "(ps, pn, ";
+    const size_t at = pin_find(rung, needle.c_str(), 0, helper);
+    const size_t e = pin_find(rung, ", &", at, helper);
+    const std::string args = rung.substr(at + needle.size(), e - at - needle.size());
+    const size_t comma = args.find(", ");
+    TEST_ASSERT_TRUE_MESSAGE(comma != std::string::npos, helper);
+    *lo = b5_bound(args.substr(0, comma));
+    *hi = b5_bound(args.substr(comma + 2));
+    TEST_ASSERT_TRUE_MESSAGE(rung.find("mcTrimSpan(&ps, &pn);") < at, "the rung does not trim before it parses");
+}
+
+static bool b5_int(int32_t lo, int32_t hi, const char *in, int32_t *v)
+{
+    const char *p = in; size_t n = strlen(in);
+    mcTrimSpan(&p, &n);
+    return mcParseInt(p, n, lo, hi, v);
+}
+
+static bool b5_dec(int32_t lo, int32_t hi, const char *in, int32_t *v)
+{
+    const char *p = in; size_t n = strlen(in);
+    mcTrimSpan(&p, &n);
+    return mcParseDec3(p, n, lo, hi, v);
+}
+
+// B5 (advisor step 6): the console line of a setting rung is built from the PARSED value and only after the parse
+// succeeded -- a refusal sends nothing, and the raw text never reaches commandAction
+static void test_web_b5_console_line_after_the_parse()
+{
+    const std::string web = read_repo_file("src/web_functions/web_setup.cpp");
+    struct Rung { const char *begin; const char *guard; const char *line; const char *format; };
+    const Rung rungs[] = {
+        {"paramName.equals(\"windpin\")", "if(bOneInt) {", "\"--windpin %d\", (int)pin)", NULL},
+        {"paramName.equals(\"windcal\")", "if(bOneFloat) {", "\"--windcal %s\", value)", "mcFormatDec3(calMilli, value, sizeof(value))"},
+        {"paramName.equals(\"storetime\")", "if(bHoursOk) {", "\"--storetime %d\", (int)hours)", NULL},
+        {"paramName.equals(\"storeslots\")", "if(bSlotsOk) {", "\"--storeslots %d\", (int)slots)", NULL},
+        {"paramName.equals(\"tempoffsetindoor\")", "if(bOneFloat) {", "\"--tempoff in %s\", value)", "mcFormatDec3(offMilli, value, sizeof(value))"},
+        {"paramName.equals(\"tempoffsetoutdoor\")", "if(bOneFloat) {", "\"--tempoff out %s\", value)", "mcFormatDec3(offMilli, value, sizeof(value))"},
+    };
+    for (const Rung &r : rungs)
+    {
+        const size_t b = pin_find(web, r.begin, 0, r.begin);
+        const size_t parse = pin_find(web, "mcParse", b, r.begin);
+        const size_t guard = pin_find(web, r.guard, parse, r.guard);
+        const size_t line = pin_find(web, r.line, guard, r.line);
+        const size_t call = pin_find(web, "commandAction(", parse, r.begin);
+        TEST_ASSERT_TRUE_MESSAGE(call > guard && call > line, (std::string(r.begin) + ": commandAction before the parse guard").c_str());
+        TEST_ASSERT_TRUE_MESSAGE(web.substr(guard, call - guard).find('}') == std::string::npos,
+                                 (std::string(r.begin) + ": commandAction outside the parse guard block").c_str());
+        TEST_ASSERT_TRUE_MESSAGE(web.substr(b, call - b).find("%s\", setupData->paramValue") == std::string::npos,
+                                 (std::string(r.begin) + ": raw paramValue in the console line").c_str());
+        if (r.format != NULL)
+            TEST_ASSERT_TRUE_MESSAGE(web.find(r.format, parse) < guard, (std::string(r.begin) + ": value not formatted by mcFormatDec3").c_str());
+    }
+}
+
+static void test_web_b5_sites_use_the_strict_parser()
+{
+    const std::string web = read_repo_file("src/web_functions/web_setup.cpp");
+    const std::string wf = read_repo_file("src/web_functions/web_functions.cpp");
+    const B5Site ints[] = {
+        {"paramName.equals(\"windpin\")", "paramName.equals(\"windcal\")", "mcParseInt", 0, 48},
+        {"paramName.equals(\"storetime\")", "paramName.equals(\"storeslots\")", "mcParseInt", 1, 168},
+        {"paramName.equals(\"storeslots\")", "paramName.equals(\"storenotice\")", "mcParseInt", 1, 50},
+        {"GPIO<N> (GPIO-01 Part B)", "###### MCPOUT", "mcParseInt", 0, 999},
+        {"functionName.equals(\"mboxpurge\")", "functionName.equals(\"mboxdeliver\")", "mcParseInt", 0, 49},
+        {"functionName.equals(\"mboxdeliver\")", "webFunctionCall(&functionData)", "mcParseInt", 0, 49},
+    };
+    for (const B5Site &st : ints)
+    {
+        const std::string rung = b5_rung(st.begin[0] == 'f' ? wf : web, st);
+        int32_t lo = 0, hi = 0;
+        b5_args(rung, st.helper, &lo, &hi);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(st.lo, lo, st.begin);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(st.hi, hi, st.begin);
+        TEST_ASSERT_TRUE_MESSAGE(rung.find("toInt()") == std::string::npos && rung.find("atoi(") == std::string::npos &&
+                                     rung.find("sscanf") == std::string::npos,
+                                 st.begin);
+        int32_t v = -7;
+        // B5 differences: refused now (were a prefix parse / slot 0)
+        for (const char *bad : {"5x", "abc", "", "+5", "1e1", "1.5", "nan", "0x5", "5\n"})
+            TEST_ASSERT_FALSE_MESSAGE(b5_int(lo, hi, bad, &v), bad);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(-7, v, "a refusal wrote the output");
+        // accepted: trimmed, boundaries; refused one outside
+        TEST_ASSERT_TRUE(b5_int(lo, hi, " 7 ", &v) == (7 >= lo && 7 <= hi));
+        TEST_ASSERT_TRUE(b5_int(lo, hi, std::to_string(lo).c_str(), &v));
+        TEST_ASSERT_EQUAL_INT(lo, v);
+        TEST_ASSERT_TRUE(b5_int(lo, hi, std::to_string(hi).c_str(), &v));
+        TEST_ASSERT_EQUAL_INT(hi, v);
+        TEST_ASSERT_FALSE(b5_int(lo, hi, std::to_string(hi + 1).c_str(), &v));
+        TEST_ASSERT_FALSE(b5_int(lo, hi, std::to_string(lo - 1).c_str(), &v));
+    }
+    // mboxpurge: "all" stays an exact match before the number parse; a refusal answers FAIL (422 {"mboxpurge":"failed"})
+    const size_t all = pin_find(wf, "functionParameter.equals(\"all\")", pin_find(wf, "functionName.equals(\"mboxpurge\")", 0, "mboxpurge"), "all");
+    TEST_ASSERT_TRUE_MESSAGE(all < wf.find("mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1", all), "mboxpurge=all is not matched before the number parse");
+    TEST_ASSERT_TRUE_MESSAGE(wf.find("mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstorePurge(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL") != std::string::npos, "mboxpurge refusal is not FAIL");
+    TEST_ASSERT_TRUE_MESSAGE(wf.find("mcParseInt(ps, pn, 0, MSGSTORE_SLOTS_MAX - 1, &slot) && msgstoreDeliverNow(slot)) ? WF_RETURNCODE_OKAY : WF_RETURNCODE_FAIL") != std::string::npos, "mboxdeliver refusal is not FAIL");
+
+    // windcal, tempoffsetindoor, tempoffsetoutdoor: thousandths, formatted back into the console line
+    const B5Site decs[] = {
+        {"paramName.equals(\"windcal\")", "setgrc", "mcParseDec3", 100, 100000},
+        {"paramName.equals(\"tempoffsetindoor\")", "paramName.equals(\"tempoffsetoutdoor\")", "mcParseDec3", -50000, 50000},
+        {"paramName.equals(\"tempoffsetoutdoor\")", "paramName.equals(\"zzz-end\")", "mcParseDec3", -50000, 50000},
+    };
+    for (const B5Site &st : decs)
+    {
+        const std::string rung = (std::string(st.end) == "paramName.equals(\"zzz-end\")") ? web.substr(web.find(st.begin)) : b5_rung(web, st);
+        int32_t lo = 0, hi = 0;
+        b5_args(rung, st.helper, &lo, &hi);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(st.lo, lo, st.begin);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(st.hi, hi, st.begin);
+        TEST_ASSERT_TRUE_MESSAGE(rung.find("mcFormatDec3(") != std::string::npos, "the console line is not built with mcFormatDec3");
+        TEST_ASSERT_TRUE_MESSAGE(rung.find("%d.%03d") == std::string::npos && rung.find("sscanf") == std::string::npos &&
+                                     rung.find("cmdDecimalComma") == std::string::npos,
+                                 st.begin);
+        int32_t v = -7;
+        for (const char *bad : {"1.5abc", "nan", "inf", "", "+5", "1e1", "1.2345", "5.", ".5", "1,2,3", "0x5", "5x"})
+            TEST_ASSERT_FALSE_MESSAGE(b5_dec(lo, hi, bad, &v), bad);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(-7, v, "a refusal wrote the output");
+        TEST_ASSERT_TRUE(b5_dec(lo, hi, " 2,5 ", &v) == (2500 >= lo && 2500 <= hi));
+        TEST_ASSERT_TRUE(b5_dec(lo, hi, std::to_string(hi / 1000).c_str(), &v));
+        TEST_ASSERT_EQUAL_INT(hi, v);
+        TEST_ASSERT_FALSE(b5_dec(lo, hi, (std::to_string(hi / 1000) + ".001").c_str(), &v));
+        char line[16];
+        TEST_ASSERT_TRUE(mcFormatDec3(lo, line, sizeof line) > 0);
+        TEST_ASSERT_TRUE(b5_dec(lo, hi, line, &v));
+        TEST_ASSERT_EQUAL_INT(lo, v);
+    }
+    int32_t neg = 0;
+    TEST_ASSERT_TRUE(b5_dec(-50000, 50000, "-0,5", &neg));
+    TEST_ASSERT_EQUAL_INT(-500, neg); // the sign of -0.5 survives (mcFormatDec3 writes "-0.500")
+    char out[16];
+    TEST_ASSERT_EQUAL_STRING("-0.500", (mcFormatDec3(neg, out, sizeof out), out));
 }
 
 // WEB-TEMPOFF-01 (#1296): the outdoor getparam branch tested "tempoffsetindoor" a second time, so
@@ -2718,6 +2883,8 @@ int main(int, char **)
     RUN_TEST(test_manual_ota_warns_on_old_safeboot_and_proceeds);
     RUN_TEST(test_update_apply_hands_over_now_and_is_not_remote);
     RUN_TEST(test_web_temp_offset_takes_comma_and_leading_zero);
+    RUN_TEST(test_web_b5_sites_use_the_strict_parser);
+    RUN_TEST(test_web_b5_console_line_after_the_parse);
     RUN_TEST(test_web_getparam_outdoor_offset_is_reachable);
     RUN_TEST(test_web_setup_has_msgwake_toggle);
     RUN_TEST(test_stagelan_is_instrument_only_everywhere);
