@@ -9,7 +9,7 @@
 #include "web_io.h"          // webReadBody, webSendFixedHead
 #include "web_body.h"        // WB_SHORT
 #include <config_json.h>     // CS-03: config download/upload as one JSON object, CONFIG_JSON_MAX
-#include <loop_breadcrumb.h> // INS-05: loopCrumbClear() before a deliberate reboot
+#include "../reboot_defer.h"   // rebootDeferArm: the restart after the import runs from the main loop
 #include <prod_lock.h>       // prodLockNormalise(): an imported file may hold values the setters now refuse
 #include <instrument.h>      // INSTRUMENT_ENABLED
 #include <loop_functions.h>  // save_settings()
@@ -185,15 +185,8 @@ void sub_config_upload(long content_length)
 
     Serial.printf("[CONFIG];reboot;after;import\n");
 
-    delay(2000);
-
-    #ifdef ESP32
-        loopCrumbClear();   // INS-05: deliberate reboot, no LAST_LOOP_SECTION at the next boot
-        ESP.restart();
-    #endif
-
-    #if defined NRF52_SERIES
-        NVIC_SystemReset();     // resets the device
-    #endif
+    // B9 (FORMAL-02 9h): the answer is out; the main loop restarts the node a moment later (it used to block the request for two seconds)
+    // 2 s, as the old blocking delay: ESP32 stop() does not linger, so the answer may still need a TCP resend
+    rebootDeferArm(2000, "config import");
 }
 #endif

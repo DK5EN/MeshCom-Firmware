@@ -486,6 +486,7 @@ void blinkLED2();                                    // blink RED
 #include "gw_reg_runtime.h"
 #include "csma_timing.h"   // CSMA-05: csmaIdleCeilingMs()
 #include "ping_budget.h"   // PING-NRF-01: pingBudgetOpen(), pingCountAfterSend()
+#include "reboot_defer.h"   // rebootDeferService(): deferred reboot of the config import (B9)
 
 
 #if defined(ENABLE_RTC)
@@ -1400,6 +1401,7 @@ void nrf52loop()
     INSTR_LOOPTICK();
 
     gwRegTick();
+    rebootDeferService();   // B9: a reboot armed by a request handler (config import); every pass, before anything can return
 
     #if defined(REMOTE_LED_PIN)
     remoteLedTick();   // RM "led flash" pattern (LED-07)

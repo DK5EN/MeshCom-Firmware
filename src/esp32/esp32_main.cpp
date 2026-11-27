@@ -1318,6 +1318,7 @@ bool is_new_packet(uint8_t compBuffer[4]);     // switch if we have a packet rec
 #endif
 #include "csma_timing.h"   // CSMA-05: csmaIdleCeilingMs() (idle re-anchor), independent of ENABLE_WIND
 #include "ping_budget.h"   // PING-NRF-01: pingBudgetOpen(), pingCountAfterSend()
+#include "reboot_defer.h"   // rebootDeferService(): deferred reboot of the config import (B9)
 
 bool g_meshcom_initialized;
 bool init_flash_done=false;
@@ -3660,6 +3661,7 @@ void esp32loop()
     // stall is caught regardless of which call site blocked. See src/instrument.h
     INSTR_LOOPTICK();
     gwRegTick();   // gateway registration state: call-change check (rate-limited to 1 s)
+    rebootDeferService();   // B9: a reboot armed by a request handler (config import); every pass, before anything can return
 #if INSTRUMENT_ENABLED
     INSTR_ONRX_DRAIN();      // R1-F: emit queued [INS] ONRX records
 #endif
