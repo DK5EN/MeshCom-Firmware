@@ -39,6 +39,7 @@
 using namespace std;
 
 #define SPECTRAL_STEP_TIMEOUT_MS 1000UL
+#define SPECTRAL_POLL_MS 10UL   // wait before each status read, never read right after the start
 
 
 // include the library
@@ -143,16 +144,23 @@ uint16_t *sx126x_spectral_scan_freq(float freq, uint16_t samples)
     // start spectral scan
     if (radio.spectralScanStart(samples) == RADIOLIB_ERR_NONE)
     { // if scan started without an error, wait for spectral scan to finish
-      // Bounded poll (FORMAL-02 B8): one step takes a few ms; a stuck chip must not hang the loop task.
+      // Bounded poll (FORMAL-02 B8): one step takes about 20 ms; a stuck chip must not hang the loop task.
+      // Wait BEFORE every status read (SPECTRUM-TDECKPLUS-01): a read of the status register right after
+      // SetSpectrScanParams stalls the patched scan, the status then stays 0x0F (running) for good. Measured
+      // 2026-11-28 on a Heltec V3: immediate first read = timeout on every step, first read after a wait =
+      // 0xFF (done) within 20 ms. RadioLib's example only works because a Serial print sits in between.
       const unsigned long t0 = millis();
-      while (radio.spectralScanGetStatus() != RADIOLIB_ERR_NONE){
+      for (;;)
+      {
+        delay(SPECTRAL_POLL_MS);
+        meshcom_wdt_feed();
+        if (radio.spectralScanGetStatus() == RADIOLIB_ERR_NONE)
+          break;
         if ((unsigned long)(millis() - t0) > SPECTRAL_STEP_TIMEOUT_MS)
         {
           delete[] results;
           return nullptr;   // callers handle nullptr (timeout)
         }
-        meshcom_wdt_feed();
-        delay(10);
       }
 
       // read the results

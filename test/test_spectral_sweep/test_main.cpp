@@ -263,6 +263,22 @@ static void test_pin_sweep_reports_failed_restore(void)
     TEST_ASSERT_TRUE(has(repo_slurp("src/web_functions/Web-API_documentation.txt"), "/callfunction/?spectrumscan"));
 }
 
+// SPECTRUM-TDECKPLUS-01: a status read right after SetSpectrScanParams stalls the patched scan for good
+// (Heltec V3 and T-Deck Plus, 2026-11-28: every step timed out). The poll must wait before every read.
+static void test_pin_scan_waits_before_first_status_read(void)
+{
+    const std::string scan = repo_slurp("src/spectral_scan.cpp");
+    const std::string fn = fnBody(scan, "uint16_t *sx126x_spectral_scan_freq(float freq, uint16_t samples)");
+    const size_t start = fn.find("radio.spectralScanStart(samples)");
+    const size_t wait = fn.find("delay(SPECTRAL_POLL_MS);");
+    const size_t read = fn.find("radio.spectralScanGetStatus()");
+    TEST_ASSERT_TRUE(start != std::string::npos && wait != std::string::npos && read != std::string::npos);
+    TEST_ASSERT_TRUE_MESSAGE(start < wait && wait < read, "wait before the first status read, never read right after the start");
+    TEST_ASSERT_EQUAL_INT(1, countOf(fn, "radio.spectralScanGetStatus()"));   // the only read sits behind the wait
+    TEST_ASSERT_TRUE(has(fn, "> SPECTRAL_STEP_TIMEOUT_MS"));                 // still bounded
+    TEST_ASSERT_TRUE(has(scan, "#define SPECTRAL_POLL_MS 10UL"));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -280,5 +296,6 @@ int main(int, char **)
     RUN_TEST(test_pin_rearm_checks_start_receive);
     RUN_TEST(test_pin_disarm_refuses_midair_and_no_radio);
     RUN_TEST(test_pin_sweep_reports_failed_restore);
+    RUN_TEST(test_pin_scan_waits_before_first_status_read);
     return UNITY_END();
 }
