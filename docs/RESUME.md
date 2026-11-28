@@ -1,11 +1,19 @@
 # RESUME -- pick up here
 
-**Resume here: released `v4.40a.11.28` (2026-11-28, Latest, 69 assets) on `fork-dev` `431342f0`: 11.27 plus the spectrum scan fix. Web flasher and Pages on 11.28. All five nodes run the 11.28 release images (2026-11-28): DK5EN-14 by Auto Update from the web GUI, DK5EN-1, -92 and the gateway DK5EN-98 (operator OK) by OTA, DK5EN-90 by DFU; `tag=v4.40a.11.28` read back on every ESP32, DK5EN-98 gateway on and connected to the server after the flash. Campaign FORMAL-02 is done. Open: NIMBLE-PREP-VARIANTS-01, web accumulator heap figure; next upstream PR: the FORMAL-02 firmware. `fork-dev` contains all of `upstream/dev` (#1345); no upstream PR open.** Release plan and working checklist: operator's
+**Resume here: released `v4.40a.11.28` (2026-11-28, Latest, 69 assets) on `fork-dev` `431342f0`: 11.27 plus the spectrum scan fix. Web flasher and Pages on 11.28. All five nodes run the 11.28 release images (2026-11-28): DK5EN-14 by Auto Update from the web GUI, DK5EN-1, -92 and the gateway DK5EN-98 (operator OK) by OTA, DK5EN-90 by DFU; `tag=v4.40a.11.28` read back on every ESP32, DK5EN-98 gateway on and connected to the server after the flash. Campaign FORMAL-02 is done. Open: NIMBLE-PREP-VARIANTS-01, web accumulator heap figure; upstream PR #1346 open (seven small fixes); next: the library patches. `fork-dev` contains all of `upstream/dev` (#1345).** Release plan and working checklist: operator's
 Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).
 
 ## Now (2026-11-28)
+
+- **Upstream PR [#1346](https://github.com/icssw-org/MeshCom-Firmware/pull/1346) opened (2026-11-28), branch `pr/hardening-small-fixes`
+  (worktree `../MeshCom-PR-next`):** nine commits closing #1327, #1334, #1337, #1338, #1339, #1341, #1342; 19 files, +445/-40,
+  `platformio.ini` unchanged. Gate: all 33 default envs build; fork suites against the PR source 1,171/1,178 (the 7 failing suites
+  cover fork-only code). Bench with the PR image: V3 gateway AU TLS check, console slot takeover (1 s refused, 4 s taken over),
+  EXTUDP two 15-text bursts to 9999 (every received text exactly once, no ring full; losses were the sender's TX buffer),
+  T-Beam AU TLS check, RAK Ethernet gateway up. Nodes restored to 11.28 afterwards. Left out: #1333 (needs time and testing),
+  library patches #1330-#1332, #1335, #1336 (own PR later). After the merge: `/sync-upstream`, remove worktree and branch.
 
 - **Fixes for upstream #1327 and #1341 on `fork-dev` (2026-11-28), for the next upstream PR:** with GPS on but no position the
   position interval falls back to `--postime` (`src/gps_interval.h`, ESP32 one site, nRF52 two sites; before: always 1800 s).
