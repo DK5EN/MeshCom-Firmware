@@ -1,6 +1,6 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261127`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261128`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
@@ -8,6 +8,26 @@ Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `releas
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
 
 ---
+
+## Release v4.40a.11.28 (Samstag, 2026-11-28)
+
+Getaggt am 2026-11-28 auf `fork-dev` auf Anweisung des Betreibers, einen Tag nach `v4.40a.11.27`. Gebaut wird von GitHub CI (`MeshCom CI`, Tag `v4.40a.11.28`, `MC_BUILD_TAG`, `MC_AU_DEV_CHANNEL`). `FLASH_VERSION` 20261128, `FLASH_STRUCT_VERSION` 20260724 unverändert, die Einstellungen bleiben erhalten. Safeboot unverändert. Basis wie 11.27: `upstream/dev` `99111908` (#1345).
+
+Inhalt, neu gegenüber `v4.40a.11.27`:
+
+- Spektrum-Scan läuft auf SX1262-Boards durch (SPECTRUM-TDECKPLUS-01, `62a9d5eb`): die Schleife las das Status-Register direkt nach dem Start eines Scan-Schritts; dieses Lesen blockiert den Scan-Patch im Chip, jeder Schritt lief in die Zeitgrenze. Jetzt wartet sie vor jedem Lesen 10 ms. Ein voller Durchlauf mit 81 Schritten dauert etwa 1,9 s. Die Konsole `--spectrum` nutzt denselben Schritt.
+
+### Was für dieses Release auf Hardware geprüft wurde
+
+- 2026-11-28, Diagnose-Build auf DK5EN-1 (Heltec V3): Patch geladen (Versionsstring 2D02 -> 2D06), jeder Schritt nach einer Pause vor dem ersten Lesen innerhalb von 20 ms fertig (Status 0xFF).
+- 2026-11-28, mit dem Fix: DK5EN-1 drei Scans hintereinander, DK5EN-14 (T-Deck Plus) zwei, je etwa 1,9 s mit gezeichnetem Spektrum. Danach sendete DK5EN-1 einen Gruppentext an 9999 mit 2 dBm (von DK5EN-98 mit -36 dBm gehört) und empfing DK5EN-90 und DK5EN-98.
+- 2026-11-28. Idle-Heap-Gate auf DK5EN-92 (T-Beam) mit dem lokalen Release-Build dieses Baums: 63.256 B frei. Basis 64.016 B. -760 B. bestanden (`tools/bench/runs/harness/heap-idle-v4.40a.11.28.json`).
+- 2026-11-28, Host-Gate `tools/regression.sh --stage 1,2` PASS: 4.486 Unity-Fälle in 143 Umgebungen (einer übersprungen), Golden 48, fünf Board-Builds, 1.857 pytest.
+
+### Was ausdrücklich NICHT geprüft wurde
+
+- Scan auf weiteren SX126x-Boards (Wireless Paper, E290, E213, T-ETH-Elite, Heltec V4) und auf 868 MHz.
+- Alles Übrige wie bei `v4.40a.11.27`.
 
 ## Release v4.40a.11.27 (Samstag, 2026-11-28, Tag datiert auf 2026-11-27)
 

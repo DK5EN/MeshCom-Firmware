@@ -3,12 +3,12 @@
 
 ## What this release is
 
-**`v4.40a.11.27` hardens the web server, the Bluetooth link and the UDP receive path, and gives the memory of the gateway outage hold back to every node that is not a gateway. Anyone who calls the web API from scripts should read the first box: malformed requests are now refused instead of being answered loosely.** Your configuration survives the update.
+**`v4.40a.11.28` makes the spectrum scan work on SX1262 boards; everything else is `v4.40a.11.27`, which hardened the web server, the Bluetooth link and the UDP receive path. Coming from before 11.27 and calling the web API from scripts: read the first box.** Your configuration survives the update.
 
 ### Action needed
 
 > [!WARNING]
-> **Scripts and tools that call the node's web API get clear error codes now** (web server B1-B11).
+> **Coming from before `v4.40a.11.27`: scripts and tools that call the node's web API get clear error codes** (web server B1-B11).
 >
 > - An unknown path answers `404`, a wrong method `405` with an `Allow` header. Before, both got the start page.
 > - A malformed request line or `Content-Length` answers `400`, a stalled request `408`.
@@ -16,7 +16,7 @@
 > - The web GUI and the phone apps send correct requests and are not affected.
 
 > [!WARNING]
-> **Node behind a port forward, reached by a DynDNS name:** set that name once with `--webhost <name>` (#1323). Without it the web guard answers `403 forbidden` to any host name that is not an IP address, a single-label name or a LAN name, as before.
+> **Coming from before `v4.40a.11.27`, node behind a port forward, reached by a DynDNS name:** set that name once with `--webhost <name>` (#1323). Without it the web guard answers `403 forbidden` to any host name that is not an IP address, a single-label name or a LAN name, as before.
 
 > [!WARNING]
 > **Coming from before `v4.40a.11.25`, RAK4631, T114 and T-Echo:** the LoRa sync word is `0x24B4` since 11.25 (SYNC-NRF-01, upstream #1320). Update all nRF52 nodes of a route that runs only over nRF52 boards together.
@@ -32,15 +32,29 @@
 ### Key facts
 
 - **Base:** the official `v4.40a.11.22` plus upstream `dev` up to #1345 (2026-11-27, `99111908`). That includes our combined PR [#1328](https://github.com/icssw-org/MeshCom-Firmware/pull/1328) (the Auto Update memory work, gateway hold, register query and small fixes of `v4.40a.11.25`) and [#1329](https://github.com/icssw-org/MeshCom-Firmware/pull/1329), both merged 2026-11-26. Upstream has released none of them yet.
-- **Fork-only firmware:** everything under "New in" except #1323, #1324, HOLD-NONET-01 and #1345, the fork-only items of `v4.40a.11.25` and older, the library patches (FORMAL-01) and the `dev` Auto Update channel. Not byte-identical to any official release.
-- **How to tell builds apart:** `--info` prints `...AU env=<board> tag=v4.40a.11.27` and `FLASH_VERSION 20261127`; `--id` ends in `:v4.40a.11.27`.
+- **Fork-only firmware:** everything under "New in" and in `v4.40a.11.27` except #1323, #1324, HOLD-NONET-01 and #1345, the fork-only items of `v4.40a.11.25` and older, the library patches (FORMAL-01) and the `dev` Auto Update channel. Not byte-identical to any official release.
+- **How to tell builds apart:** `--info` prints `...AU env=<board> tag=v4.40a.11.28` and `FLASH_VERSION 20261128`; `--id` ends in `:v4.40a.11.28`.
 - **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings are kept. The new web host name is stored separately (`node_webhost`).
 - **Safeboot** stays at capability v3.
 - **Auto Update channels:** `prod` reads the latest icssw-org release, `dev` (`--updchan dev`) the Latest release of this fork. Mode always `notify`.
-- **Bench status:** web checks on four boards and a 9.4 hour soak of four nodes with the production gateway, a phone on Bluetooth and the nightly Auto Update check ran on 2026-11-27/28. "Verification" says what was checked.
+- **Bench status:** the scan fix ran on a Heltec V3 and a T-Deck Plus on 2026-11-28; the 11.27 soak (four nodes, 9.4 hours, production gateway, phone on Bluetooth, nightly Auto Update check) covers the rest. "Verification" says what was checked.
 - **Assets (69):** 28 ESP32 application `.bin` plus 28 `.autoupdate` files, the three nRF52 boards as `.uf2` and DFU `.zip`, and seven support files.
 
-## New in `v4.40a.11.27`
+## New in `v4.40a.11.28`
+
+**Spectrum scan**
+
+- **The spectrum scan completes on SX1262 boards** (SPECTRUM-TDECKPLUS-01).
+  - Cause: the scan asked the radio chip for its status immediately after starting each step. That early read stalls the chip's scan patch, so every step timed out and the page said "The scan timed out" (Heltec V3 and T-Deck Plus, also in `v4.40a.11.27`).
+  - Now: the scan waits 10 ms before every status read. A full sweep of 81 steps takes about 1.9 s. The console `--spectrum` uses the same step and works too.
+  - Bench 2026-11-28: three scans on DK5EN-1 (Heltec V3) and two on DK5EN-14 (T-Deck Plus); afterwards DK5EN-1 sent and received LoRa as before.
+
+## Earlier fork releases
+
+Everything below is already in `v4.40a.11.27` and older, and therefore in this release too. Open a section for details.
+
+<details>
+<summary><strong><code>v4.40a.11.27</code></strong> — web server, Bluetooth and UDP receive hardened, hold memory only on gateways, <code>--webhost</code>, server flag only while the server answers, <code>TT</code> server row</summary>
 
 **Web server**
 
@@ -95,9 +109,7 @@
 - Web server modules moved out of `web_functions.cpp` (Ethernet MSS, pin rows, Auto Update status, mailbox actions, config import and export), one hex and URL decoder, one hardware random fill, the shared duplicate-ring lookups. Checked by differential tests against frozen copies of the old code and by bounded proofs.
   - Background: [`docs/campaign-formal-02-20261127.md`](docs/campaign-formal-02-20261127.md), [`docs/web-server-seams-20261127.md`](docs/web-server-seams-20261127.md).
 
-## Earlier fork releases
-
-Everything below is already in `v4.40a.11.25` and older, and therefore in this release too. Open a section for details.
+</details>
 
 <details>
 <summary><strong><code>v4.40a.11.25</code></strong> — Auto Update without low-memory failures on ESP32 boards without PSRAM, T-Beam download without reboot, nRF52 sync word <code>0x24B4</code>, wave-3 fixes, T-Deck tabs</summary>
@@ -651,6 +663,18 @@ Since the official `v4.40a.11.14`, unchanged from the previous fork release:
 
 ### Verification for this release
 
+- **Host suite:** `tools/regression.sh --stage 1,2` PASS on the release tree (2026-11-28): 4,486 Unity test cases in 143 native environments (one skipped), the golden selftest (48 commands), five board link builds, 1,857 pytest cases plus the Node, nbrlog and tool self-test suites. The scan fix has a test that fails on the old code.
+- **Build:** CI builds all shipped environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download. The T-Beam release image was built locally from the same tree.
+- **Idle heap on the T-Beam release image (`DK5EN-92`), 2026-11-28:** 63,256 B free at idle, -760 B against the baseline of 64,016 B (limit 3,072 B below): pass.
+- **Spectrum scan, 2026-11-28:** `DK5EN-1` (Heltec V3) three scans in a row, each about 1.9 s with the spectrum drawn; `DK5EN-14` (T-Deck Plus) two. Afterwards `DK5EN-1` sent a group 9999 text at 2 dBm (heard by `DK5EN-98` at -36 dBm) and kept receiving `DK5EN-90` and `DK5EN-98`.
+- **Everything else** is unchanged from `v4.40a.11.27`; its soak and web checks are under "Bench results of earlier releases".
+- **Still pending:** `--webhost` through a real port forward, a real server outage with the new hold memory, heap of the web request buffer on a running node.
+
+<details>
+<summary>Bench results of earlier releases (unchanged code since)</summary>
+
+**`v4.40a.11.27`:**
+
 - **Host suite:** `tools/regression.sh --stage 1,2` PASS on the release tree (2026-11-28): 4,485 Unity test cases in 143 native environments (one skipped), the golden selftest (48 commands), five board link builds, 1,857 pytest cases plus the Node, nbrlog and tool self-test suites. The new web, UDP, Bluetooth and parser code is checked by differential tests against frozen copies of the old code (1,247 recorded web requests in four login states, 111,884 UDP frame pairs, 93,781 ACK frames) and by bounded proofs run on 2026-11-27.
 - **Build:** CI builds all shipped environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download. The T-Beam release image was built locally from the same tree.
 - **Idle heap on the T-Beam release image (`DK5EN-92`), 2026-11-28:** 64,076 B free at idle, 60 B above the baseline of 64,016 B (limit 3,072 B below): pass.
@@ -664,9 +688,6 @@ Since the official `v4.40a.11.14`, unchanged from the previous fork release:
 - **Spectrum scan, 2026-11-27, `DK5EN-14` (T-Deck Plus):** the scan ends cleanly with "The scan timed out" and RX and TX work afterwards; the chip never finishes a scan step on this board (see "Known gaps").
 - **Production gateway:** `DK5EN-98` runs the image of `3a60b512` since 2026-11-27 (OTA), settings unchanged.
 - **Still pending:** `--webhost` through a real port forward, a real server outage with the new hold memory, heap of the web request buffer on a running node.
-
-<details>
-<summary>Bench results of earlier releases (unchanged code since)</summary>
 
 **`v4.40a.11.25`:**
 
@@ -844,9 +865,9 @@ Since the official `v4.40a.11.14`, unchanged from the previous fork release:
 - **A failed image after the flash erase** leaves the node in Safeboot until a web-flasher upload (single app slot).
 - **Locked settings are reset at boot without asking.** INSTRUMENT bench builds keep them changeable. `--stor on` is refused, so store-and-forward (#1188) is effectively off.
 
-**New in `v4.40a.11.27`**
+**From `v4.40a.11.27`**
 
-- **The spectrum scan does not complete on our SX1262 boards** (SPECTRUM-TDECKPLUS-01): on the T-Deck Plus and, checked after the release on 2026-11-28, on a Heltec V3 the chip never finishes a scan step, not even with a 10 s limit in a test build. The page reports "The scan timed out" and the radio keeps working. Fixed on `fork-dev` after this release (the status was read too soon after the scan start); it ships with the next release. The console `--spectrum` still takes the radio without the busy check of the web path (SPECTRUM-CONSOLE-01).
+- **The spectrum scan did not complete on our SX1262 boards** (SPECTRUM-TDECKPLUS-01): on the T-Deck Plus and, checked after the release on 2026-11-28, on a Heltec V3 the chip never finishes a scan step, not even with a 10 s limit in a test build. Fixed in `v4.40a.11.28` (see "New in"). The console `--spectrum` still takes the radio without the busy check of the web path (SPECTRUM-CONSOLE-01).
 - **Web API:** the `400` and `408` answers are checked in host tests and against the recorded request corpus, not with real broken clients. `--webhost` was not tried through a real port forward.
 - **Gateway hold:** a text captured before the first gateway pass after boot, or right after `--gateway on` at runtime, is not held (one loop pass). No real server outage on the bench with the new memory handling.
 - **Bluetooth:** eight board builds that link NimBLE without the common ESP32 settings lack the prepare-write limits of `v4.40a.11.25` (NIMBLE-PREP-VARIANTS-01): T-Deck Pro, the Vision Master E213 and E290 images, Wireless Paper, and two builds that are not shipped. The mobile app cuts texts of 254 bytes or more before sending them (APP-TEXTLEN-01, app issue [#1343](https://github.com/icssw-org/MeshCom-Firmware/issues/1343)); the firmware is not involved.
@@ -1018,7 +1039,7 @@ Since the official `v4.40a.11.14`, unchanged from the previous fork release:
   - **Boards:** Heltec V4 GNSS, DHT22, T-Deck Pro pins and sky plot.
   - **From others:** DH1FR's T114 pages (#1264 to #1267), INA226 on Heltec (#1272), and the OE1KBC fixes #1274 and #1275 (`BOARD_COUNTRY` default, spectral scan, Info page label). Merged as `f05ead76`, `ac763f66` and `173b1e3c`.
 - **Merged in upstream `dev`, not in an official release:** [#1280](https://github.com/icssw-org/MeshCom-Firmware/pull/1280) (ping, `4cfa2ac2`) and [#1281](https://github.com/icssw-org/MeshCom-Firmware/pull/1281) (web GUI, Pins page, GPIO control, board LED, `45f66dc7`), both by oe1kbc on 2026-11-19; [#1269](https://github.com/icssw-org/MeshCom-Firmware/pull/1269) (APRS-IS weather, Mateusz-Krajewski) on 2026-11-20, merged here as `6731af6c`; our [#1284](https://github.com/icssw-org/MeshCom-Firmware/pull/1284) (W/S hemisphere) on 2026-11-21, synced here as `0110fd3c` with the tree unchanged; our [#1285](https://github.com/icssw-org/MeshCom-Firmware/pull/1285) (`REVIEW.md` only) on 2026-11-21, synced as `29d9d65c`. This release carries all of upstream `dev` as of 2026-11-21.
-- **Not byte-identical:** this release adds the fork-only firmware listed under "New in" to the official `v4.40a.11.14`. The flash stamp in `--info` (`FLASH_VERSION 20261127`, `tag=v4.40a.11.27`) is the distinguishing mark.
+- **Not byte-identical:** this release adds the fork-only firmware listed under "New in" to the official `v4.40a.11.14`. The flash stamp in `--info` (`FLASH_VERSION 20261128`, `tag=v4.40a.11.28`) is the distinguishing mark.
 - **Open upstream:** our [#1286](https://github.com/icssw-org/MeshCom-Firmware/pull/1286) (navigation buttons WEB-NAV-02 and unsigned pong id PONG-SIGN-01, since 2026-11-21). The Ethernet fix ETH-06, the dash commands CMD-DASH-01 and AppLink have no PR yet. The Auto Update downgrade fix (AU-27) goes with the Auto Update wave. The next waves (remote management and mesh, gateway, Auto Update and Safeboot, channel access) follow; RAM-WSP-01 goes with the next web PR.
 - **Earlier official releases:** `v4.40a.10.28` (2026-10-28) with all fork firmware up to `v4.40a.10.25` as one commit ([#1238](https://github.com/icssw-org/MeshCom-Firmware/pull/1238)), `.autoupdate` assets in the official CI ([#1239](https://github.com/icssw-org/MeshCom-Firmware/pull/1239)) and the E290 OTP image ([#1240](https://github.com/icssw-org/MeshCom-Firmware/pull/1240), sp2ong). Before it `v4.40a.spserver` (2026-10-22) with the gateway server table, network mode and RAK4631 static IP ([#1213](https://github.com/icssw-org/MeshCom-Firmware/pull/1213)), T-Deck reply button and web firmware column (#1214), web send buffer (#1224) and the gateway server-link warning fix (#1233).
 - **In the official release `v4.40a.11.07`** (2026-11-08, `upstream/dev` 5d76238b): our PRs [#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247) to #1251 (ping target lock, own beacons at priority 2, receive-silence logging, national characters, charge state, UV and wind) and [#1257](https://github.com/icssw-org/MeshCom-Firmware/pull/1257) (mailbox echo), plus OE1KBC's RAK4631 L76K GPS probe (#1259) and the T-Deck Pro / T3 S3 bootloader mapping in `tools/download_meshcom.py` (#1260 to #1262). Merged into this tree as `da76033b`.
