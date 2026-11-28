@@ -1,16 +1,23 @@
 # RESUME -- pick up here
 
-**Resume here: released `v4.40a.11.27` (2026-11-28, Latest, 69 assets) on `fork-dev` `fe057645`; web flasher and Pages on 11.27; DK5EN-98, -1, -14, -90, -92 run the release images. Campaign FORMAL-02 is done. Open: NIMBLE-PREP-VARIANTS-01, web accumulator heap figure; next upstream PR: the FORMAL-02 firmware. `fork-dev` contains all of `upstream/dev` (#1345); no upstream PR open.** Release plan and working checklist: operator's
+**Resume here: released `v4.40a.11.28` (2026-11-28, Latest, 69 assets) on `fork-dev` `431342f0`: 11.27 plus the spectrum scan fix. Web flasher and Pages on 11.28. DK5EN-14 runs the 11.28 release image (Auto Update from the web GUI), DK5EN-92 a local 11.28 build, DK5EN-1 a local build of the scan fix, DK5EN-98 and -90 the 11.27 release images. Campaign FORMAL-02 is done. Open: NIMBLE-PREP-VARIANTS-01, web accumulator heap figure; next upstream PR: the FORMAL-02 firmware. `fork-dev` contains all of `upstream/dev` (#1345); no upstream PR open.** Release plan and working checklist: operator's
 Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).
 
 ## Now (2026-11-28)
 
-- **Spectrum scan fixed after `v4.40a.11.27` (SPECTRUM-TDECKPLUS-01, 2026-11-28):** the poll read the status right after the scan
+- **Released `v4.40a.11.28` (2026-11-28, Latest, 69 assets) on `fork-dev` `431342f0`:** `v4.40a.11.27` plus the spectrum scan fix
+  (SPECTRUM-TDECKPLUS-01, `62a9d5eb`), `FLASH_VERSION` 20261128. Gate stage 1,2 PASS (4,486 Unity cases); T-Beam idle heap 63,256 B (-760 B,
+  within the 3,072 B tolerance). CI run about 69 min; 69 assets, names as 11.27, 28 `.autoupdate` re-inflate byte-exact, tag string and
+  field-command scan as expected; Safeboot assets byte-identical to 11.27. Auto Update from the web GUI in Chrome on DK5EN-14 (T-Deck
+  Plus, channel `dev`): Check now found 11.28, Download about 40 s and verified, Install now rebooted into `v4.40a.11.28` (CI build
+  11:53:57), afterwards "available none". Web flasher on 11.28 only, Pages start page and PR history on 11.28 (the start page card
+  had stayed on 11.25 through the 11.27 sync; now current).
+
+- **Spectrum scan fixed after `v4.40a.11.27`, released in `v4.40a.11.28` (SPECTRUM-TDECKPLUS-01, 2026-11-28):** the poll read the status right after the scan
   start, which stalls the patched scan; it now waits 10 ms before every read. Bench: DK5EN-1 (Heltec V3) and DK5EN-14 (T-Deck
-  Plus) scan in 1.9 s, TX/RX fine after. DK5EN-1 and DK5EN-14 run local builds of this fix (not the release image). Ships with the
-  next release.
+  Plus) scan in 1.9 s, TX/RX fine after.
 
 - **Released `v4.40a.11.27` (2026-11-28, tag dated 2026-11-27 by the operator, Latest, 69 assets) on `fork-dev` `fe057645`:** FORMAL-02
   (web server B1-B11 and D14, B8/B9, WEB-GUARD-DASH-01, `--webhost` #1323, #1324, hold memory only on gateways, one UDP receive
