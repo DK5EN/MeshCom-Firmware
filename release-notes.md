@@ -3,16 +3,23 @@
 
 ## What this release is
 
-**`v4.40a.11.25` makes Auto Update work on ESP32 boards without PSRAM after long uptime and stops the T-Beam from rebooting during the download. RAK4631, T114 and T-Echo owners should read the first box: these boards now send the same LoRa sync word as every ESP32 SX1262 board.** Your configuration survives the update.
+**`v4.40a.11.27` hardens the web server, the Bluetooth link and the UDP receive path, and gives the memory of the gateway outage hold back to every node that is not a gateway. Anyone who calls the web API from scripts should read the first box: malformed requests are now refused instead of being answered loosely.** Your configuration survives the update.
 
 ### Action needed
 
 > [!WARNING]
-> **RAK4631, T114 and T-Echo: the LoRa sync word changes from `0x242B` to `0x24B4`** (SYNC-NRF-01, upstream #1320).
+> **Scripts and tools that call the node's web API get clear error codes now** (web server B1-B11).
 >
-> - Why: the old value put the second sync symbol where no other board sends it; a LoRa chip of the newest generation (LR2012) drops such frames. With `0x24B4` an nRF52 board sends exactly like a Heltec V3.
-> - Bench 2026-11-24: a RAK4631 with the old and with the new value against Heltec V3, T-Deck Plus and T-Beam, both directions: no difference.
-> - **Not measured:** an nRF52 node with the old value against one with the new value (we have one RAK). Update all nRF52 nodes of a route that runs only over nRF52 boards together, and report it if such a route loses frames after the update.
+> - An unknown path answers `404`, a wrong method `405` with an `Allow` header. Before, both got the start page.
+> - A malformed request line or `Content-Length` answers `400`, a stalled request `408`.
+> - `/setparam/` without `=`, with a second command in the value (`--`, `&&`, look-alike dashes) or with a value over 200 bytes answers `422`. Numbers at the nine numeric settings must be valid and in range.
+> - The web GUI and the phone apps send correct requests and are not affected.
+
+> [!WARNING]
+> **Node behind a port forward, reached by a DynDNS name:** set that name once with `--webhost <name>` (#1323). Without it the web guard answers `403 forbidden` to any host name that is not an IP address, a single-label name or a LAN name, as before.
+
+> [!WARNING]
+> **Coming from before `v4.40a.11.25`, RAK4631, T114 and T-Echo:** the LoRa sync word is `0x24B4` since 11.25 (SYNC-NRF-01, upstream #1320). Update all nRF52 nodes of a route that runs only over nRF52 boards together.
 
 > [!WARNING]
 > **Coming from before `v4.40a.11.20`, T-Beam: holding the user button for 3 s puts the node into deep sleep** (TBEAM-SLEEP-01). A short press still toggles the display.
@@ -24,16 +31,76 @@
 
 ### Key facts
 
-- **Base:** the official `v4.40a.11.22` plus upstream `dev` up to #1321 (2026-11-25, `2dcac7d8`), which includes our wave-3 PR [#1316](https://github.com/icssw-org/MeshCom-Firmware/pull/1316) (merged 2026-11-22). Upstream has released #1316, #1320 and #1321 in no official release yet.
-- **Fork-only firmware:** Auto Update memory work (OTA-LOWHEAP-01, AU-29, AU-30), library patches (FORMAL-01), INA226 calibration, everything listed under "New in", the fork-only items of `v4.40a.11.22` and older, and the `dev` Auto Update channel. Not byte-identical to any official release.
-- **How to tell builds apart:** `--info` prints `...AU env=<board> tag=v4.40a.11.25` and `FLASH_VERSION 20261125`; `--id` ends in `:v4.40a.11.25`.
-- **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings are kept.
+- **Base:** the official `v4.40a.11.22` plus upstream `dev` up to #1345 (2026-11-27, `99111908`). That includes our combined PR [#1328](https://github.com/icssw-org/MeshCom-Firmware/pull/1328) (the Auto Update memory work, gateway hold, register query and small fixes of `v4.40a.11.25`) and [#1329](https://github.com/icssw-org/MeshCom-Firmware/pull/1329), both merged 2026-11-26. Upstream has released none of them yet.
+- **Fork-only firmware:** everything under "New in" except #1323, #1324, HOLD-NONET-01 and #1345, the fork-only items of `v4.40a.11.25` and older, the library patches (FORMAL-01) and the `dev` Auto Update channel. Not byte-identical to any official release.
+- **How to tell builds apart:** `--info` prints `...AU env=<board> tag=v4.40a.11.27` and `FLASH_VERSION 20261127`; `--id` ends in `:v4.40a.11.27`.
+- **Configuration:** `FLASH_STRUCT_VERSION` stays at `20260724`, so settings are kept. The new web host name is stored separately (`node_webhost`).
 - **Safeboot** stays at capability v3.
 - **Auto Update channels:** `prod` reads the latest icssw-org release, `dev` (`--updchan dev`) the Latest release of this fork. Mode always `notify`.
-- **Bench status:** Auto Update on Heltec V3, T-Beam and T-Deck Plus, the sync word, the gateway hold, the register query and remote management ran on our bench on 2026-11-24, plus one night of Auto Update runs. "Verification" says what was checked.
+- **Bench status:** web checks on four boards and a 9.4 hour soak of four nodes with the production gateway, a phone on Bluetooth and the nightly Auto Update check ran on 2026-11-27/28. "Verification" says what was checked.
 - **Assets (69):** 28 ESP32 application `.bin` plus 28 `.autoupdate` files, the three nRF52 boards as `.uf2` and DFU `.zip`, and seven support files.
 
-## New in `v4.40a.11.25`
+## New in `v4.40a.11.27`
+
+**Web server**
+
+- **The web server answers malformed requests with a clear code** (web server B1-B7, B10, B11). See "Action needed" for the codes.
+  - Cause: the old request handling matched paths loosely, answered unknown paths with the start page and read numbers leniently.
+  - Now: one request parser and an exact route table decide every request before a handler runs; numbers are parsed strictly; `send_message` reads `tocall` by name, so a hand-made URL with `&message=` first reaches the named station.
+  - Every response head ends its status line in CRLF (D14); before, the shared header writer ended it with a space and a bare LF.
+  - The request path was checked against a recorded corpus of 1,247 requests in four login states; every difference is listed and pinned by a test.
+- **A look-alike dash no longer slips past the web guard** (WEB-GUARD-DASH-01). An em dash or similar in `/setparam/?manualcommand=` could run a command such as `update install` without the `X-MC` header. Now the guard treats it like `--`. The GUI always sends `X-MC` and is not affected.
+- **The spectrum page scans only when you press "Scan now"** (B8, SPECTRUM-RESTORE-01).
+  - Cause: opening the page started a blocking scan of 70-80 steps; afterwards the radio lost board settings such as the TCXO voltage, RX boost and current limit until a reboot, and RX was not re-armed. Each page view also leaked about 5 KB (WEB-SPECTRUM-LEAK-01).
+  - Now: the page shows the last result; the scan runs once on request with a 1 s limit per step, refuses while the radio is busy, and restores the radio as setup left it. The shading of the dots works.
+  - T-Deck Pro and boards without an SX126x chip say "not supported".
+- **A config import reboots from the main loop** (B9): the node answers, then restarts 2 s later without blocking inside the request.
+- **The web host name for port forwards** (`--webhost`, #1323): see "Action needed". Exact, case-insensitive match of the whole name; no wildcards.
+
+**Gateway and UDP**
+
+- **A gateway sets the "server has this frame" flag only while the server answers** (#1324, upstream #1329).
+  - Cause: with WiFi up but the Internet down, the gateway still marked its relays as uploaded, so neighbouring gateways skipped them, and the phone got a false "server reached" ACK.
+  - Now: the flag needs a frame from the server within the last 65 s.
+- **The outage hold uses memory only on gateways** (wave 9). The ring of 6,144 bytes (1,024 on classic ESP32) is allocated on the first gateway pass after boot instead of at build time. Every node that is not a gateway has 6,136 bytes more free memory on ESP32-S3 boards and the RAK4631, 1,016 bytes on classic ESP32.
+  - T114 and T-Echo have no network and reserve no hold memory at all (HOLD-NONET-01).
+  - A gateway that cannot get the memory logs it once and retries every 60 s.
+- **One UDP receive handler for ESP32 and nRF52.**
+  - nRF52 gateways now show server DMs and group texts and answer `{pong}` and `{MCP}` like ESP32 gateways.
+  - A server position enters the duplicate ring at once, so its LoRa echo is not uploaded again.
+  - Fixed: a datagram of `GAT` plus one stale byte crashed an nRF52 gateway (negative copy length).
+
+**Bluetooth**
+
+- **Lost phone frames are counted, and old frames never reach a new connection** (BLE-QDROP-01, BLE-STALE-01).
+  - Cause: a full phone queue dropped a frame silently, and a frame queued during one connection could be applied in the next one.
+  - Now: drops are counted and shown by `--bledebug`; every frame carries its connection number and is dropped if it is stale.
+- **NimBLE edge cases on ESP32** (F1, F2, F6, F10): a failed copy in the write callback could read a null pointer; the node's TX characteristic no longer offers WRITE (the app only subscribes to it); nRF52 counts a full Bluetooth receive buffer.
+- **Attribute values are pre-allocated at 300 bytes on all ESP32 boards** (F3), so a long write from the phone needs no growth inside the Bluetooth stack.
+
+**Console and parsers**
+
+- **Phone frames are read only up to the received length.** A frame whose header claims more bytes than arrived is dropped with a log line; before, the node read past the buffer. Every frame the mobile app builds decodes as before.
+- **An ACK frame of length 0 is ignored** instead of reading one byte past it.
+- **Settings with `nan` or `inf` are rejected on load**, so a broken coordinate cannot reach the APRS encoder. Records of all 25 releases since 2026-10-01 load as before.
+- **APRS positions with an exponent, `nan` or `inf`** (`1e99`) are rejected (APRS-POS-RANGE-01, upstream issue #1342).
+- **Serial console:** lines with control bytes or invalid UTF-8 are dropped, and UART input during the node's own LoRa transmission is discarded (SER-JUNK-01). The net console hands over its slot correctly (#1339).
+
+**From upstream #1345** (OE1KBC, merged 2026-11-27)
+
+- **Server table:** new entry `TT` (MeshCom TT, test server), Internet and Hamnet.
+
+**Code structure** (no behaviour change)
+
+- Web server modules moved out of `web_functions.cpp` (Ethernet MSS, pin rows, Auto Update status, mailbox actions, config import and export), one hex and URL decoder, one hardware random fill, the shared duplicate-ring lookups. Checked by differential tests against frozen copies of the old code and by bounded proofs.
+  - Background: [`docs/campaign-formal-02-20261127.md`](docs/campaign-formal-02-20261127.md), [`docs/web-server-seams-20261127.md`](docs/web-server-seams-20261127.md).
+
+## Earlier fork releases
+
+Everything below is already in `v4.40a.11.25` and older, and therefore in this release too. Open a section for details.
+
+<details>
+<summary><strong><code>v4.40a.11.25</code></strong> — Auto Update without low-memory failures on ESP32 boards without PSRAM, T-Beam download without reboot, nRF52 sync word <code>0x24B4</code>, wave-3 fixes, T-Deck tabs</summary>
 
 **Auto Update**
 
@@ -92,9 +159,7 @@
 - **Patched copies of library code fix findings of a code review:** NimBLE (NB-01..07), W5100S Ethernet (ETH-07), the arduino-esp32 HTTP client (AE-01..03), mDNS and the DHCP server of the access point, an lwIP MTU guard, a certificate date check and TLS 1.2 as minimum for Auto Update, DNS through the network thread, and fixes in the UDP drain, the Extern-UDP queue, the net console slot and APRS. See "Known gaps": these were not benched one by one.
   - Background: [`docs/campaign-formal-01-20261123.md`](docs/campaign-formal-01-20261123.md).
 
-## Earlier fork releases
-
-Everything below is already in `v4.40a.11.22` and older, and therefore in this release too. Open a section for details.
+</details>
 
 <details>
 <summary><strong><code>v4.40a.11.22</code></strong> — RAK4631 Ethernet gateway no longer goes silent after a chip reset, AppLink (phone app over the LAN), dash commands, unsigned pong id</summary>
@@ -530,6 +595,7 @@ Full list of differences from upstream: [`docs/fork-dev-vs-upstream-20261018.md`
 
 With default settings, compared with the official `v4.40a.11.22`:
 
+- **A gateway marks a relayed frame as "already on the server" only while the server answers** (#1324, upstream #1329): with WiFi up but the Internet down, the flag (byte 5, `0x80`) is no longer set, so a neighbouring gateway uploads the frame instead. Nothing else from `v4.40a.11.27` changes what goes on LoRa.
 - **RAK4631, T114 and T-Echo send sync word `0x24B4`** (SYNC-NRF-01, upstream #1320): the second sync symbol now sits where every ESP32 SX1262 board puts it. In TRACK mode the APRS sync word is unchanged.
 - **Track frames carry up to 25 bytes of comment** instead of 16, without a `#name` (APRS-TXT-01, #1293).
 - **Automatic position beacons go out on time**, at least 60 s apart; manual beacons keep 30 s (POSINFO-LAG-01, #1315).
@@ -585,6 +651,25 @@ Since the official `v4.40a.11.14`, unchanged from the previous fork release:
 
 ### Verification for this release
 
+- **Host suite:** `tools/regression.sh --stage 1,2` PASS on the release tree (2026-11-28): 4,485 Unity test cases in 143 native environments (one skipped), the golden selftest (48 commands), five board link builds, 1,857 pytest cases plus the Node, nbrlog and tool self-test suites. The new web, UDP, Bluetooth and parser code is checked by differential tests against frozen copies of the old code (1,247 recorded web requests in four login states, 111,884 UDP frame pairs, 93,781 ACK frames) and by bounded proofs run on 2026-11-27.
+- **Build:** CI builds all shipped environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download. The T-Beam release image was built locally from the same tree.
+- **Idle heap on the T-Beam release image (`DK5EN-92`), 2026-11-28:** 64,076 B free at idle, 60 B above the baseline of 64,016 B (limit 3,072 B below): pass.
+- **Soak, 2026-11-27 23:47 to 2026-11-28 09:10 (9.4 hours)** on the images of `3a60b512` (the release without the `TT` server row and the version stamp): production gateway `DK5EN-98` (Heltec V3), `DK5EN-90` (RAK4631, gateway over Ethernet), `DK5EN-14` (T-Deck Plus), `DK5EN-92` (T-Beam).
+  - No restart on any node, no failed transmission, no queue drop; the gateway hold never lacked memory.
+  - The operator's phone stayed connected to `DK5EN-98` over Bluetooth all night: no disconnect, no error counter.
+  - The nightly Auto Update check ran once on each ESP32 node without a memory failure or restart.
+  - Greetings typed on the phone went over Bluetooth into `DK5EN-98`, at once to the server over UDP and out on LoRa; the three other nodes heard them, and all four DMs were acknowledged within 0.9-1.6 s.
+  - Free memory flat on `DK5EN-98` (96-100 KB) and `DK5EN-90`; on the T-Deck Plus it followed the number of chat messages on screen.
+- **Web checks, 2026-11-27,** on `DK5EN-14`, `DK5EN-92` and `DK5EN-90`: every page 200 (the mailbox page 404 on the T-Beam, where it is not built), unknown path and unknown page 404, POST to `/getparam/` 405, scan without `X-MC` 403. A config import on `DK5EN-14` answered after 0.27 s, rebooted, and kept call, frequency and power.
+- **Spectrum scan, 2026-11-27, `DK5EN-14` (T-Deck Plus):** the scan ends cleanly with "The scan timed out" and RX and TX work afterwards; the chip never finishes a scan step on this board (see "Known gaps").
+- **Production gateway:** `DK5EN-98` runs the image of `3a60b512` since 2026-11-27 (OTA), settings unchanged.
+- **Still pending:** spectrum scan on a Heltec V3 (bench board offline), `--webhost` through a real port forward, a real server outage with the new hold memory, heap of the web request buffer on a running node.
+
+<details>
+<summary>Bench results of earlier releases (unchanged code since)</summary>
+
+**`v4.40a.11.25`:**
+
 - **Host suite:** `tools/regression.sh --stage 1,2` PASS on the tagged tree (2026-11-25): 4,237 Unity test cases in 129 native environments (one skipped), the golden selftest (48 commands), five board link builds, 1,842 pytest cases plus the Node, nbrlog and tool self-test suites. The new Auto Update buffer size, the `hmac_connect.py` fixes and the INA226 calibration each have tests that fail on the old code.
 - **Build:** all 36 board environments built from the release candidate on 2026-11-24 (35 green; `esp32-external-radio` needs its own build overlay and is not shipped); all 33 shipped environments again on 2026-11-25 before the #1321 merge, and after it the five board builds of the host gate. CI builds all shipped environments from the tagged tree; the 28 `.autoupdate` files are re-inflated byte-exact after download.
 - **Auto Update, bench 2026-11-24** (release-candidate images, check and download with staging, never installed): DK5EN-1 Heltec V3, DK5EN-92 T-Beam v1.2, DK5EN-14 T-Deck Plus, numbers under "New in". Night 2026-11-24/25, three runs per board three hours apart (19:26 to 01:49, uptime up to 6.5 hours): 9 of 9 downloads staged, no restart, no refusal. DK5EN-1 10.9 to 11.4 s, lowest free memory after a run 21,260 bytes; DK5EN-92 13.6 to 13.7 s, 11,700 bytes, the image check ran in place on the first run and was moved to the check start at install on runs two and three (AU-30, memory short after the download); DK5EN-14 20.6 to 22.0 s, 23,444 bytes. Production gateway DK5EN-98 on the release candidate: no restart for 15.8 hours (2026-11-24 15:38 to 2026-11-25 07:28), free memory steady at 100 to 104 KB, no failed transmission.
@@ -593,9 +678,6 @@ Since the official `v4.40a.11.14`, unchanged from the previous fork release:
 - **Gateway and remote management, bench 2026-11-24:** message hold in a simulated server outage on DK5EN-1 (held, replayed once with the same id); Extern-UDP register query on DK5EN-92 (16 registers, no secret, rate limit); RM1 `pins`, `gpio`, `txq`, `mbox`, `maxhop` over LoRa from DK5EN-92 to DK5EN-1, refusals for the button pin and without the GPIO master switch.
 - **Production gateway:** `DK5EN-98` runs the release candidate since 2026-11-24 15:38 (OTA), settings unchanged.
 - **Not on a node:** INA226 calibration and the WX table (no sensor on the bench), and most wave-3 fixes listed under "Not on our bench" below.
-
-<details>
-<summary>Bench results of earlier releases (unchanged code since)</summary>
 
 **`v4.40a.11.22`:**
 
@@ -762,7 +844,16 @@ Since the official `v4.40a.11.14`, unchanged from the previous fork release:
 - **A failed image after the flash erase** leaves the node in Safeboot until a web-flasher upload (single app slot).
 - **Locked settings are reset at boot without asking.** INSTRUMENT bench builds keep them changeable. `--stor on` is refused, so store-and-forward (#1188) is effectively off.
 
-**New in `v4.40a.11.25`**
+**New in `v4.40a.11.27`**
+
+- **Spectrum scan on the T-Deck Plus never completes** (SPECTRUM-TDECKPLUS-01): the chip does not finish a scan step, not even with a 10 s limit in a test build. The page reports "The scan timed out" and the radio keeps working. Not tried on a Heltec V3 yet. The console `--spectrum` still takes the radio without the busy check of the web path (SPECTRUM-CONSOLE-01).
+- **Web API:** the `400` and `408` answers are checked in host tests and against the recorded request corpus, not with real broken clients. `--webhost` was not tried through a real port forward.
+- **Gateway hold:** a text captured before the first gateway pass after boot, or right after `--gateway on` at runtime, is not held (one loop pass). No real server outage on the bench with the new memory handling.
+- **Bluetooth:** eight board builds that link NimBLE without the common ESP32 settings lack the prepare-write limits of `v4.40a.11.25` (NIMBLE-PREP-VARIANTS-01): T-Deck Pro, the Vision Master E213 and E290 images, Wireless Paper, and two builds that are not shipped. The mobile app cuts texts of 254 bytes or more before sending them (APP-TEXTLEN-01, app issue [#1343](https://github.com/icssw-org/MeshCom-Firmware/issues/1343)); the firmware is not involved.
+- **nRF52 gateways** now show server DMs and group texts on their display and phone; the RAK4631 ran all night as a gateway, but the display and phone side of this change were not watched.
+- **Web request buffer:** the 2.4 KB the web server keeps for the request head is heap, not measured on a running node.
+
+**From `v4.40a.11.25`**
 
 - **Library patches (FORMAL-01) were not benched one by one.** They ran on the bench nodes the whole day (WiFi, web, BLE advertising, Auto Update download over TLS, Ethernet on the RAK), but no patch has a targeted test on hardware. One of them broke the Auto Update download on 2026-11-23 (AU-28, fixed before this release). Report anything new around BLE, mDNS, the access point, Ethernet or downloads.
 - **Sync word:** an nRF52 node with the old value against one with the new value is not measured (one RAK on our bench), and the margin near the sensitivity limit is not testable on our bench table. See "Action needed".
@@ -823,6 +914,7 @@ Since the official `v4.40a.11.14`, unchanged from the previous fork release:
 - **Less memory on classic ESP32:** T-Beam idle heap 64.0 KB against 68.7 KB on `v4.40a.11.01` (measured 2026-11-06). After 150 web requests the T-Beam holds 53.3 KB (TBEAM-HEAP-01); the `v4.40a.11.08` release image shows the same, so this is no regression since then.
   - About 2.5 KB are new static buffers (hold ring, web settings table, register query); the rest is not itemised. Measured with about 1 KB of the drop possibly caused by the first web request after boot.
   - Check now passed 20 of 20 on a T-Beam. Accepted by the operator.
+  - Seen again in the `v4.40a.11.27` soak: about 57 KB after 20 web requests right after boot, against 64.1 KB at idle without web traffic on the release image.
 - **Web password:** no prompt for the current one, so an open session can change or clear it. It crosses the network in plain text.
 - **Auto Update restart on a split heap with a phone held:** the phone path works, but this run may not have hit a split heap (AU-23).
 - **Message hold:** one simulated outage on the bench, no real server failure. A single lost `BEAT` may replay the few held frames (about 1 per 4 h, measured), by decision.
@@ -917,16 +1009,16 @@ Since the official `v4.40a.11.14`, unchanged from the previous fork release:
 
 ## Upstream
 
-- **In upstream `dev`, not in an official release yet:** our wave-3 PR [#1316](https://github.com/icssw-org/MeshCom-Firmware/pull/1316) (21 issues, merged 2026-11-22, synced here as `dc5ea81c`) #1320 (nRF52 sync word and `hmac_connect.py`, merged 2026-11-23, synced as `4fe57374`) and #1321 (T114 display dark on ping and pong, `MWAKE` over BLE, merged 2026-11-25, synced as `cd262938`). This release carries all of upstream `dev` as of 2026-11-25.
+- **In upstream `dev`, not in an official release yet:** our combined PR [#1328](https://github.com/icssw-org/MeshCom-Firmware/pull/1328) (Auto Update memory work, gateway hold, register query, remote-management node side, `--webhost`, INA226, T-Deck TD-35 and TD-36, small fixes; merged 2026-11-26) and [#1329](https://github.com/icssw-org/MeshCom-Firmware/pull/1329) (server flag only while the server answers, #1324; merged 2026-11-26); our wave-3 PR [#1316](https://github.com/icssw-org/MeshCom-Firmware/pull/1316) (21 issues, merged 2026-11-22), #1320 (nRF52 sync word, merged 2026-11-23), #1321 (T114 display dark on ping and pong, merged 2026-11-25) and #1345 (OE1KBC, `TT` server row, merged 2026-11-27, merged here as `dc9dbc6d`). This release carries all of upstream `dev` as of 2026-11-27.
 - **Official `v4.40a.11.22`** (upstream tag on `5db0a4f5`) shares only its name with our `v4.40a.11.22`; the two are different builds.
-- **Next upstream PR (planned):** one combined PR with the Auto Update memory work, the small fixes (#1305, #1306, INA226), the gateway hold (#1307), the register query (#1308), the remote-management node side (#1303) and the `hmac_connect.py` fix. The library patches, Safeboot, AppLink and the `dev` channel stay fork-only for now.
+- **Next upstream PR (planned):** the FORMAL-02 work of this release (web server, Bluetooth, UDP receive, parsers, hold memory). The library patches, Safeboot, AppLink and the `dev` channel stay fork-only for now.
 - **In the official release `v4.40a.11.14`** (2026-11-14, `upstream/dev` 70ae124d): our PR [#1277](https://github.com/icssw-org/MeshCom-Firmware/pull/1277) with 20 commits. Merged into this tree as `d4384eac`.
   - **Clock and display:** stale `{CET}` beacons, clock line every second, GPS without a fix against NTP, shown time held.
   - **T-Deck:** theme and readable light mode, setup controls, header icons, GPS layout and sky plot, smaller builds.
   - **Boards:** Heltec V4 GNSS, DHT22, T-Deck Pro pins and sky plot.
   - **From others:** DH1FR's T114 pages (#1264 to #1267), INA226 on Heltec (#1272), and the OE1KBC fixes #1274 and #1275 (`BOARD_COUNTRY` default, spectral scan, Info page label). Merged as `f05ead76`, `ac763f66` and `173b1e3c`.
 - **Merged in upstream `dev`, not in an official release:** [#1280](https://github.com/icssw-org/MeshCom-Firmware/pull/1280) (ping, `4cfa2ac2`) and [#1281](https://github.com/icssw-org/MeshCom-Firmware/pull/1281) (web GUI, Pins page, GPIO control, board LED, `45f66dc7`), both by oe1kbc on 2026-11-19; [#1269](https://github.com/icssw-org/MeshCom-Firmware/pull/1269) (APRS-IS weather, Mateusz-Krajewski) on 2026-11-20, merged here as `6731af6c`; our [#1284](https://github.com/icssw-org/MeshCom-Firmware/pull/1284) (W/S hemisphere) on 2026-11-21, synced here as `0110fd3c` with the tree unchanged; our [#1285](https://github.com/icssw-org/MeshCom-Firmware/pull/1285) (`REVIEW.md` only) on 2026-11-21, synced as `29d9d65c`. This release carries all of upstream `dev` as of 2026-11-21.
-- **Not byte-identical:** this release adds the fork-only firmware listed under "New in" to the official `v4.40a.11.14`. The flash stamp in `--info` (`FLASH_VERSION 20261122`, `tag=v4.40a.11.22`) is the distinguishing mark.
+- **Not byte-identical:** this release adds the fork-only firmware listed under "New in" to the official `v4.40a.11.14`. The flash stamp in `--info` (`FLASH_VERSION 20261127`, `tag=v4.40a.11.27`) is the distinguishing mark.
 - **Open upstream:** our [#1286](https://github.com/icssw-org/MeshCom-Firmware/pull/1286) (navigation buttons WEB-NAV-02 and unsigned pong id PONG-SIGN-01, since 2026-11-21). The Ethernet fix ETH-06, the dash commands CMD-DASH-01 and AppLink have no PR yet. The Auto Update downgrade fix (AU-27) goes with the Auto Update wave. The next waves (remote management and mesh, gateway, Auto Update and Safeboot, channel access) follow; RAM-WSP-01 goes with the next web PR.
 - **Earlier official releases:** `v4.40a.10.28` (2026-10-28) with all fork firmware up to `v4.40a.10.25` as one commit ([#1238](https://github.com/icssw-org/MeshCom-Firmware/pull/1238)), `.autoupdate` assets in the official CI ([#1239](https://github.com/icssw-org/MeshCom-Firmware/pull/1239)) and the E290 OTP image ([#1240](https://github.com/icssw-org/MeshCom-Firmware/pull/1240), sp2ong). Before it `v4.40a.spserver` (2026-10-22) with the gateway server table, network mode and RAK4631 static IP ([#1213](https://github.com/icssw-org/MeshCom-Firmware/pull/1213)), T-Deck reply button and web firmware column (#1214), web send buffer (#1224) and the gateway server-link warning fix (#1233).
 - **In the official release `v4.40a.11.07`** (2026-11-08, `upstream/dev` 5d76238b): our PRs [#1247](https://github.com/icssw-org/MeshCom-Firmware/pull/1247) to #1251 (ping target lock, own beacons at priority 2, receive-silence logging, national characters, charge state, UV and wind) and [#1257](https://github.com/icssw-org/MeshCom-Firmware/pull/1257) (mailbox echo), plus OE1KBC's RAK4631 L76K GPS probe (#1259) and the T-Deck Pro / T3 S3 bootloader mapping in `tools/download_meshcom.py` (#1260 to #1262). Merged into this tree as `da76033b`.

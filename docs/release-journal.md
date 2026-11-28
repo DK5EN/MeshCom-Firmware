@@ -1,6 +1,6 @@
 # Release Notes -- MeshCom Firmware v4.40a
 
-Firmware `4.40a`, `FLASH_VERSION 20261125`, `FLASH_STRUCT_VERSION 20260724`
+Firmware `4.40a`, `FLASH_VERSION 20261127`, `FLASH_STRUCT_VERSION 20260724`
 (`src/configuration_global.h`).
 Aeltere Eintraege bis einschliesslich 2026-03-22 stehen im Archiv
 [`docs/archive/release_lora_trx.md`](archive/release_lora_trx.md).
@@ -8,6 +8,44 @@ Dieses Journal ist seit 2026-10-02 hier (`docs/release-journal.md`); das `releas
 Wurzelverzeichnis ist wieder die Datei von upstream und wird nicht angefasst.
 
 ---
+
+## Release v4.40a.11.27 (Samstag, 2026-11-28, Tag datiert auf 2026-11-27)
+
+Getaggt am 2026-11-28 auf `fork-dev` nach dem Go des Betreibers; der Tag trägt auf Wunsch des Betreibers das Datum 2026-11-27. Gebaut wird von GitHub CI (`MeshCom CI`, Tag `v4.40a.11.27`, `MC_BUILD_TAG`, `MC_AU_DEV_CHANNEL`). `FLASH_VERSION` 20261127, `FLASH_STRUCT_VERSION` 20260724 unverändert, die Einstellungen bleiben erhalten. Safeboot unverändert seit `v4.40a.11.20`.
+Basis ist `upstream/dev` `99111908` (#1345, 2026-11-27) mit unseren gemergten PRs #1328 und #1329; upstream hat nichts davon released.
+
+Handlungsbedarf: Skripte, die die Web-API aufrufen, bekommen für fehlerhafte Anfragen jetzt 400, 404, 405, 408 oder 422 statt der Startseite. Ein Knoten hinter einer Portweiterleitung braucht einmal `--webhost <name>`.
+
+Inhalt, neu gegenüber `v4.40a.11.25` (Kampagne FORMAL-02):
+
+- Webserver: ein Anfrage-Parser und eine exakte Routentabelle vor jedem Handler (B1-B7, B10, B11); 404/405 mit `Allow`, 400 für fehlerhafte Anfragezeile und `Content-Length`, 408 bei stockender Anfrage, 422 für `/setparam/` ohne `=`, mit verketteten Befehlen oder Werten über 200 Byte; strenge Zahlen an neun Einstellungen; `tocall` nach Namen (`1b876b95` bis `d9566bb4`, `d528d071`, `d787c11b`, `28eb83bf`).
+- Web-Guard erkennt Ersatz-Bindestriche vor Befehlen (WEB-GUARD-DASH-01, `c22944b2`).
+- Spektrum-Seite scannt nur auf "Scan now", das Funkmodul wird danach wie beim Start eingestellt, RX wieder scharf; Speicherleck der Seite behoben (B8, SPECTRUM-RESTORE-01, WEB-SPECTRUM-LEAK-01, `e4b8bcd6`, `28eb83bf`).
+- Config-Import startet den Knoten aus der Hauptschleife neu (B9, `9b7c7735`).
+- `--webhost` für den Zugriff über einen DynDNS-Namen (#1323, `430b6254`).
+- Gateway: Server-Flag nur, solange der Server antwortet (#1324, upstream #1329, `da6b46ed`).
+- Halten bei Serverausfall: Speicher nur auf Gateways, beim ersten Gateway-Durchlauf vom Heap; -6.136 Byte statisch auf S3 und RAK4631, -1.016 Byte auf klassischem ESP32; T114 und T-Echo ohne Halte-Speicher (`3c341d78`, HOLD-NONET-01 `624569ef`).
+- Ein UDP-Empfang für ESP32 und nRF52; nRF52-Gateways zeigen Server-DMs und Gruppentexte und antworten auf `{pong}` und `{MCP}`; Absturz eines nRF52-Gateways bei `GAT` plus Restbyte behoben (`f4f541d5`, `ac4a7638`).
+- Bluetooth: verlorene Telefon-Frames werden gezählt, Frames einer alten Verbindung verworfen (BLE-QDROP-01, BLE-STALE-01, `f4d66451`); NimBLE F1, F2, F6, F10 (`acc07d31`); Attributwerte mit 300 Byte vorbelegt (F3, `71705b36`).
+- Parser: Telefon-Frames nur bis zur empfangenen Länge, ACK der Länge 0 ignoriert, Einstellungen mit `nan`/`inf` abgelehnt (`3139a4d6`); APRS-Positionen mit Exponent abgelehnt, serielle Zeilen mit Steuerzeichen verworfen, Net-Console-Slot (#1339) (`96cd34be`).
+- Upstream #1345 (OE1KBC): Servereintrag `TT` (Merge `dc9dbc6d`).
+- Ohne Verhaltensänderung: Web-Module aus `web_functions.cpp` herausgelöst (`3657932e`, `168ec015`, `9fbbfccc`, `8025a723`, `55f2d728`, `5cceb18a`), Doku `ddbdfee2`.
+
+### Was für dieses Release auf Hardware geprüft wurde
+
+- 2026-11-27, Web auf DK5EN-14 (T-Deck Plus), DK5EN-92 (T-Beam) und DK5EN-90 (RAK4631): alle Seiten 200 (außer `mailbox` 404 auf dem T-Beam, dort nicht gebaut), unbekannter Pfad und unbekannte Seite 404, POST `/getparam/` 405, Scan ohne `X-MC` 403 (`tools/bench/runs/harness/w10-webcheck-*.summary`).
+- 2026-11-27, Config-Import auf DK5EN-14: Antwort nach 0,27 s, Neustart, Rufzeichen, Frequenz und Sendeleistung unverändert.
+- 2026-11-27, Spektrum auf DK5EN-14: der Scan endet sauber mit "The scan timed out" (422), RX und TX danach in Ordnung.
+- 2026-11-27/28, Dauerlauf 9,4 h auf DK5EN-98 (Produktions-Gateway, Heltec V3), DK5EN-90 (RAK4631, Gateway über Ethernet), -14 und -92: kein Neustart, Halten nie ohne Speicher, Bluetooth mit dem Telefon des Betreibers die ganze Nacht verbunden ohne Fehler, nächtliche Auto-Update-Prüfung auf allen drei ESP32 ohne Speicherfehler, Grüße vom Telefon über DK5EN-98 per BLE, UDP und LoRa, jede DM bestätigt (`tools/bench/runs/harness/w10-soak-20261128.summary`).
+- 2026-11-28, Idle-Heap-Gate auf dem T-Beam DK5EN-92 mit dem lokalen Release-Build dieses Baums (`MC_BUILD_TAG` gesetzt), 2323: 64.076 B frei nach 600 s, Basis 64.016 B, +60 B, bestanden (`tools/bench/runs/harness/heap-idle-v4.40a.11.27.json`). Die rund 57 KB aus dem Dauerlauf kamen von etwa 20 Web-Anfragen direkt nach dem Start (bekannter Effekt TBEAM-HEAP-01), nicht vom Release.
+- 2026-11-28, Host-Gate `tools/regression.sh --stage 1,2` PASS: 4.485 Unity-Fälle in 143 Umgebungen (einer übersprungen), Golden 48, fünf Board-Builds, 1.857 pytest. Der erste Lauf scheiterte an `test_gw_servers` (die Tabelle bekam mit #1345 die Zeile `TT`); Test um die Zeile ergänzt.
+
+### Was ausdrücklich NICHT geprüft wurde
+
+- Spektrum-Scan auf einem Heltec V3 (DK5EN-1 offline); auf dem T-Deck Plus endet kein Scan-Schritt (SPECTRUM-TDECKPLUS-01).
+- `--webhost` über eine echte Portweiterleitung; die 408- und 400-Antworten nur in Host-Tests und im Anfrage-Rig.
+- Ausfall des Servers mit dem neuen Halte-Speicher auf echter Hardware (Halten nur im Host-Test und 2026-11-24 simuliert).
+- Heap des Web-Puffers (2,4 kB) am laufenden Knoten.
 
 ## Release v4.40a.11.25 (Mittwoch, 2026-11-25, vorbereitet am 2026-11-24)
 

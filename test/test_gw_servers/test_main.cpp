@@ -10,8 +10,8 @@
 void setUp(void) {}
 void tearDown(void) {}
 
-static const char *ALL[] = {"OE", "DL", "IT", "HC", "HB", "SP"};
-static const int NALL = 6;
+static const char *ALL[] = {"OE", "DL", "IT", "HC", "HB", "SP", "TT"};
+static const int NALL = 7;
 
 static void eqIp(const uint8_t *exp, const uint8_t *got)
 {
@@ -146,6 +146,7 @@ static void test_table_values_every_cell(void)
     static const uint8_t hcH[4] = {44, 148, 230, 197}, hcN[4] = {44, 148, 224, 123};
     static const uint8_t hbI[4] = {157, 143, 4, 44}, hbH[4] = {44, 142, 42, 59}, hbN[4] = {44, 142, 163, 2};
     static const uint8_t spI[4] = {146, 59, 232, 234};
+    static const uint8_t ttI[4] = {89, 185, 97, 35}, ttH[4] = {44, 143, 8, 141}, ttN[4] = {44, 143, 0, 9};
 
     expectTarget("OE", GW_NET_INET, "meshcom.oevsv.at", oeI, "pool.ntp.org", pool);
     expectTarget("OE", GW_NET_HAMNET, nullptr, oeH, nullptr, oeN);
@@ -159,6 +160,8 @@ static void test_table_values_every_cell(void)
     expectTarget("HB", GW_NET_HAMNET, nullptr, hbH, nullptr, hbN);
     expectTarget("SP", GW_NET_INET, "sp.meshcom.pl", spI, "pool.ntp.org", pool);
     expectTarget("SP", GW_NET_HAMNET, "sp.meshcom.pl", spI, "pool.ntp.org", pool);
+    expectTarget("TT", GW_NET_INET, nullptr, ttI, "pool.ntp.org", pool);
+    expectTarget("TT", GW_NET_HAMNET, nullptr, ttH, nullptr, ttN);
 
     // table structure
     TEST_ASSERT_EQUAL(GWM_VIA, gwFind("DL")->side[GW_NET_HAMNET].mode);
@@ -170,6 +173,8 @@ static void test_table_values_every_cell(void)
     TEST_ASSERT_EQUAL(GWM_DIRECT, gwFind("OE")->side[GW_NET_INET].mode);
     TEST_ASSERT_EQUAL(GWM_DIRECT, gwFind("OE")->side[GW_NET_HAMNET].mode);
     TEST_ASSERT_EQUAL(GWM_DIRECT, gwFind("HB")->side[GW_NET_HAMNET].mode);
+    TEST_ASSERT_EQUAL(GWM_DIRECT, gwFind("TT")->side[GW_NET_INET].mode);
+    TEST_ASSERT_EQUAL(GWM_DIRECT, gwFind("TT")->side[GW_NET_HAMNET].mode);
 }
 
 static void test_ownntp_ipv4_literal(void)
@@ -298,6 +303,7 @@ static void test_resolve_node_end_to_end(void)
     static const uint8_t hcH[4] = {44, 148, 230, 197}, hcN[4] = {44, 148, 224, 123};
     static const uint8_t hbI[4] = {157, 143, 4, 44}, hbH[4] = {44, 142, 42, 59}, hbN[4] = {44, 142, 163, 2};
     static const uint8_t spI[4] = {146, 59, 232, 234};
+    static const uint8_t ttI[4] = {89, 185, 97, 35}, ttH[4] = {44, 143, 8, 141}, ttN[4] = {44, 143, 0, 9};
     const uint8_t ip[4] = {10, 0, 0, 1};
     struct C { const char *code; uint8_t mode; const char *path, *sh; const uint8_t *sip; const char *nh; const uint8_t *nip; };
     const C cs[] = {
@@ -313,6 +319,8 @@ static void test_resolve_node_end_to_end(void)
         {"HB", 1, "hamnet", nullptr, hbH, nullptr, hbN},
         {"SP", 0, "inet", "sp.meshcom.pl", spI, "pool.ntp.org", pool},
         {"SP", 1, "inet", "sp.meshcom.pl", spI, "pool.ntp.org", pool},
+        {"TT", 0, "inet", nullptr, ttI, "pool.ntp.org", pool},
+        {"TT", 1, "hamnet", nullptr, ttH, nullptr, ttN},
     };
     for (const C &c : cs) {
         GwTarget t;
