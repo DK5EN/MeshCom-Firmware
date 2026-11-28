@@ -1,11 +1,22 @@
 # RESUME -- pick up here
 
-**Resume here: campaign FORMAL-02 is done (2026-11-28): waves 1-10 closed, full host gate green on `3a60b512`, wave 10 soak of four nodes 9.4 h without a reboot or failure ([campaign-formal-02-20261127.md](campaign-formal-02-20261127.md), section "Now"). Open from it: TBEAM-IDLEHEAP-01 (measure before the next release), SPECTRUM-TDECKPLUS-01 (V3 comparison), web accumulator heap figure, NIMBLE-PREP-VARIANTS-01. `fork-dev` contains all of `upstream/dev`; no upstream PR open.** Release plan and working checklist: operator's
+**Resume here: released `v4.40a.11.27` (2026-11-28, Latest, 69 assets) on `fork-dev` `fe057645`; web flasher and Pages on 11.27; DK5EN-98, -1, -14, -90, -92 run the release images. Campaign FORMAL-02 is done. Open: SPECTRUM-TDECKPLUS-01 (scan fails on every SX1262 bench board), NIMBLE-PREP-VARIANTS-01, web accumulator heap figure; next upstream PR: the FORMAL-02 firmware. `fork-dev` contains all of `upstream/dev` (#1345); no upstream PR open.** Release plan and working checklist: operator's
 Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).
 
 ## Now (2026-11-28)
+
+- **Released `v4.40a.11.27` (2026-11-28, tag dated 2026-11-27 by the operator, Latest, 69 assets) on `fork-dev` `fe057645`:** FORMAL-02
+  (web server B1-B11 and D14, B8/B9, WEB-GUARD-DASH-01, `--webhost` #1323, #1324, hold memory only on gateways, one UDP receive
+  handler, BLE-QDROP-01/BLE-STALE-01, NimBLE F1/F2/F3/F6/F10, parsers) plus upstream #1345 (`TT` test server, merged `dc9dbc6d`;
+  `test_gw_servers` extended). Gate stage 1,2 PASS (4,485 Unity cases, 1,857 pytest); T-Beam idle heap 64,076 B (+60 B,
+  TBEAM-IDLEHEAP-01 closed: the soak figure came from web requests); all 28 `.autoupdate` re-inflate byte-exact; field-command
+  scan as expected; web flasher on 11.27 only (31 boards, 0 mismatches), Pages synced. Safeboot assets +128/+112 B against 11.25
+  (same size from a local build of the commit; strings unchanged), committed to the repo root. Flashed from the release assets:
+  DK5EN-14, -92, -1 (OTA), DK5EN-90 (DFU), DK5EN-98 (OTA, operator OK; identity checked by hand after the flash because
+  `identity_guard.py` has no fleet entry for -98). After the release: the spectrum scan also times out on DK5EN-1 (Heltec V3).
+  The CI run took about 54 min.
 
 - **FORMAL-02 wave 10 (2026-11-28, campaign done):** web checks on DK5EN-14/-92/-90 and the gateway DK5EN-98 (B1/B2/B8/B9,
   `tools/bench/runs/harness/w10-webcheck-*.summary`), then a 9.4 h soak of all four on `3a60b512`

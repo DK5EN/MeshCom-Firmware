@@ -663,7 +663,7 @@ Since the official `v4.40a.11.14`, unchanged from the previous fork release:
 - **Web checks, 2026-11-27,** on `DK5EN-14`, `DK5EN-92` and `DK5EN-90`: every page 200 (the mailbox page 404 on the T-Beam, where it is not built), unknown path and unknown page 404, POST to `/getparam/` 405, scan without `X-MC` 403. A config import on `DK5EN-14` answered after 0.27 s, rebooted, and kept call, frequency and power.
 - **Spectrum scan, 2026-11-27, `DK5EN-14` (T-Deck Plus):** the scan ends cleanly with "The scan timed out" and RX and TX work afterwards; the chip never finishes a scan step on this board (see "Known gaps").
 - **Production gateway:** `DK5EN-98` runs the image of `3a60b512` since 2026-11-27 (OTA), settings unchanged.
-- **Still pending:** spectrum scan on a Heltec V3 (bench board offline), `--webhost` through a real port forward, a real server outage with the new hold memory, heap of the web request buffer on a running node.
+- **Still pending:** `--webhost` through a real port forward, a real server outage with the new hold memory, heap of the web request buffer on a running node.
 
 <details>
 <summary>Bench results of earlier releases (unchanged code since)</summary>
@@ -846,7 +846,7 @@ Since the official `v4.40a.11.14`, unchanged from the previous fork release:
 
 **New in `v4.40a.11.27`**
 
-- **Spectrum scan on the T-Deck Plus never completes** (SPECTRUM-TDECKPLUS-01): the chip does not finish a scan step, not even with a 10 s limit in a test build. The page reports "The scan timed out" and the radio keeps working. Not tried on a Heltec V3 yet. The console `--spectrum` still takes the radio without the busy check of the web path (SPECTRUM-CONSOLE-01).
+- **The spectrum scan does not complete on our SX1262 boards** (SPECTRUM-TDECKPLUS-01): on the T-Deck Plus and, checked after the release on 2026-11-28, on a Heltec V3 the chip never finishes a scan step, not even with a 10 s limit in a test build. The page reports "The scan timed out" and the radio keeps working. The console `--spectrum` still takes the radio without the busy check of the web path (SPECTRUM-CONSOLE-01).
 - **Web API:** the `400` and `408` answers are checked in host tests and against the recorded request corpus, not with real broken clients. `--webhost` was not tried through a real port forward.
 - **Gateway hold:** a text captured before the first gateway pass after boot, or right after `--gateway on` at runtime, is not held (one loop pass). No real server outage on the bench with the new memory handling.
 - **Bluetooth:** eight board builds that link NimBLE without the common ESP32 settings lack the prepare-write limits of `v4.40a.11.25` (NIMBLE-PREP-VARIANTS-01): T-Deck Pro, the Vision Master E213 and E290 images, Wireless Paper, and two builds that are not shipped. The mobile app cuts texts of 254 bytes or more before sending them (APP-TEXTLEN-01, app issue [#1343](https://github.com/icssw-org/MeshCom-Firmware/issues/1343)); the firmware is not involved.
