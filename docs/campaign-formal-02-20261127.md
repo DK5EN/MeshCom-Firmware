@@ -3,12 +3,13 @@
 Resume point of the campaign. Current state, next wave and open questions only; finished waves move to the
 archive section at the end with one line each.
 
-## Now (2026-11-27, resume here)
+## Now (2026-11-28, campaign done)
 
-**State:** waves 1-9 committed and pushed on `fork-dev` (2026-11-28, `64e02c90`). Full host gate green on `3a60b512` (143 envs, 4,484 ok, 0
-failed, 1 skipped; pytest 1,857). Wave 10 bench part 1 done 2026-11-27 (below); an 18 h soak runs on rpizero (DK5EN-98,
--14, -92) and on the Mac (DK5EN-90, USB) until 2026-11-28 18:00. **Resume (about 08:00):** evaluate the soak (below), then close
-wave 10. DK5EN-1 is offline: the V3 scan comparison stays open.
+**State:** all ten waves done; waves 1-9 committed and pushed on `fork-dev`. Full host gate green on `3a60b512` (143 envs,
+4,484 ok, 0 failed, 1 skipped; pytest 1,857); no source, test or build file changed after it, so it stands as the
+end-of-campaign gate. Wave 10 (large bench test) closed 2026-11-28 with a 9.4 h soak of four nodes: no reboot, no failure
+(result below). Still open from wave 10: V3 scan comparison (DK5EN-1 offline, SPECTRUM-TDECKPLUS-01), web accumulator heap
+figure, T-Beam idle heap (TBEAM-IDLEHEAP-01). Next work: BACKLOG.
 
 - **Wave 8 result:** step 9 moves 9b `3657932e` (`src/nrf52/eth_mss.cpp`), 9c `168ec015` (`mcRandomFill`), 9d `9fbbfccc`
   (`pin_board.cpp`), 9e `8025a723` (`src/esp32/au_web.cpp`), 9f `55f2d728` (mbox in `webFunctionCall`), 9g `5cceb18a`
@@ -40,17 +41,25 @@ wave 10. DK5EN-1 is offline: the V3 scan comparison stays open.
   - BLE with F3: the operator's phone (McMap) is connected to DK5EN-98 for the whole soak, next to the gateway UDP
     traffic (`...BLE: con=1`, MTU 255, at logger start).
   - Not done: web accumulator heap figure, V3 scan comparison (DK5EN-1 offline).
-- **Soak (resume here, 2026-11-28 about 08:00 on the operator's word; loggers keep running to 18:00, read their files, do
-  not open the consoles):** also check the overnight AU check on every ESP32 node (`AU` lines: check time, result, heap and
-  largest block around the TLS session, no reboot) and the operator's morning greetings sent from the phone via DK5EN-98
-  (BLE in, LoRa out, gateway UDP to the server). `rpizero.local:~/meshlog/dk5en-98-formal02w10-20261127/` and
-  `dk5en-14-formal02w10-20261127/`, `dk5en-92-formal02w10-20261127/` (meshlogger in screens `w10-98`, `w10-14`,
-  `w10-92`; `status.txt` shows running/finished); DK5EN-90 has no net console: USB serial capture on the Mac, screen
-  `w10-90`, `tools/bench/runs/harness/w10-soak-dk5en90.log` (raw, gitignored). T-Beam: compare the idle STAT heap
-  against `tools/heap_baseline.json` (board ttgo_tbeam).
-  Check: no reboot (banner/`BOOT RESET_REASON` once), DK5EN-98 `[GW];hold` never `alloc;failed`, gateway traffic all
-  night (`[EXT] Out` / `GWI`), DK5EN-98 `--info` after the logger ends: `BLE: con=1 dis=0` still (no drop overnight),
-  the `...BLE :` counters (tx/r/d/t/e) without errors, heap trend flat (STAT/`[INSTR-HEAP]` on DK5EN-14), no `spectrum re-init failed`.
+- **Soak result (2026-11-27 23:47 to 2026-11-28 09:10, about 9.4 h, `tools/bench/runs/harness/w10-soak-20261128.summary`):**
+  - No reboot on any of the four nodes (STAT uptime monotonic, logger reconnects 0, DK5EN-98 uptime 9.4 h at the end), no
+    crash or watchdog output, no `spectrum re-init failed`, txfail 0, ring drops 0.
+  - DK5EN-98 (gateway): no `[GW];hold` line all night (no `alloc;failed`); at the end `hold;state;ok;cap;6144`,
+    pushed 6 / released 6, 0 outages; 32-52 `[EXT] Out` per hour all night, UDP tx_fail 0. Heap flat (STAT 96.0-100.7 kB);
+    `--info` at the end free 97,284 / min 20,848 / blk 55,284.
+  - BLE with F3 on DK5EN-98 (operator's phone all night): `BLE: con=1 dis=0`, `tx s973 ... e0 mtu255`, no drop, no error.
+  - Operator's greetings from the phone via DK5EN-98 (09:06-09:09): one to `*`, four DMs; each went BLE in, UDP to the
+    server at once, LoRa out (heard by DK5EN-14, -92, -90); all four DMs acknowledged over UDP within 0.9-1.6 s.
+  - Overnight AU check, one per node, `alloc;end;fails;0`, no reboot: DK5EN-98 00:25 (11.25, not newer: already
+    installed); DK5EN-92 00:02 (prod 11.22, not newer; BLE paused at heap 74,364 / blk 36,852 and resumed); DK5EN-14 23:54
+    (TLS in PSRAM; internal low 36,616, largest internal block 40,948 before, 32,756 after and flat to the end; 11.25
+    newer on this undated local build, notify only).
+  - DK5EN-14 internal heap 63.9 kB at midnight to 56.3 kB at the end, falling with the chat UI (6 tabs, 32 messages);
+    `afail` 0. DK5EN-90 heap constant 80,752 B, Ethernet up all night.
+  - T-Beam (DK5EN-92) STAT heap about 56.8 kB, about 7 kB below the v4.40a.11.25 release gate (64,440 B) and beyond the
+    3,072 B tolerance; the soak setup differs from the gate (txcapture and loradebug on, gateway off), so it is not
+    attributed. Wave 9 is not the cause there (no gateway: the hold store is never allocated; static RAM -1,016 B).
+    BACKLOG TBEAM-IDLEHEAP-01: measure with `heap_idle.py` on `3a60b512` and `9586d82d` under the gate's settings.
 - **Wave 9 result (operator scope 2026-11-27: hold store + F3 on all ESP32):** UDP outage hold store on the heap,
   `udpHoldEnsure()` first on every gateway-on pass (ESP32 ahead of the IP check, nRF52 first in `if(bGATEWAY)`), kept
   until reboot, failed allocation off + logged once + retried every 60 s, `enabled` published release/acquire
@@ -183,17 +192,17 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 
 ## Waves
 
-| Wave | Content                                                                                                                                                                                                         | State   |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| 1    | Seams: `handleACK` core, `readPhoneCommand` with explicit length, settings round trip + migration; UDP twin analysis, web_functions map                                                                         | done    |
-| 1b   | UDP receive consolidated into `src/udp_frame.cpp` (part 1 `f4f541d5`; part 2 applies operator decisions D1/D2/D3/D5)                                                                                            | done    |
-| 2    | Bounded proofs: ACK core, phone frame (`ce013112`), UDP parse core (`5b692faa`); differential strips tightened                                                                                                  | done    |
-| 3    | BLE host task vs main loop model `specs/tla/bletask.tla`; fixed BLE-QDROP-01 and BLE-STALE-01 (wave 3b)                                                                                                         | done    |
-| 4    | 4a NimBLE fixes F1/F2/F6/F10 + `nimble_attvalue` (`acc07d31`); web server: analysis, B1-B10 accepted, corpus captured, wave A steps 0-2 (`28eb83bf`, `1a6c3c63`); `nimble_gatts_write` 7 of 7 (`d8aa2576`)      | done    |
-| 5    | Mesh model `specs/tla/meshrelay.tla` (asymmetric nodes, co-located pair, dedup, ACK TTL): today fails DeafNotFirst/RedundantRelayBound, candidate rule holds (`4f6ab492`); firmware rule waits for the operator | done    |
-| 6    | Web step 3: head parser `web_request.h`, `work_webpage` on it, rig live entry (`d528d071`, `d787c11b`); proofs `web_request` 27, `nimble_att_write` 3 (13 parked over 15 GB)                                    | done    |
-| 7-9  | Web waves B and C, heap for F3 (see "Next waves" under Now)                                                                                                                                                     | done    |
-| 10   | Large bench test                                                                                                                                                                                                | planned |
+| Wave | Content                                                                                                                                                                                                         | State |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| 1    | Seams: `handleACK` core, `readPhoneCommand` with explicit length, settings round trip + migration; UDP twin analysis, web_functions map                                                                         | done  |
+| 1b   | UDP receive consolidated into `src/udp_frame.cpp` (part 1 `f4f541d5`; part 2 applies operator decisions D1/D2/D3/D5)                                                                                            | done  |
+| 2    | Bounded proofs: ACK core, phone frame (`ce013112`), UDP parse core (`5b692faa`); differential strips tightened                                                                                                  | done  |
+| 3    | BLE host task vs main loop model `specs/tla/bletask.tla`; fixed BLE-QDROP-01 and BLE-STALE-01 (wave 3b)                                                                                                         | done  |
+| 4    | 4a NimBLE fixes F1/F2/F6/F10 + `nimble_attvalue` (`acc07d31`); web server: analysis, B1-B10 accepted, corpus captured, wave A steps 0-2 (`28eb83bf`, `1a6c3c63`); `nimble_gatts_write` 7 of 7 (`d8aa2576`)      | done  |
+| 5    | Mesh model `specs/tla/meshrelay.tla` (asymmetric nodes, co-located pair, dedup, ACK TTL): today fails DeafNotFirst/RedundantRelayBound, candidate rule holds (`4f6ab492`); firmware rule waits for the operator | done  |
+| 6    | Web step 3: head parser `web_request.h`, `work_webpage` on it, rig live entry (`d528d071`, `d787c11b`); proofs `web_request` 27, `nimble_att_write` 3 (13 parked over 15 GB)                                    | done  |
+| 7-9  | Web waves B and C, heap for F3 (see "Next waves" under Now)                                                                                                                                                     | done  |
+| 10   | Large bench test: web checks on four boards, B8/B9, wave 9 on the gateway, 9.4 h soak with BLE, AU check and greetings                                                                                          | done  |
 
 ## Wave 5 input: asymmetric nodes (operator 2026-11-27)
 
@@ -314,6 +323,7 @@ accepted (operator 2026-11-27); each B change gets its own commit and a counted 
 
 ## Archive
 
+- Wave 10 (2026-11-28): large bench test and 9.4 h soak of DK5EN-98/-14/-92/-90 on `3a60b512`, no reboot or failure; campaign done; details under Now.
 - Wave 9 (2026-11-27, `3c341d78`, `71705b36`): hold store on the heap for gateways only, NimBLE F3; details under Now.
 - Wave 8 (2026-11-27, `ddbdfee2`): web wave C steps 9 and 11 (relocations, B8 scan on request, B9 reboot from the loop); step 10 deferred; details under Now.
 - Wave 7b end (2026-11-27, `d9566bb4`): `webRouteLegacy`, the disagreement counter, the unparsed no-session gate rules and

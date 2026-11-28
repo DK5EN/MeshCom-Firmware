@@ -1,0 +1,45 @@
+FORMAL-02 wave 10 soak, 2026-11-27 23:47 .. 2026-11-28 09:10 (about 9.4 h), firmware 3a60b512
+loggers: meshlogger on rpizero (net console 2323) for DK5EN-98/-14/-92, serial_capture on the Mac (USB) for DK5EN-90
+logger end: stopped by signal at 09:10, reconnects=0, dropped=0 on all three net loggers; raw logs not committed
+
+node      board            reboots  STAT lines  STAT heap min..max (first -> last)        err  txfail  drop
+DK5EN-98  heltec V3 (GW)   0        108         96,044..100,660 (100,660 -> 100,096)        0*   0       0/0/0/0/0
+DK5EN-14  T-Deck Plus INS  0        108         52,372..64,332  (61,388 -> 52,372)          0    0       0/0/0/0/0
+DK5EN-92  T-Beam v1.2      0        107         53,760..57,604  (57,604 -> 56,808)          0    0       0/0/0/0/0
+DK5EN-90  RAK4631          0        107         80,752..80,752                              0    0       0/0/0/0/0
+(* err=1 in 5 of 108 STAT windows (23:50, 00:50, 02:00, 03:35, 06:00) = the 5 LoRa CRC errors below)
+reboots: STAT up= monotonic on all four, no banner/RESET_REASON after the logger's own --info, no Guru/Backtrace/wdt;
+DK5EN-98 --info at 09:11: TIME 33,917,134 ms (booted 2026-11-27 23:45)
+
+DK5EN-98 gateway
+  [GW];hold lines during the soak: none (no alloc;failed)
+  --udpstat 09:11: [GW];hold;state;ok;held;0;bytes;0;cap;6144;pushed;6;released;6;replayed;0;drop_full;0;drop_age;0;refused;0;outages;0
+  UDP: rx 1263 tx 1304 tx_fail 0; server connected (last rx 11 s)
+  [EXT] Out per hour 00..08: 41 52 42 52 39 32 52 46 48 (417 total)
+  --info 09:11: HEAP free 97,284 min 20,848 blk 55,284 (boot: 97,680 / 81,156 / 86,004)
+  BLE (operator's phone, McMap, all night): BLE: con=1 dis=0 to=0 rem=0 loc=0 fail=0 adv=0; BLE : short tx s973 r0 d0 t0 e0 mtu255
+
+DK5EN-14 heap ([INSTR-HEAP], internal RAM)
+  ifree 64,800 (23:47) -> 63,880 (00:17) -> 63,120 (04:47) -> 56,276 (08:47); falls with the chat UI: tabs 1 -> 6, tabmsgs 1 -> 32
+  iblk 53,236 at start, 40,948 before the AU check, 32,756 after it and flat to the end; imin 36,616 since the AU check
+  afail 0 throughout; PSRAM free 4.84..4.87 MB
+
+Overnight AU check (one per node, no reboot, alloc;end;fails;0 on all)
+  DK5EN-14 23:54 (dev): tlsalloc psram; internal free 50,372 at start, peak low 39,872, imin 36,616, iblk 40,948 -> 32,756;
+           check tag v4.40a.11.25 newer 1 (undated local build, 11.25 never installed here, AU-27), notify only
+  DK5EN-92 00:02 (prod): ble pause heap 74,364 blk 36,852; check tag v4.40a.11.22 newer 0; ble resume ok
+  DK5EN-98 00:25 (dev): buf32 ok; check tag v4.40a.11.25 newer 0 (last installed = 11.25)
+
+Operator greetings via DK5EN-98 (phone over BLE), 2026-11-28 09:06..09:09, all NEW-TXT src=user_msg
+  1AE1E296 to *         : EXT Out + TX-UDP at once, LoRa TX after 1.7 s; heard by DK5EN-14 (-38 dBm), -92 (-48), -90 (-49);
+                           DK5EN-90 also got it from the server (GWI) and relayed it (src=g)
+  1AE1E297 !wx  to OE5HWN-12: UDP + LoRa; ack663 back over UDP after 1.1 s, reply received
+  1AE1E299 !stats to OE5HWN-12: UDP + LoRa; ack665 after 0.9 s, reply received
+  1AE1E29B 150 B DM to OE5HWN-12: UDP + LoRa; ack667 after 1.0 s
+  1AE1E29C DM to DJ8MEH-8: UDP + LoRa; ack668 after 1.6 s (checkOwnTx, [UDP-MSGID] ACK)
+
+Not seen: spectrum re-init failed, hold alloc;failed, BLE errors. Other: DK5EN-98 5 and DK5EN-92 1 LoRa CRC errors (RX restarted).
+
+T-Beam idle heap: STAT heap about 56.8 KB vs tools/heap_baseline.json ttgo_tbeam 64,016 (2026-11-06) and 64,440 at the
+v4.40a.11.25 release gate: about 7 KB lower, beyond the 3,072 B tolerance. Soak setup differs from the gate (txcapture and
+loradebug on, gateway off); not measured with heap_idle.py. BACKLOG TBEAM-IDLEHEAP-01.

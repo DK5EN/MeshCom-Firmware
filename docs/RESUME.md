@@ -1,11 +1,19 @@
 # RESUME -- pick up here
 
-**Resume here: campaign FORMAL-02, wave 10: evaluate the 18 h soak (rpizero: DK5EN-98/-14/-92; Mac USB: DK5EN-90; 2026-11-28 about 08:00, incl. overnight AU check), bench part 1 done; waves 1-9 committed, full host gate green. Start a fresh session with `/orchestrate-waves` on [campaign-formal-02-20261127.md](campaign-formal-02-20261127.md), section "Now" (state, dispatch plan for wave 10, run rules). Waves 6 to 9 are committed and pushed on `fork-dev`; `fork-dev` contains all of `upstream/dev`; no upstream PR open.** Release plan and working checklist: operator's
+**Resume here: campaign FORMAL-02 is done (2026-11-28): waves 1-10 closed, full host gate green on `3a60b512`, wave 10 soak of four nodes 9.4 h without a reboot or failure ([campaign-formal-02-20261127.md](campaign-formal-02-20261127.md), section "Now"). Open from it: TBEAM-IDLEHEAP-01 (measure before the next release), SPECTRUM-TDECKPLUS-01 (V3 comparison), web accumulator heap figure, NIMBLE-PREP-VARIANTS-01. `fork-dev` contains all of `upstream/dev`; no upstream PR open.** Release plan and working checklist: operator's
 Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).
 
-## Now (2026-11-27)
+## Now (2026-11-28)
+
+- **FORMAL-02 wave 10 (2026-11-28, campaign done):** web checks on DK5EN-14/-92/-90 and the gateway DK5EN-98 (B1/B2/B8/B9,
+  `tools/bench/runs/harness/w10-webcheck-*.summary`), then a 9.4 h soak of all four on `3a60b512`
+  (`tools/bench/runs/harness/w10-soak-20261128.summary`): no reboot, gateway hold never failed, BLE with F3 connected all
+  night (`con=1 dis=0`, no errors), overnight AU check on the three ESP32 nodes without an allocation failure, the
+  operator's greetings from the phone went BLE -> UDP + LoRa with every DM acknowledged. Found: T-Beam STAT heap about
+  7 kB below the 11.25 release gate (TBEAM-IDLEHEAP-01, not yet a gate measurement); T-Deck Plus scan never completes
+  (SPECTRUM-TDECKPLUS-01).
 
 - **FORMAL-02 wave 9 (2026-11-27):** the gateway outage hold store moved to the heap, allocated only on the first
   gateway pass (`3c341d78`): static RAM -6,136 B on S3 boards and RAK4631, -1,016 B on classic ESP32. NimBLE F3
