@@ -7,6 +7,13 @@ Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 
 ## Now (2026-11-28)
 
+- **Fixes for upstream #1327 and #1341 on `fork-dev` (2026-11-28), for the next upstream PR:** with GPS on but no position the
+  position interval falls back to `--postime` (`src/gps_interval.h`, ESP32 one site, nRF52 two sites; before: always 1800 s).
+  Deep sleep wake pin gets the pull-up also with `--button off` (SLEEP-PULLUP-01). Tests `native_gps_interval`,
+  `native_sleep_wake_pull` (source pins red before). Bench DK5EN-1: release image `--postime 300 --gps on` -> RATE 1800,
+  fixed build -> RATE 300; deep sleep with button off stayed asleep 60 s, PRG woke it. Gate `--changed` PASS (4,495 cases).
+  DK5EN-1 runs this local build (settings restored); its AU channel is `prod`.
+
 - **Released `v4.40a.11.28` (2026-11-28, Latest, 69 assets) on `fork-dev` `431342f0`:** `v4.40a.11.27` plus the spectrum scan fix
   (SPECTRUM-TDECKPLUS-01, `62a9d5eb`), `FLASH_VERSION` 20261128. Gate stage 1,2 PASS (4,486 Unity cases); T-Beam idle heap 63,256 B (-760 B,
   within the 3,072 B tolerance). CI run about 69 min; 69 assets, names as 11.27, 28 `.autoupdate` re-inflate byte-exact, tag string and
