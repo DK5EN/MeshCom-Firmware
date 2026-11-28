@@ -1,6 +1,6 @@
 # RESUME -- pick up here
 
-**Resume here: released `v4.40a.11.28` (2026-11-28, Latest, 69 assets) on `fork-dev` `431342f0`: 11.27 plus the spectrum scan fix. Web flasher and Pages on 11.28. DK5EN-14 runs the 11.28 release image (Auto Update from the web GUI), DK5EN-92 a local 11.28 build, DK5EN-1 a local build of the scan fix, DK5EN-98 and -90 the 11.27 release images. Campaign FORMAL-02 is done. Open: NIMBLE-PREP-VARIANTS-01, web accumulator heap figure; next upstream PR: the FORMAL-02 firmware. `fork-dev` contains all of `upstream/dev` (#1345); no upstream PR open.** Release plan and working checklist: operator's
+**Resume here: released `v4.40a.11.28` (2026-11-28, Latest, 69 assets) on `fork-dev` `431342f0`: 11.27 plus the spectrum scan fix. Web flasher and Pages on 11.28. All five nodes run the 11.28 release images (2026-11-28): DK5EN-14 by Auto Update from the web GUI, DK5EN-1, -92 and the gateway DK5EN-98 (operator OK) by OTA, DK5EN-90 by DFU; `tag=v4.40a.11.28` read back on every ESP32, DK5EN-98 gateway on and connected to the server after the flash. Campaign FORMAL-02 is done. Open: NIMBLE-PREP-VARIANTS-01, web accumulator heap figure; next upstream PR: the FORMAL-02 firmware. `fork-dev` contains all of `upstream/dev` (#1345); no upstream PR open.** Release plan and working checklist: operator's
 Desktop `upstream-releaseplan-20261125.html` (Fassung 13). Active campaigns:
 [campaign-ota-lowheap-01-20261122.md](campaign-ota-lowheap-01-20261122.md),
 [campaign-release-train-20261115.md](campaign-release-train-20261115.md) (waves).
